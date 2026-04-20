@@ -55,7 +55,7 @@ export async function expandAudience(
         .from("season_participants")
         .select("player:players(user_id), season:seasons(status)")
         .is("deleted_at", null);
-      for (const r of (data ?? []) as {
+      for (const r of (data ?? []) as unknown as {
         player: { user_id: string | null } | null;
         season: { status: string } | null;
       }[]) {
