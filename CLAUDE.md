@@ -44,7 +44,9 @@ Four values in `user_roles.role`: `admin`, `moderator`, `player`. Unauthenticate
 
 ## Workflow
 
-Per parent `CLAUDE.md`, non-trivial work uses this cadence:
+The parent `CLAUDE.md` at `C:\Users\Sweez\Desktop\LAYO\CLAUDE\CLAUDE.md` is **load-bearing and non-negotiable**. Read it at session start.
+
+Non-trivial work uses this cadence (from parent):
 
 1. **Plan first.** Write plan to `tasks/todo.md` with checkable items. Validate scope with the user before coding.
 2. **Track progress.** Mark items complete as you go; summarize each step at a high level.
@@ -53,6 +55,28 @@ Per parent `CLAUDE.md`, non-trivial work uses this cadence:
 5. **Verify before claiming done.** Run tests, demonstrate the success-criteria scenarios in §1 of the Phase 1A spec.
 
 For implementation plans derived from an approved spec, invoke the `superpowers:writing-plans` skill. For new features outside the current spec, invoke `superpowers:brainstorming` first.
+
+## Verification discipline (mandatory before claiming a plan complete)
+
+Parent CLAUDE.md §4 says "Never mark a task complete without proving it works." In practice that means before saying "Plan N is done":
+
+1. `npm run test` — all unit tests pass.
+2. `npm run lint` — clean.
+3. `npm run build` — clean production build.
+4. `npm --workspace apps/web run e2e` — every E2E spec passes.
+5. At least one success-criteria scenario from the plan's own "Acceptance Criteria" section demonstrated end-to-end (manual or scripted).
+
+If verification fails, the plan is NOT complete. Fix or raise it with the user. Do not publish a "complete" status with caveats.
+
+**When parallel agents are churning files:** their in-flight commits may break local builds. Don't declare a plan complete during the churn. Checkpoint (commit my own work), pause verification, wait for agents to finish, then do a single clean verification pass before claiming the wave complete.
+
+## Testing strategy
+
+- **Unit tests (Vitest)** live next to the code they test: `foo.ts` + `foo.test.ts` in the same folder. Mock the Supabase client when a function takes one as a parameter — never hit the real DB from unit tests.
+- **E2E (Playwright)** lives in `apps/web/tests/e2e/`. E2E hits the real cloud DB via the dev server. Tests must be self-cleaning (or self-tolerating — they rely on existing seed users, create named-throwaway rows, etc).
+- **Migrations** are verified with `npx supabase db query` against the linked project after `db:push`. Verify the schema matches expectations (column list, check constraints, trigger attachment).
+- **Audit trigger** has a dedicated smoke test at `supabase/tests/audit_smoke.sql`, runnable via `npm run audit:smoke`.
+- **Do NOT skip unit tests** for server modules just because E2E covers the flow. Unit tests catch regressions 10× faster than E2E.
 
 ## Seed Data
 
