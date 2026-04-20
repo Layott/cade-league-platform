@@ -1,29 +1,29 @@
 # Tasks — Active Work
 
-Active plan: Plan 6 — Announcements + Notifications (in progress)
+Active plan: Plan 6 complete — awaiting next (Plan 7 landing page or phase wrap).
 
 Update this file as work progresses per parent CLAUDE.md workflow.
 
-## In Progress — Plan 6
+## In Progress — Plan 6 (all complete)
 
-- [ ] 1. Migration: announcements table
-- [ ] 2. Migration: notifications table
-- [ ] 3. Install marked + isomorphic-dompurify
-- [ ] 4. Markdown render helper (TDD)
-- [ ] 5. Audience expansion helper (TDD)
-- [ ] 6. Server module skeleton (create/schedulePublish/publishNow/listForUser/markRead)
-- [ ] 7. publishNow TDD tests
-- [ ] 8. listForUser + markRead tests
-- [ ] 9. Cron route handler (X-Cron-Secret gated)
-- [ ] 10. Admin list page
-- [ ] 11. Admin compose page + actions
-- [ ] 12. Admin detail page
-- [ ] 13. Public /announcements (ISR 60s)
-- [ ] 14. Bell unread count in admin layout
-- [ ] 15. POST /api/notifications/[id]/read
-- [ ] 16. E2E spec
-- [ ] 17. .env.example CRON_SECRET
-- [ ] 18. Final verification
+- [x] 1. Migration: announcements table
+- [x] 2. Migration: notifications table
+- [x] 3. Install marked + isomorphic-dompurify
+- [x] 4. Markdown render helper (TDD, 5 tests)
+- [x] 5. Audience expansion helper (TDD, 5 tests)
+- [x] 6. Server module skeleton (create/schedulePublish/publishNow/listForUser/markRead)
+- [x] 7. publishNow TDD tests (3 tests)
+- [x] 8. listForUser + markRead tests (2 tests)
+- [x] 9. Cron route handler (X-Cron-Secret gated)
+- [x] 10. Admin list page
+- [x] 11. Admin compose page + actions
+- [x] 12. Admin detail page
+- [x] 13. Public /announcements (ISR 60s)
+- [x] 14. Bell unread count in admin layout
+- [x] 15. POST /api/notifications/[id]/read
+- [x] 16. E2E spec (3 tests; 2 active, 1 skip when CRON_SECRET unset)
+- [x] 17. .env.example CRON_SECRET (already present from prior session)
+- [x] 18. Final verification (test/lint/build green; audit events confirmed)
 
 ## Done
 - Spec: `docs/superpowers/specs/2026-04-20-phase-1a-design.md`

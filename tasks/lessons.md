@@ -51,3 +51,19 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Typed `searchParams` as a plain object `{ error?: string }`. Next.js 15 passes `searchParams` as a `Promise<...>` in async Server Components.
 **Correction:** Type it as `Promise<{...}>` and `await searchParams` at top of the component.
 **Rule for future:** In Next.js 15, both `params` and `searchParams` are Promises in async Server Components. Always await them.
+
+---
+
+**Date:** 2026-04-26
+**Context:** Plan 6 — adding `isomorphic-dompurify` for markdown sanitization; `next build` failed with `ENOENT: default-stylesheet.css` during "Collecting page data" for every route that transitively imported DOMPurify.
+**Mistake:** Assumed any npm package could be bundled by webpack. `isomorphic-dompurify` pulls in `jsdom`, which loads its own `default-stylesheet.css` asset from `node_modules/jsdom/lib/jsdom/browser/` at runtime. When Next bundles jsdom into `.next/server/chunks/*`, the CSS asset path no longer resolves.
+**Correction:** Add `serverExternalPackages: ["isomorphic-dompurify", "jsdom"]` to `next.config.ts` so these packages stay in `node_modules` at runtime instead of being bundled.
+**Rule for future:** Any server-side dependency that ships non-JS assets (CSS, WASM, data files) it loads at runtime needs to go in `serverExternalPackages`. When `next build` fails with ENOENT on a file inside a package's own tree, this is the first thing to check.
+
+---
+
+**Date:** 2026-04-26
+**Context:** Plan 6 — writing Supabase table join mocks for `expandAudience` tests; then typechecking the real implementation.
+**Mistake:** Used `as { ... }[]` direct cast on Supabase `.select("a:table(col)")` results. TypeScript infers the join as `{ a: { col: any }[] }[]` (array), so a cast to `{ a: { col: string } | null }[]` (object) fails with TS2352 "neither type sufficiently overlaps".
+**Correction:** Go through `unknown` first: `as unknown as { a: { col: string } | null }[]`. The supabase-js types don't currently express "to-one" vs "to-many" joins.
+**Rule for future:** For Supabase join result casts, use `as unknown as <shape>` rather than direct `as <shape>` — the inferred types assume many-side unless a typed client/codegen says otherwise.
