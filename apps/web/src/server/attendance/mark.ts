@@ -33,7 +33,12 @@ async function doMark(
   // Africa/Lagos is UTC+1 year-round (no DST), so we can form the timestamptz directly.
   const scheduledCall = new Date(`${md.match_date}T${md.arrival_cutoff_time}+01:00`);
   const markedAt = new Date();
-  const deltaSeconds = Math.round((markedAt.getTime() - scheduledCall.getTime()) / 1000);
+  // Clamp delta to 32-bit int range. Plan 5 stores delta_seconds as int; values
+  // outside that range only happen for test-fixture dates far in the future/past
+  // but we defensively cap to avoid any possible overflow.
+  const INT32_MAX = 2_147_483_647;
+  const rawDelta = Math.round((markedAt.getTime() - scheduledCall.getTime()) / 1000);
+  const deltaSeconds = Math.max(-INT32_MAX, Math.min(INT32_MAX, rawDelta));
 
   // 2. Refuse if already marked — caller must use editMark.
   const { data: existing } = await sb
