@@ -1,8 +1,20 @@
 # Tasks — Active Work
 
-Active plan: Plan 6 complete — awaiting next (Plan 7 landing page or phase wrap).
+Active plan: Plan 5 complete (2026-04-20). Plan 6 complete. Plan 7A landed in parallel.
 
 Update this file as work progresses per parent CLAUDE.md workflow.
+
+## Done
+
+- Plan 5 — Attendance complete (2026-04-20). All 11 tasks green.
+  - attendance_marks migration applied with UNIQUE (match_day_id, player_id) + audit
+  - markPresent/Late/Absent + editMark implemented with revoke/re-apply penalty flow
+  - /admin/match-days/[id]/attendance roster UI shipped with Edit + Undo
+  - 16 new unit tests green + 2 E2E specs green (full suite 85 unit pass, 21/22 e2e pass)
+  - Public /players/[id] attendance % deferred (not in scope of this plan)
+  - Migration filename used `20260427` (not `20260425`) because Plan 6's `20260426` was already in the cloud and the Supabase CLI `--include-all` flag was blocked by the sandbox.
+  - `delta_seconds` clamped to int32 range in `mark.ts` (defensive cap; column is `int`).
+  - One pre-existing E2E (`match-day-flow.spec.ts`) failure unrelated to Plan 5 — Plan 7A renamed the /standings heading from "Standings" to "League Table" and the old assertion was never updated. All 2 attendance specs pass.
 
 ## In Progress — Plan 6 (all complete)
 
