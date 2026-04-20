@@ -30,7 +30,7 @@ export const PUBLIC_PERMS: readonly string[] = [
   "punishments.read.public",
 ];
 
-type Actor = { roles: readonly string[] };
+export type Actor = { userId: string | null; roles: readonly string[] };
 
 function matchesPerm(rule: string, action: string): boolean {
   if (rule === "*") return true;
