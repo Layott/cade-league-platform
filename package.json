@@ -14,7 +14,9 @@
     "e2e": "npm --workspace apps/web run e2e",
     "db:push": "supabase db push",
     "db:query": "supabase db query --linked",
-    "audit:smoke": "bash scripts/audit-smoke.sh"
+    "audit:smoke": "bash scripts/audit-smoke.sh",
+    "seed:user": "bash scripts/create-auth-user.sh",
+    "backup": "bash scripts/backup.sh"
   },
   "engines": {
     "node": ">=20"
