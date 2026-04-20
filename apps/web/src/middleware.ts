@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+
+const ADMIN_ROLES = new Set(["admin", "moderator"]);
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (!pathname.startsWith("/admin")) return NextResponse.next();
+
+  const res = NextResponse.next();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookies) {
+          cookies.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  const { data: pub } = await supabase
+    .from("users")
+    .select("id")
+    .eq("supabase_auth_id", user.id)
+    .single();
+  if (!pub) return NextResponse.redirect(new URL("/login", req.url));
+
+  const { data: rolesRows } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", pub.id)
+    .is("deleted_at", null);
+  const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
+
+  const allowed = roles.some((r) => ADMIN_ROLES.has(r));
+  if (!allowed) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  return res;
+}
+
+export const config = {
+  matcher: ["/admin/:path*"],
+};
