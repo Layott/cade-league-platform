@@ -2,7 +2,9 @@
   "name": "cade-league-platform",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/web run build",
@@ -10,12 +12,14 @@
     "lint": "npm --workspace apps/web run lint",
     "test": "npm --workspace apps/web run test",
     "e2e": "npm --workspace apps/web run e2e",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "supabase:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:query": "supabase db query --linked",
     "audit:smoke": "bash scripts/audit-smoke.sh"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "supabase": "^2.93.0"
   }
 }
