@@ -6,7 +6,7 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "announcements.*",
     "punishments.issue",
     "punishments.edit",
-    "punishments.revoke",
+    "punishments.read",
     "attendance.mark",
     "attendance.edit",
     "matches.read",
