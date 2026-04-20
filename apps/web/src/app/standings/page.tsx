@@ -1,65 +1,68 @@
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listStandings } from "@/server/standings/read";
+import { getActiveSeason } from "@/server/seasons";
+import { PageHeader } from "@/components/public/PageHeader";
+import { StandingsTable } from "@/components/public/StandingsTable";
+import { EmptyState } from "@/components/public/EmptyState";
 
-export const revalidate = 60; // ISR: 60s
+export const revalidate = 60;
+
+export const metadata = { title: "Standings" };
 
 export default async function StandingsPage() {
   const sb = await getServerSupabase();
-  const { data: season } = await sb
-    .from("seasons")
-    .select("id, year_range")
-    .eq("status", "active")
-    .is("deleted_at", null)
-    .maybeSingle();
+  const season = await getActiveSeason(sb);
+  const rows = season ? await listStandings(sb, season.id) : [];
 
-  if (!season) {
-    return (
-      <main className="p-8">
-        <p>No active season.</p>
-      </main>
-    );
-  }
-
-  const rows = await listStandings(sb, season.id);
+  const played = rows.reduce((sum, r) => sum + r.matches_played, 0) / 2;
+  const totalGoals = rows.reduce((sum, r) => sum + r.goals_for, 0);
 
   return (
-    <main className="max-w-4xl mx-auto p-6 space-y-4">
-      <h1 className="text-3xl font-bold">Standings · {season.year_range}</h1>
-      <table className="w-full text-sm border bg-white">
-        <thead className="bg-slate-100">
-          <tr>
-            <th className="text-left p-2 w-8">#</th>
-            <th className="text-left p-2">Player</th>
-            <th className="text-right p-2">MP</th>
-            <th className="text-right p-2">W</th>
-            <th className="text-right p-2">D</th>
-            <th className="text-right p-2">L</th>
-            <th className="text-right p-2">GF</th>
-            <th className="text-right p-2">GA</th>
-            <th className="text-right p-2">GD</th>
-            <th className="text-right p-2 font-bold">Pts</th>
-          </tr>
-        </thead>
-        <tbody data-testid="standings-body">
-          {rows.map((r, i) => (
-            <tr key={r.player_id} className="border-t">
-              <td className="p-2">{i + 1}</td>
-              <td className="p-2">{r.player_name}</td>
-              <td className="p-2 text-right">{r.matches_played}</td>
-              <td className="p-2 text-right">{r.wins}</td>
-              <td className="p-2 text-right">{r.draws}</td>
-              <td className="p-2 text-right">{r.losses}</td>
-              <td className="p-2 text-right">{r.goals_for}</td>
-              <td className="p-2 text-right">{r.goals_against}</td>
-              <td className="p-2 text-right">{r.goal_difference}</td>
-              <td className="p-2 text-right font-bold">{r.points}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="text-xs text-gray-500">
-        Tiebreakers: points → goal difference → goals for.
-      </p>
-    </main>
+    <div>
+      <PageHeader
+        eyebrow={season ? `${season.division_name} · ${season.year_range}` : "Standings"}
+        title="League Table"
+        description={
+          season
+            ? "Live standings for the active season. Updated within seconds of each confirmed scoreline."
+            : "Standings will open once the active season begins."
+        }
+        right={
+          rows.length > 0 ? (
+            <div className="flex gap-4 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-5 py-4">
+              <Metric label="Matches" value={played.toString()} />
+              <span aria-hidden className="w-px bg-[var(--ink-4)]" />
+              <Metric label="Goals" value={totalGoals.toString()} />
+              <span aria-hidden className="w-px bg-[var(--ink-4)]" />
+              <Metric label="Competitors" value={rows.length.toString()} />
+            </div>
+          ) : null
+        }
+      />
+
+      <div className="mx-auto max-w-6xl px-5 py-10">
+        {rows.length === 0 ? (
+          <EmptyState
+            title="No matches confirmed yet"
+            hint="Standings populate the moment match day 1 results are signed off by the referee."
+          />
+        ) : (
+          <StandingsTable rows={rows} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-start">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+        {label}
+      </div>
+      <div className="tabular mt-1 font-display text-2xl font-bold leading-none text-[var(--chalk-0)]">
+        {value}
+      </div>
+    </div>
   );
 }
