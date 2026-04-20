@@ -1,21 +1,37 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
+import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { SiteChrome } from "@/components/public/SiteChrome";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const display = Space_Grotesk({
+  variable: "--font-display-src",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const body = Inter({
+  variable: "--font-body-src",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  variable: "--font-mono-src",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "CADE League",
-  description: "CADE Esports League platform — Division 1 Elite 2025-2026",
+  title: {
+    default: "CADE League — Division 1 Elite · 2025-2026",
+    template: "%s · CADE League",
+  },
+  description:
+    "CADE Esports League — Division 1 Elite. Nigeria's eFootball competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
+  icons: { icon: "/favicon.ico" },
+  themeColor: "#07080b",
 };
 
 export default function RootLayout({
@@ -24,21 +40,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <nav className="border-b bg-white px-6 py-3">
-          <div className="max-w-6xl mx-auto flex items-center gap-6 text-sm">
-            <Link href="/" className="font-semibold">
-              CADE League
-            </Link>
-            <Link href="/players" className="text-slate-600 hover:text-slate-900">
-              Players
-            </Link>
-          </div>
-        </nav>
-        {children}
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <body className="antialiased">
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

@@ -1,26 +1,251 @@
 @import "tailwindcss";
 
+/* ---- CADE League Design Tokens -------------------------------------------
+   Night-studio aesthetic. Near-black surfaces, one punchy signal-green accent,
+   sharp display type paired with a tabular mono for match numerics.
+--------------------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --ink-0: #000000;       /* deepest black — pitch edge */
+  --ink-1: #07080b;       /* page background */
+  --ink-2: #0d0f14;       /* surface 1 (cards) */
+  --ink-3: #14171e;       /* surface 2 (rows, hover) */
+  --ink-4: #1d2029;       /* borders, hairlines */
+  --ink-5: #2a2e39;       /* accent borders */
+
+  /* Text */
+  --chalk-0: #ffffff;
+  --chalk-1: #e8e9ec;
+  --chalk-2: #a8adb8;
+  --chalk-3: #6b7280;
+
+  /* Signal green — one accent, commit to it. */
+  --signal: #00ff88;
+  --signal-ink: #002c18;  /* text on signal-green fills */
+  --signal-dim: #08b26b;  /* low-energy variant */
+  --signal-glow: rgba(0, 255, 136, 0.18);
+
+  /* Warning / priority pips */
+  --flare: #ff5b3b;       /* urgent / red card */
+  --amber: #ffb020;       /* warnings, late */
+
+  --font-display: var(--font-display-src), "Space Grotesk", "Inter Display",
+    system-ui, sans-serif;
+  --font-body: var(--font-body-src), "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-mono-src), "JetBrains Mono", ui-monospace, monospace;
+
+  --background: var(--ink-1);
+  --foreground: var(--chalk-1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink-0: var(--ink-0);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-5: var(--ink-5);
+  --color-chalk-0: var(--chalk-0);
+  --color-chalk-1: var(--chalk-1);
+  --color-chalk-2: var(--chalk-2);
+  --color-chalk-3: var(--chalk-3);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-signal-dim: var(--signal-dim);
+  --color-flare: var(--flare);
+  --color-amber: var(--amber);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  /* Subtle stadium-floor grid — disappears almost to texture. */
+  background-image:
+    radial-gradient(
+      1100px 600px at 50% -200px,
+      rgba(0, 255, 136, 0.06),
+      transparent 70%
+    ),
+    linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.018) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.018) 1px,
+      transparent 1px
+    );
+  background-size: auto, 56px 56px, 56px 56px;
+  background-position: center top, center top, center top;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Utility: heading kerning + weight */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Utility: tabular lining numerics for standings/match numbers */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "ss01", "zero";
+}
+
+/* Ticker stripe pattern — used on hero mark */
+.ticker-stripe {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--signal) 0 6px,
+    transparent 6px 14px
+  );
+}
+
+/* Scanline pattern — top-card accent */
+.scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.03) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* Accent glow — used sparingly */
+.signal-glow {
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 136, 0.25),
+    0 0 28px -4px var(--signal-glow);
+}
+
+/* Animated pulse dot — status indicator */
+@keyframes cade-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+.pulse-dot {
+  animation: cade-pulse 2s ease-in-out infinite;
+}
+
+/* Animated underline for hero callouts */
+@keyframes cade-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.hero-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 255, 136, 0.14) 40%,
+    rgba(0, 255, 136, 0.28) 50%,
+    rgba(0, 255, 136, 0.14) 60%,
+    transparent 100%
+  );
+  animation: cade-sweep 6s ease-in-out infinite;
+}
+
+/* Focus ring — signal green */
+:where(a, button, [role="button"]):focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Prose overrides for markdown content on dark surface */
+.cade-prose h1,
+.cade-prose h2,
+.cade-prose h3 {
+  font-family: var(--font-display);
+  color: var(--chalk-0);
+  letter-spacing: -0.01em;
+}
+.cade-prose h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+.cade-prose h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.5rem;
+}
+.cade-prose h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+}
+.cade-prose p {
+  color: var(--chalk-1);
+  line-height: 1.65;
+  margin: 0 0 0.85rem;
+}
+.cade-prose a {
+  color: var(--signal);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cade-prose strong {
+  color: var(--chalk-0);
+  font-weight: 600;
+}
+.cade-prose code {
+  font-family: var(--font-mono);
+  background: var(--ink-3);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+.cade-prose ul {
+  list-style: disc;
+  margin: 0 0 0.85rem 1.25rem;
+}
+.cade-prose ol {
+  list-style: decimal;
+  margin: 0 0 0.85rem 1.25rem;
+}
+.cade-prose li {
+  margin: 0.15rem 0;
+  color: var(--chalk-1);
+}
+.cade-prose blockquote {
+  border-left: 3px solid var(--signal);
+  padding-left: 0.9rem;
+  color: var(--chalk-2);
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+.cade-prose hr {
+  border: none;
+  border-top: 1px solid var(--ink-4);
+  margin: 1.25rem 0;
 }
