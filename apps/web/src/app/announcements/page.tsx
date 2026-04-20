@@ -1,8 +1,42 @@
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatWat } from "@/lib/time";
 import { renderMarkdownToSafeHtml } from "@/server/announcements/render";
+import { PageHeader } from "@/components/public/PageHeader";
+import { EmptyState } from "@/components/public/EmptyState";
 
-export const revalidate = 60; // ISR — per spec §12
+export const revalidate = 60;
+
+export const metadata = { title: "News" };
+
+type Priority = "info" | "important" | "urgent" | string;
+
+const PRIORITY_TONES: Record<
+  string,
+  { label: string; bg: string; text: string; bar: string }
+> = {
+  urgent: {
+    label: "Urgent",
+    bg: "bg-[var(--flare)]/15",
+    text: "text-[var(--flare)]",
+    bar: "bg-[var(--flare)]",
+  },
+  important: {
+    label: "Important",
+    bg: "bg-[var(--amber)]/15",
+    text: "text-[var(--amber)]",
+    bar: "bg-[var(--amber)]",
+  },
+  info: {
+    label: "News",
+    bg: "bg-[var(--signal)]/12",
+    text: "text-[var(--signal)]",
+    bar: "bg-[var(--signal)]",
+  },
+};
+
+function toneOf(priority: Priority) {
+  return PRIORITY_TONES[priority] ?? PRIORITY_TONES.info;
+}
 
 export default async function PublicAnnouncements() {
   const sb = await getServerSupabase();
@@ -15,27 +49,73 @@ export default async function PublicAnnouncements() {
     .order("published_at", { ascending: false })
     .limit(50);
 
+  const items = rows ?? [];
+
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-8">
-      <h1 className="text-3xl font-bold">Announcements</h1>
-      {(rows ?? []).map((r) => (
-        <article key={r.id} className="space-y-2 border-b pb-6">
-          <header className="flex items-baseline gap-3">
-            <h2 className="text-xl font-semibold">{r.title}</h2>
-            <span className="text-xs uppercase tracking-wide text-gray-500">{r.priority}</span>
-          </header>
-          <time className="text-sm text-gray-500">
-            {r.published_at ? formatWat(r.published_at, "yyyy-MM-dd HH:mm") : ""}
-          </time>
-          <div
-            className="prose prose-sm"
-            dangerouslySetInnerHTML={{ __html: renderMarkdownToSafeHtml(r.body_md) }}
+    <div>
+      <PageHeader
+        eyebrow="From the studio"
+        title="League News"
+        description="Official announcements, fixture releases, rule clarifications, and discipline updates from the CADE League office."
+      />
+
+      <div className="mx-auto max-w-4xl px-5 py-10">
+        {items.length === 0 ? (
+          <EmptyState
+            title="The studio is quiet — for now"
+            hint="Public announcements from the league office will surface here the moment they go live."
           />
-        </article>
-      ))}
-      {(!rows || rows.length === 0) && (
-        <p className="text-gray-500">Nothing to announce yet.</p>
-      )}
-    </main>
+        ) : (
+          <ul className="space-y-6">
+            {items.map((r) => {
+              const tone = toneOf(r.priority);
+              return (
+                <li key={r.id}>
+                  <article className="relative overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] transition-colors hover:border-[var(--signal)]">
+                    <div aria-hidden className={"h-1 w-full " + tone.bar} />
+                    <div className="p-6 md:p-7">
+                      <header className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span
+                            className={
+                              "inline-flex items-center rounded-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em] " +
+                              tone.bg +
+                              " " +
+                              tone.text
+                            }
+                          >
+                            {tone.label}
+                          </span>
+                          <time
+                            dateTime={r.published_at ?? ""}
+                            className="tabular text-[11px] uppercase tracking-[0.2em] text-[var(--chalk-3)]"
+                          >
+                            {r.published_at
+                              ? formatWat(
+                                  r.published_at,
+                                  "EEE dd MMM yyyy · HH:mm",
+                                ) + " WAT"
+                              : ""}
+                          </time>
+                        </div>
+                      </header>
+                      <h2 className="mt-4 font-display text-2xl font-bold leading-tight tracking-tight text-[var(--chalk-0)] md:text-3xl">
+                        {r.title}
+                      </h2>
+                      <div
+                        className="cade-prose mt-4 text-[15px] leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: renderMarkdownToSafeHtml(r.body_md),
+                        }}
+                      />
+                    </div>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
