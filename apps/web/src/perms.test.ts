@@ -22,4 +22,22 @@ describe("hasPerm", () => {
   it("multi-role user gets union of permissions", () => {
     expect(hasPerm({ userId: null, roles: ["player", "moderator"] }, "punishments.issue")).toBe(true);
   });
+
+  it("admin has attendance.mark and attendance.edit", () => {
+    expect(hasPerm({ userId: "u", roles: ["admin"] }, "attendance.mark")).toBe(true);
+    expect(hasPerm({ userId: "u", roles: ["admin"] }, "attendance.edit")).toBe(true);
+  });
+
+  it("moderator has attendance.mark and attendance.edit", () => {
+    expect(hasPerm({ userId: "u", roles: ["moderator"] }, "attendance.mark")).toBe(true);
+    expect(hasPerm({ userId: "u", roles: ["moderator"] }, "attendance.edit")).toBe(true);
+  });
+
+  it("player does NOT have attendance.mark", () => {
+    expect(hasPerm({ userId: "u", roles: ["player"] }, "attendance.mark")).toBe(false);
+  });
+
+  it("viewer does NOT have attendance.edit", () => {
+    expect(hasPerm({ userId: null, roles: [] }, "attendance.edit")).toBe(false);
+  });
 });
