@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { listDeleted } from "@/server/trash";
 import { TRASH_ENTITIES, isTrashEntityType } from "@/server/trash/entities";
 import { RestoreButton } from "@/components/admin/RestoreButton";
@@ -34,7 +34,10 @@ export default async function TrashEntityPage({
   if (!isTrashEntityType(entity)) notFound();
 
   const def = TRASH_ENTITIES[entity];
-  const sb = await getServerSupabase();
+  // Admin Trash must bypass RLS — public-read policies filter out
+  // `deleted_at is not null` rows, so a user-JWT client returns nothing.
+  // Middleware already gates /admin/* to admin/moderator roles.
+  const sb = getServiceRoleSupabase();
   const { rows, missingTable } = await listDeleted(sb, entity);
 
   return (

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { listDeleted, restore } from "./index";
 
 function mkListSb(rows: Array<Record<string, unknown>>, error: unknown = null) {
-  const from = vi.fn((_table: string) => ({
+  const from = vi.fn(() => ({
     select: vi.fn(() => ({
       not: vi.fn(() => ({
         order: vi.fn().mockResolvedValue({ data: rows, error }),

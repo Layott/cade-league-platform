@@ -42,7 +42,7 @@ export async function listDeleted(
     throw error;
   }
   return {
-    rows: (data ?? []) as Array<Record<string, unknown>>,
+    rows: (data ?? []) as unknown as Array<Record<string, unknown>>,
     missingTable: false,
   };
 }
@@ -60,6 +60,7 @@ export async function restore(
   sb: SupabaseClient,
   entityType: string,
   id: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _actorUserId: string
 ): Promise<void> {
   if (!isTrashEntityType(entityType)) {
