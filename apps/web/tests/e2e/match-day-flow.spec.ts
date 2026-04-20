@@ -97,7 +97,7 @@ test("admin creates match day, adds fixture, enters draft, confirms, standings r
 
   // 4. Standings page renders (draft is excluded from totals).
   await page.goto("/standings");
-  await expect(page.getByRole("heading", { name: /Standings/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /League Table/i })).toBeVisible();
 
   // 5. Confirm the result
   await page.goto(matchDayUrl);
