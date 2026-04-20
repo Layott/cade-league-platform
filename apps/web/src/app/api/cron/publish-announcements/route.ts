@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { publishNow } from "@/server/announcements";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 // Polled by Vercel Cron / GitHub Actions / manual curl every ~5 minutes.
 // Protected by X-Cron-Secret header matching env CRON_SECRET.
@@ -11,12 +14,8 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Use service role so we bypass RLS and can publish under an admin-like context.
-  const sb = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  // Service role bypasses RLS so cron can publish under an admin-like context.
+  const sb = getServiceRoleSupabase();
 
   const now = new Date().toISOString();
   const { data: due, error } = await sb
@@ -30,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Resolve "cron" publisher id — the first admin user, or a zero UUID sentinel.
+  // Resolve a "cron" publisher id — the first admin user, or a zero UUID sentinel.
   const { data: adminRow } = await sb
     .from("user_roles")
     .select("user_id")
