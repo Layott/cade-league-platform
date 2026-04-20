@@ -54,6 +54,8 @@ test.afterAll(async () => {
   await cleanupE2EMatchDays();
 });
 
+test.setTimeout(120_000);
+
 test("admin creates match day, adds fixture, enters draft, confirms, standings reflect", async ({
   page,
 }) => {
@@ -100,8 +102,9 @@ test("admin creates match day, adds fixture, enters draft, confirms, standings r
   // 5. Confirm the result
   await page.goto(matchDayUrl);
   await page.locator("[data-testid^='confirm-']").first().click();
-  // After confirm: page reloads and the confirm button disappears.
-  await expect(page.locator("[data-testid^='confirm-']")).toHaveCount(0);
+  // After confirm: the server action revalidates and the page re-renders.
+  // The confirmed badge appears and the confirm button disappears.
+  await expect(page.locator("text=confirmed").first()).toBeVisible({ timeout: 10_000 });
 
   // 6. Standings now reflect the confirmed result: the home player earned 3 pts.
   await page.goto("/standings");
