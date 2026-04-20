@@ -18,7 +18,6 @@ function formatCell(key: string, value: unknown): string {
     }
   }
   if (key === "scheduled_time") {
-    // scheduled_time may be a time-of-day string; render raw.
     return String(value);
   }
   if (typeof value === "boolean") return value ? "yes" : "no";
@@ -34,70 +33,103 @@ export default async function TrashEntityPage({
   if (!isTrashEntityType(entity)) notFound();
 
   const def = TRASH_ENTITIES[entity];
-  // Admin Trash must bypass RLS — public-read policies filter out
-  // `deleted_at is not null` rows, so a user-JWT client returns nothing.
-  // Middleware already gates /admin/* to admin/moderator roles.
   const sb = getServiceRoleSupabase();
   const { rows, missingTable } = await listDeleted(sb, entity);
 
   return (
-    <section className="space-y-3" data-testid="trash-entity-section">
+    <section className="space-y-4" data-testid="trash-entity-section">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-lg font-semibold">{def.label}</h3>
-        <span className="text-xs text-gray-500">
+        <h3 className="font-display text-lg font-bold text-[var(--chalk-0)]">
+          {def.label}
+        </h3>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
           {missingTable ? "schema pending" : `${rows.length} row(s)`}
         </span>
       </div>
 
       {missingTable ? (
-        <div className="border border-dashed rounded-md p-6 text-center text-gray-500 text-sm">
+        <div className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-8 text-center text-sm text-[var(--chalk-3)]">
           Schema not yet migrated. Table{" "}
-          <code className="font-mono">{def.table}</code> does not exist yet.
+          <code className="rounded-sm bg-[var(--ink-3)] px-1.5 py-0.5 font-mono text-[12px] text-[var(--chalk-1)]">
+            {def.table}
+          </code>{" "}
+          does not exist yet.
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-gray-500 text-sm py-6" data-testid="trash-empty">
-          Nothing deleted in <b>{def.label}</b>.
-        </p>
-      ) : (
-        <table
-          className="w-full text-sm border bg-white"
-          data-testid="trash-table"
+        <div
+          className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-8 text-center text-sm text-[var(--chalk-3)]"
+          data-testid="trash-empty"
         >
-          <thead className="bg-slate-100">
-            <tr>
-              {def.columns.map((c) => (
-                <th key={c.key} className="text-left p-2">
-                  {c.label}
-                </th>
-              ))}
-              <th className="text-left p-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const rowId = String(row.id ?? "");
-              return (
-                <tr
-                  key={rowId}
-                  className="border-t"
-                  data-testid="trash-row"
-                  data-entity={entity}
-                  data-id={rowId}
+          Nothing deleted in{" "}
+          <b className="text-[var(--chalk-1)]">{def.label}</b>.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)]">
+          <table
+            className="w-full text-sm text-[var(--chalk-1)]"
+            data-testid="trash-table"
+          >
+            <thead>
+              <tr className="border-b border-[var(--ink-4)] bg-[var(--ink-3)]/60 text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+                {def.columns.map((c) => (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    className="px-4 py-2.5 text-left font-semibold"
+                  >
+                    {c.label}
+                  </th>
+                ))}
+                <th
+                  scope="col"
+                  className="px-4 py-2.5 text-right font-semibold"
                 >
-                  {def.columns.map((c) => (
-                    <td key={c.key} className="p-2">
-                      {formatCell(c.key, row[c.key])}
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => {
+                const rowId = String(row.id ?? "");
+                return (
+                  <tr
+                    key={rowId}
+                    className={
+                      "border-b border-[var(--ink-4)]/70 last:border-b-0 " +
+                      (idx % 2 === 1 ? "bg-[var(--ink-3)]/30" : "")
+                    }
+                    data-testid="trash-row"
+                    data-entity={entity}
+                    data-id={rowId}
+                  >
+                    {def.columns.map((c) => (
+                      <td
+                        key={c.key}
+                        className={
+                          "px-4 py-3 " +
+                          (c.key === "deleted_at" ||
+                          c.key === "published_at" ||
+                          c.key === "effective_from" ||
+                          c.key === "scheduled_time"
+                            ? "font-mono text-[12px] tabular text-[var(--chalk-2)]"
+                            : "text-[var(--chalk-1)]")
+                        }
+                      >
+                        {formatCell(c.key, row[c.key])}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-4">
+                        <RestoreButton entityType={entity} id={rowId} />
+                        <PurgeButtonStub />
+                      </div>
                     </td>
-                  ))}
-                  <td className="p-2 flex gap-3 items-center">
-                    <RestoreButton entityType={entity} id={rowId} />
-                    <PurgeButtonStub />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
