@@ -47,9 +47,15 @@ export default async function MatchDaysPage() {
               <td className="p-2">{d.venue_name}</td>
               <td className="p-2">{d.status}</td>
               <td className="p-2">{d.match_count}</td>
-              <td className="p-2">
+              <td className="p-2 space-x-3">
                 <Link href={`/admin/match-days/${d.id}`} className="underline">
                   Manage
+                </Link>
+                <Link
+                  href={`/admin/match-days/${d.id}/attendance`}
+                  className="underline"
+                >
+                  Attendance
                 </Link>
               </td>
             </tr>
