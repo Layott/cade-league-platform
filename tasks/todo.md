@@ -1,5 +1,81 @@
 # Tasks — Active Work
 
+Active plan: **Plan 8 — Admin brand polish + unified navigation** (complete 2026-04-20).
+
+## Plan 8 Tasks
+
+- [x] 1. Convert SiteChrome into split Server+Client pair, add role-gated Admin nav entry, bell, log-out; render everywhere except /login + /logout.
+- [x] 2. Rewrite `/admin/layout.tsx` as a thin shell (eyebrow, sub-nav, back-to-site, dark content area). Move bell to SiteChrome.
+- [x] 3. Create admin shared components: `AdminSubnav`, `DataTable`, `StatusPill`, `PrimaryButton`, `SecondaryButton`, `DangerButton`, `FormField`.
+- [x] 4. Polish `/admin` dashboard with quick stats + recent activity.
+- [x] 5. Polish match-days list + new + detail + attendance.
+- [x] 6. Polish punishments list + new + detail.
+- [x] 7. Polish announcements list + new + detail.
+- [x] 8. Polish trash layout + per-entity page; upgrade RestoreButton + PurgeButtonStub tone.
+- [x] 9. Polish sessions page.
+- [x] 10. Verify unit (vitest) + lint + build + e2e; commit in slices; push.
+
+### Plan 8 review — 2026-04-20
+
+Six logical commits on `main`, all green:
+
+| Command | Result |
+|---------|--------|
+| `npm run lint` | clean |
+| `npm run test` (vitest) | 85 passed (20 files) |
+| `npm run build` | 27 routes compiled |
+| `npm --workspace apps/web run e2e` | 22 passed (2.5m) |
+
+Design decisions:
+
+- **Split chrome:** `SiteChrome` is now a Server Component that reads
+  the session + roles + unread count once, then renders
+  `SiteChromeClient` (the actual layout). This lets the role-gated
+  Admin pill render on first paint with no flicker, and lets the bell
+  + count share a single server trip.
+- **Hide rule flipped:** SiteChrome now renders on /admin/* and hides
+  only on /login + /logout. Admin pages get both the global nav
+  (brand, bell, sign-out, Back to site semantics) AND a thin
+  `AdminShell` (eyebrow + tab subnav + Back-to-site link).
+- **Admin primitives** in `apps/web/src/components/admin/`:
+  `AdminShell`, `AdminSubnav`, `SectionHeader`, `DataTable` (with
+  reusable zebra/sticky-header table + brand-voice empty states),
+  `StatusPill` (one color map for every status/sanction/priority),
+  `FormField` + `inputClass/selectClass/textareaClass` (consistent
+  10px uppercase label eyebrows), and three button primitives
+  (`PrimaryButton` signal-green, `SecondaryButton` chalk outline,
+  `DangerButton` flare red). These are now the only way admin pages
+  speak — no more duplicated style strings.
+- **Dashboard:** Four quick-stat tiles (active season, match days in
+  next 7 days, open cases, pending announcements) plus four quick-
+  action cards plus a last-10 audit_events feed with action-typed
+  insert/update/delete pills. Uses service-role client for audit
+  reads (audit_events is not RLS-covered and /admin is middleware-
+  gated).
+- **Attendance action pills** use real color semantics: present →
+  signal green fill, late → amber fill, absent → flare red fill
+  when active; chalk outline with matching hover tone when inactive.
+- **Sessions table** tags your own session with a signal-green "YOU"
+  pill by matching the public `users.id` to session `user_id`.
+- **Trash** keeps the per-entity sub-tab strip but restyles as pills;
+  empty states, Restore + Purge buttons all re-themed for dark surface.
+
+Test updates (for E2E coverage preservation):
+
+- No spec file edits were needed. Every existing `data-testid`,
+  `aria-label`, `getByLabel(...)` target, and `getByRole("button", {
+  name: "..." })` name was preserved exactly. The Delivery string on
+  /admin/announcements/[id] was explicitly re-added as a plain-text
+  line after the markdown article so the regex `Delivery: N / M
+  read` still matches.
+
+Nothing deferred / blocked.
+
+Follow-up ideas (not in scope of Plan 8):
+- Pull audit action icons into a lookup instead of inline classes.
+- Add keyboard shortcuts for common admin actions (g → d for
+  dashboard, etc.).
+
 Active plan: Plan 7 Part B complete (2026-04-20). Plan 7 Part A landed in parallel.
 
 Update this file as work progresses per parent CLAUDE.md workflow.
