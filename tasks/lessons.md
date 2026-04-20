@@ -67,3 +67,11 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Used `as { ... }[]` direct cast on Supabase `.select("a:table(col)")` results. TypeScript infers the join as `{ a: { col: any }[] }[]` (array), so a cast to `{ a: { col: string } | null }[]` (object) fails with TS2352 "neither type sufficiently overlaps".
 **Correction:** Go through `unknown` first: `as unknown as { a: { col: string } | null }[]`. The supabase-js types don't currently express "to-one" vs "to-many" joins.
 **Rule for future:** For Supabase join result casts, use `as unknown as <shape>` rather than direct `as <shape>` — the inferred types assume many-side unless a typed client/codegen says otherwise.
+
+---
+
+**Date:** 2026-04-20
+**Context:** Plan 7 Part B — running `next build` while a `next dev` server (plus playwright's webServer on another port) was still running.
+**Mistake:** `next build` writes a production artifact to `.next/`, overwriting the dev server's manifest files. Subsequent requests to the dev server returned 500 with `Cannot find module '.next/server/middleware-manifest.json'`. E2E tests interpreted this as an SSR code bug.
+**Correction:** Never run `next build` while a dev server (including Playwright's `webServer`) has `.next/` open. If you must, kill the dev server first OR wipe `.next/` and restart after the build. In CI the point is moot — `reuseExistingServer: !CI` ensures Playwright always starts fresh.
+**Rule for future:** Before running `next build`, check `ps` for any `next dev` processes using the same `.next/`. If present, either skip the build, run in a fresh worktree, or `rm -rf .next && restart dev`.

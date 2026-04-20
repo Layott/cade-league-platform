@@ -2,7 +2,9 @@ import { test, expect } from "@playwright/test";
 
 test("/players shows a grid of player cards", async ({ page }) => {
   await page.goto("/players");
-  await expect(page.getByRole("heading", { name: "Players" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "The Roster",
+  );
   const cards = page.getByTestId("player-card");
   await expect(cards.first()).toBeVisible();
   const count = await cards.count();

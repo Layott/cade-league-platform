@@ -35,16 +35,14 @@ function tone(priority: Priority) {
 }
 
 /** Trim a rendered HTML string to the first N characters of *text*, then
- * return the HTML up to that point (best-effort preview). */
+ * return the HTML up to that point (best-effort preview). We flatten to a
+ * single <p> so the homepage never renders stray h1/h2 from markdown. */
 function firstParagraphHtml(md: string): string {
   const html = renderMarkdownToSafeHtml(md);
-  // Grab the first block tag's content — good enough for a preview.
-  const match = html.match(/<(p|h1|h2|h3|ul|ol|blockquote)[^>]*>[\s\S]*?<\/\1>/i);
-  const block = match?.[0] ?? html;
-  // Cap at ~220 chars of text.
-  const text = block.replace(/<[^>]+>/g, "");
-  if (text.length <= 220) return block;
-  return `<p>${text.slice(0, 220).trim()}…</p>`;
+  const text = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const preview = text.length <= 220 ? text : text.slice(0, 220).trim() + "…";
+  return `<p>${preview}</p>`;
 }
 
 export function LatestAnnouncements({

@@ -1,6 +1,18 @@
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatWat } from "@/lib/time";
 import { renderMarkdownToSafeHtml } from "@/server/announcements/render";
+
+/** Shift markdown heading levels down by one so the page's PageHeader
+ * remains the sole h1. h1→h2, h2→h3, h3→h4. Sanitized HTML only. */
+function shiftHeadings(html: string): string {
+  return html
+    .replace(/<h3(\s[^>]*)?>/gi, "<h4$1>")
+    .replace(/<\/h3>/gi, "</h4>")
+    .replace(/<h2(\s[^>]*)?>/gi, "<h3$1>")
+    .replace(/<\/h2>/gi, "</h3>")
+    .replace(/<h1(\s[^>]*)?>/gi, "<h2$1>")
+    .replace(/<\/h1>/gi, "</h2>");
+}
 import { PageHeader } from "@/components/public/PageHeader";
 import { EmptyState } from "@/components/public/EmptyState";
 
@@ -105,7 +117,9 @@ export default async function PublicAnnouncements() {
                       <div
                         className="cade-prose mt-4 text-[15px] leading-relaxed"
                         dangerouslySetInnerHTML={{
-                          __html: renderMarkdownToSafeHtml(r.body_md),
+                          __html: shiftHeadings(
+                            renderMarkdownToSafeHtml(r.body_md),
+                          ),
                         }}
                       />
                     </div>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteChrome } from "@/components/public/SiteChrome";
@@ -31,7 +31,11 @@ export const metadata: Metadata = {
   description:
     "CADE Esports League — Division 1 Elite. Nigeria's eFootball competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
   icons: { icon: "/favicon.ico" },
+};
+
+export const viewport: Viewport = {
   themeColor: "#07080b",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
