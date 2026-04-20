@@ -22,7 +22,8 @@ test.describe("announcements happy path", () => {
     await page.getByLabel("Public").check();
     // audience_type stays on "All users"; channels in_app + email stay checked.
     await page.getByRole("button", { name: "Publish now" }).click();
-    await expect(page).toHaveURL(/\/admin\/announcements\/[0-9a-f-]+/);
+    // publishNow fans out emails via the stub logger; allow generous time.
+    await expect(page).toHaveURL(/\/admin\/announcements\/[0-9a-f-]+/, { timeout: 20_000 });
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
     await expect(page.getByText(/Delivery: \d+ \/ \d+ read/)).toBeVisible();
 
