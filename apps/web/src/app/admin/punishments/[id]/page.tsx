@@ -3,6 +3,10 @@ import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatWat } from "@/lib/time";
 import { revokeAction } from "./actions";
+import { SectionHeader } from "@/components/admin/SectionHeader";
+import { StatusPill } from "@/components/admin/StatusPill";
+import { DangerButton, SecondaryButton } from "@/components/admin/buttons";
+import { FormField, textareaClass } from "@/components/admin/FormField";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +30,7 @@ export default async function PunishmentDetailPage({
           users!inner ( display_name )
         )
       )
-      `
+      `,
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -56,60 +60,139 @@ export default async function PunishmentDetailPage({
     };
   };
   const row = data as unknown as Row;
+  const name = row.disciplinary_cases.players.users.display_name;
+  const tag = row.disciplinary_cases.players.gamer_tag;
 
   return (
-    <div className="space-y-6">
-      <Link href="/admin/punishments" className="text-sm text-slate-500 hover:underline">
-        ← Back to list
-      </Link>
+    <div className="space-y-8">
+      <SectionHeader
+        eyebrow="Case file"
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            <span>{name}</span>
+            <StatusPill status={row.sanction_type} className="ml-1" />
+            <StatusPill
+              status={row.revoked_at ? "revoked" : "active"}
+            />
+          </span>
+        }
+        description={
+          <span className="text-xs uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+            {tag} · {row.disciplinary_cases.incident_type.replace(/_/g, " ")}
+          </span>
+        }
+        action={
+          <Link href="/admin/punishments">
+            <SecondaryButton type="button">← Back to list</SecondaryButton>
+          </Link>
+        }
+      />
 
-      <h2 className="text-2xl font-bold">
-        {row.sanction_type} · {row.disciplinary_cases.players.users.display_name}
-      </h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        <InfoCard
+          label="Imposed"
+          value={formatWat(row.imposed_at, "yyyy-MM-dd · HH:mm")}
+        />
+        <InfoCard label="Magnitude" value={String(row.magnitude)} tabular />
+        <InfoCard label="Effective from" value={row.effective_from} tabular />
+        <InfoCard
+          label="Effective until"
+          value={row.effective_until ?? "—"}
+          tabular={!!row.effective_until}
+        />
+        <InfoCard
+          label="Public visible"
+          value={row.public_visible ? "Yes" : "No"}
+          tone={row.public_visible ? "signal" : "muted"}
+        />
+        <InfoCard
+          label="Status"
+          value={row.revoked_at ? "Revoked" : "Active"}
+          tone={row.revoked_at ? "muted" : "signal"}
+        />
+      </div>
 
-      <dl className="grid grid-cols-[160px_1fr] gap-y-2 text-sm">
-        <dt className="text-slate-500">Imposed</dt>
-        <dd>{formatWat(row.imposed_at, "yyyy-MM-dd HH:mm")}</dd>
-        <dt className="text-slate-500">Incident</dt>
-        <dd>{row.disciplinary_cases.incident_type}</dd>
-        <dt className="text-slate-500">Magnitude</dt>
-        <dd>{row.magnitude}</dd>
-        <dt className="text-slate-500">Effective from</dt>
-        <dd>{row.effective_from}</dd>
-        <dt className="text-slate-500">Effective until</dt>
-        <dd>{row.effective_until ?? "—"}</dd>
-        <dt className="text-slate-500">Public visible</dt>
-        <dd>{row.public_visible ? "yes" : "no"}</dd>
-        <dt className="text-slate-500">Status</dt>
-        <dd>{row.revoked_at ? "revoked" : "active"}</dd>
-        {row.revoked_at ? (
-          <>
-            <dt className="text-slate-500">Revoked at</dt>
-            <dd>{formatWat(row.revoked_at, "yyyy-MM-dd HH:mm")}</dd>
-            <dt className="text-slate-500">Revoke reason</dt>
-            <dd>{row.revoke_reason ?? "—"}</dd>
-          </>
-        ) : null}
-        <dt className="text-slate-500">Notes</dt>
-        <dd className="whitespace-pre-line">{row.notes ?? "—"}</dd>
-      </dl>
-
-      {!row.revoked_at ? (
-        <form action={revokeAction} className="space-y-3 border-t pt-6">
-          <h3 className="font-semibold">Revoke this punishment</h3>
-          <input type="hidden" name="actionId" value={row.id} />
-          <textarea
-            name="reason"
-            required
-            placeholder="Reason for revoking (required)"
-            className="w-full border rounded px-3 py-2 text-sm"
-            rows={2}
-          />
-          <button type="submit" className="bg-red-600 text-white rounded px-3 py-2 text-sm">
-            Revoke
-          </button>
-        </form>
+      {row.notes ? (
+        <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
+            Notes
+          </div>
+          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--chalk-1)]">
+            {row.notes}
+          </p>
+        </section>
       ) : null}
+
+      {row.revoked_at ? (
+        <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
+            Revoked
+          </div>
+          <div className="mt-2 font-mono text-[12px] tabular text-[var(--chalk-1)]">
+            {formatWat(row.revoked_at, "yyyy-MM-dd · HH:mm")}
+          </div>
+          {row.revoke_reason ? (
+            <p className="mt-2 text-sm text-[var(--chalk-1)]">
+              {row.revoke_reason}
+            </p>
+          ) : null}
+        </section>
+      ) : (
+        <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--flare)]">
+            Revoke this sanction
+          </div>
+          <p className="mt-1 text-xs text-[var(--chalk-3)]">
+            Requires a written reason. Action is logged to the audit trail.
+          </p>
+          <form action={revokeAction} className="mt-4 space-y-3">
+            <input type="hidden" name="actionId" value={row.id} />
+            <FormField label="Reason">
+              <textarea
+                name="reason"
+                required
+                placeholder="Explain why this sanction is being withdrawn…"
+                className={textareaClass}
+                rows={3}
+              />
+            </FormField>
+            <DangerButton type="submit">Revoke</DangerButton>
+          </form>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  tabular,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tabular?: boolean;
+  tone?: "signal" | "muted";
+}) {
+  return (
+    <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
+        {label}
+      </div>
+      <div
+        className={
+          "mt-1 font-display text-base font-semibold " +
+          (tone === "signal"
+            ? "text-[var(--signal)]"
+            : tone === "muted"
+              ? "text-[var(--chalk-2)]"
+              : "text-[var(--chalk-0)]") +
+          (tabular ? " tabular font-mono" : "")
+        }
+      >
+        {value}
+      </div>
     </div>
   );
 }

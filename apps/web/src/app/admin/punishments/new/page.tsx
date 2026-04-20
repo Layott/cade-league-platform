@@ -1,6 +1,15 @@
+import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listPlayersInActiveSeason } from "@/server/players";
 import { createPunishment } from "./actions";
+import { SectionHeader } from "@/components/admin/SectionHeader";
+import {
+  FormField,
+  inputClass,
+  selectClass,
+  textareaClass,
+} from "@/components/admin/FormField";
+import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -9,89 +18,109 @@ export default async function NewPunishmentPage() {
   const players = await listPlayersInActiveSeason(sb);
 
   return (
-    <div className="max-w-xl space-y-6">
-      <h2 className="text-2xl font-bold">New punishment</h2>
-      <form action={createPunishment} className="space-y-4 border rounded p-6 bg-white">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Player</span>
-          <select name="playerId" required className="w-full border rounded px-3 py-2">
+    <div className="space-y-8">
+      <SectionHeader
+        eyebrow="Issue sanction"
+        title="New punishment"
+        description="Log an incident and its sanction. Public visibility defaults to on — uncheck for private warnings."
+      />
+
+      <form
+        action={createPunishment}
+        className="max-w-2xl space-y-5 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6"
+      >
+        <FormField label="Player">
+          <select
+            name="playerId"
+            required
+            className={selectClass}
+          >
             {players.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.display_name} ({p.gamer_tag})
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
 
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Incident</span>
-          <select
-            name="incidentType"
-            required
-            className="w-full border rounded px-3 py-2"
-            defaultValue="other"
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField label="Incident">
+            <select
+              name="incidentType"
+              required
+              className={selectClass}
+              defaultValue="other"
+            >
+              <option value="late_arrival">Late arrival</option>
+              <option value="forfeit">Forfeit</option>
+              <option value="equipment">Equipment</option>
+              <option value="social_media">Social media</option>
+              <option value="other">Other</option>
+            </select>
+          </FormField>
+
+          <FormField label="Sanction">
+            <select
+              name="sanctionType"
+              required
+              className={selectClass}
+              defaultValue="point_deduction"
+            >
+              <option value="warning">Warning</option>
+              <option value="point_deduction">Point deduction</option>
+              <option value="gd_deduction">GD deduction</option>
+              <option value="forfeit">Forfeit (3-0)</option>
+              <option value="ban">Ban</option>
+            </select>
+          </FormField>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField
+            label="Magnitude"
+            hint="Points / GD / ban-games, depending on sanction type."
           >
-            <option value="late_arrival">Late arrival</option>
-            <option value="forfeit">Forfeit</option>
-            <option value="equipment">Equipment</option>
-            <option value="social_media">Social media</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
+            <input
+              name="magnitude"
+              type="number"
+              min={0}
+              defaultValue={0}
+              className={inputClass + " tabular"}
+            />
+          </FormField>
 
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Sanction</span>
-          <select
-            name="sanctionType"
-            required
-            className="w-full border rounded px-3 py-2"
-            defaultValue="point_deduction"
-          >
-            <option value="warning">Warning</option>
-            <option value="point_deduction">Point deduction</option>
-            <option value="gd_deduction">GD deduction</option>
-            <option value="forfeit">Forfeit (3-0)</option>
-            <option value="ban">Ban</option>
-          </select>
-        </label>
+          <FormField label="Effective from">
+            <input
+              name="effectiveFrom"
+              type="date"
+              className={inputClass + " tabular"}
+            />
+          </FormField>
+        </div>
 
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Magnitude (points / GD)</span>
+        <label className="flex items-center gap-2 text-sm text-[var(--chalk-2)]">
           <input
-            name="magnitude"
-            type="number"
-            min={0}
-            defaultValue={0}
-            className="w-full border rounded px-3 py-2"
+            type="checkbox"
+            name="publicVisible"
+            defaultChecked
+            className="h-4 w-4 accent-[var(--signal)]"
           />
+          Show on the public /punishments feed
         </label>
 
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Effective from</span>
-          <input
-            name="effectiveFrom"
-            type="date"
-            className="w-full border rounded px-3 py-2"
-          />
-        </label>
+        <FormField
+          label="Notes"
+          hint="Visible to admins; shown on the punishment detail page."
+        >
+          <textarea name="notes" rows={3} className={textareaClass} />
+        </FormField>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="publicVisible" defaultChecked />
-          Show on public /punishments feed
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Notes</span>
-          <textarea
-            name="notes"
-            rows={3}
-            className="w-full border rounded px-3 py-2"
-          />
-        </label>
-
-        <button type="submit" className="bg-black text-white rounded px-4 py-2">
-          Issue punishment
-        </button>
+        <div className="flex items-center gap-3 pt-2">
+          <PrimaryButton type="submit">Issue punishment</PrimaryButton>
+          <Link href="/admin/punishments">
+            <SecondaryButton type="button">Cancel</SecondaryButton>
+          </Link>
+        </div>
       </form>
     </div>
   );

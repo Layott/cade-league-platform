@@ -2,73 +2,113 @@ import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listAllForAdmin } from "@/server/punishments";
 import { formatWat } from "@/lib/time";
+import { SectionHeader } from "@/components/admin/SectionHeader";
+import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
+import { StatusPill } from "@/components/admin/StatusPill";
+import { PrimaryButton } from "@/components/admin/buttons";
 
 export const dynamic = "force-dynamic";
+
+type Row = Awaited<ReturnType<typeof listAllForAdmin>>[number];
 
 export default async function PunishmentsAdminPage() {
   const sb = await getServerSupabase();
   const rows = await listAllForAdmin(sb);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Punishments</h2>
+  const columns: DataTableColumn<Row>[] = [
+    {
+      key: "imposed",
+      label: "Imposed",
+      render: (r) => (
+        <span className="font-mono text-[12px] text-[var(--chalk-1)] tabular">
+          {formatWat(r.imposed_at, "yyyy-MM-dd HH:mm")}
+        </span>
+      ),
+    },
+    {
+      key: "player",
+      label: "Player",
+      render: (r) => (
+        <div>
+          <Link
+            href={`/players/${r.player.id}`}
+            className="font-display text-sm font-semibold text-[var(--chalk-0)] underline-offset-4 hover:text-[var(--signal)] hover:underline"
+          >
+            {r.player.display_name}
+          </Link>
+          <div className="font-mono text-[11px] text-[var(--chalk-3)]">
+            {r.player.gamer_tag}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "incident",
+      label: "Incident",
+      render: (r) => (
+        <span className="text-xs uppercase tracking-[0.14em] text-[var(--chalk-2)]">
+          {r.incident_type.replace(/_/g, " ")}
+        </span>
+      ),
+    },
+    {
+      key: "sanction",
+      label: "Sanction",
+      render: (r) => <StatusPill status={r.sanction_type} />,
+    },
+    {
+      key: "magnitude",
+      label: "Magnitude",
+      align: "right",
+      render: (r) => (
+        <span className="font-mono text-sm text-[var(--chalk-0)] tabular">
+          {r.magnitude}
+        </span>
+      ),
+    },
+    {
+      key: "state",
+      label: "Status",
+      render: (r) => (
+        <StatusPill status={r.revoked_at ? "revoked" : "active"} />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "right",
+      render: (r) => (
         <Link
-          href="/admin/punishments/new"
-          className="rounded bg-black text-white text-sm px-3 py-2"
+          href={`/admin/punishments/${r.id}`}
+          className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
         >
-          New punishment
+          View
         </Link>
-      </div>
+      ),
+    },
+  ];
 
-      <table className="w-full text-sm border" data-testid="punishments-table">
-        <thead className="bg-slate-100">
-          <tr>
-            <th className="text-left p-2">Imposed (WAT)</th>
-            <th className="text-left p-2">Player</th>
-            <th className="text-left p-2">Incident</th>
-            <th className="text-left p-2">Sanction</th>
-            <th className="text-left p-2">Magnitude</th>
-            <th className="text-left p-2">Status</th>
-            <th className="text-left p-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="border-t">
-              <td className="p-2">{formatWat(r.imposed_at, "yyyy-MM-dd HH:mm")}</td>
-              <td className="p-2">
-                <Link
-                  href={`/players/${r.player.id}`}
-                  className="underline hover:text-black"
-                >
-                  {r.player.display_name}
-                </Link>
-                <div className="text-xs text-slate-500">{r.player.gamer_tag}</div>
-              </td>
-              <td className="p-2">{r.incident_type}</td>
-              <td className="p-2">{r.sanction_type}</td>
-              <td className="p-2">{r.magnitude}</td>
-              <td className="p-2">{r.revoked_at ? "revoked" : "active"}</td>
-              <td className="p-2">
-                <Link
-                  href={`/admin/punishments/${r.id}`}
-                  className="underline text-sm"
-                >
-                  View
-                </Link>
-              </td>
-            </tr>
-          ))}
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="p-4 text-center text-slate-500">
-                No punishments recorded.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+  return (
+    <div className="space-y-8">
+      <SectionHeader
+        eyebrow="Discipline"
+        title="Punishments"
+        description="Every sanction issued across the active season. Revoke from the detail view with a written reason."
+        action={
+          <Link href="/admin/punishments/new">
+            <PrimaryButton>+ New punishment</PrimaryButton>
+          </Link>
+        }
+      />
+
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        testId="punishments-table"
+        emptyLabel="Clean slate"
+        emptyHint="No punishments on the books — nobody in the book."
+      />
     </div>
   );
 }
