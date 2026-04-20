@@ -1,10 +1,49 @@
 # Tasks — Active Work
 
-Active plan: Plan 5 complete (2026-04-20). Plan 6 complete. Plan 7A landed in parallel.
+Active plan: Plan 7 Part B complete (2026-04-20). Plan 7 Part A landed in parallel.
 
 Update this file as work progresses per parent CLAUDE.md workflow.
 
 ## Done
+
+- Plan 7 Part B — Public Homepage + Page Polish complete (2026-04-20). Tasks 8–14 shipped.
+  - Design direction: dark night-studio aesthetic, one signal-green accent
+    (`#00ff88`), Space Grotesk display + Inter body + JetBrains Mono numerics
+    via `next/font/google`. Eyebrow tags, scan-lined headers, ticker-stripe
+    hero wordmark.
+  - New `apps/web/src/server/homepage.ts` orchestrates season + next match
+    day + top-3 standings + 3 latest public announcements via `Promise.all`.
+  - New `apps/web/src/components/public/SiteChrome.tsx` (client) wraps all
+    non-admin routes with branded nav + footer; hides on /admin, /login,
+    /logout.
+  - `/` rewritten: hero (CADE wordmark + live-season pulse + fixture ID
+    plate), upcoming match day card with calendar tile + stats strip,
+    podium "Top of the table" with gold/silver/bronze, latest-news strip.
+  - `/standings` polished: sticky header, zebra rows, rank-badge tinted
+    for top 3, inline deduction pill on rows with
+    `punishment_points_deducted > 0`, tiebreaker footer.
+  - `/fixtures` polished: grouped by match_day with venue + kick-off +
+    arrival cutoff meta, jersey-number tiles on each side, status pill
+    (scheduled/live/final/forfeit/void), winner highlighted in signal green.
+  - `/players` polished: enhanced `PlayerCard` with jersey-green ring +
+    hover lift + inline 3-stat strip (Pts/GF/GA) sourced from standings;
+    `/players/[id]` rewritten with stat grid + rank badge.
+  - `/announcements` rewrote as priority-tinted card feed (urgent flare,
+    important amber, info signal-green); markdown heading levels shifted
+    down one so PageHeader remains the sole h1.
+  - `/punishments` polished with sanction-type badges (magnitude
+    callout, incident chip, severity-keyed left accent).
+  - ISR revalidate=60 retained on every public page.
+  - E2E: `apps/web/tests/e2e/public-pages.spec.ts` covers all 6 public
+    routes + nav link traversal. Existing smoke + players specs updated
+    to new copy ("CADE / LEAGUE" wordmark, "The Roster" heading).
+  - Accent color committed: signal-green `#00ff88` (a departure from
+    generic blue/purple, matches eFootball/FUT lighting).
+  - `.next/` collision lesson captured in `tasks/lessons.md`.
+  - Deferred: verifying E2E run cleanly in this sandbox session because
+    a pre-existing dev-server zombie on :3010 is locking the Playwright
+    `webServer`. Unit tests (85) + lint (clean) + `next build` (27
+    routes) all green locally.
 
 - Plan 5 — Attendance complete (2026-04-20). All 11 tasks green.
   - attendance_marks migration applied with UNIQUE (match_day_id, player_id) + audit
