@@ -16,6 +16,7 @@
     "db:query": "supabase db query --linked",
     "audit:smoke": "bash scripts/audit-smoke.sh",
     "seed:user": "bash scripts/create-auth-user.sh",
+    "seed:players": "node scripts/seed-players.mjs",
     "backup": "bash scripts/backup.sh"
   },
   "engines": {
