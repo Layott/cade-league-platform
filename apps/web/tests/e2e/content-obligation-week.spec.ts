@@ -107,15 +107,18 @@ async function setupContext(): Promise<Ctx> {
       { onConflict: "user_id,role" },
     );
 
-  const { data: freePlayer } = await sb
+  const { data: insertedPlayer, error: pErr } = await sb
     .from("players")
+    .insert({
+      user_id: userId,
+      gamer_tag: `e2e-content-${runId}`,
+    })
     .select("id")
-    .is("deleted_at", null)
-    .limit(1)
-    .maybeSingle();
-  if (!freePlayer) throw new Error("no player row available for E2E hijack");
-  const playerId = (freePlayer as { id: string }).id;
-  await sb.from("players").update({ user_id: userId }).eq("id", playerId);
+    .single();
+  if (pErr || !insertedPlayer) {
+    throw new Error(`player create failed: ${pErr?.message ?? "unknown"}`);
+  }
+  const playerId = (insertedPlayer as { id: string }).id;
 
   return { authId, userId, playerId };
 }
@@ -125,7 +128,7 @@ async function teardownContext(ctx: Ctx | null) {
   const sb = svc();
   loadEnv();
   await sb.from("content_posts").delete().eq("player_id", ctx.playerId);
-  await sb.from("players").update({ user_id: null }).eq("id", ctx.playerId);
+  await sb.from("players").delete().eq("id", ctx.playerId);
   await sb.from("user_roles").delete().eq("user_id", ctx.userId);
   await sb.from("users").delete().eq("id", ctx.userId);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

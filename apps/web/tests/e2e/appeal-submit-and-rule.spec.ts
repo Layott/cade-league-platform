@@ -114,25 +114,20 @@ async function setupContext(): Promise<Ctx> {
       { onConflict: "user_id,role" },
     );
 
-  // 4. Find an unlinked player and attach to this user. Fall back to
-  // creating a disposable player row if none free.
-  const { data: freePlayer } = await sb
+  // 4. Create a disposable player row owned by the new user. Avoids
+  // hijacking seeded rows (players.user_id is NOT NULL UNIQUE).
+  const { data: insertedPlayer, error: pErr } = await sb
     .from("players")
-    .select("id, user_id")
-    .is("deleted_at", null)
-    .limit(1)
-    .maybeSingle();
-  let playerId: string;
-  if (freePlayer) {
-    // Hijack it for the test — original user_id will be restored at teardown.
-    await sb
-      .from("players")
-      .update({ user_id: userId })
-      .eq("id", (freePlayer as { id: string }).id);
-    playerId = (freePlayer as { id: string }).id;
-  } else {
-    throw new Error("no player row available for E2E hijack");
+    .insert({
+      user_id: userId,
+      gamer_tag: `e2e-appeal-${runId}`,
+    })
+    .select("id")
+    .single();
+  if (pErr || !insertedPlayer) {
+    throw new Error(`player create failed: ${pErr?.message ?? "unknown"}`);
   }
+  const playerId = (insertedPlayer as { id: string }).id;
 
   // 5. Create disciplinary_case (reported_by = admin).
   const { data: admin } = await sb
@@ -194,8 +189,10 @@ async function teardownContext(ctx: Ctx | null) {
   // Delete appeals + case first to free refs.
   await sb.from("appeals").delete().eq("disciplinary_case_id", ctx.caseId);
   await sb.from("disciplinary_cases").delete().eq("id", ctx.caseId);
-  // Reset player user_id (orphan it, admin can re-link later).
-  await sb.from("players").update({ user_id: null }).eq("id", ctx.playerId);
+  // Delete the disposable player row. ON DELETE CASCADE on user_id so
+  // users get cleaned up when auth user goes, but delete explicitly to
+  // surface any FK errors from lingering test rows.
+  await sb.from("players").delete().eq("id", ctx.playerId);
   await sb.from("user_roles").delete().eq("user_id", ctx.userId);
   await sb.from("users").delete().eq("id", ctx.userId);
   // Delete auth user.

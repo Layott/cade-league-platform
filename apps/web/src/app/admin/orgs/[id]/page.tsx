@@ -283,14 +283,7 @@ export default async function OrgDetailPage({
           </span>
         }
         action={
-          <form
-            action={softDeleteOrgAction}
-            onSubmit={(e) => {
-              if (!confirm("Suspend (soft-delete) this organization?")) {
-                e.preventDefault();
-              }
-            }}
-          >
+          <form action={softDeleteOrgAction}>
             <input type="hidden" name="id" value={org.id} />
             <DangerButton type="submit" data-testid="org-suspend-btn">
               Suspend org
