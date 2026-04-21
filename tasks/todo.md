@@ -404,6 +404,103 @@ Blocked / deferred:
   `/punishments` E2E specs depend on shared ambiguous `users` joins
   that Plan 13A broke. The Plan 14 E2E spec itself passes green.
 
+## Plan 13B Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-13b-orgs-disputes-ui.md`. Consumes Plan 13A server modules (shipped). Ships admin + player UI + 4 private buckets + 3 E2E specs.
+
+### Storage + shared primitives (tasks 1–8)
+
+- [x] 1. Migration `20260505000002_plan13b_storage_buckets.sql` — four private buckets (`org-cac-certs`, `org-contracts`, `dispute-evidence`, `appeal-evidence`). Numbered past HEAD (20260505000001 existed).
+- [x] 2. `apps/web/src/server/storage/paths.ts` — 4 path builders + 6 unit tests (incl. ext sanitization + PRIVATE_BUCKETS export).
+- [x] 3. `apps/web/src/server/storage/signed.ts` — `createSignedUpload` + `createSignedRead` + `trySignedRead`; 5 unit tests.
+- [x] 4. Extend `apps/web/src/components/admin/AdminSubnav.tsx` — 5 new tabs + `visibleTabs` prop.
+- [x] 5. `apps/web/src/app/admin/layout.tsx` — resolves `visibleTabs` via `hasPermAsync` per request.
+- [x] 6. `apps/web/src/components/admin/DeadlineBadge.tsx` + 6 unit tests on `computeDeadlineTone` + `formatCountdown`. Client ticks every 30s.
+- [x] 7. `apps/web/src/components/admin/AuditTrail.tsx` — collapsed `<details>` panel; mounted on every detail page.
+- [x] 8. `apps/web/src/components/shared/SignedFileInput.tsx` — client, multi-file capable, 50 MB cap.
+
+### Admin — orgs + contracts + ledger (tasks 9–13)
+
+- [x] 9. `/admin/orgs/page.tsx` — list with linked-player count join.
+- [x] 10. `/admin/orgs/new/page.tsx` + `actions.ts` — `createOrgAction` + `requestCacUploadAction`; 4 schema tests.
+- [x] 11. `/admin/orgs/[id]/page.tsx` — Info/Players/Contracts/Ledger sections + link/unlink/suspend actions + balance drift check + audit trail.
+- [x] 12. `/admin/orgs/[id]/ledger/new/page.tsx` + `actions.ts` — 5 schema tests (amount>0, adjustment requires direction, coercion).
+- [x] 13. `/admin/orgs/[id]/contracts/new/page.tsx` + `actions.ts` — 3 schema tests (range validation, required path).
+
+### Admin — disputes + appeals (tasks 14–15)
+
+- [x] 14. `/admin/disputes/page.tsx` (status filter) + `[id]/page.tsx` with assign + rule + audit trail; 3 schema tests.
+- [x] 15. `/admin/appeals/page.tsx` with `DeadlineBadge` + `[id]/page.tsx` with panel editor (IDC/admin filter) + ruling; 4 schema tests (duplicate/missing/valid panel + ruling).
+
+### Admin — content + preseason (tasks 16–18)
+
+- [x] 16. `/admin/content/page.tsx` + `actions.ts`; 3 schema tests (reason ≥10 chars + uuid guard).
+- [x] 17. `/admin/content/sessions/[matchDayId]/page.tsx` + `actions.ts` — batched save; iterates per-row with idempotent retry.
+- [x] 18. `/admin/preseason/page.tsx` list + `/new/` + `[id]/` grid + 4 schema tests.
+
+### Player — subnav + pages (tasks 19–21)
+
+- [x] 19. `PlayerSubnav.tsx` mounted in `player/layout.tsx`; `/player/disputes` list + `/new/` with evidence upload (≤3) + 4 schema tests.
+- [x] 20. `/player/appeals` list with `DeadlineBadge` + `/new?caseId=…` (case-ownership check) + 4 schema tests.
+- [x] 21. `/player/content` — obligation card + submit form (`https://` pattern) + own-posts table + 4 schema tests. Stub `/player/profile/page.tsx` landing.
+
+### Tests + verification (task 22)
+
+- [x] 22. 3 E2E specs written: `orgs-manual-ledger.spec.ts`, `appeal-submit-and-rule.spec.ts`, `content-obligation-week.spec.ts`. Appeal + content specs spin up dedicated auth users + hijack a seeded player row; self-clean at teardown. 55+ new unit tests (far exceeds ≥15 requirement).
+
+### Acceptance criteria
+
+Plan 13B is done when:
+
+1. All four parent §1 scenarios (A/B/C/D) demoable from a browser.
+2. A, B, C green as Playwright E2E.
+3. D covered by Plan 13A unit tests + manual UI smoke.
+4. ≥15 new unit tests land (action-level Zod schemas, DeadlineBadge tones, signed-URL helpers).
+5. Verification gate clean.
+
+## Plan 16 Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-16-broadcast-visual-polish.md`.
+Depends on Plan 12 (shipped). Review-first workflow — NO template ships to production until its row in the spec's §14 Review log reads `APPROVED` + git sha.
+
+### Group A — harness + motion tokens (land before any template polish)
+
+- [ ] 1. Install `framer-motion` in `apps/web`. Commit lockfile.
+- [ ] 2. Confirm `KNOWLEDGE/brand-assets/videos/*.mp4` gitignored (large binaries). Add `.gitignore` entry if missing.
+- [ ] 3. Create `apps/web/src/lib/motion.ts` (ENTER / EXIT / STAGGER / SCORE_FLIP / IDLE_PULSE / scaleDuration). TDD `motion.test.ts` (4 tests).
+- [ ] 4. Add ESLint rule banning literal `duration:` in `(overlay)/` + `components/overlay/` — forces token consumption. Smoke-test rule fires on a seeded bad import.
+- [ ] 5. Scaffold `/overlay/design-preview/page.tsx` with grid shell + global controls (theme, bg, frame, speed, export). Gated `broadcast.manage`.
+- [ ] 6. Scaffold `/overlay/style-guide/page.tsx` with palette + type-ramp + motion-token demo blocks + lock-up section.
+- [ ] 7. Add `?preview=1` auto-loop + debug HUD to all 7 production overlay pages via shared `usePreviewMode` hook in `lib/overlay-preview.ts`.
+- [ ] 8. Extend `server/overlays/schemas.ts` — outro gets `finalScore?` + `mvp?`. Migrate registry + existing tests.
+
+### Group B — asset ingestion (run before Group C)
+
+- [ ] 9. Ingest `KNOWLEDGE/brand-assets/logos/` — copy PNGs to `apps/web/public/brand/` with normalized slugs, build React wrappers under `components/overlay/brand/`. Emit placeholder watermark if directory empty.
+- [ ] 10. Sample `KNOWLEDGE/brand-assets/videos/*.mp4` via `ffmpeg` (install if missing); run Claude vision on key frames; write findings to `docs/superpowers/specs/plan-16-design-language.md`.
+- [ ] 11. Commit `plan-16-design-language.md`.
+- [ ] 12. If `KNOWLEDGE/brand-assets/fonts/` drops files mid-plan, load via `next/font/local` + expose `--font-broadcast-display` var.
+
+### Group C — per-template polish (serial, each gated by user review)
+
+Each task: (a) build polished component, (b) wire into design-preview card, (c) STOP — user reviews, commits verdict to spec §14 Review log, (d) on `APPROVED`, swap production stub. Record bundle size per template.
+
+- [ ] 13. **Scorebar** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+- [ ] 14. **Lower Third** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+- [ ] 15. **Standings Widget** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+- [ ] 16. **Player Card** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+- [ ] 17. **Punishment Ticker** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+- [ ] 18. **Intro** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+- [ ] 19. **Outro** — build → preview wire → REVIEW GATE → swap stub. Record bundle size.
+
+### Group D — final verification + docs
+
+- [ ] 20. Optional `/api/broadcast/design-preview/export-stills` endpoint (playwright-based PNG ZIP). Skip if playwright-in-prod infeasible.
+- [ ] 21. E2E `broadcast-design-preview.spec.ts` — 5 tests per spec §8.2.
+- [ ] 22. Update `README.md` Broadcast section with design-preview + style-guide URLs + `?preview=1` format + motion-token reference.
+- [ ] 23. Verification gate: `npm run test` (≥105 pass), `lint`, `build` (≤200 KB per overlay page), `e2e`, `audit:smoke`. Record outputs in spec review.
+- [ ] 24. Append Plan 16 lessons to `tasks/lessons.md`. Populate spec §14 Review log with `APPROVED` shas for all 7 templates.
+
 ## Plan 8 Tasks
 
 - [x] 1. Convert SiteChrome into split Server+Client pair, add role-gated Admin nav entry, bell, log-out; render everywhere except /login + /logout.
