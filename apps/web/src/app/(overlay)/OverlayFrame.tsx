@@ -10,7 +10,8 @@ import type { OverlayState } from "./useOverlayChannel";
  *   - the visible card which fades in when `payload` is non-null and
  *     out when null. 300ms CSS transition.
  *
- * Positioning is absolute to the viewport edges so vMix can key/crop.
+ * Positioning is absolute to the viewport edges so the broadcast tool
+ * (OBS, vMix, Streamlabs, etc.) can key/crop.
  */
 export function OverlayFrame({
   state,

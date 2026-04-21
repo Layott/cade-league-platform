@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 type SessionRow = {
   id: string;
   match_day_id: string;
-  vmix_session_tag: string | null;
+  session_tag: string | null;
   started_at: string;
   ended_at: string | null;
   notes: string | null;
@@ -120,7 +120,7 @@ export default async function BroadcastSessionPage({
   const { data: sessionRaw } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, vmix_session_tag, started_at, ended_at, notes",
+      "id, match_day_id, session_tag, started_at, ended_at, notes",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -175,7 +175,7 @@ export default async function BroadcastSessionPage({
         description={
           <>
             Started {formatWat(session.started_at, "EEE MMM d · HH:mm")} WAT.
-            vMix sources:{" "}
+            Browser source URL:{" "}
             <code className="text-[var(--signal)]">
               /overlay/&lt;key&gt;?session={session.id}
             </code>

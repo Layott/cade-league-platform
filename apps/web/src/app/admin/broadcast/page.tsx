@@ -115,7 +115,7 @@ export default async function BroadcastPage({
       label: "Tag",
       render: (s) => (
         <span className="text-[var(--chalk-1)]">
-          {s.vmix_session_tag ?? "—"}
+          {s.session_tag ?? "—"}
         </span>
       ),
     },
@@ -149,7 +149,7 @@ export default async function BroadcastPage({
       <SectionHeader
         eyebrow="Broadcast"
         title="Stream control"
-        description="Start a stream session against a scheduled match day, then trigger overlays from its control panel. vMix browser sources point at /overlay/<key>?session=<id>."
+        description="Start a stream session against a scheduled match day, then trigger overlays from its control panel. Browser sources (OBS, vMix, Streamlabs, etc.) point at /overlay/<key>?session=<id>."
       />
 
       <form
@@ -203,7 +203,7 @@ export default async function BroadcastPage({
                 Started {formatWat(active.started_at, "HH:mm")} WAT
               </div>
               <div className="text-xs text-[var(--chalk-2)]">
-                Tag: {active.vmix_session_tag ?? "—"}
+                Tag: {active.session_tag ?? "—"}
               </div>
             </div>
             <Link

@@ -19,17 +19,21 @@ See `CLAUDE.md` for contribution guidance and `docs/superpowers/specs/` for desi
 - `npm run lint` — lint the monorepo
 - `npm run build` — production build
 
-## Broadcast (vMix overlay bridge — Plan 12)
+## Broadcast (generic overlay bridge — Plan 12)
 
-`/admin/broadcast` is the stream operator's control surface. Workflow:
+`/admin/broadcast` is the stream operator's control surface. The overlays
+are plain transparent HTML pages, so any tool that supports a browser
+source works: **OBS Studio, vMix, Streamlabs, Ecamm, XSplit, Restream**,
+etc. Workflow:
 
 1. **Pre-flight (one-time):** confirm Supabase Realtime is enabled in the
-   project (Dashboard → Project Settings → API → Realtime). vMix and the
-   overlay-serving origin must reach the Supabase WebSocket endpoint.
+   project (Dashboard → Project Settings → API → Realtime). The broadcast
+   tool and the overlay-serving origin must reach the Supabase WebSocket
+   endpoint.
 2. **Start a session.** Navigate to `/admin/broadcast`, pick the match
    day from the dropdown, optionally add a session tag, click
    **Start stream session**. You'll land on `/admin/broadcast/<sessionId>`.
-3. **Point vMix browser sources** at each overlay URL you need:
+3. **Point your browser sources** at each overlay URL you need:
    - Scorebar — `https://<host>/overlay/scorebar?session=<sessionId>`
    - Lower Third — `https://<host>/overlay/lower-third?session=<sessionId>`
    - Standings Widget — `https://<host>/overlay/standings-widget?session=<sessionId>`
@@ -52,7 +56,8 @@ Notes:
 - Overlay URLs are the shared secret for Phase 2 prep — do not share
   publicly. A short-lived HMAC token is planned for Phase 2 proper.
 - Overlay pages set `.overlay-mode` on `<html>` + `<body>` to force a
-  transparent background; vMix composites directly onto video output.
+  transparent background; the broadcast tool composites directly onto
+  video output.
 - Cache-Control on the hydration endpoint is `no-store` so redeploys
   never pin stale overlay state in the browser source.
 - Permissions: `broadcast.manage` (session start/end + admin UI),

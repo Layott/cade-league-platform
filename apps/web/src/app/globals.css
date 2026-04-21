@@ -95,10 +95,10 @@ body {
   min-height: 100vh;
 }
 
-/* Overlay mode — vMix browser sources composite onto video output so
- * html + body must be fully transparent. The (overlay) route group's
- * layout adds `.overlay-mode` to both documents via a client-side
- * effect on mount. */
+/* Overlay mode — browser sources (OBS, vMix, Streamlabs, etc.) composite
+ * onto video output so html + body must be fully transparent. The (overlay)
+ * route group's layout adds `.overlay-mode` to both documents via a
+ * client-side effect on mount. */
 html.overlay-mode,
 html.overlay-mode body {
   background: transparent !important;

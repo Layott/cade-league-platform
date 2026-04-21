@@ -21,7 +21,7 @@ export type StartSessionInput = {
 export type StreamSessionRow = {
   id: string;
   match_day_id: string;
-  vmix_session_tag: string | null;
+  session_tag: string | null;
   started_at: string;
   ended_at: string | null;
   started_by_user_id: string;
@@ -35,7 +35,7 @@ export async function getActiveSession(
   const { data } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, vmix_session_tag, started_at, ended_at, started_by_user_id, notes",
+      "id, match_day_id, session_tag, started_at, ended_at, started_by_user_id, notes",
     )
     .eq("match_day_id", matchDayId)
     .is("ended_at", null)
@@ -60,7 +60,7 @@ export async function startSession(
     .insert({
       match_day_id: input.matchDayId,
       started_by_user_id: input.userId,
-      vmix_session_tag: input.tag ?? null,
+      session_tag: input.tag ?? null,
       notes: input.notes ?? null,
     })
     .select("id")
@@ -127,7 +127,7 @@ export async function listSessions(
   const { data } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, vmix_session_tag, started_at, ended_at, started_by_user_id, notes",
+      "id, match_day_id, session_tag, started_at, ended_at, started_by_user_id, notes",
     )
     .eq("match_day_id", matchDayId)
     .is("deleted_at", null)

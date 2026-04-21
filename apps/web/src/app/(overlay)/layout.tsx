@@ -10,8 +10,9 @@ import { OverlayBodyTransparent } from "./OverlayBodyTransparent";
  * tacks `.overlay-mode` onto `<html>` + `<body>` so the `!important`
  * overrides in globals.css kick in and the backgrounds go transparent.
  *
- * Overlay pages must render bare markup — vMix composites them onto the
- * video output, so any stray background or chrome will bleed.
+ * Overlay pages must render bare markup — browser sources (OBS, vMix,
+ * Streamlabs, etc.) composite them onto the video output, so any stray
+ * background or chrome will bleed.
  */
 export default function OverlayLayout({
   children,

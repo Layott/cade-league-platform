@@ -5,8 +5,8 @@ import { useEffect } from "react";
 /**
  * Client-side effect that toggles `.overlay-mode` on `<html>` on mount.
  * Paired with the `html.overlay-mode` rules in `globals.css` to make
- * the document background transparent so vMix browser sources can key
- * the overlay directly onto the video output.
+ * the document background transparent so browser sources (OBS, vMix,
+ * Streamlabs, etc.) can key the overlay directly onto the video output.
  *
  * Renders nothing — effect-only.
  */

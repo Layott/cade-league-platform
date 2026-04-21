@@ -11,8 +11,9 @@ export const runtime = "nodejs";
 /**
  * GET /api/broadcast/sessions/:id/active[?template_key=scorebar]
  *
- * NO AUTH. Overlay pages run in headless browser sources (vMix) and the
- * URL itself is the shared secret. Service-role client bypasses RLS.
+ * NO AUTH. Overlay pages run in headless browser sources (OBS, vMix,
+ * Streamlabs, etc.) and the URL itself is the shared secret.
+ * Service-role client bypasses RLS.
  * Response payload is only the overlay_events fields — no PII leakage.
  *
  * If `template_key` is provided, returns a single row or null (the most
