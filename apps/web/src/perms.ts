@@ -32,9 +32,9 @@ export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMS: Record<RoleName, readonly string[]> = {
   admin: ["*"],
-  loc: [],
+  loc: ["squads.validate", "squads.change_authorize"],
   idc: [],
-  referee: [],
+  referee: ["squads.validate", "squads.change_authorize"],
   technical: [],
   production: ["broadcast.trigger"],
   design: [],
@@ -48,6 +48,17 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "matches.read",
     "standings.read",
     "audit.read",
+    // Plan 13A — governance review
+    "orgs.read",
+    "disputes.read",
+    "disputes.rule",
+    "appeals.read",
+    "appeals.rule",
+    "content.verify",
+    "preseason.manage",
+    // Plan 14 — stats OCR review (delete + re-run stay admin-only).
+    "stats.screenshot.upload",
+    "stats.screenshot.review",
   ],
   coach: [],
   team_manager: [],
@@ -56,6 +67,15 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "standings.read",
     "announcements.read.own",
     "profile.edit.own",
+    // Plan 10 — own-submission squad pipeline
+    "squads.submit.own",
+    // Plan 13A — governance submissions + own-data reads
+    "disputes.submit",
+    "disputes.read.own",
+    "appeals.submit",
+    "appeals.read.own",
+    "content.submit",
+    "content.read.own",
   ],
   viewer: [],
 } as const;

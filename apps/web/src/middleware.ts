@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 const ADMIN_ROLES = new Set(["admin", "moderator"]);
+const PLAYER_AREA_ROLES = new Set([
+  "admin",
+  "moderator",
+  "player",
+  "loc",
+  "referee",
+]);
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (!pathname.startsWith("/admin")) return NextResponse.next();
+  const isAdmin = pathname.startsWith("/admin");
+  const isPlayerArea = pathname.startsWith("/player");
+  if (!isAdmin && !isPlayerArea) return NextResponse.next();
 
   const res = NextResponse.next();
   const supabase = createServerClient(
@@ -49,14 +58,24 @@ export async function middleware(req: NextRequest) {
     .is("deleted_at", null);
   const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
 
-  const allowed = roles.some((r) => ADMIN_ROLES.has(r));
+  if (isAdmin) {
+    const allowed = roles.some((r) => ADMIN_ROLES.has(r));
+    if (!allowed) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+    return res;
+  }
+
+  // /player/** — any authenticated user whose roles include player (or an
+  // admin/moderator/ref impersonation path). Admins + refs still need to see
+  // this area for impersonation QA; the server action layer re-checks perms.
+  const allowed = roles.some((r) => PLAYER_AREA_ROLES.has(r));
   if (!allowed) {
     return new NextResponse("Forbidden", { status: 403 });
   }
-
   return res;
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/player/:path*"],
 };

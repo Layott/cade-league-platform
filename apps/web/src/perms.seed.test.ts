@@ -79,11 +79,9 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     ]);
   });
 
-  it("most new roles (loc/idc/referee/technical/design/coach/team_manager/viewer) seed to empty", () => {
+  it("most new roles (idc/technical/design/coach/team_manager/viewer) seed to empty", () => {
     const empties: RoleName[] = [
-      "loc",
       "idc",
-      "referee",
       "technical",
       "design",
       "coach",
@@ -93,6 +91,17 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     for (const r of empties) {
       expect(PERMS[r].length).toBe(0);
     }
+  });
+
+  it("loc + referee seed with squads.* perms (Plan 10)", () => {
+    expect(PERMS.loc).toContain("squads.validate");
+    expect(PERMS.loc).toContain("squads.change_authorize");
+    expect(PERMS.referee).toContain("squads.validate");
+    expect(PERMS.referee).toContain("squads.change_authorize");
+  });
+
+  it("player seed holds squads.submit.own (Plan 10)", () => {
+    expect(PERMS.player).toContain("squads.submit.own");
   });
 
   it("production seed holds broadcast.trigger (Plan 12)", () => {
@@ -116,5 +125,28 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
 
   it("admin seed is the single '*' wildcard row (do not split)", () => {
     expect(PERMS.admin).toEqual(["*"]);
+  });
+
+  it("moderator has stats.screenshot.upload + review (Plan 14)", () => {
+    expect(PERMS.moderator).toContain("stats.screenshot.upload");
+    expect(PERMS.moderator).toContain("stats.screenshot.review");
+  });
+
+  it("admin matches stats.* via wildcard (Plan 14)", () => {
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "stats.screenshot.upload")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "stats.screenshot.delete")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "stats.ocr.rerun")).toBe(true);
+  });
+
+  it("player is denied every stats.* perm (Plan 14)", () => {
+    expect(hasPerm({ userId: null, roles: ["player"] }, "stats.screenshot.upload")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["player"] }, "stats.screenshot.review")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["player"] }, "stats.screenshot.delete")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["player"] }, "stats.ocr.rerun")).toBe(false);
+  });
+
+  it("moderator cannot delete or re-run OCR (admin-only)", () => {
+    expect(hasPerm({ userId: null, roles: ["moderator"] }, "stats.screenshot.delete")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["moderator"] }, "stats.ocr.rerun")).toBe(false);
   });
 });
