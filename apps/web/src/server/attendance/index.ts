@@ -4,5 +4,4 @@ export { editMark, ValidationError } from "./edit";
 export type { EditMarkInput } from "./edit";
 export { listByMatchDay } from "./list";
 export type { RosterRow } from "./list";
-export { flatLadder } from "./penalty";
 export type { AttendanceStatus } from "./penalty";

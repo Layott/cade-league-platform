@@ -15,6 +15,7 @@ export async function listPlayersInActiveSeason(
       entry_status,
       players!inner (
         id, user_id, gamer_tag, psn_id, jersey_number, photo_url, bio,
+        organization_id, team_manager_id, coach_id,
         users!inner ( id, display_name )
       )
       `
@@ -35,6 +36,9 @@ export async function listPlayersInActiveSeason(
       jersey_number: number | null;
       photo_url: string | null;
       bio: string | null;
+      organization_id: string | null;
+      team_manager_id: string | null;
+      coach_id: string | null;
       users: { id: string; display_name: string };
     };
   };
@@ -49,6 +53,9 @@ export async function listPlayersInActiveSeason(
     photo_url: r.players.photo_url,
     bio: r.players.bio,
     entry_status: r.entry_status,
+    organization_id: r.players.organization_id ?? null,
+    team_manager_id: r.players.team_manager_id ?? null,
+    coach_id: r.players.coach_id ?? null,
   }));
 
   return rows.sort((a, b) => {
@@ -68,6 +75,7 @@ export async function getPlayerById(
     .select(
       `
       id, user_id, gamer_tag, psn_id, jersey_number, photo_url, bio,
+      organization_id, team_manager_id, coach_id,
       users!inner ( id, display_name )
       `
     )
@@ -85,6 +93,9 @@ export async function getPlayerById(
     jersey_number: number | null;
     photo_url: string | null;
     bio: string | null;
+    organization_id: string | null;
+    team_manager_id: string | null;
+    coach_id: string | null;
     users: { id: string; display_name: string };
   };
 
@@ -99,5 +110,8 @@ export async function getPlayerById(
     photo_url: row.photo_url,
     bio: row.bio,
     entry_status: "confirmed",
+    organization_id: row.organization_id ?? null,
+    team_manager_id: row.team_manager_id ?? null,
+    coach_id: row.coach_id ?? null,
   };
 }

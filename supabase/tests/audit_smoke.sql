@@ -128,6 +128,152 @@ begin
     end if;
   end;
 
+  -- Plan 13A — organizations + caution_ledger_entries smoke.
+  -- Insert org + update; insert ledger row; assert audit capture; verify the
+  -- append-only trigger on caution_ledger_entries blocks UPDATE.
+  declare
+    v_org_id       uuid;
+    v_actor_uid    uuid;
+    v_org_events   int;
+    v_ledg_events  int;
+    v_blocked      boolean := false;
+  begin
+    select id into v_actor_uid from public.users where deleted_at is null limit 1;
+    if v_actor_uid is null then
+      raise notice 'plan13 smoke skipped: no user available as actor';
+    else
+      insert into public.organizations (name, status)
+        values ('smoke-org-'||substr(v_request_id,11,8), 'active')
+        returning id into v_org_id;
+      update public.organizations
+        set status = 'suspended', updated_at = now()
+        where id = v_org_id;
+
+      insert into public.caution_ledger_entries (
+        organization_id, entry_type, amount_coins, direction,
+        balance_after_coins, entered_by_user_id, reference
+      ) values (
+        v_org_id, 'deposit', 100, 'credit', 100, v_actor_uid,
+        'smoke-'||v_request_id
+      );
+
+      select count(*) into v_org_events
+        from public.audit_events
+        where entity_type = 'organizations'
+          and entity_id = v_org_id::text
+          and request_id = v_request_id;
+      if v_org_events < 2 then
+        raise exception 'organizations audit expected >=2, got %', v_org_events;
+      end if;
+
+      select count(*) into v_ledg_events
+        from public.audit_events
+        where entity_type = 'caution_ledger_entries'
+          and request_id = v_request_id;
+      if v_ledg_events < 1 then
+        raise exception 'caution_ledger_entries audit expected >=1, got %',
+          v_ledg_events;
+      end if;
+
+      -- Verify append-only block on UPDATE.
+      begin
+        update public.caution_ledger_entries
+          set reference = 'tamper'
+          where organization_id = v_org_id;
+      exception when others then
+        v_blocked := true;
+      end;
+      if not v_blocked then
+        raise exception
+          'caution_ledger_entries UPDATE was NOT blocked (append-only broken)';
+      end if;
+
+      -- Soft-delete smoke org.
+      update public.organizations set deleted_at = now() where id = v_org_id;
+    end if;
+  end;
+
+  -- Plan 14 — match_stat_screenshots + ocr_usage_log smoke. Insert + update
+  -- + soft-delete on the screenshot table fires the audit trigger. Then
+  -- prove ocr_usage_log rejects UPDATE and DELETE.
+  declare
+    v_mss_id    uuid;
+    v_mss_mid   uuid;
+    v_mss_uid   uuid;
+    v_mss_n     int;
+    v_log_id    uuid;
+    v_blocked   boolean;
+  begin
+    select id into v_mss_mid from public.matches where deleted_at is null limit 1;
+    select id into v_mss_uid from public.users  where deleted_at is null limit 1;
+    if v_mss_mid is null or v_mss_uid is null then
+      raise notice 'plan14 smoke skipped: missing match or user';
+    else
+      insert into public.match_stat_screenshots
+        (match_id, storage_path, uploaded_by, parse_status, notes)
+      values (
+        v_mss_mid,
+        'smoke/' || v_request_id || '.png',
+        v_mss_uid,
+        'pending',
+        'plan14-smoke'
+      ) returning id into v_mss_id;
+
+      update public.match_stat_screenshots
+        set parse_status = 'parsed', notes = 'plan14-smoke-u'
+        where id = v_mss_id;
+
+      update public.match_stat_screenshots
+        set deleted_at = now()
+        where id = v_mss_id;
+
+      select count(*) into v_mss_n
+        from public.audit_events
+        where entity_type = 'match_stat_screenshots'
+          and entity_id = v_mss_id::text
+          and request_id = v_request_id;
+      if v_mss_n <> 3 then
+        raise exception 'match_stat_screenshots: expected 3 audit rows, got %', v_mss_n;
+      end if;
+    end if;
+
+    -- ocr_usage_log append-only: insert a row, then prove UPDATE + DELETE
+    -- both raise.
+    insert into public.ocr_usage_log
+      (engine, cost_usd_cents, success_bool, error_message)
+    values
+      ('tesseract', 0, true, 'plan14-smoke-'||v_request_id)
+    returning id into v_log_id;
+
+    v_blocked := false;
+    begin
+      update public.ocr_usage_log set error_message = 'tamper' where id = v_log_id;
+    exception when others then
+      if sqlerrm like '%append-only%' then
+        v_blocked := true;
+      else
+        raise exception 'unexpected UPDATE error on ocr_usage_log: %', sqlerrm;
+      end if;
+    end;
+    if not v_blocked then
+      raise exception 'ocr_usage_log UPDATE was NOT blocked (append-only broken)';
+    end if;
+
+    v_blocked := false;
+    begin
+      delete from public.ocr_usage_log where id = v_log_id;
+    exception when others then
+      if sqlerrm like '%append-only%' then
+        v_blocked := true;
+      else
+        raise exception 'unexpected DELETE error on ocr_usage_log: %', sqlerrm;
+      end if;
+    end;
+    if not v_blocked then
+      raise exception 'ocr_usage_log DELETE was NOT blocked (append-only broken)';
+    end if;
+  end;
+
   -- Audit rows stay (append-only). They are tagged with the smoke request_id
   -- and can be filtered out of reporting queries.
 
