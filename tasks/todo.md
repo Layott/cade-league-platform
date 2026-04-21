@@ -94,6 +94,52 @@ Open items:
   not yet filter by `?userId`. Left as a link; follow-up plan to wire the
   filter.
 
+## Plan 12 Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-12-vmix-overlay-bridge.md`.
+
+### Migrations + perms seed
+
+- [ ] 1. Migration `20260503000001_broadcast_tables.sql` — create `overlay_templates`, `stream_sessions`, `overlay_events` with constraints + indexes per spec §3. Renumbered from spec's `20260421_*` to keep monotonic order past `20260428000003`.
+- [ ] 2. Migration `20260503000002_broadcast_audit.sql` — attach `audit_row_change()` to all three new tables.
+- [ ] 3. Verify `user_roles.role` CHECK already contains `'production'` (added in `20260428000001_user_roles_expand.sql`). If present, skip migration 3; else add `20260503000003_user_roles_add_production.sql`. Expected: skip.
+- [ ] 4. Migration `20260503000003_overlay_templates_seed.sql` — seed 7 overlay templates (`scorebar`, `lower_third`, `standings_widget`, `player_card`, `punishment_ticker`, `intro`, `outro`) with matching `html_route`.
+- [ ] 5. Migration `20260503000004_broadcast_perms_seed.sql` — grant `broadcast.trigger`+`broadcast.manage` to admin (via wildcard already) and `broadcast.trigger` to `production` with `ON CONFLICT DO NOTHING`.
+- [ ] 6. Update `apps/web/src/perms.ts` seed doc: add `broadcast.trigger` to `production` role; admin wildcard already covers. Keep seed contract test green.
+
+### Server modules (TDD)
+
+- [ ] 7. Create `apps/web/src/server/overlays/schemas.ts` — 7 Zod schemas per spec §5.2.
+- [ ] 8. Create `apps/web/src/server/overlays/registry.ts` — `TEMPLATE_KEY → { schema, route }` const map.
+- [ ] 9. TDD `overlays/schemas.test.ts` + `registry.test.ts` — ≥3 tests (schema round-trip, registry CHECK-constraint parity, realtime event-name formation).
+- [ ] 10. TDD `overlays/autofill.ts` + `autofill.test.ts` — ≥2 tests (scorebar from match, punishment_ticker filters `public_visible=true`).
+- [ ] 11. TDD `server/broadcast/realtime.ts` + `realtime.test.ts` — thin `publish(sessionId, event, payload)` wrapper; mockable.
+- [ ] 12. TDD `server/broadcast/sessions.ts` + `sessions.test.ts` — ≥3 tests (start rejects when active exists, start creates row, end clears active overlays).
+- [ ] 13. TDD `server/broadcast/events.ts` + `events.test.ts` — ≥4 tests (rejects unknown templateKey, rejects bad payload, writes row + publishes once, clearOverlay sets cleared_at + publishes).
+- [ ] 14. Add `server/broadcast/permissions.ts` re-export surface for `broadcast.trigger`/`broadcast.manage`.
+
+### API routes
+
+- [ ] 15. Add 6 API routes under `apps/web/src/app/api/broadcast/` per spec §5.3. Use `requirePermAsync` for gated routes. `/sessions/:id/active` stays unauthenticated (headless browser source).
+
+### Overlay route group
+
+- [ ] 16. Create `(overlay)` route group with `layout.tsx` — transparent body, no SiteChrome. Add `/overlay/*` to `SiteChromeClient` HIDDEN_PREFIXES so global chrome doesn't leak in.
+- [ ] 17. Create 7 overlay pages under `(overlay)/overlay/<key>/page.tsx` — Client Components that hydrate + subscribe via Supabase Realtime.
+
+### Admin UI
+
+- [ ] 18. Create `/admin/broadcast/page.tsx` — match_day picker + start/end session.
+- [ ] 19. Create `/admin/broadcast/[sessionId]/page.tsx` — trigger grid + active overlays panel + session controls.
+- [ ] 20. Add "Broadcast" tab to `AdminSubnav`.
+
+### Tests + verification
+
+- [ ] 21. Write E2E `apps/web/tests/e2e/broadcast-overlay.spec.ts` per spec §7.
+- [ ] 22. Docs: append operator workflow + Realtime pre-flight note to `README.md`.
+- [ ] 23. Verification gate — `npm run test`, `npm run lint`, `npm run build` (dev server killed), `npm --workspace apps/web run e2e`, `npm run audit:smoke`, `npm run db:push`.
+- [ ] 24. Commit in slices (migrations → server → API → overlay routes → admin UI → E2E → docs). Push. Add Plan 12 review section.
+
 ## Plan 14 Tasks
 
 Spec: `docs/superpowers/specs/2026-04-21-plan-14-stats-screenshot-ocr.md`.

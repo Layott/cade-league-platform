@@ -36,7 +36,7 @@ export const PERMS: Record<RoleName, readonly string[]> = {
   idc: [],
   referee: [],
   technical: [],
-  production: [],
+  production: ["broadcast.trigger"],
   design: [],
   moderator: [
     "announcements.*",

@@ -79,13 +79,12 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     ]);
   });
 
-  it("new roles (loc/idc/referee/technical/production/design/coach/team_manager/viewer) seed to empty", () => {
+  it("most new roles (loc/idc/referee/technical/design/coach/team_manager/viewer) seed to empty", () => {
     const empties: RoleName[] = [
       "loc",
       "idc",
       "referee",
       "technical",
-      "production",
       "design",
       "coach",
       "team_manager",
@@ -94,6 +93,25 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     for (const r of empties) {
       expect(PERMS[r].length).toBe(0);
     }
+  });
+
+  it("production seed holds broadcast.trigger (Plan 12)", () => {
+    expect(PERMS.production).toEqual(["broadcast.trigger"]);
+  });
+
+  it("admin matches broadcast.trigger and broadcast.manage via wildcard", () => {
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "broadcast.trigger")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "broadcast.manage")).toBe(true);
+  });
+
+  it("production can trigger overlays but cannot manage sessions", () => {
+    expect(hasPerm({ userId: null, roles: ["production"] }, "broadcast.trigger")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["production"] }, "broadcast.manage")).toBe(false);
+  });
+
+  it("moderator and player have neither broadcast perm", () => {
+    expect(hasPerm({ userId: null, roles: ["moderator"] }, "broadcast.trigger")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["player"] }, "broadcast.manage")).toBe(false);
   });
 
   it("admin seed is the single '*' wildcard row (do not split)", () => {
