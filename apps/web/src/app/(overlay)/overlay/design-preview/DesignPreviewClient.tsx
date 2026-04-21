@@ -443,16 +443,17 @@ function TemplateCard({
           </div>
         </div>
         <a
-          href={card.route}
+          href={src}
           target="_blank"
           rel="noreferrer"
+          title="Open this template full-screen in a new tab with the same payload, auto-looping. Use browser fullscreen (F11) for a true 1920×1080 preview."
           style={{
             fontSize: 11,
             color: "var(--primary)",
             textDecoration: "underline",
           }}
         >
-          open
+          open ⤢
         </a>
       </header>
 
