@@ -93,8 +93,10 @@ export async function createSubmission(
  * insert itself is the lock (unique partial index enforces one live row).
  */
 export async function lockSubmission(
-  _sb: SupabaseClient,
-  _submissionId: string,
+  sb: SupabaseClient,
+  submissionId: string,
 ): Promise<void> {
   // Intentionally a no-op in Phase 1B. See plan §4.4 note.
+  void sb;
+  void submissionId;
 }
