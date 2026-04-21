@@ -44,3 +44,6 @@ backups/
 
 # Claude / plugin state
 .claude/cache/
+
+# Brand asset zip archives — extracted contents live alongside
+KNOWLEDGE/brand-assets/fonts/*.zip

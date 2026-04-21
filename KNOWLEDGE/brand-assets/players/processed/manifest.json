@@ -1,0 +1,710 @@
+{
+  "generated_at": "2026-04-21T15:07:48Z",
+  "source_dir": "KNOWLEDGE\\brand-assets\\players",
+  "output_dir": "KNOWLEDGE\\brand-assets\\players\\processed",
+  "players": {
+    "adefola": {
+      "display_name": "Adefola",
+      "pose_count": 3,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "ADEFOLA 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "adefola/headshot_01.png",
+            "card": "adefola/card_01.png",
+            "fullbody": "adefola/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "ADEFOLA 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "adefola/headshot_02.png",
+            "card": "adefola/card_02.png",
+            "fullbody": "adefola/fullbody_02.png"
+          },
+          "face_detected": false,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "ADEFOLA 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "adefola/headshot_03.png",
+            "card": "adefola/card_03.png",
+            "fullbody": "adefola/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "anife": {
+      "display_name": "Anife",
+      "pose_count": 5,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "ANIFE 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "anife/headshot_01.png",
+            "card": "anife/card_01.png",
+            "fullbody": "anife/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "ANIFE 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "anife/headshot_02.png",
+            "card": "anife/card_02.png",
+            "fullbody": "anife/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "ANIFE 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "anife/headshot_03.png",
+            "card": "anife/card_03.png",
+            "fullbody": "anife/fullbody_03.png"
+          },
+          "face_detected": false,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 4,
+          "source": "ANIFE 4.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "anife/headshot_04.png",
+            "card": "anife/card_04.png",
+            "fullbody": "anife/fullbody_04.png"
+          },
+          "face_detected": false,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 5,
+          "source": "ANIFE 5.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "anife/headshot_05.png",
+            "card": "anife/card_05.png",
+            "fullbody": "anife/fullbody_05.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "baji_jnr": {
+      "display_name": "Baji Jnr",
+      "pose_count": 4,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "BAJI JNR 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "baji_jnr/headshot_01.png",
+            "card": "baji_jnr/card_01.png",
+            "fullbody": "baji_jnr/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "BAJI JNR 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "baji_jnr/headshot_02.png",
+            "card": "baji_jnr/card_02.png",
+            "fullbody": "baji_jnr/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "BAJI JNR 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "baji_jnr/headshot_03.png",
+            "card": "baji_jnr/card_03.png",
+            "fullbody": "baji_jnr/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 4,
+          "source": "BAJI JNR 4.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "baji_jnr/headshot_04.png",
+            "card": "baji_jnr/card_04.png",
+            "fullbody": "baji_jnr/fullbody_04.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "dadaboi": {
+      "display_name": "Dadaboi",
+      "pose_count": 4,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "DADABOI 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "dadaboi/headshot_01.png",
+            "card": "dadaboi/card_01.png",
+            "fullbody": "dadaboi/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "DADABOI 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "dadaboi/headshot_02.png",
+            "card": "dadaboi/card_02.png",
+            "fullbody": "dadaboi/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "DADABOI 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "dadaboi/headshot_03.png",
+            "card": "dadaboi/card_03.png",
+            "fullbody": "dadaboi/fullbody_03.png"
+          },
+          "face_detected": false,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 4,
+          "source": "DADABOI 4.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "dadaboi/headshot_04.png",
+            "card": "dadaboi/card_04.png",
+            "fullbody": "dadaboi/fullbody_04.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "faruk": {
+      "display_name": "Faruk",
+      "pose_count": 4,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "FARUK 1.png",
+          "source_resolution": "246x491",
+          "variants": {
+            "headshot": "faruk/headshot_01.png",
+            "card": "faruk/card_01.png",
+            "fullbody": "faruk/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "FARUK 2.CR3",
+          "source_resolution": "6742x4498",
+          "variants": {
+            "headshot": "faruk/headshot_02.png",
+            "card": "faruk/card_02.png",
+            "fullbody": "faruk/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "FARUK 3.CR3",
+          "source_resolution": "6742x4498",
+          "variants": {
+            "headshot": "faruk/headshot_03.png",
+            "card": "faruk/card_03.png",
+            "fullbody": "faruk/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 4,
+          "source": "FARUK 4.CR3",
+          "source_resolution": "6742x4498",
+          "variants": {
+            "headshot": "faruk/headshot_04.png",
+            "card": "faruk/card_04.png",
+            "fullbody": "faruk/fullbody_04.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "guru": {
+      "display_name": "Guru",
+      "pose_count": 1,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "GURU 1.png",
+          "source_resolution": "3264x4928",
+          "variants": {
+            "headshot": "guru/headshot_01.png",
+            "card": "guru/card_01.png",
+            "fullbody": "guru/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "kaykay": {
+      "display_name": "Kaykay",
+      "pose_count": 1,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "KAYKAY 1.png",
+          "source_resolution": "466x945",
+          "variants": {
+            "headshot": "kaykay/headshot_01.png",
+            "card": "kaykay/card_01.png",
+            "fullbody": "kaykay/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "killer_freak": {
+      "display_name": "Killer Freak",
+      "pose_count": 3,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "KILLER FREAK 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "killer_freak/headshot_01.png",
+            "card": "killer_freak/card_01.png",
+            "fullbody": "killer_freak/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "KILLER FREAK 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "killer_freak/headshot_02.png",
+            "card": "killer_freak/card_02.png",
+            "fullbody": "killer_freak/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "KILLER FREAK 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "killer_freak/headshot_03.png",
+            "card": "killer_freak/card_03.png",
+            "fullbody": "killer_freak/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "kingnonex": {
+      "display_name": "Kingnonex",
+      "pose_count": 3,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "KINGNONEX 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "kingnonex/headshot_01.png",
+            "card": "kingnonex/card_01.png",
+            "fullbody": "kingnonex/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "KINGNONEX 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "kingnonex/headshot_02.png",
+            "card": "kingnonex/card_02.png",
+            "fullbody": "kingnonex/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "KINGNONEX 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "kingnonex/headshot_03.png",
+            "card": "kingnonex/card_03.png",
+            "fullbody": "kingnonex/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "mitch": {
+      "display_name": "Mitch",
+      "pose_count": 3,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "MITCH 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "mitch/headshot_01.png",
+            "card": "mitch/card_01.png",
+            "fullbody": "mitch/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "MITCH 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "mitch/headshot_02.png",
+            "card": "mitch/card_02.png",
+            "fullbody": "mitch/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "MITCH 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "mitch/headshot_03.png",
+            "card": "mitch/card_03.png",
+            "fullbody": "mitch/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "mr_oga": {
+      "display_name": "Mr Oga",
+      "pose_count": 3,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "MR OGA 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "mr_oga/headshot_01.png",
+            "card": "mr_oga/card_01.png",
+            "fullbody": "mr_oga/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "MR OGA 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "mr_oga/headshot_02.png",
+            "card": "mr_oga/card_02.png",
+            "fullbody": "mr_oga/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "MR OGA 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "mr_oga/headshot_03.png",
+            "card": "mr_oga/card_03.png",
+            "fullbody": "mr_oga/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "tactical": {
+      "display_name": "Tactical",
+      "pose_count": 3,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "TACTICAL 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "tactical/headshot_01.png",
+            "card": "tactical/card_01.png",
+            "fullbody": "tactical/fullbody_01.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "TACTICAL 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "tactical/headshot_02.png",
+            "card": "tactical/card_02.png",
+            "fullbody": "tactical/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "TACTICAL 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "tactical/headshot_03.png",
+            "card": "tactical/card_03.png",
+            "fullbody": "tactical/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    },
+    "wolevation": {
+      "display_name": "Wolevation",
+      "pose_count": 4,
+      "poses": [
+        {
+          "pose_index": 1,
+          "source": "WOLEVATION 1.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "wolevation/headshot_01.png",
+            "card": "wolevation/card_01.png",
+            "fullbody": "wolevation/fullbody_01.png"
+          },
+          "face_detected": false,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 2,
+          "source": "WOLEVATION 2.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "wolevation/headshot_02.png",
+            "card": "wolevation/card_02.png",
+            "fullbody": "wolevation/fullbody_02.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 3,
+          "source": "WOLEVATION 3.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "wolevation/headshot_03.png",
+            "card": "wolevation/card_03.png",
+            "fullbody": "wolevation/fullbody_03.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        },
+        {
+          "pose_index": 4,
+          "source": "WOLEVATION 4.ARW",
+          "source_resolution": "6024x4024",
+          "variants": {
+            "headshot": "wolevation/headshot_04.png",
+            "card": "wolevation/card_04.png",
+            "fullbody": "wolevation/fullbody_04.png"
+          },
+          "face_detected": true,
+          "skipped_variants": [
+            "wide"
+          ],
+          "notes": null
+        }
+      ]
+    }
+  },
+  "warnings": [
+    {
+      "player": "guru",
+      "warning": "only 1 pose available — consider adding more for variety"
+    },
+    {
+      "player": "kaykay",
+      "warning": "only 1 pose available — consider adding more for variety"
+    }
+  ]
+}
