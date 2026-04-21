@@ -5,6 +5,10 @@ import { getPlayerById } from "@/server/players";
 import { getActiveSeason } from "@/server/seasons";
 import { listStandings } from "@/server/standings/read";
 import { PlayerAvatar } from "@/components/players/PlayerAvatar";
+import {
+  getApprovedSubmissionForPlayer,
+  weekStartThursday,
+} from "@/server/squads";
 
 export const revalidate = 60;
 
@@ -26,6 +30,81 @@ export default async function PlayerProfilePage({
   const rank = stats
     ? standings.findIndex((r) => r.player_id === player.id) + 1
     : null;
+  const weekStart = weekStartThursday(new Date());
+  const approvedSquad = await getApprovedSubmissionForPlayer(sb, player.id, weekStart);
+
+  // Plan 14 — recent match stats card. Pulls player_match_stats rows whose
+  // originating screenshot has parse_status='confirmed'. Unreviewed OCR
+  // never leaks: the inner join on match_stat_screenshots with the status
+  // filter excludes any PMS row lacking a confirmed screenshot.
+  type RecentRow = {
+    match_id: string;
+    goals: number;
+    assists: number;
+    custom_metrics: Record<string, number | null> | null;
+    matches: {
+      id: string;
+      match_day_id: string;
+      home_player_id: string;
+      away_player_id: string;
+      match_stat_screenshots:
+        | { id: string; parse_status: string; confirmed_at: string | null }[]
+        | null;
+      match_day: { match_date: string } | { match_date: string }[] | null;
+    } | null;
+  };
+  const { data: recentRaw } = await sb
+    .from("player_match_stats")
+    .select(
+      `match_id, goals, assists, custom_metrics,
+       matches:match_id (
+         id, match_day_id, home_player_id, away_player_id,
+         match_stat_screenshots!inner ( id, parse_status, confirmed_at ),
+         match_day:match_day_id ( match_date )
+       )`
+    )
+    .eq("player_id", player.id)
+    .is("deleted_at", null)
+    .eq("matches.match_stat_screenshots.parse_status", "confirmed")
+    .limit(10);
+
+  const recentStats: Array<{
+    matchId: string;
+    matchDate: string | null;
+    opponentId: string | null;
+    goals: number;
+    assists: number;
+    possessionPct: number | null;
+    shots: number | null;
+    passAccuracyPct: number | null;
+  }> = [];
+
+  for (const raw of (recentRaw ?? []) as RecentRow[]) {
+    const m = raw.matches;
+    if (!m) continue;
+    const ss = m.match_stat_screenshots ?? [];
+    if (!ss.some((s) => s.parse_status === "confirmed")) continue;
+    const md = Array.isArray(m.match_day)
+      ? m.match_day[0]?.match_date
+      : m.match_day?.match_date;
+    const opponentId =
+      m.home_player_id === player.id ? m.away_player_id : m.home_player_id;
+    const cm = raw.custom_metrics ?? {};
+    recentStats.push({
+      matchId: raw.match_id,
+      matchDate: md ?? null,
+      opponentId,
+      goals: raw.goals,
+      assists: raw.assists,
+      possessionPct: (cm.possessionPct ?? null) as number | null,
+      shots: (cm.shots ?? null) as number | null,
+      passAccuracyPct: (cm.passAccuracyPct ?? null) as number | null,
+    });
+  }
+  // Sort newest-first by matchDate.
+  recentStats.sort((a, b) =>
+    (b.matchDate ?? "").localeCompare(a.matchDate ?? ""),
+  );
 
   return (
     <div>
@@ -95,6 +174,32 @@ export default async function PlayerProfilePage({
             </p>
           )}
         </section>
+
+        {approvedSquad ? (
+          <section data-testid="public-week-squad">
+            <h2 className="mb-3 font-display text-xl font-bold text-[var(--chalk-0)]">
+              This week&apos;s squad
+            </h2>
+            <p className="mb-3 text-xs uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+              Week of {approvedSquad.submission.week_start_date}
+            </p>
+            <ul className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
+              {approvedSquad.items.map((it) => (
+                <li
+                  key={it.id}
+                  className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-2"
+                >
+                  <div className="font-semibold text-[var(--chalk-0)]">
+                    #{it.slot_index} {it.name}
+                  </div>
+                  <div className="font-mono text-[11px] text-[var(--chalk-3)]">
+                    {it.rating} · {it.position} · {it.item_type}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {player.bio ? (
           <section>
