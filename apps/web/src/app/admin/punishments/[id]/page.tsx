@@ -27,7 +27,7 @@ export default async function PunishmentDetailPage({
         id, incident_type, match_id,
         players!inner (
           id, gamer_tag,
-          users!inner ( display_name )
+          users:users!players_user_id_fkey!inner ( display_name )
         )
       )
       `,

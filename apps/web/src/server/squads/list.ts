@@ -48,7 +48,7 @@ export async function listSubmissionsForWeek(
       `id, season_id, player_id, week_start_date, futbin_screenshot_path,
        submitted_at, validation_status, validated_by, validated_at,
        rejection_reason, notes,
-       player:player_id (id, display_name, gamer_tag)`,
+       player:player_id (id, gamer_tag, users:users!players_user_id_fkey (display_name))`,
     )
     .eq("season_id", seasonId)
     .eq("week_start_date", weekStart)
@@ -57,9 +57,27 @@ export async function listSubmissionsForWeek(
   if (opts.status) q = q.eq("validation_status", opts.status);
   const { data, error } = await q;
   if (error) throw new Error(`listSubmissionsForWeek: ${error.message}`);
-  // Supabase `.select("player:player_id (...)")` infers as a to-many shape;
-  // cast via unknown to the correct single-object shape for this FK.
-  return (data ?? []) as unknown as SubmissionRow[];
+  // The embedded shape is `{ player: { id, gamer_tag, users: { display_name } } }`;
+  // flatten to the public `{ player: { id, display_name, gamer_tag } }` shape.
+  type Nested = Omit<SubmissionRow, "player"> & {
+    player:
+      | {
+          id: string;
+          gamer_tag: string;
+          users: { display_name: string | null } | null;
+        }
+      | null;
+  };
+  return ((data ?? []) as unknown as Nested[]).map((r) => ({
+    ...r,
+    player: r.player
+      ? {
+          id: r.player.id,
+          display_name: r.player.users?.display_name ?? r.player.gamer_tag,
+          gamer_tag: r.player.gamer_tag,
+        }
+      : undefined,
+  }));
 }
 
 export async function getSubmissionWithItems(
@@ -72,7 +90,7 @@ export async function getSubmissionWithItems(
       `id, season_id, player_id, week_start_date, futbin_screenshot_path,
        submitted_at, validation_status, validated_by, validated_at,
        rejection_reason, notes,
-       player:player_id (id, display_name, gamer_tag)`,
+       player:player_id (id, gamer_tag, users:users!players_user_id_fkey (display_name))`,
     )
     .eq("id", submissionId)
     .is("deleted_at", null)
@@ -88,8 +106,30 @@ export async function getSubmissionWithItems(
     .order("slot_index", { ascending: true });
   if (iErr) throw new Error(`getSubmissionWithItems items: ${iErr.message}`);
 
+  // Flatten embedded `users.display_name` into the public `player` shape.
+  type Nested = Omit<SubmissionRow, "player"> & {
+    player:
+      | {
+          id: string;
+          gamer_tag: string;
+          users: { display_name: string | null } | null;
+        }
+      | null;
+  };
+  const nested = sub as unknown as Nested;
+  const submission: SubmissionRow = {
+    ...nested,
+    player: nested.player
+      ? {
+          id: nested.player.id,
+          display_name: nested.player.users?.display_name ?? nested.player.gamer_tag,
+          gamer_tag: nested.player.gamer_tag,
+        }
+      : undefined,
+  };
+
   return {
-    submission: sub as unknown as SubmissionRow,
+    submission,
     items: (items ?? []) as SquadItemRow[],
   };
 }

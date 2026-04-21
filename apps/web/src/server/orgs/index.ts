@@ -141,7 +141,7 @@ export async function listPlayersForOrg(
 ): Promise<Array<{ id: string; gamer_tag: string; display_name: string }>> {
   const { data, error } = await sb
     .from("players")
-    .select("id, gamer_tag, users!inner(display_name)")
+    .select("id, gamer_tag, users:users!players_user_id_fkey!inner(display_name)")
     .eq("organization_id", orgId)
     .is("deleted_at", null);
   if (error) throw new OrgError(`listPlayersForOrg: ${error.message}`);

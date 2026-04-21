@@ -125,7 +125,7 @@ export async function listPublic(sb: SupabaseClient, limit = 50): Promise<Public
         incident_type,
         players!inner (
           id, gamer_tag,
-          users!inner ( display_name )
+          users:users!players_user_id_fkey!inner ( display_name )
         )
       )
       `
@@ -185,7 +185,7 @@ export async function listAllForAdmin(sb: SupabaseClient): Promise<
         incident_type,
         players!inner (
           id, gamer_tag,
-          users!inner ( display_name )
+          users:users!players_user_id_fkey!inner ( display_name )
         )
       )
       `
@@ -242,7 +242,7 @@ export async function listForPlayer(
     .select(
       `
       incident_type,
-      players!inner ( id, gamer_tag, users!inner ( display_name ) ),
+      players!inner ( id, gamer_tag, users:users!players_user_id_fkey!inner ( display_name ) ),
       disciplinary_actions!inner (
         id, case_id, sanction_type, magnitude, imposed_at, effective_from, notes,
         public_visible, revoked_at, deleted_at

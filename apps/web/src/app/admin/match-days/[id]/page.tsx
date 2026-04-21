@@ -54,7 +54,7 @@ export default async function MatchDayDetailPage({
   const { data: players } = await sb
     .from("season_participants")
     .select(
-      "player_id, player:player_id ( id, gamer_tag, users:user_id ( id, display_name ) )"
+      "player_id, player:player_id ( id, gamer_tag, users:users!players_user_id_fkey ( id, display_name ) )"
     )
     .eq("season_id", matchDay.season_id)
     .is("deleted_at", null);

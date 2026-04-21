@@ -73,8 +73,8 @@ export default async function FixturesPage() {
         id, match_date, venue_name, match_start_time, arrival_cutoff_time, status,
         matches:matches (
           id, status, scheduled_time,
-          home_player:home_player_id ( id, gamer_tag, jersey_number, users:user_id ( id, display_name ) ),
-          away_player:away_player_id ( id, gamer_tag, jersey_number, users:user_id ( id, display_name ) ),
+          home_player:home_player_id ( id, gamer_tag, jersey_number, users:users!players_user_id_fkey ( id, display_name ) ),
+          away_player:away_player_id ( id, gamer_tag, jersey_number, users:users!players_user_id_fkey ( id, display_name ) ),
           result:match_results ( home_score, away_score, confirmed_at, result_type )
         )
         `,

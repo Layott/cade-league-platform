@@ -33,7 +33,7 @@ export async function listStandings(
       matches_played, wins, draws, losses,
       goals_for, goals_against, goal_difference, points,
       punishment_points_deducted, punishment_gd_deducted,
-      player:player_id ( id, gamer_tag, users:user_id ( id, display_name ) )
+      player:player_id ( id, gamer_tag, users:users!players_user_id_fkey ( id, display_name ) )
     `
     )
     .eq("season_id", seasonId)

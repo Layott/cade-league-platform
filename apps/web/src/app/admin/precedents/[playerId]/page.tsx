@@ -61,7 +61,7 @@ export default async function PrecedentsPage({
 
   const { data: player } = await sb
     .from("players")
-    .select("id, gamer_tag, users:user_id ( id, display_name )")
+    .select("id, gamer_tag, users:users!players_user_id_fkey ( id, display_name )")
     .eq("id", playerId)
     .is("deleted_at", null)
     .maybeSingle();

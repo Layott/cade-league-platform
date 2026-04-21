@@ -34,8 +34,8 @@ export async function previewSuspensionVoids(
       `
       id, home_player_id, away_player_id, match_day_id,
       match_days!inner ( id, match_date, venue_name, deleted_at ),
-      home:home_player_id ( id, gamer_tag, users!inner ( display_name ) ),
-      away:away_player_id ( id, gamer_tag, users!inner ( display_name ) )
+      home:home_player_id ( id, gamer_tag, users:users!players_user_id_fkey!inner ( display_name ) ),
+      away:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey!inner ( display_name ) )
       `,
     )
     .is("deleted_at", null)

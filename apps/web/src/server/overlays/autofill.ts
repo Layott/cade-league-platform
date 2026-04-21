@@ -32,11 +32,11 @@ export async function buildScorebarPayload(
       id,
       home_player:home_player_id (
         id,
-        users:user_id ( display_name )
+        users:users!players_user_id_fkey ( display_name )
       ),
       away_player:away_player_id (
         id,
-        users:user_id ( display_name )
+        users:users!players_user_id_fkey ( display_name )
       ),
       match_results ( home_score, away_score )
       `,
@@ -82,7 +82,7 @@ export async function buildStandingsWidgetPayload(
       points,
       goal_difference,
       player:player_id (
-        users:user_id ( display_name )
+        users:users!players_user_id_fkey ( display_name )
       )
       `,
     )
@@ -123,7 +123,7 @@ export async function buildPunishmentTickerPayload(
       issued_at,
       public_visible,
       player:player_id (
-        users:user_id ( display_name )
+        users:users!players_user_id_fkey ( display_name )
       )
       `,
     )
@@ -162,7 +162,7 @@ export async function buildPlayerCardPayload(
       id,
       gamer_tag,
       photo_url,
-      users:user_id ( display_name )
+      users:users!players_user_id_fkey ( display_name )
       `,
     )
     .eq("id", playerId)
@@ -228,7 +228,7 @@ export async function buildLowerThirdPayload(
       id,
       gamer_tag,
       jersey_number,
-      users:user_id ( display_name )
+      users:users!players_user_id_fkey ( display_name )
       `,
     )
     .eq("id", playerId)

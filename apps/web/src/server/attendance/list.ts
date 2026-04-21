@@ -33,7 +33,7 @@ export async function listByMatchDay(
   const { data: participants } = await sb
     .from("season_participants")
     .select(
-      "player_id, players:player_id (id, jersey_number, gamer_tag, users:user_id (display_name))"
+      "player_id, players:player_id (id, jersey_number, gamer_tag, users:users!players_user_id_fkey (display_name))"
     )
     .eq("season_id", (md as { season_id: string }).season_id)
     .is("deleted_at", null);
