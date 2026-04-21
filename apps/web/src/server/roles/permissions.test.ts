@@ -30,7 +30,7 @@ function mkSb(config: {
   const allPerms = config.allPerms ?? [];
   const roleRows = config.roleRows ?? [];
 
-  const from = vi.fn((_table: string) => {
+  const from = vi.fn(() => {
     const chain: Record<string, unknown> = {};
     chain.select = vi.fn((cols?: string) => {
       const res = {

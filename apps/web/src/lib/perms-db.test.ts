@@ -3,11 +3,10 @@ import { hasPermAsync, requirePermAsync, PermissionError } from "./perms-db";
 import { __test as cacheTest } from "@/server/roles/cache";
 
 function mkSb(rowsByRole: Record<string, string[]>) {
-  const from = vi.fn((_table: string) => {
+  const from = vi.fn(() => {
     const chain: Record<string, unknown> = {};
     chain.select = vi.fn(() => chain);
-    chain.eq = vi.fn((col: string, val: string) => {
-      void col;
+    chain.eq = vi.fn((_col: string, val: string) => {
       const perms = (rowsByRole[val] ?? []).map((permission) => ({ permission }));
       return Promise.resolve({ data: perms, error: null });
     });

@@ -12,7 +12,15 @@ type Tone =
   | "amber"
   | "flare"
   | "crimson"
-  | "muted";
+  | "muted"
+  | "sky"
+  | "violet"
+  | "teal"
+  | "magenta"
+  | "lime"
+  | "rose"
+  | "indigo"
+  | "copper";
 
 const TONE_STYLES: Record<Tone, string> = {
   neutral:
@@ -27,7 +35,47 @@ const TONE_STYLES: Record<Tone, string> = {
     "border-[rgba(220,38,38,0.4)] bg-[rgba(220,38,38,0.1)] text-[#ff7070]",
   muted:
     "border-[var(--ink-4)] bg-transparent text-[var(--chalk-3)]",
+  // Plan 9 extended tone set — one unique colour per non-admin role so the
+  // user-list chips read at a glance. All colours chosen for contrast on
+  // the dark brand surface; none collide with existing status tones.
+  sky:
+    "border-[rgba(86,183,255,0.35)] bg-[rgba(86,183,255,0.1)] text-[#7fc1ff]",
+  violet:
+    "border-[rgba(171,130,255,0.35)] bg-[rgba(171,130,255,0.1)] text-[#bda3ff]",
+  teal:
+    "border-[rgba(78,220,198,0.35)] bg-[rgba(78,220,198,0.1)] text-[#7cebd0]",
+  magenta:
+    "border-[rgba(255,112,204,0.35)] bg-[rgba(255,112,204,0.1)] text-[#ff97d5]",
+  lime:
+    "border-[rgba(195,240,90,0.35)] bg-[rgba(195,240,90,0.1)] text-[#d6f28d]",
+  rose:
+    "border-[rgba(255,135,148,0.35)] bg-[rgba(255,135,148,0.1)] text-[#ffa3b0]",
+  indigo:
+    "border-[rgba(118,132,230,0.35)] bg-[rgba(118,132,230,0.1)] text-[#a3aff1]",
+  copper:
+    "border-[rgba(216,142,94,0.35)] bg-[rgba(216,142,94,0.1)] text-[#e7b389]",
 };
+
+// Role-name → tone map used by the /admin/users role chips. Keep in sync
+// with ROLE_NAMES in src/perms.ts.
+export const ROLE_TONES: Record<string, Tone> = {
+  admin: "signal",
+  loc: "amber",
+  idc: "copper",
+  referee: "sky",
+  technical: "violet",
+  production: "teal",
+  design: "magenta",
+  moderator: "lime",
+  coach: "indigo",
+  team_manager: "rose",
+  player: "neutral",
+  viewer: "muted",
+};
+
+export function roleTone(role: string): Tone {
+  return ROLE_TONES[role] ?? "neutral";
+}
 
 const STATUS_TONES: Record<string, Tone> = {
   // match + result lifecycle

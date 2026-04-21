@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
-import { hasPerm } from "@/perms";
+import { hasPermAsync } from "@/lib/perms-db";
 import { markPresent, markLate, markAbsent, editMark } from "@/server/attendance";
 
 type PermName = "attendance.mark" | "attendance.edit";
@@ -28,13 +28,17 @@ async function requireActor(perm: PermName) {
     .is("deleted_at", null);
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
 
-  if (!hasPerm({ userId: pub.id, roles }, perm)) {
+  // Plan 9: DB-backed perm check via role_permissions (cached 30s). Uses
+  // the service-role client so we see the full table without user-scoped
+  // RLS filtering.
+  const sb = getServiceRoleSupabase();
+  if (!(await hasPermAsync(sb, { userId: pub.id, roles }, perm))) {
     throw new Error("forbidden");
   }
 
   // Use service-role client for the mutation path so we control audit context
   // and are not gated by RLS on attendance_marks / disciplinary_* tables.
-  return { sb: getServiceRoleSupabase(), actorUserId: pub.id as string };
+  return { sb, actorUserId: pub.id as string };
 }
 
 export async function markAction(formData: FormData) {
