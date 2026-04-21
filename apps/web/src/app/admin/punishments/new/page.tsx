@@ -10,6 +10,7 @@ import {
   textareaClass,
 } from "@/components/admin/FormField";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
+import { SuspensionFields } from "./SuspensionFields";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function NewPunishmentPage() {
       <SectionHeader
         eyebrow="Issue sanction"
         title="New punishment"
-        description="Log an incident and its sanction. Public visibility defaults to on — uncheck for private warnings."
+        description="Log an incident and its sanction. Public visibility defaults to on — uncheck for private warnings. Suspensions auto-void affected fixtures via Rule 3.4.4.2."
       />
 
       <form
@@ -30,11 +31,7 @@ export default async function NewPunishmentPage() {
         className="max-w-2xl space-y-5 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6"
       >
         <FormField label="Player">
-          <select
-            name="playerId"
-            required
-            className={selectClass}
-          >
+          <select name="playerId" required className={selectClass} data-testid="pn-player">
             {players.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.display_name} ({p.gamer_tag})
@@ -52,9 +49,15 @@ export default async function NewPunishmentPage() {
               defaultValue="other"
             >
               <option value="late_arrival">Late arrival</option>
+              <option value="absent">Absence</option>
               <option value="forfeit">Forfeit</option>
               <option value="equipment">Equipment</option>
               <option value="social_media">Social media</option>
+              <option value="unauthorized_access">Unauthorized access</option>
+              <option value="betting">Betting</option>
+              <option value="match_fixing">Match fixing</option>
+              <option value="dress_code">Dress code</option>
+              <option value="preseason_miss">Preseason miss</option>
               <option value="other">Other</option>
             </select>
           </FormField>
@@ -65,12 +68,13 @@ export default async function NewPunishmentPage() {
               required
               className={selectClass}
               defaultValue="point_deduction"
+              data-testid="pn-sanction"
             >
               <option value="warning">Warning</option>
               <option value="point_deduction">Point deduction</option>
               <option value="gd_deduction">GD deduction</option>
               <option value="forfeit">Forfeit (3-0)</option>
-              <option value="ban">Ban</option>
+              <option value="ban">Suspension (ban)</option>
             </select>
           </FormField>
         </div>
@@ -78,7 +82,7 @@ export default async function NewPunishmentPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             label="Magnitude"
-            hint="Points / GD / ban-games, depending on sanction type."
+            hint="Points / GD / ban-games. Ignored for suspensions (use the date window below)."
           >
             <input
               name="magnitude"
@@ -94,9 +98,14 @@ export default async function NewPunishmentPage() {
               name="effectiveFrom"
               type="date"
               className={inputClass + " tabular"}
+              data-testid="pn-from"
             />
           </FormField>
         </div>
+
+        {/* Client-side helper: reveals suspension fields + live void preview
+            when sanctionType='ban' is selected. Hidden otherwise. */}
+        <SuspensionFields />
 
         <label className="flex items-center gap-2 text-sm text-[var(--chalk-2)]">
           <input

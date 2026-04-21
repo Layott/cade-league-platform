@@ -138,6 +138,13 @@ export default async function AttendancePage({
                       {row.gamer_tag}
                     </div>
                   ) : null}
+                  <Link
+                    href={`/admin/precedents/${row.player_id}`}
+                    className="mt-1 inline-block text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)] hover:text-[var(--signal)]"
+                    data-testid={`att-precedents-${row.player_id}`}
+                  >
+                    Precedents →
+                  </Link>
                 </td>
                 <td className="px-4 py-3">
                   {row.status ? (

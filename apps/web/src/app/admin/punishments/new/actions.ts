@@ -23,9 +23,15 @@ export async function createPunishment(formData: FormData) {
     matchId: (formData.get("matchId") as string) || null,
     incidentType: formData.get("incidentType") as
       | "late_arrival"
+      | "absent"
       | "forfeit"
       | "equipment"
       | "social_media"
+      | "unauthorized_access"
+      | "betting"
+      | "match_fixing"
+      | "dress_code"
+      | "preseason_miss"
       | "other",
     sanctionType: formData.get("sanctionType") as
       | "warning"

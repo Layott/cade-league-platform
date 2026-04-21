@@ -62,6 +62,38 @@ export default async function PunishmentDetailPage({
   const row = data as unknown as Row;
   const name = row.disciplinary_cases.players.users.display_name;
   const tag = row.disciplinary_cases.players.gamer_tag;
+  const playerId = row.disciplinary_cases.players.id;
+
+  // For suspension (ban) actions, list the matches the ban auto-voided.
+  // Marker format mirrors `propagate_suspension_voids` exactly.
+  type VoidedMatch = {
+    id: string;
+    match_id: string;
+    notes: string | null;
+    matches: {
+      id: string;
+      match_day_id: string;
+      home_player_id: string;
+      away_player_id: string;
+      match_days: { id: string; match_date: string; venue_name: string };
+    };
+  };
+  let voidedMatches: VoidedMatch[] = [];
+  if (row.sanction_type === "ban") {
+    const marker = `auto-voided: suspension action ${row.id}`;
+    const { data: voids } = await sb
+      .from("match_results")
+      .select(
+        `id, match_id, notes,
+         matches!inner (
+           id, match_day_id, home_player_id, away_player_id,
+           match_days!inner ( id, match_date, venue_name )
+         )`,
+      )
+      .eq("result_type", "void")
+      .eq("notes", marker);
+    voidedMatches = (voids ?? []) as unknown as VoidedMatch[];
+  }
 
   return (
     <div className="space-y-8">
@@ -82,9 +114,14 @@ export default async function PunishmentDetailPage({
           </span>
         }
         action={
-          <Link href="/admin/punishments">
-            <SecondaryButton type="button">← Back to list</SecondaryButton>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/admin/precedents/${playerId}`}>
+              <SecondaryButton type="button">View precedents</SecondaryButton>
+            </Link>
+            <Link href="/admin/punishments">
+              <SecondaryButton type="button">← Back to list</SecondaryButton>
+            </Link>
+          </div>
         }
       />
 
@@ -120,6 +157,43 @@ export default async function PunishmentDetailPage({
           <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--chalk-1)]">
             {row.notes}
           </p>
+        </section>
+      ) : null}
+
+      {row.sanction_type === "ban" ? (
+        <section
+          data-testid="voided-matches"
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
+            Voided matches
+          </div>
+          {voidedMatches.length === 0 ? (
+            <p className="mt-2 text-xs text-[var(--chalk-3)]">
+              {row.revoked_at
+                ? "This ban is revoked — all voids have been reverted."
+                : "No fixtures were in the suspension window."}
+            </p>
+          ) : (
+            <>
+              <p className="mt-2 text-xs text-[var(--chalk-2)]">
+                Revoking this ban will un-void the{" "}
+                <span className="font-mono text-[var(--signal)]">
+                  {voidedMatches.length}
+                </span>{" "}
+                {voidedMatches.length === 1 ? "match" : "matches"} below and trigger a
+                full standings recompute.
+              </p>
+              <ul className="mt-3 space-y-1 font-mono text-[11px] tabular text-[var(--chalk-1)]">
+                {voidedMatches.map((v) => (
+                  <li key={v.id}>
+                    {v.matches.match_days.match_date} · match {v.match_id.slice(0, 8)}… ·{" "}
+                    {v.matches.match_days.venue_name}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </section>
       ) : null}
 
