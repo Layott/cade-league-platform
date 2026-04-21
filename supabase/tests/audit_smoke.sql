@@ -40,6 +40,20 @@ begin
       v_insert_count, v_update_count, v_delete_count;
   end if;
 
+  -- role_permissions audit smoke: insert + delete should produce 2 audit rows
+  -- tagged with this request_id and entity_type='role_permissions'. We pick
+  -- the `viewer` role which has zero seed rows, with a throwaway permission
+  -- string that matches the format constraint (no wildcard).
+  insert into public.role_permissions (role, permission) values ('viewer', 'smoke.test');
+  delete from public.role_permissions where role = 'viewer' and permission = 'smoke.test';
+
+  select count(*) into v_total
+    from public.audit_events
+    where entity_type = 'role_permissions' and request_id = v_request_id;
+  if v_total <> 2 then
+    raise exception 'role_permissions: expected 2 audit rows, got %', v_total;
+  end if;
+
   -- Audit rows stay (append-only). They are tagged with the smoke request_id
   -- and can be filtered out of reporting queries.
 
