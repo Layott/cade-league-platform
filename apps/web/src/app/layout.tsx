@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteChrome } from "@/components/public/SiteChrome";
+import { PRIMARY_LOGOS } from "@/lib/brand";
 
 const display = Space_Grotesk({
   variable: "--font-display-src",
@@ -30,7 +31,20 @@ export const metadata: Metadata = {
   },
   description:
     "CADE Esports League — Division 1 Elite. Nigeria's eFootball competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
-  icons: { icon: "/favicon.ico" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: PRIMARY_LOGOS.cade, type: "image/png" },
+    ],
+    apple: [{ url: PRIMARY_LOGOS.cade, type: "image/png" }],
+  },
+  openGraph: {
+    title: "CADE League — Division 1 Elite · 2025-2026",
+    description:
+      "CADE Esports League — Division 1 Elite. Nigeria's eFootball competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
+    images: [{ url: PRIMARY_LOGOS.cade }],
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {
