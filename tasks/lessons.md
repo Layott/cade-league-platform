@@ -91,3 +91,35 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Trusted python-docx output blindly. User corrected with screenshots of the rendered docx — rows 2-5 actually have values. python-docx splits on page-break-in-table and returns one empty row per split; the real content lives in a sibling table element further down the `doc.tables` array.
 **Correction:** User: "there's information there you can't see?" — I'd already escalated to them for something I should have debugged.
 **Rule for future:** When python-docx returns empty cells in a table that HAS visible content in the rendered file, do NOT flag it as "missing data". Instead: (a) iterate every `doc.tables` entry, not just the one whose header matches — a split table appears as 2+ tables; (b) try `pymupdf`/`fitz` on a PDF export of the docx; (c) use Python's `zipfile` to unpack the raw `word/document.xml` and regex-grep the rows. Only escalate to the user AFTER those three paths fail. And never stage a "blocked on external input" status before exhausting extraction alternatives.
+
+---
+
+**Date:** 2026-04-21
+**Context:** Plan 12 TDD tests failed on load with "Cannot access 'publishMock' before initialization".
+**Mistake:** Wrote `const publishMock = vi.fn()` at module top then `vi.mock("./realtime", () => ({ publish: publishMock }))`. Vitest hoists `vi.mock` above imports (and above the `const`), so at mock-factory time the closure reference to `publishMock` is still in the temporal dead zone.
+**Correction:** `const { publishMock } = vi.hoisted(() => ({ publishMock: vi.fn() }))` lifts the mock object to the same hoist band as `vi.mock`. Then the factory closes over a real value.
+**Rule for future:** Any mock factory that references a module-level vi.fn/spy needs `vi.hoisted`. If a test errors with "Cannot access X before initialization" where X is a mock const, that's the fix.
+
+---
+
+**Date:** 2026-04-21
+**Context:** Plan 12 overlay pages failed `next build` with "useSearchParams() should be wrapped in a suspense boundary".
+**Mistake:** Client components that call `useSearchParams()` force a CSR bailout during prerender even with `export const dynamic = "force-dynamic"`. Next.js 15 still attempts to resolve the page shell at build time.
+**Correction:** Export the page as `() => <Suspense fallback={null}><Inner /></Suspense>` and put `useSearchParams` in `Inner`.
+**Rule for future:** Any Client Component page that reads `useSearchParams` in Next.js 15 must be wrapped in a Suspense boundary at the page root. `force-dynamic` alone is not enough.
+
+---
+
+**Date:** 2026-04-21
+**Context:** Plan 12 overlay route group. Root `app/layout.tsx` wraps every page in `<SiteChrome>`; a route group's `layout.tsx` inherits from the root, cannot replace html/body, cannot remove the parent wrapper.
+**Mistake:** Initially tried to rely on only the route-group layout to strip chrome. Chrome rendered anyway.
+**Correction:** Two-sided fix. (1) Extend `SiteChromeClient.HIDDEN_PREFIXES` with `/overlay` so the client chrome self-hides on that URL prefix. (2) In the route-group layout, a client `useEffect` adds `.overlay-mode` to `<html>` + `<body>` so `html.overlay-mode { background: transparent !important }` rules in `globals.css` zero out the backgrounds.
+**Rule for future:** Root layout is load-bearing — route groups cannot unlayer it. To opt specific paths out of global chrome, patch the chrome component's HIDDEN list AND use a classname-driven CSS override for body-level styling. Don't fight Next.js conventions by trying to move html/body into a child layout.
+
+---
+
+**Date:** 2026-04-21
+**Context:** Executing Plan 12 while parallel agents were landing Plans 10/11/13/14. `npm run build` broke on an attendance `flatLadder` export that didn't exist in the snapshot I saw, and `npm run test` had 22 failures in orgs/disputes/appeals modules.
+**Mistake:** Initially tried to verify the full wave before claiming Plan 12 complete. Spent time diagnosing failures that were in other agents' unfinished code.
+**Correction:** Per CLAUDE.md "parallel agents are churning files" rule: checkpoint my own work, verify my slice in isolation (`vitest run src/server/broadcast src/server/overlays src/perms.seed.test.ts`), commit + push, and document the wave-level verification gap in the review.
+**Rule for future:** When other agents are mid-commit on adjacent code, run targeted `vitest run <my-paths>` + `tsc --noEmit <my-paths>` rather than the monorepo-wide commands. Full wave verification is a separate pass once the churn settles. Document the gap explicitly in the plan review so nothing gets lost.
