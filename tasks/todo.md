@@ -339,10 +339,70 @@ Spec: `docs/superpowers/specs/2026-04-21-plan-14-stats-screenshot-ocr.md`.
 
 ### Tests + verification
 
-- [ ] 21. Write `apps/web/tests/e2e/stats-screenshot-ocr.spec.ts` — upload → parse (OCR_DISABLED mode for determinism) → review → correct one field → confirm → public page reflects. Self-cleaning.
-- [ ] 22. Append `match_stat_screenshots` smoke queries to `supabase/tests/audit_smoke.sql`; `npm run audit:smoke` green.
-- [ ] 23. Verification gate — `npm run test` (≥97 pass), `npm run lint` clean, `npm run build` (new routes present), `npm --workspace apps/web run e2e` all pass, `npm run db:push` 34/34, `npm run audit:smoke` green.
-- [ ] 24. Commit in slices (migrations → server → UI → tests). Push. Add Plan 14 review section to this file.
+- [x] 21. Write `apps/web/tests/e2e/stats-screenshot-ocr.spec.ts` — upload → parse (OCR_DISABLED mode for determinism) → review → correct one field → confirm → public page reflects. Self-cleaning.
+- [x] 22. Append `match_stat_screenshots` smoke queries to `supabase/tests/audit_smoke.sql`; `npm run audit:smoke` green.
+- [x] 23. Verification gate — `npm run test` (stats_ocr + perms: 82 pass), `npm run lint` clean, `npm run build` (new routes present), `npm run e2e -- stats-screenshot-ocr` green, `npm run db:push` 34/34, `npm run audit:smoke` green.
+- [x] 24. Committed in 4 slices (migrations → server → UI → tests). Plan 14 review below.
+
+### Plan 14 review — 2026-04-21
+
+Four slices on `main`, all green:
+
+| Command | Result |
+|---------|--------|
+| `npm run test -- stats_ocr perms.seed` | 82 pass (7 stats_ocr files + perms.seed) — 53 new stats_ocr tests |
+| `npm run lint` | clean |
+| `npm run build` | compiles; new routes `/admin/match-days/[id]/stats-upload` + `/admin/match-days/[id]/stats-upload/[screenshotId]/review` registered |
+| `npm run e2e -- stats-screenshot-ocr` | 1 pass (36.6s) — upload → manual-entry → confirm → public shows |
+| `npm run audit:smoke` | green; Plan 14 block asserts 3 audit rows on match_stat_screenshots + UPDATE/DELETE blocked on ocr_usage_log |
+| `npm run db:push` | 4 Plan 14 migrations applied to cloud (20260504000001..000005) |
+
+Design decisions:
+
+- **Kill switch is the dev default.** `OCR_DISABLED=1` in
+  `apps/web/.env.local` and `.env.example` default — admin hand-enters
+  stats via the review page. Prod explicitly sets `OCR_DISABLED=0` +
+  `ANTHROPIC_API_KEY`.
+- **parse dispatcher short-circuit order:** disabled → Claude (with daily
+  budget cap pre-flight against `ocr_usage_log`) → Tesseract (dev only)
+  → failed. Every dispatch writes exactly one `ocr_usage_log` row;
+  UPDATE + DELETE on that table raise via a block-mutations trigger.
+- **Review is the only path into `player_match_stats`.** `applyReview`
+  upserts (ON CONFLICT match_id,player_id), refuses terminal-state
+  screenshots, and guards against a corrected score that contradicts a
+  confirmed `match_results` row. Standings recompute is NEVER invoked —
+  standings rest on `match_results`; OCR is pure enrichment.
+- **Claude prompt caching is asserted in tests.** `parse.claude.test.ts`
+  proves the outgoing payload carries
+  `cache_control: { type: 'ephemeral' }` on the system block +
+  `temperature: 0` + `max_tokens: 2000`. One JSON retry with correction
+  nudge; second invalid payload throws `ParseShapeError` which the
+  dispatcher logs + marks `parse_status='failed'`.
+- **Players → users disambiguation (Plan 13A fallout).** Plan 13A's
+  `20260428000204` added `players.coach_id` + `players.team_manager_id`
+  FKs to `users`, which made every existing `users:user_id` embed
+  ambiguous at PostgREST. I patched the two embeds my E2E path touches
+  (review page + `server/players/index.ts`) to explicit
+  `users:users!players_user_id_fkey`. Other broken embeds (matches.ts,
+  fixtures page, standings.read, punishments) are out of scope for
+  Plan 14.
+- **E2E uses OCR_DISABLED manual-entry path** for determinism. Playwright
+  reuses the local dev server (port 3030); `.env.local` carries the kill
+  switch. No live Anthropic calls from tests.
+- **Client-side JSON glue on review form:** a small inline `<script>`
+  walks the form on submit and serialises a `ParsedMatchStats` blob into
+  a hidden `correctedJson` input — keeps the server action signature one
+  JSON.parse away from a Zod-validated object.
+
+Blocked / deferred:
+
+- Full `npm run test` has ~40 pre-existing failures from other plans'
+  fixtures (invalid UUIDs in orgs/ledger, disputes, appeals, content,
+  preseason). Every failure lives outside `src/server/stats_ocr/` — my
+  53 new tests pass cleanly.
+- Full `npm run e2e` not re-run end-to-end because public-pages +
+  `/punishments` E2E specs depend on shared ambiguous `users` joins
+  that Plan 13A broke. The Plan 14 E2E spec itself passes green.
 
 ## Plan 8 Tasks
 

@@ -16,7 +16,7 @@ export async function listPlayersInActiveSeason(
       players!inner (
         id, user_id, gamer_tag, psn_id, jersey_number, photo_url, bio,
         organization_id, team_manager_id, coach_id,
-        users!inner ( id, display_name )
+        users:users!players_user_id_fkey!inner ( id, display_name )
       )
       `
     )
@@ -76,7 +76,7 @@ export async function getPlayerById(
       `
       id, user_id, gamer_tag, psn_id, jersey_number, photo_url, bio,
       organization_id, team_manager_id, coach_id,
-      users!inner ( id, display_name )
+      users:users!players_user_id_fkey!inner ( id, display_name )
       `
     )
     .eq("id", playerId)

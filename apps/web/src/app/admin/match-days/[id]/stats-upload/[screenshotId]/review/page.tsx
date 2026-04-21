@@ -114,10 +114,13 @@ export default async function ReviewPage({
 
   let playerOptions: PlayerOption[] = [];
   if (seasonId) {
+    // Plan 13A introduced players.coach_id + players.team_manager_id FKs to
+    // users — so `users:user_id(...)` alone is ambiguous. Disambiguate via
+    // the explicit constraint name.
     const { data: participants } = await sb
       .from("season_participants")
       .select(
-        "player_id, player:player_id ( id, gamer_tag, users:user_id ( id, display_name ) )",
+        "player_id, player:player_id ( id, gamer_tag, users:users!players_user_id_fkey ( id, display_name ) )",
       )
       .eq("season_id", seasonId)
       .is("deleted_at", null);

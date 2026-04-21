@@ -171,7 +171,6 @@ export default async function StatsUploadPage({
                   <div className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-1)]/60 p-4">
                     <form
                       action={uploadScreenshotAction}
-                      encType="multipart/form-data"
                       className="space-y-3"
                       data-testid={`stats-upload-dropzone-${m.id}`}
                     >
