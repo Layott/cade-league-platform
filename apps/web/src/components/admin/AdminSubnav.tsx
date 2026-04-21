@@ -8,6 +8,11 @@ import { usePathname } from "next/navigation";
  * highlighted with a signal-green underline + chalk-0 label, others fade
  * to chalk-2. Rendered client-side so `usePathname` determines active
  * state without server-round-trip.
+ *
+ * Plan 13B — tab visibility is pre-resolved by the parent layout against
+ * `hasPermAsync` and passed as `visibleTabs: string[]` (list of hrefs).
+ * Omit the prop to show every tab (back-compat for callers who haven't
+ * wired perms yet; admin wildcard perm makes this a no-op in practice).
  */
 
 const TABS = [
@@ -15,6 +20,11 @@ const TABS = [
   { href: "/admin/match-days", label: "Match days" },
   { href: "/admin/punishments", label: "Punishments" },
   { href: "/admin/squads", label: "Squads" },
+  { href: "/admin/orgs", label: "Orgs" },
+  { href: "/admin/disputes", label: "Disputes" },
+  { href: "/admin/appeals", label: "Appeals" },
+  { href: "/admin/content", label: "Content" },
+  { href: "/admin/preseason", label: "Preseason" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/broadcast", label: "Broadcast" },
   { href: "/admin/roles", label: "Roles" },
@@ -28,15 +38,21 @@ function matches(pathname: string, href: string, exact?: boolean) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function AdminSubnav() {
+export function AdminSubnav({
+  visibleTabs,
+}: {
+  visibleTabs?: readonly string[];
+}) {
   const pathname = usePathname() ?? "/admin";
+  const allowed = visibleTabs ? new Set(visibleTabs) : null;
+  const tabs = allowed ? TABS.filter((t) => allowed.has(t.href)) : TABS;
   return (
     <nav
       aria-label="Admin sections"
       className="flex flex-wrap items-center gap-1 border-b border-[var(--ink-4)] bg-[var(--ink-1)]/80 px-1 pt-1"
       data-testid="admin-subnav"
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = matches(pathname, tab.href, tab.exact);
         return (
           <Link

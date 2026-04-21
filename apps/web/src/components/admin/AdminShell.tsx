@@ -14,7 +14,13 @@ import { AdminSubnav } from "./AdminSubnav";
  * header chrome.
  */
 
-export function AdminShell({ children }: { children: ReactNode }) {
+export function AdminShell({
+  children,
+  visibleTabs,
+}: {
+  children: ReactNode;
+  visibleTabs?: readonly string[];
+}) {
   return (
     <div className="min-h-screen bg-[var(--ink-1)]">
       <div className="mx-auto w-full max-w-6xl px-5 pt-6">
@@ -37,7 +43,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </span>
         </div>
         <div className="mt-4">
-          <AdminSubnav />
+          <AdminSubnav visibleTabs={visibleTabs} />
         </div>
       </div>
       <main className="mx-auto w-full max-w-6xl px-5 py-8">{children}</main>
