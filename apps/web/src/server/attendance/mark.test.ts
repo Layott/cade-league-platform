@@ -100,13 +100,28 @@ describe("markPresent", () => {
   });
 });
 
+const OUTCOME_NOOP = {
+  gdDeduction: 0,
+  pointDeduction: 0,
+  createCase: "none" as const,
+  suspensionMatchDays: 0,
+  autoForfeit: false,
+  rulebookClause: "test stub",
+};
+
 describe("markLate", () => {
   beforeEach(() => {
     openAutoCaseMock.mockReset();
-    openAutoCaseMock.mockResolvedValue({ caseId: "c-1", actionId: "a-1" });
+    openAutoCaseMock.mockResolvedValue({
+      caseId: "c-1",
+      actionId: "a-1",
+      actionIds: { pointDeduction: "a-1", gdDeduction: null, ban: null },
+      outcome: OUTCOME_NOOP,
+      priorCount: 0,
+    });
   });
 
-  it("creates disciplinary_case + action of magnitude 1", async () => {
+  it("invokes the Rule 5.4 ladder via openAutoCase", async () => {
     const sb = mkSb({});
     const out = await markLate(sb as never, {
       matchDayId: "md-1",
@@ -117,7 +132,7 @@ describe("markLate", () => {
     expect(openAutoCaseMock).toHaveBeenCalledTimes(1);
     expect(openAutoCaseMock).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ status: "late", playerId: "p-1" })
+      expect.objectContaining({ status: "late", playerId: "p-1" }),
     );
   });
 });
@@ -125,10 +140,16 @@ describe("markLate", () => {
 describe("markAbsent", () => {
   beforeEach(() => {
     openAutoCaseMock.mockReset();
-    openAutoCaseMock.mockResolvedValue({ caseId: "c-1", actionId: "a-2" });
+    openAutoCaseMock.mockResolvedValue({
+      caseId: "c-1",
+      actionId: "a-2",
+      actionIds: { pointDeduction: null, gdDeduction: null, ban: null },
+      outcome: { ...OUTCOME_NOOP, autoForfeit: false },
+      priorCount: 0,
+    });
   });
 
-  it("creates case + action with magnitude 3 semantics (via openAutoCase)", async () => {
+  it("passes status=absent to the ladder", async () => {
     const sb = mkSb({});
     await markAbsent(sb as never, {
       matchDayId: "md-1",
@@ -137,7 +158,7 @@ describe("markAbsent", () => {
     });
     expect(openAutoCaseMock).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ status: "absent" })
+      expect.objectContaining({ status: "absent" }),
     );
   });
 });

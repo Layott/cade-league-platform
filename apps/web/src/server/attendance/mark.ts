@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { openAutoCase, type AttendanceStatus } from "./penalty";
+import { applyForfeitMatchResult } from "@/server/punishments";
 
 export type MarkInput = {
   matchDayId: string;
@@ -19,7 +20,7 @@ export class ConflictError extends Error {
 async function doMark(
   sb: SupabaseClient,
   input: MarkInput,
-  status: AttendanceStatus
+  status: AttendanceStatus,
 ): Promise<MarkResult> {
   // 1. Look up match_day for scheduled_call_time context.
   const { data: md, error: mdErr } = await sb
@@ -50,12 +51,13 @@ async function doMark(
     .maybeSingle();
   if (existing) {
     throw new ConflictError(
-      `player ${input.playerId} already marked for match_day ${input.matchDayId} — use editMark`
+      `player ${input.playerId} already marked for match_day ${input.matchDayId} — use editMark`,
     );
   }
 
-  // 3. Open penalty case for late/absent. Skip the call entirely for present so
-  //    the code path never touches disciplinary_cases/disciplinary_actions tables.
+  // 3. Open penalty case for late/absent via the Rule 5.4 ladder. Skip the
+  //    call entirely for 'present' so the code path never touches
+  //    disciplinary tables.
   const auto =
     status === "present"
       ? null
@@ -67,7 +69,31 @@ async function doMark(
           effectiveDate: md.match_date,
         });
 
-  // 4. Insert the mark row.
+  // 3a. Apply auto-forfeit if the ladder demands it (absence). Find the
+  //     player's scheduled match on this match day; if found, apply 3-0.
+  if (auto?.outcome.autoForfeit) {
+    const { data: match } = await sb
+      .from("matches")
+      .select("id")
+      .eq("match_day_id", input.matchDayId)
+      .or(`home_player_id.eq.${input.playerId},away_player_id.eq.${input.playerId}`)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (match?.id) {
+      await applyForfeitMatchResult(
+        sb,
+        match.id as string,
+        input.playerId,
+        input.actorUserId,
+      );
+    }
+  }
+
+  // 4. Insert the mark row. auto_case_id / auto_action_id reference the
+  //    ladder-created case and "dominant" action (point_deduction first,
+  //    then gd_deduction, then ban). Additional actions from the same
+  //    ladder event are discoverable via disciplinary_cases.id.
   const { data: inserted, error: insErr } = await sb
     .from("attendance_marks")
     .insert({

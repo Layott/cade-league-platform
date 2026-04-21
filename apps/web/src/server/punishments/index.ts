@@ -1,17 +1,48 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-export const issueSchema = z.object({
-  playerId: z.string().uuid(),
-  matchId: z.string().uuid().optional().nullable(),
-  incidentType: z.enum(["late_arrival", "forfeit", "equipment", "social_media", "other"]),
-  sanctionType: z.enum(["warning", "point_deduction", "gd_deduction", "forfeit", "ban"]),
-  magnitude: z.coerce.number().int().min(0).default(0),
-  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  effectiveUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  publicVisible: z.boolean().default(true),
-  notes: z.string().trim().max(2000).optional(),
-});
+export const issueSchema = z
+  .object({
+    playerId: z.string().uuid(),
+    matchId: z.string().uuid().optional().nullable(),
+    incidentType: z.enum([
+      "late_arrival",
+      "absent",
+      "forfeit",
+      "equipment",
+      "social_media",
+      "unauthorized_access",
+      "betting",
+      "match_fixing",
+      "dress_code",
+      "preseason_miss",
+      "other",
+    ]),
+    sanctionType: z.enum(["warning", "point_deduction", "gd_deduction", "forfeit", "ban"]),
+    magnitude: z.coerce.number().int().min(0).default(0),
+    effectiveFrom: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    effectiveUntil: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
+    publicVisible: z.boolean().default(true),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .refine(
+    (v) =>
+      v.sanctionType !== "ban" ||
+      (!!v.effectiveFrom && !!v.effectiveUntil && v.effectiveUntil >= v.effectiveFrom),
+    {
+      message:
+        "ban sanction requires effectiveFrom + effectiveUntil (with until >= from); " +
+        "the DB trigger propagates voids over that window",
+      path: ["effectiveUntil"],
+    },
+  );
 export type IssueInput = z.infer<typeof issueSchema>;
 
 export type IssueResult = { caseId: string; actionId: string };
@@ -267,7 +298,7 @@ export async function listForPlayer(
   return rows.sort((a, b) => b.imposed_at.localeCompare(a.imposed_at));
 }
 
-async function applyForfeitMatchResult(
+export async function applyForfeitMatchResult(
   sb: SupabaseClient,
   matchId: string,
   forfeitingPlayerId: string,
