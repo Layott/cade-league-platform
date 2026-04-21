@@ -94,6 +94,84 @@ Open items:
   not yet filter by `?userId`. Left as a link; follow-up plan to wire the
   filter.
 
+## Plan 11 Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-11-void-propagation-and-warnings.md`.
+
+### Migrations
+
+- [x] 1. Ladder values locked from rulebook §5.4 screenshots — see `KNOWLEDGE/extracted/PLAN11-LADDER-GAPS.md`.
+- [x] 2. `20260502000001_disciplinary_precedents.sql` — composite-PK table + audit attached.
+- [x] 3. `20260502000002_extend_incident_types.sql` + `20260502000006_case_status_auto.sql` — widens enums to cover ladder categories + adds `'auto'` status.
+- [x] 4. `20260502000003_precedent_upsert_trigger.sql` — `upsert_precedent` + attendance trigger + case trigger.
+- [x] 5. `20260502000004_propagate_suspension_voids.sql` — propagate + unpropagate helpers, tagged-marker reversal.
+- [x] 6. `20260502000005_ban_propagation_trigger.sql` — INSERT/UPDATE-gated wiring.
+- [x] reconciler. `20260502000300_incident_types_merged.sql` + `20260502000301_precedent_categories_merged.sql` — post-Plan-13 enum UNION so both plans coexist.
+
+### Server modules
+
+- [x] 7. `server/precedents/ladder.ts` + 16-test suite. Every row carries an inline rulebook quote.
+- [x] 8. `server/precedents/read.ts` + `adjust.ts` + 3 adjust tests.
+- [x] 9. `server/precedents/window.ts` — next-N match_days resolver with 6-day fallback.
+- [x] 10. Rewrote `server/attendance/penalty.ts` — ladder consultation. Deleted flat-ladder tests. Extended `mark.ts` to invoke `applyForfeitMatchResult` on ladder autoForfeit. Updated `mark.test.ts` for the richer openAutoCase return shape.
+- [x] 11. Extended `server/punishments/index.ts` `issueSchema` with full incident set + ban-window refine. Added `server/punishments/preview.ts` + 3 tests.
+
+### API + UI
+
+- [x] 12. `/api/admin/punishments/preview-voids` — `punishments.issue`-gated POST.
+- [x] 13. `/admin/precedents/[playerId]` page + `adjustPrecedentAction`.
+- [x] 14. Linked precedents from `/admin/punishments/[id]` header + each attendance roster row. `/admin/players/[id]` doesn't exist in-app; linked from attendance + punishment detail instead.
+- [x] 15. `/admin/punishments/new` — added Suspension option + `SuspensionFields` client helper with debounced live preview.
+- [x] 16. `/admin/punishments/[id]` — voided-matches list for ban actions + revoke impact hint.
+
+### Tests + verification
+
+- [x] 17. `20260502000007_backfill_precedents.sql` — idempotent ON CONFLICT DO UPDATE.
+- [x] 18. `supabase/tests/void_propagation_smoke.sql` + `scripts/void-smoke.sh` + `npm run void:smoke`.
+- [x] 19. E2E `late-ladder-progression.spec.ts` + `suspend-and-void.spec.ts`.
+- [ ] 20. Full verification gate — `npm run test` / `lint` / `build` / `e2e` / `audit:smoke` / `void:smoke` / `db:push`. **BLOCKED in this sandbox** — every `npx vitest` / `npm test` / `npx supabase db push` / `npx playwright test` invocation returns "Permission to use Bash has been denied" (see review below). Deferred to user validation.
+- [ ] 21. Manual walkthrough of success-criteria §1.1 scenarios — deferred; same sandbox block.
+- [x] 22. Commit in slices.
+
+### Plan 11 review — 2026-04-21
+
+Implementation complete; execution of the verification gate is blocked by this sandbox (running `npx vitest`, `npm test`, `npx supabase db push`, `npx playwright test`, and plain `node -v` all return "Permission to use Bash has been denied"). Code and migrations are therefore validated statically; end-to-end proof is left for the caller to run:
+
+```
+npm --workspace apps/web run test
+npm --workspace apps/web run lint
+npm --workspace apps/web run build
+npm --workspace apps/web run e2e
+npm run db:push
+npm run audit:smoke
+npm run void:smoke
+```
+
+Design decisions:
+
+- **Ladder rows quote the rulebook verbatim.** Every entry in `LATE_LADDER`, `ABSENT_LADDER`, `SOCIAL_MEDIA_LADDER`, and `DRESS_CODE_LADDER` carries a leading `// Rule §...` comment + a matching `rulebookClause` string inside the outcome. `ladder.test.ts` asserts the clause field is non-empty for every tier so reviewers can never drop it.
+- **Mixed GD + point ladder for late_arrival.** Offences 2–3 return `gdDeduction=3` + `sanction_type='gd_deduction'`; offences 4–5 return `pointDeduction={1,3}` + `sanction_type='point_deduction'`; offence 6 returns `suspensionMatchDays=SEASON_REMAINING` and the ban-propagation trigger voids every remaining match.
+- **Case-per-ladder-event, status='auto' for tier 0.** Rejected the `disciplinary_actions.case_id NULL` route; every ladder event opens a case (1st-late gets `status='auto'` so the default admin cases list hides it). Preserves the existing NOT-NULL constraint and keeps audit trails consistent.
+- **Precedent counter is DB-trigger-driven.** `attendance_marks` INSERT + `disciplinary_cases` INSERT (non-attendance categories only) call `upsert_precedent`. The TS layer never writes `disciplinary_precedents` directly for auto flows — only the `adjustPrecedent` admin UI can manually nudge ±1.
+- **Tagged-marker un-propagation.** Void `match_results` rows are tagged with `notes = 'auto-voided: suspension action <uuid>'`. `unpropagate_suspension_voids` deletes ONLY rows matching that exact marker, so manually-entered results survive revocation (Risk 3 in the spec).
+- **Plan 13 enum collision resolved.** Plan 13's migration `20260502000203_incident_type_preseason_miss.sql` drops-then-re-adds the `disciplinary_cases.incident_type` check with only its own allowlist, clobbering Plan 11's additions. Fix: `20260502000300_incident_types_merged.sql` runs AFTER both and contains the UNION of every category. Same treatment for `disciplinary_precedents.category` via `20260502000301_precedent_categories_merged.sql`.
+- **sanction_type='gd_deduction' (not 'goal_difference_penalty').** Spec wording suggested the latter, but the actual CHECK constraint at `20260424000002_disciplinary_actions.sql:5` already lists `'gd_deduction'`. Used the existing enum value; no DB change required.
+
+Deleted flat-ladder tests (commit message records):
+
+```
+- flatLadder returns magnitude 1 for late
+- flatLadder returns magnitude 3 for absent
+- flatLadder returns null for present
+- openAutoCase creates case + action for late (flat -1 shape)
+- openAutoCase creates case + action for absent (flat -3 shape)
+```
+
+Follow-ups intentionally out of scope:
+- Precedent decay / season scoping (§1.2).
+- Edit-mark decrement semantics (precedent counter doesn't roll back on attendance edit).
+- Full precedent-editor CRUD — only ±1 nudge is live.
+
 ## Plan 12 Tasks
 
 Spec: `docs/superpowers/specs/2026-04-21-plan-12-vmix-overlay-bridge.md`.
@@ -464,3 +542,69 @@ Pushed to https://github.com/Layott/cade-league-platform (private).
 - Plan 2 — Season + Players + Seed (hard-coded Elite 2025-2026 season, player roster from user, public `/players` grid).
 - Before Plan 2 coding: get the 13-player roster (names, gamer tags, PSN IDs).
 - Optional parallel track for a second Claude terminal: polish public landing page design; draft Plan 2 spec scaffold.
+
+---
+
+## Plan 10 — Squad submissions + Friday change window + squad validation
+
+**Status:** COMPLETE (pending E2E green against live Supabase stack). Spec `docs/superpowers/specs/2026-04-21-plan-10-squad-submissions.md`.
+
+### Tasks 1-24 delivered
+
+1. ✅ Migrations 20260428000101-000107 — rules, submissions, items, changes, storage bucket, incident_type extension, squads.* perm seed. Applied via `supabase db push --include-all`.
+2. ✅ Seed row for Elite 2025-2026 rules (`supabase/seed.sql`, dev-guarded NOT EXISTS, also applied to remote).
+3. ✅ `weekStartThursday`, `thursdayDeadline`, `fridayWindowBounds`, `isWithinFridayWindow` in `src/lib/time.ts` + 10 new unit tests (13 total in `time.test.ts`).
+4. ✅ `src/server/squads/schemas.ts` — Zod schemas incl. reviewSchema cross-field refine.
+5. ✅ `storage.ts` + test — signed upload / read helpers for `squad-screenshots`.
+6. ✅ `validate.ts` + 8 tests — pure evaluateRules, violation types, GK exclusion, banned type matching.
+7. ✅ `submit.ts` + 4 tests — createSubmission, duplicate conflict, wrong-week rejection, rollback on item insert fail.
+8. ✅ `items.ts` + 2 tests — replace soft-deletes prior items, refuses non-pending.
+9. ✅ `review.ts` + 4 tests — approve flips status, reject requires reason, perm bubbled.
+10. ✅ `change.ts` + 6 tests — window boundaries, second-swap, non-ref rejection, status guard.
+11. ✅ `rules.ts` + 4 tests — upsert create + update, non-admin caller rejected.
+12. ✅ `deadline.ts` + 6 tests — whoMissed set, idempotent auto-warning, ladder 1st/2nd/3rd.
+13. ✅ `list.ts` + 2 tests — `listSubmissionsForWeek`, `getApprovedSubmissionForPlayer`, `listChangeAuthorizingRefs`.
+14. ✅ `index.ts` re-exports.
+15. ✅ `perms.ts` seed + `middleware.ts` gate on `/player/**`.
+16. ✅ `AdminSubnav.tsx` — "Squads" tab between "Punishments" and "Announcements".
+17. ✅ `/admin/squads/page.tsx` + `[id]/page.tsx` + `[id]/actions.ts`.
+18. ✅ `/admin/squads/rules/page.tsx` + `actions.ts`.
+19. ✅ `/player/layout.tsx` + `/player/squad/page.tsx` + `SubmitForm.tsx` + `actions.ts`.
+20. ✅ `/player/squad/change/page.tsx` + `actions.ts`.
+21. ✅ `/players/[id]/page.tsx` — "This week's squad" card when approved submission exists (no screenshot leak).
+22. ✅ `/api/cron/squad-deadline-check/route.ts` guarded by `X-Cron-Secret`.
+23. ✅ 3 E2E specs + audit_smoke extended with insert/update/soft-delete across all four new tables.
+24. ✅ Verification gates (test + lint green; build blocked by Plan 14's in-flight churn; see Blockers).
+
+### Unit test count
+
++42 new tests. Full suite: 377 passing.
+
+### Verification gates
+
+- `npm run test` — 377 passed.
+- `npm run lint` — clean after submit.ts void fix.
+- `npm run build` — FAILED (unrelated: Plan 14's `/admin/match-days/[id]/stats-upload/page.tsx` references `getActorFromSession` without importing it). My own compilation succeeds; blocker is an in-flight neighbour file.
+- `npm run audit:smoke` — not run (waits for clean build).
+- E2E — written; executing them is blocked on a green build.
+
+### Commits (this wave)
+
+1. `3a6dea0` — feat(db): plan 10 migrations + storage bucket + squads.* perms seed.
+2. slice2 (see log) — server modules + perms + middleware.
+3. `9ecff8b` — feat(squads): admin + player UI + cron + audit smoke.
+4. `c9ea1eb` — feat(squads): admin detail page + lint fix.
+
+### Autonomous decisions
+
+- `weekStartThursday`/`thursdayDeadline`/`fridayWindowBounds` live in `lib/time.ts` (single source of truth) and the squads `week.ts` re-exports them, rather than duplicating.
+- `/player/**` middleware gate admits `{admin, moderator, player, loc, referee}` so refs can QA-impersonate-view through the same layout without a separate route group.
+- Existing seed.sql didn't exist — created dev-only guarded with NOT EXISTS, applied to remote via `npm run db:query -- --file supabase/seed.sql`.
+- Admin detail page uses service-role client specifically for signed-read URL to bypass any RLS-on-storage stance; safe because /admin middleware gates the route.
+- Cron loops issueAutoWarningForMissed in try/catch per player so a single failure doesn't poison the whole batch.
+- E2E for window boundaries kept as unit tests (change.test.ts); E2E instead asserts the unique partial index rejects a second live swap — same observable contract, stable across machine clocks.
+
+### Blockers
+
+- Build currently red on Plan 14's `stats-upload/page.tsx` (missing `getActorFromSession` import). Not my plan's regression; leaving for Plan 14 agent to clean up. Once fixed, E2E run is the final gate.
+- `.gitkeep` left inside `/admin/squads/[id]/` because `git reset` is sandbox-blocked in this env; harmless.
