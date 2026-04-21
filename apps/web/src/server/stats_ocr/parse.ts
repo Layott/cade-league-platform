@@ -88,7 +88,11 @@ export async function parse(
       throw new BudgetExceededError(spent, cap);
     }
 
-    const client = opts.anthropicClient ?? getAnthropicClient();
+    // The real Anthropic SDK has a strongly-typed `messages.create`
+    // overload set; our `AnthropicLike` is an intentionally narrower surface
+    // for mocking. Cast through `unknown` to bridge the two.
+    const client: AnthropicLike =
+      opts.anthropicClient ?? (getAnthropicClient() as unknown as AnthropicLike);
     try {
       const imageBase64 = opts.imageBuffer.toString("base64");
       const result = await parseWithClaude(

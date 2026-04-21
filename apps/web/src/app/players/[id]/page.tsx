@@ -37,21 +37,44 @@ export default async function PlayerProfilePage({
   // originating screenshot has parse_status='confirmed'. Unreviewed OCR
   // never leaks: the inner join on match_stat_screenshots with the status
   // filter excludes any PMS row lacking a confirmed screenshot.
+  // Supabase-js types join columns as to-many by default (see
+  // tasks/lessons.md 2026-04-26). We express every nested join as an
+  // array-or-single union and go through `as unknown as` on read.
   type RecentRow = {
     match_id: string;
     goals: number;
     assists: number;
     custom_metrics: Record<string, number | null> | null;
-    matches: {
-      id: string;
-      match_day_id: string;
-      home_player_id: string;
-      away_player_id: string;
-      match_stat_screenshots:
-        | { id: string; parse_status: string; confirmed_at: string | null }[]
-        | null;
-      match_day: { match_date: string } | { match_date: string }[] | null;
-    } | null;
+    matches:
+      | {
+          id: string;
+          match_day_id: string;
+          home_player_id: string;
+          away_player_id: string;
+          match_stat_screenshots:
+            | { id: string; parse_status: string; confirmed_at: string | null }[]
+            | { id: string; parse_status: string; confirmed_at: string | null }
+            | null;
+          match_day:
+            | { match_date: string }
+            | { match_date: string }[]
+            | null;
+        }
+      | {
+          id: string;
+          match_day_id: string;
+          home_player_id: string;
+          away_player_id: string;
+          match_stat_screenshots:
+            | { id: string; parse_status: string; confirmed_at: string | null }[]
+            | { id: string; parse_status: string; confirmed_at: string | null }
+            | null;
+          match_day:
+            | { match_date: string }
+            | { match_date: string }[]
+            | null;
+        }[]
+      | null;
   };
   const { data: recentRaw } = await sb
     .from("player_match_stats")
@@ -79,10 +102,13 @@ export default async function PlayerProfilePage({
     passAccuracyPct: number | null;
   }> = [];
 
-  for (const raw of (recentRaw ?? []) as RecentRow[]) {
-    const m = raw.matches;
+  for (const raw of (recentRaw ?? []) as unknown as RecentRow[]) {
+    const mRaw = raw.matches;
+    if (!mRaw) continue;
+    const m = Array.isArray(mRaw) ? mRaw[0] : mRaw;
     if (!m) continue;
-    const ss = m.match_stat_screenshots ?? [];
+    const ssRaw = m.match_stat_screenshots;
+    const ss = Array.isArray(ssRaw) ? ssRaw : ssRaw ? [ssRaw] : [];
     if (!ss.some((s) => s.parse_status === "confirmed")) continue;
     const md = Array.isArray(m.match_day)
       ? m.match_day[0]?.match_date
@@ -175,6 +201,41 @@ export default async function PlayerProfilePage({
           )}
         </section>
 
+        <section data-testid="public-recent-match-stats">
+          <h2 className="mb-4 font-display text-xl font-bold text-[var(--chalk-0)]">
+            Recent match stats
+          </h2>
+          {recentStats.length === 0 ? (
+            <p className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)]/60 p-6 text-sm text-[var(--chalk-2)]">
+              Per-match stats appear here as soon as an admin confirms a
+              screenshot upload for this player&apos;s fixtures.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {recentStats.map((r) => (
+                <li
+                  key={r.matchId}
+                  data-testid={`recent-stat-${r.matchId}`}
+                  className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--chalk-3)] tabular">
+                      {r.matchDate ?? "—"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-5 gap-2 text-center">
+                    <MiniStat label="G" value={r.goals} />
+                    <MiniStat label="A" value={r.assists} />
+                    <MiniStat label="Poss%" value={r.possessionPct} />
+                    <MiniStat label="Shots" value={r.shots} />
+                    <MiniStat label="Pass%" value={r.passAccuracyPct} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         {approvedSquad ? (
           <section data-testid="public-week-squad">
             <h2 className="mb-3 font-display text-xl font-bold text-[var(--chalk-0)]">
@@ -226,6 +287,25 @@ function InfoTag({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </span>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | null;
+}) {
+  return (
+    <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)]/60 px-1.5 py-2">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--chalk-3)]">
+        {label}
+      </div>
+      <div className="tabular mt-1 font-display text-base font-bold text-[var(--chalk-0)]">
+        {value == null ? "—" : value}
+      </div>
+    </div>
   );
 }
 

@@ -249,6 +249,61 @@ Open items:
 - **Full wave verification deferred.** Other agents were mid-commit on Plan 10 (squads), Plan 11 (precedents + attendance penalty), Plan 13 (orgs/disputes/appeals), Plan 14 (OCR) while I was landing Plan 12. Those broke `npm run build` (DataTable prop mismatch in plan-11 precedents page, missing `flatLadder` export in plan-11 attendance penalty) and `npm run test` (Plan 13 orgs ledger Zod errors, Plan 13 disputes stub mock mismatches). My Plan 12 slice tested in isolation is green; the next wave verification pass should cover the combined state once the concurrent work settles.
 - **E2E not executed.** Playwright needs a clean build; blocked by the same concurrent churn. E2E spec is written and ready to run once the build is green.
 
+## Plan 13A Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-13-orgs-disputes-content.md` §1–11 (subset: data + modules, tasks 1–16). UI tasks 17–28 deferred to Plan 13B.
+
+### Migrations (tasks 1–8)
+
+- [x] 1. `20260428000201_organizations.sql` — table + partial unique CAC index + audit.
+- [x] 2. `20260428000202_organization_contracts.sql` — RLS deny-all; partial unique active contract per (player, season).
+- [x] 3. `20260428000203_caution_ledger_entries.sql` — append-only triggers (UPDATE/DELETE blocked) + RLS deny-all + audit.
+- [x] 4. `20260428000204_players_org_columns.sql` — three nullable FK columns. Extends `server/players/types.ts` in same PR.
+- [x] 5. `20260428000205_organizations_rls.sql` — public read; direct writes blocked.
+- [x] 6. `20260429000201_disputes.sql` + `20260429000202_appeals.sql` — raiser-scoped RLS; partial unique "one open appeal per case".
+- [x] 7. `20260430000201..203_content_*.sql` — posts table (Monday-anchor CHECK) + view + sessions. Self-read RLS for own player rows.
+- [x] 8. `20260502000201..203_preseason_*.sql` — shoots + attendance + incident_type enum bump. `20260502000300_incident_types_merged.sql` (written by a concurrent agent) subsumes both Plan 11 and Plan 13A enum edits.
+- [x] 8b. `20260502000204_plan13_perms_seed.sql` — ON CONFLICT DO NOTHING seed of moderator + player rows.
+
+### Server modules + helpers (tasks 9–15)
+
+- [x] 9. `apps/web/src/lib/businessDays.ts` — `addBusinessDays(base, n, tz='Africa/Lagos')` + `isBusinessDay`. 11 unit tests covering all §5 vectors + error paths.
+- [x] 10. `server/orgs/{schemas,ledger,contracts,index}.ts` + tests. Ledger is append-only at module layer too (no update/delete functions exported); `recordEntry` does the balance diff + insert atomically against the cloud DB.
+- [x] 11. `server/disputes/{schemas,index}.ts` + 14 tests. `withdraw` enforces raiser-only; `rule` requires non-empty ruling text.
+- [x] 12. `server/appeals/{schemas,deadline,index,expire}.ts` + 17 tests. Deadlines computed via businessDays helper; late rulings marked `[LATE RULING]` prefix.
+- [x] 13. `server/content/{schemas,week,posts,status,sessions,index}.ts` + 17 tests. Posts idempotent on (player, week, platform, url). Makeup session requires primary absence.
+- [x] 14. `server/preseason/{schemas,shoots,attendance,index}.ts` + 8 tests. Absent → auto-warning through `punishments.issue(incident_type='preseason_miss')`, flip `warning_issued_bool`, idempotent on re-save.
+- [x] 15. Extend `apps/web/src/perms.ts` seed + 6 new assertions in `perms.seed.test.ts`.
+
+### Seed + verification (task 16)
+
+- [x] 16. `scripts/seed-plan13.mjs` + `scripts/plan13-scenario-a-smoke.mjs`. Seeds 2 orgs, 1 contract, 1 shoot with 5 attendance rows, 2 caution deposits. Scenario A smoke proves 50,000 - 5,000 = 45,000 balance with two ledger rows.
+
+### Gate results — 2026-04-21
+
+| Command | Result |
+|---------|--------|
+| `npm run test` | 377 passed (63 files) — adds ~102 new Plan 13A tests |
+| `npm run lint` | clean (0 errors; 2 Plan 10 warnings unchanged) |
+| `npm run build` | blocked by unrelated Plan 14 TS mismatch; `tsc --noEmit` on Plan 13A files is clean |
+| `npm run db:push` | 16 new migrations applied |
+| `npm run audit:smoke` | green after repairing Plan 14's hard-coded placeholder UUID; Plan 13A block asserts org + ledger audits + append-only UPDATE block |
+| `npm run seed:plan13` | 2 orgs + 1 contract + 1 shoot + 5 attendance + 2×50,000-coin deposits |
+| `npm run plan13:scenario-a` | 50,000 → 45,000 after 5,000 fine_deduction |
+
+### Plan 13A autonomous decisions
+
+- Accepted the Plan 11 × Plan 13A enum merge migration (`20260502000300_incident_types_merged.sql`) that unions both plans' incident_type values.
+- Removed a stale `flatLadder` re-export from `apps/web/src/server/attendance/index.ts` (Plan 11 deleted the function but left the re-export, blocking `next build`).
+- Added `preseason_miss` to the zod `issueSchema` enum in `apps/web/src/server/punishments/index.ts` so the preseason attendance module can call `issue()` for auto-warnings.
+- Fixed Plan 14's hard-coded placeholder UUID in `audit_smoke.sql` to `select id from users limit 1`, mirroring the Plan 10 pattern.
+
+Not in scope (Plan 13B):
+
+- No admin or player UI pages.
+- No E2E specs.
+- No storage buckets for CAC certs / contracts / dispute evidence.
+
 ## Plan 14 Tasks
 
 Spec: `docs/superpowers/specs/2026-04-21-plan-14-stats-screenshot-ocr.md`.
