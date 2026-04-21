@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { StatusPill } from "./StatusPill";
+import { computeDeadlineTone, formatCountdown } from "./DeadlineBadge.helpers";
+
+// Re-export helpers for any caller that imports from this module.
+export { computeDeadlineTone, formatCountdown } from "./DeadlineBadge.helpers";
+export type { DeadlineTone } from "./DeadlineBadge.helpers";
 
 /**
  * Plan 13B — Deadline badge with server-rendered initial tone + 30s
@@ -11,36 +16,9 @@ import { StatusPill } from "./StatusPill";
  *   - < 72h remaining → amber `<72h`
  *   - else           → chalk-2 mono countdown `NdHh`
  *
- * Countdown is computed off the `deadlineIso` prop (server-sent). Client
- * re-evaluates every 30 s — clock skew up to ~30 s is acceptable.
+ * Pure helpers live in `./DeadlineBadge.helpers` so vitest can import
+ * them without parsing the client-component JSX.
  */
-
-export function formatCountdown(msRemaining: number): string {
-  if (msRemaining <= 0) return "0h";
-  const totalHours = Math.floor(msRemaining / (1000 * 60 * 60));
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  if (days > 0) return `${days}d${hours}h`;
-  return `${hours}h`;
-}
-
-export type DeadlineTone = "expired" | "lt24" | "lt72" | "ok";
-
-export function computeDeadlineTone(
-  deadlineMs: number,
-  nowMs: number,
-  status?: string,
-): { tone: DeadlineTone; remainingMs: number } {
-  const remainingMs = deadlineMs - nowMs;
-  if (status === "expired" || remainingMs <= 0) {
-    return { tone: "expired", remainingMs: Math.max(0, remainingMs) };
-  }
-  const H24 = 24 * 60 * 60 * 1000;
-  const H72 = 72 * 60 * 60 * 1000;
-  if (remainingMs < H24) return { tone: "lt24", remainingMs };
-  if (remainingMs < H72) return { tone: "lt72", remainingMs };
-  return { tone: "ok", remainingMs };
-}
 
 export function DeadlineBadge({
   deadlineIso,

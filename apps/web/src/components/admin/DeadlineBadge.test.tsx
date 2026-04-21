@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCountdown, computeDeadlineTone } from "./DeadlineBadge";
+import { formatCountdown, computeDeadlineTone } from "./DeadlineBadge.helpers";
 
 describe("DeadlineBadge helpers (Plan 13B)", () => {
   it("tone = expired when now >= deadline", () => {
