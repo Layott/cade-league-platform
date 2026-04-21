@@ -1,0 +1,82 @@
+# Real fixture pairings extracted from EVENT FLOW DIVISION 2 CADE ESPORTS ESOCCER.xlsx
+# match_days: 13
+# matches   : 34
+
+## WK 1 DAY 1 — 2025-11-01
+  MR_OGA vs ANIFE  (Mr OGA vs Anife)
+  BAJI_JNR vs GURU  (Baji SNR vs Guru)
+  KAYKAY vs TACTICAL  (KayKay vs Tactical)
+
+## WK 1 DAY 2 — 2025-11-02
+  DADABOI vs KINGNONEX  (Dadaboi vs KingNonex)
+  ANIFE vs GURU  (Anife vs Guru)
+  TACTICAL vs WOLEVATION  (Tactical vs Wolevation)
+
+## WK 2 DAY 1 — 2025-11-08
+  ANIFE vs BAJI_JNR  (Anife vs Baji Snr)
+
+## WK 2 DAY 2 — 2025-11-09
+  KINGNONEX vs TACTICAL  (KingNonex vs Tactical)
+  MR_OGA vs BAJI_JNR  (Mr Oga vs Baji Snr)
+  BAJI_JNR vs WOLEVATION  (Baji Snr vs Wolevation)
+
+## WK 3 DAY 1 — 2025-11-15
+  ANIFE vs DADABOI  (Anife vs Dadaboi)
+  ANIFE vs KAYKAY  (Anife vs Kaykay)
+  WOLEVATION vs KINGNONEX  (Wolevation vs KingNonex)
+
+## WK 3 DAY 2 — 2025-11-16
+  MR_OGA vs GURU  (Mr Oga vs Guru)
+  KAYKAY vs KINGNONEX  (Kaykay vs KingNonex)
+
+## WK 4 DAY 1 — 2025-11-22
+  KINGNONEX vs GURU  (KingNonex vs Guru)
+  TACTICAL vs MR_OGA  (Tactical vs Mr Oga)
+
+## WK 4 DAY 2 — 2025-11-23
+  KINGNONEX vs ANIFE  (KingNonex vs Anife)
+  TACTICAL vs ANIFE  (Tactical vs Anife)
+  KINGNONEX vs BAJI_JNR  (KingNonex vs Baji Snr)
+
+## WK 5 DAY 1 — 2025-11-29
+  GURU vs TACTICAL  (Guru vs Tactical)
+  MR_OGA vs KAYKAY  (Mr Oga vs Kaykay)
+
+## WK 5 DAY 2 — 2025-11-30
+  TACTICAL vs BAJI_JNR  (Tactical vs Baji Snr)
+
+## WK 6 DAY 1 — 2025-12-06
+  MR_OGA vs DADABOI  (Mr Oga vs Dadaboi)
+  ANIFE vs WOLEVATION  (Anife vs Wolevation)
+  DADABOI vs WOLEVATION  (Dadaboi vs Wolevation)
+  KINGNONEX vs MR_OGA  (KingNonex vs Mr Oga)
+
+## WK 6 DAY 2 — 2025-12-07
+  KAYKAY vs GURU  (Kaykay vs Guru)
+  KAYKAY vs DADABOI  (Kaykay vs Dadabo)
+  TACTICAL vs DADABOI  (Tactical vs Dadaboi)
+
+## WK 7 DAY 1 — 2025-12-13
+  DADABOI vs GURU  (Dadaboi vs Guru)
+  WOLEVATION vs GURU  (Wolevation vs Guru)
+  BAJI_JNR vs KAYKAY  (Baji Snr vs Kaykay)
+  WOLEVATION vs KAYKAY  (Wolevation vs Kaykay)
+
+
+## Names not in 13-player Elite roster (likely Div 2 or different Elite cohort):
+  - Balo K
+  - Blaise99
+  - Bright
+  - Dracarys
+  - Flick
+  - GameWithJosh
+  - Gamewithjoshh
+  - KhaledOY
+  - Khaleedoy
+  - Rhymez
+  - SON OF GOD
+  - Simplyy Uzo
+  - Son of God (SOG
+  - Son of God (SOG)
+  - Yem
+  - Yemi
