@@ -35,7 +35,10 @@ from PIL import Image
 
 try:
     from rembg import remove as _rembg_remove, new_session as _rembg_session  # type: ignore
-    _REMBG_SESSION = _rembg_session("u2net")
+    # u2net_human_seg is purpose-built for human subjects — keeps hair +
+    # jerseys + body extremities better than generic u2net (which removed
+    # parts of Killer Freak + Anife on first run).
+    _REMBG_SESSION = _rembg_session("u2net_human_seg")
     _REMBG_OK = True
 except Exception as _e:
     print(f"rembg unavailable ({_e}) — background removal skipped", file=sys.stderr)
