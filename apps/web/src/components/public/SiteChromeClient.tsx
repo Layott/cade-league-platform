@@ -15,7 +15,9 @@ import { ReactNode } from "react";
  * - Replaces the per-page logout <form> with a nav-level Sign out button.
  */
 
-const HIDDEN_PREFIXES = ["/login", "/logout"];
+// Overlay routes (vMix browser sources) render transparent with no chrome
+// so they composite cleanly into video output. See (overlay)/layout.tsx.
+const HIDDEN_PREFIXES = ["/login", "/logout", "/overlay"];
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
