@@ -83,3 +83,11 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Deferred to user for things I could have done myself — approvals I was already authorized to act on, and a file extraction I could script.
 **Correction:** "Never ask me for something if it's something you can do yourself."
 **Rule for future:** When the user has given a clear directive ("continue building, spin up agents, move fast"), DO NOT re-request permission for each sub-step. Also, never dead-end on a file format barrier (.docx, .pdf, .xlsx) — convert it with pandoc / python-docx / pdftotext / openpyxl myself and proceed. Only ask the user when a decision genuinely requires human judgement or external knowledge (org policy, budget, credentials), never for execution mechanics I can resolve with a tool.
+
+---
+
+**Date:** 2026-04-21
+**Context:** Extracting rulebook tables for Plan 11 ladder. python-docx reported rows 2-5 of the Late Arrival table as literal `''`. I flagged them as "blank in source — needs LOC input".
+**Mistake:** Trusted python-docx output blindly. User corrected with screenshots of the rendered docx — rows 2-5 actually have values. python-docx splits on page-break-in-table and returns one empty row per split; the real content lives in a sibling table element further down the `doc.tables` array.
+**Correction:** User: "there's information there you can't see?" — I'd already escalated to them for something I should have debugged.
+**Rule for future:** When python-docx returns empty cells in a table that HAS visible content in the rendered file, do NOT flag it as "missing data". Instead: (a) iterate every `doc.tables` entry, not just the one whose header matches — a split table appears as 2+ tables; (b) try `pymupdf`/`fitz` on a PDF export of the docx; (c) use Python's `zipfile` to unpack the raw `word/document.xml` and regex-grep the rows. Only escalate to the user AFTER those three paths fail. And never stage a "blocked on external input" status before exhausting extraction alternatives.

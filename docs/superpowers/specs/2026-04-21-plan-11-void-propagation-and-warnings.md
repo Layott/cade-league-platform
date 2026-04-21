@@ -34,30 +34,68 @@
 
 ---
 
-## 2. Rule 5.4 ladder — authoritative values (to be verified against `KNOWLEDGE/`)
+## 2. Rule 5.4 ladder — AUTHORITATIVE (resolved 2026-04-21)
 
-The ladder below is the **proposed** transcription. The concrete numeric values MUST be confirmed against `KNOWLEDGE/CADE_Elite_League_Rulebook_v1_7.docx` §5.4 and `KNOWLEDGE/RULE BOOK VER 7.0 - ESOCCER LEAGUE DIV 2 (2).pdf` §5.4 before merging. If rulebook values differ, update spec and open follow-up task — **do not silently rewrite code to match guesses**. See §10 Risks.
+Source: rulebook `CADE_Elite_League_Rulebook_v1_7.docx` §5.4 table, transcribed via user-supplied screenshots when python-docx dropped rows 2-5 due to table-page-break. Full intel + screenshot provenance in `KNOWLEDGE/extracted/PLAN11-LADDER-GAPS.md`.
 
 ### 2.1 Late arrival (category = `late_arrival`)
 
-| Offense count (after this mark) | Point deduction | Case created | Suspension |
-|---|---|---|---|
-| 1 | -1 | none | none |
-| 2 | -3 | warning (`disciplinary_cases.status = 'open'`, ladder notes "warning") | none |
-| 3 | -5 | disciplinary case | none |
-| 4+ | -5 | disciplinary case | 1 match day |
+Mixed GD + point ladder. Offenses 2-3 deduct **Goal Difference** (applied to next scheduled match, stacking per rulebook phrasing "accumulated GD now -6"). Offenses 4-5 deduct **League Points**. Offense 6 is season ban.
+
+| Offense count (after this mark) | GD deduction | Point deduction | Case created | Suspension |
+|---|---|---|---|---|
+| 1 | 0 | 0 | none (auto-status log only) | none |
+| 2 | **-3** (applied to next scheduled match) | 0 | warning | none |
+| 3 | **-3** (accumulates — total -6 after this offense) | 0 | warning | none |
+| 4 | 0 | **-1** | disciplinary | none |
+| 5 | 0 | **-3** | disciplinary | none |
+| 6 | 0 | 0 | disciplinary + IDC | **season ban** (triggers void propagation per Rule 3.4.4.2) |
 
 ### 2.2 Absence (category = `absent`)
 
-| Offense count (after this mark) | Point deduction | Case created | Suspension | Auto-forfeit |
-|---|---|---|---|---|
-| 1 | -3 | disciplinary case | none | yes, if a fixture was scheduled for that match day |
-| 2 | -5 | disciplinary case | 1 match day | yes |
-| 3+ | rulebook TBD | disciplinary case | per rulebook | yes |
+Rulebook treats full absence under Rule 3.4.4.1 as unexcused forfeit → auto 3-0 forfeit + warning (1st) + season suspension (2nd). No separate late-style scaling ladder for absence; the forfeit + Rule 3.4.4.2 escalation path applies directly.
 
-### 2.3 Quoting rule
+| Offense count | Effect |
+|---|---|
+| 1 | Auto 3-0 forfeit + formal written warning (Rule 3.4.4.1 + §6.3) |
+| 2 | Auto 3-0 forfeit + season suspension + IDC referral (Rule 3.4.4.2) → void-match propagation |
 
-Each row in `LADDER.ts` must carry an inline comment quoting the rulebook clause verbatim (`// Rule 5.4.2 "A player late for the third time..."`). Reviewers should reject any ladder entry without a quote.
+### 2.3 Social Media (category = `social_media`) — separate ladder per §5.5
+
+Not used by `attendance` module but must coexist in `computeSocialMediaSanction`:
+
+| Offence | Point deduction | Case |
+|---|---|---|
+| 1st week non-compliance | 0 | warning |
+| 2nd consecutive week | -1 | disciplinary |
+| 3rd consecutive or ongoing | -3 + IDC | disciplinary |
+
+### 2.4 Dress Code (category = `dress_code`)
+
+| Offence | Effect |
+|---|---|
+| 1st | Formal warning |
+| 2nd | Refused entry; match forfeit if unable to change in time |
+| 3rd | IDC review + possible point deduction (magnitude IDC-set) |
+
+### 2.5 Quoting rule
+
+Each row in `LADDER.ts` must carry an inline comment quoting the rulebook clause verbatim (e.g., `// Rule §5.4 Late Arrival 3rd offence: "-3 Goal Difference (accumulated GD now -6)"`). Reviewers reject any ladder entry without a quote.
+
+### 2.6 `LadderOutcome` shape (replaces original §5.1 type)
+
+```ts
+type LadderOutcome = {
+  gdDeduction: number;        // applied to next scheduled match, via sanction_type='goal_difference_penalty'
+  pointDeduction: number;     // via sanction_type='point_deduction'
+  createCase: 'none' | 'warning' | 'disciplinary';
+  suspensionMatchDays: number | 'season_remaining';
+  autoForfeit: boolean;
+  rulebookClause: string;     // verbatim quote, required
+}
+```
+
+Previous single-magnitude shape is obsolete. All callers of `computeLateSanction`/`computeAbsentSanction`/`computeSocialMediaSanction`/`computeDressCodeSanction` use this union.
 
 ---
 

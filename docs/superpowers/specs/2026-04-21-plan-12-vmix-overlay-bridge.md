@@ -1,4 +1,6 @@
-# Plan 12 — Phase 2 prep: vMix overlay bridge + broadcast entities
+# Plan 12 — Phase 2 prep: browser-source overlay bridge + broadcast entities
+
+**IMPORTANT (2026-04-21 clarification):** overlay pages are **plain browser URLs**. They work in ANY streaming tool that supports Browser Sources — OBS Studio, vMix, Streamlabs Desktop, Ecamm Live, XSplit, Restream Studio, etc. There is nothing vMix-specific in the implementation. All column names, UI labels, env vars, and docs use tool-agnostic terms ("browser source", "stream session", "overlay URL") — never "vMix" as a required prefix. vMix is mentioned only as one example operator tool in the README.
 
 **Owner:** Spektakula
 **Version:** 1.0
@@ -10,7 +12,7 @@
 
 ## 1. Goal + Success Criteria
 
-**Goal:** Land the data model, realtime bridge, admin control panel, and browser-source overlay route group required to push data-wired graphics into vMix. Visual polish and the actual production workstation setup stay out. After this plan, a production operator can point vMix browser sources at `/overlay/<template_key>?session=<id>` and see overlays animate in when an admin clicks Trigger.
+**Goal:** Land the data model, realtime bridge, admin control panel, and browser-source overlay route group required to push data-wired graphics into ANY stream tool (OBS Studio, vMix, Streamlabs, Ecamm, XSplit, Restream, etc.). Visual polish and the actual production workstation setup stay out. After this plan, a production operator can add a Browser Source in their tool pointing at `/overlay/<template_key>?session=<id>` and see overlays animate in when an admin clicks Trigger.
 
 **Success criteria (each demonstrable end-to-end before plan is complete):**
 
@@ -84,7 +86,7 @@ CREATE INDEX overlay_templates_active_idx ON overlay_templates (active_bool) WHE
 CREATE TABLE stream_sessions (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   match_day_id         UUID NOT NULL REFERENCES match_days(id),
-  vmix_session_tag     TEXT NULL,        -- free-form label the operator chooses
+  session_tag     TEXT NULL,        -- free-form label the operator chooses
   started_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   ended_at             TIMESTAMPTZ NULL,
   started_by_user_id   UUID NOT NULL REFERENCES users(id),
