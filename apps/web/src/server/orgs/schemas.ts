@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+// Plan 13B: cacCertUrl now stores an object-storage *path* (e.g.
+// `orgs/<orgId>/cac-cert.pdf`), not a public URL — callers mint signed
+// URLs server-side at render time. Drop the `.url()` constraint.
 export const createOrgSchema = z.object({
   name: z.string().trim().min(1).max(200),
   cacNumber: z.string().trim().min(1).max(64).optional().nullable(),
-  cacCertUrl: z.string().trim().url().optional().nullable(),
+  cacCertUrl: z.string().trim().min(1).max(500).optional().nullable(),
   contactRepUserId: z.string().uuid().optional().nullable(),
   status: z.enum(["active", "suspended", "dissolved"]).default("active"),
 });
@@ -13,7 +16,7 @@ export const updateOrgSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(200).optional(),
   cacNumber: z.string().trim().min(1).max(64).optional().nullable(),
-  cacCertUrl: z.string().trim().url().optional().nullable(),
+  cacCertUrl: z.string().trim().min(1).max(500).optional().nullable(),
   contactRepUserId: z.string().uuid().optional().nullable(),
   status: z.enum(["active", "suspended", "dissolved"]).optional(),
 });
@@ -40,7 +43,8 @@ export const createContractSchema = z.object({
   organizationId: z.string().uuid(),
   playerId: z.string().uuid(),
   seasonId: z.string().uuid(),
-  contractUrl: z.string().trim().url(),
+  // Storage path (not public URL) — signed reads minted server-side.
+  contractUrl: z.string().trim().min(1).max(500),
   validFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: z
