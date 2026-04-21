@@ -50,6 +50,14 @@
   --font-body: var(--font-body-src), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-mono-src), "JetBrains Mono", ui-monospace, monospace;
 
+  /* Plan 16 — broadcast surface fonts. Self-hosted Agharti (primary
+   * display) + Quedora (accent). Consumed by (overlay) pages and the
+   * /overlay/style-guide / /overlay/design-preview harness only. */
+  --font-broadcast-display: var(--font-agharti), "Agharti", "Space Grotesk",
+    system-ui, sans-serif;
+  --font-broadcast-accent: var(--font-quedora), "Quedora", "Inter", system-ui,
+    sans-serif;
+
   --background: var(--ink-1);
   --foreground: var(--chalk-1);
 }
@@ -134,6 +142,21 @@ html.overlay-mode body {
 .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
+}
+
+/* Plan 16 broadcast utilities — used only on (overlay) routes + the
+ * style-guide / design-preview harness pages. */
+.font-broadcast-display {
+  font-family: var(--font-broadcast-display);
+  letter-spacing: -0.03em;
+  font-weight: 900;
+}
+
+.font-broadcast-accent {
+  font-family: var(--font-broadcast-accent);
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 /* Utility: tabular lining numerics for standings/match numbers */

@@ -820,3 +820,48 @@ Pushed to https://github.com/Layott/cade-league-platform (private).
 
 - Build currently red on Plan 14's `stats-upload/page.tsx` (missing `getActorFromSession` import). Not my plan's regression; leaving for Plan 14 agent to clean up. Once fixed, E2E run is the final gate.
 - `.gitkeep` left inside `/admin/squads/[id]/` because `git reset` is sandbox-blocked in this env; harmless.
+
+---
+
+## Plan 15 Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-15-session-monitoring.md`. Goal: cron-driven anomaly detector on existing `sessions` + `auth_events` tables with `/admin/security/anomalies` feed, email on critical only. **NO device fingerprinting, NO MFA, NO captcha, NO blocklists** (user direction).
+
+### Migrations + seed
+
+- [ ] 1. Write `supabase/migrations/20260506000002_anomaly_events.sql` — table + check constraints + indexes + partial unique dedupe idx + `attach_audit`. Verify trigger via `supabase db query`.
+- [ ] 2. Write `supabase/migrations/20260506000003_anomaly_perms_seed.sql` — seed 7 rows (`admin×3 + idc×3 + loc×1`). Verify count.
+- [ ] 3. Bootstrap `cron_state` row for `anomaly_scan_last_run_at` (idempotent DO $$).
+- [ ] 4. Extend `supabase/tests/audit_smoke.sql` with `anomaly_events` insert/update/soft-delete loop.
+
+### Server modules
+
+- [ ] 5. TDD `server/anomalies/detect.ts` + `detect.test.ts` — ≥ 9 tests (concurrent, unusual-ip, unusual-hour, cold-start, CIDR edge, rapid-hops, new-country null path, empty-input).
+- [ ] 6. TDD `server/anomalies/scan.ts` + `scan.test.ts` — ≥ 4 tests (happy path, cursor bump, dedupe no-op, critical triggers sendCriticalAlert exactly once).
+- [ ] 7. TDD `server/anomalies/resolve.ts` + `resolve.test.ts` — ≥ 4 tests (dismiss, idempotent dismiss, resolve fires revokeSession, perm denial bubble).
+- [ ] 8. TDD `server/anomalies/read.ts` + `read.test.ts` — 2 tests (filter, soft-delete filter).
+- [ ] 9. Write `server/anomalies/email.ts` `sendCriticalAlert` — reuse `lib/email/resend.ts`; subject `CADE League — critical sign-in anomaly`.
+- [ ] 10. Write `server/anomalies/schemas.ts` — Zod for dismiss + resolve.
+- [ ] 11. `server/anomalies/index.ts` re-export surface.
+
+### API + cron
+
+- [ ] 12. `app/api/cron/anomaly-scan/route.ts` — `X-Cron-Secret`-gated POST calling `scanAndEmit(sb)`. Add entry to `vercel.json` (every 5 min).
+
+### UI
+
+- [ ] 13. `app/admin/security/anomalies/page.tsx` — list + status/severity filter chips, gated `anomalies.read`. Tone-mapped severity pills.
+- [ ] 14. `app/admin/security/anomalies/[id]/page.tsx` + `actions.ts` — detail page, context_json pretty-printed, dismiss + resolve forms (resolve can revoke attached session).
+- [ ] 15. `AdminSubnav.tsx` — add **Anomalies** tab next to Sessions; rose badge when any open critical exists.
+- [ ] 16. `StatusPill` — ensure severity tones (info=sky, warning=amber, critical=rose) present.
+
+### Tests + verification
+
+- [ ] 17. E2E `apps/web/tests/e2e/anomaly-flagging.spec.ts` — 2 throwaway sessions → cron scan → admin feed assertion → dismiss + audit check.
+- [ ] 18. Verification gate — `npm run test`, `lint`, `build`, `e2e`, `audit:smoke`, `db:push`. Must all be green.
+- [ ] 19. Demo §1.2 success criteria 1-10 end-to-end; capture evidence in Plan 15 review section below.
+- [ ] 20. Commit in slices (migrations → server → API/cron → UI → tests). Plan 15 review when complete.
+
+### Plan 15 review
+
+_(To be filled once tasks 1-20 are complete.)_

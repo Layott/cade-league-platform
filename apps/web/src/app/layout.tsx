@@ -1,9 +1,33 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { SiteChrome } from "@/components/public/SiteChrome";
 import { PRIMARY_LOGOS } from "@/lib/brand";
 
+// Plan 16 — primary broadcast display face (Agharti, self-hosted woff2).
+const agharti = localFont({
+  src: [
+    { path: "./fonts/Agharti-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Agharti-Bold.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/Agharti-Black.woff2", weight: "900", style: "normal" },
+  ],
+  variable: "--font-agharti",
+  display: "swap",
+});
+
+// Plan 16 — secondary broadcast accent face (Quedora, self-hosted woff2).
+const quedora = localFont({
+  src: [
+    { path: "./fonts/Quedora-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Quedora-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-quedora",
+  display: "swap",
+});
+
+// Phase 1A retained — public web pages still use Space Grotesk + Inter.
+// Overlay surface consumes Agharti + Quedora via --font-agharti / --font-quedora.
 const display = Space_Grotesk({
   variable: "--font-display-src",
   subsets: ["latin"],
@@ -58,7 +82,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html
+      lang="en"
+      className={`${display.variable} ${body.variable} ${mono.variable} ${agharti.variable} ${quedora.variable}`}
+    >
       <body className="antialiased">
         <SiteChrome>{children}</SiteChrome>
       </body>
