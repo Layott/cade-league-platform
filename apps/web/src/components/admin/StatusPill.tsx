@@ -112,6 +112,11 @@ const STATUS_TONES: Record<string, Tone> = {
   // announcement lifecycle
   published: "signal",
   draft_ann: "amber",
+
+  // broadcast (Plan 12)
+  ended: "muted",
+  triggered: "signal",
+  cleared: "muted",
 };
 
 export function tonefor(status: string): Tone {

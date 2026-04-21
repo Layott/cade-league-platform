@@ -15,6 +15,7 @@ const TABS = [
   { href: "/admin/match-days", label: "Match days" },
   { href: "/admin/punishments", label: "Punishments" },
   { href: "/admin/announcements", label: "Announcements" },
+  { href: "/admin/broadcast", label: "Broadcast" },
   { href: "/admin/roles", label: "Roles" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/trash", label: "Trash" },
