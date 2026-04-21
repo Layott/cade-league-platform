@@ -13,6 +13,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "date-fns": "^4.1.0",
@@ -20,9 +21,11 @@
     "isomorphic-dompurify": "^2.36.0",
     "marked": "^14.1.4",
     "next": "15.5.15",
+    "node-tesseract-ocr": "^2.2.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "resend": "^6.12.2",
+    "sharp": "^0.34.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
