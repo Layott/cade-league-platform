@@ -21,7 +21,9 @@ Read these before proposing changes — they contain decisions already made:
 
 Phase 1A is **deliberately minimal**. The following are **dropped entirely** (do not implement, do not propose unless user reopens): GPS geofence, QR check-in, prize disbursement automation, under-18 parental consent, auto promotion/relegation, mobile app, anonymous whistleblower flow.
 
-The following are **deferred** to later phases (do not build in Phase 1A): vMix overlays, multi-season abstraction, Paystack, Futbin scraper, social/weekly graphics, full 12-role matrix, squad submission + Friday change window.
+The following are **deferred** to later phases (do not build in Phase 1A): vMix overlays, multi-season abstraction, Futbin scraper, social/weekly graphics, full 12-role matrix, squad submission + Friday change window.
+
+**Dropped entirely as of 2026-04-21:** Paystack payment gateway + caution-fee ledger automation. Payment tracking will be manual bank-transfer + ledger rows only; no gateway integration at any phase.
 
 When in doubt about a feature, check §2.5 of `PRODUCT_STRUCTURE.md` and §16 of the Phase 1A spec before writing code.
 

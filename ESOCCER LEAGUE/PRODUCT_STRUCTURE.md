@@ -3,7 +3,7 @@
 **Primary target:** Division 1 (Elite League), Season 2025-2026
 **Extensibility target:** Division 2 (Pro), Division 3 (Challenger), Onile (Grassroots), future seasons
 **Document owner:** Spektakula
-**Version:** 0.2 (scope-locked, 2026-04-20)
+**Version:** 0.3 (Paystack dropped + Phase 1B/2 prep kickoff, 2026-04-21)
 
 ---
 
@@ -50,8 +50,10 @@ Post-brainstorm scope cuts and confirmations. Supersedes any conflicting guidanc
 - Multi-season + multi-division configuration layer.
 - Futbin scraper — attempted in Phase 3 to see what data accessible; manual fallback remains canonical.
 - Auto-generated social / weekly graphics.
-- Paystack integration + caution fee ledger.
 - Full 12-role permission matrix UI (Phase 1B).
+
+**Additional drop (2026-04-21):**
+- Paystack + any payment gateway integration. All money flows (entry fees, caution fees, fine top-ups, prize payouts) are tracked manually via a ledger that admin enters by hand. No automated collection, no webhook processing, no gateway SDK in the codebase at any phase.
 
 ---
 
@@ -80,9 +82,9 @@ Post-brainstorm scope cuts and confirmations. Supersedes any conflicting guidanc
 - Manual squad validation interface (ref-facing, against `SquadValidationRule`)
 - Session monitoring + anomaly flagging
 
-### Phase 2 — Revenue + Broadcast + Governance (Weeks 4-8)
+### Phase 2 — Broadcast + Governance (Weeks 4-8)
 - vMix-integrated stream graphics (data-wired overlays)
-- Paystack entry fee collection + caution fee tracking + prize disbursement tracking
+- Manual caution-fee ledger (admin enters ledger rows by hand — no payment gateway)
 - Content obligations tracker (manual URL submission)
 - Disputes & appeals workflow
 - Organization (CAC) entity + player-org contract storage
@@ -163,8 +165,9 @@ Below is the entity inventory. Every feature in the product maps to one of these
 - **OverlayEvent** — triggered_by, template_id, payload_snapshot, trigger_time, stream_session_id (for audit/replay of broadcast actions)
 - **StreamSession** — match_day, vmix_session_id, active_overlays, started_at, ended_at
 
-### 4.11 Payments (Phase 2)
-- **Payment** — payer (player or org), type (entry_fee, caution_fee, fine_topup, reschedule_fee), amount, status, paystack_reference, paid_at
+### 4.11 Payments (Phase 2 — manual ledger only)
+- **CautionLedgerEntry** — organization_id, entry_type (deposit, fine_deduction, topup, adjustment), amount, balance_after, reference (freeform bank-transfer note), entered_by_user_id, entered_at. Append-only; admin enters rows by hand from bank-statement reconciliation.
+- ~~Payment (gateway-integrated)~~ — **dropped 2026-04-21**. No Paystack or other gateway. Entry fees, caution fees, fine top-ups, reschedule fees all reconciled manually off bank transfers and recorded in the caution ledger.
 - ~~PrizeDisbursement~~ — **dropped**. Prize payouts tracked manually (bank transfer + ledger row). No payroll system.
 
 ### 4.12 Disputes & Appeals
@@ -207,7 +210,7 @@ Below is the entity inventory. Every feature in the product maps to one of these
 - **Database:** Postgres (via Supabase). All business logic enforced with RLS policies + triggers.
 - **Auth:** Supabase Auth (email + phone + MFA). JWT sessions.
 - **Storage:** Supabase Storage for photos, CAC certificates, squad screenshots, ID documents (encrypted bucket).
-- **Payments:** Paystack (Phase 2)
+- **Payments:** none — manual bank transfer reconciliation + ledger entries only (Paystack dropped entirely 2026-04-21)
 - **Email:** Resend (free tier — 3k/month)
 - **SMS/WhatsApp:** Termii or WhatsApp Business API (Phase 2)
 - **Hosting:** Vercel (frontend + API routes)
@@ -292,7 +295,7 @@ Tagged by urgency:
 ### HIGH PRIORITY (needed in first 2 weeks)
 - **Venue details.** Exact address, latitude/longitude for geofence, wifi SSID (for optional on-network validation).
 - **vMix production setup.** What's the version? Who's the production operator I'll coordinate with? Is there a vMix Web Controller license?
-- **Paystack business account.** Does CADE Entertainment have it already? What's the settlement account?
+- ~~**Paystack business account.**~~ N/A — payment gateway dropped 2026-04-21. Manual bank-transfer reconciliation only.
 - **Visual design assets.** Who designs the overlay visuals? Are there existing brand guidelines / colors / fonts?
 - **Brand voice docs.** I noticed there's a `brand-voice` skill available and this project mentions design. Are there existing brand guidelines I should be using for all site copy?
 
@@ -316,7 +319,7 @@ Tagged by urgency:
 |------|------------|--------|------------|
 | Build takes longer than 9-11 weeks | High | Medium | Ruthless Phase 1A scope. Ship weekly. |
 | Solo dev / AI-on-demand fails at 10 AM Saturday | Medium | High | Dev friend pre-briefed. Runbook written. Managed services = fewer things to fix. |
-| Paystack approval delay | Medium | Medium (blocks Phase 2) | Start Paystack registration NOW, in parallel. |
+| ~~Paystack approval delay~~ | N/A | N/A | Gateway dropped 2026-04-21 — manual ledger only. |
 | EA patches break squad scraper | High (Phase 3) | Low | Start with manual validation. Automation is Phase 3 nice-to-have. |
 | vMix production team unavailable / uncooperative | Medium | Medium | Confirm production contact before Phase 2 kickoff. |
 | Real PII in the database (NIN, bank, ID docs) | Certain | High if breached | Encrypted bucket + RLS + audit log + rate limits + MFA on admin accounts |
@@ -343,3 +346,4 @@ Once 1-5 are done, I move to `DATA_MODEL.md` (detailed schema + ERD) and then Ph
 |---------|------|--------|--------|
 | 0.1 | 2026-04-20 | Claude (via Spektakula) | Initial draft based on rulebook + conversation |
 | 0.2 | 2026-04-20 | Claude (via Spektakula) | Phase 1A scope-locked after brainstorm. Added Decisions Log (§2.5). Dropped: geofence, prize disbursement, under-18 consent, auto promo/relegation, mobile app, anonymous whistleblower. Confirmed monolith, hard-coded perms Phase 1A, RLS only on PII, DB-trigger audit, idempotent recompute, ref-driven attendance, backup strategy (§6.4). |
+| 0.3 | 2026-04-21 | Claude (via Spektakula) | **Paystack + all payment gateway integration dropped entirely.** Money flows now manual-only: admin enters caution/entry/fine ledger rows against bank-statement reconciliation. §3 Phase 2, §4.11 Payments, §6.1 Stack, §9 Open Questions, §10 Risks, §2.5 Decisions Log all updated. Phase 1B + Phase 2 prep kicked off (plans 9-13 in `docs/superpowers/specs/`). |

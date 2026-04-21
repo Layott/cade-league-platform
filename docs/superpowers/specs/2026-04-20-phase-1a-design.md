@@ -18,7 +18,7 @@ Ship the minimum viable platform to run **Division 1 Elite 2025-2026 (13 players
 - Players, fans read standings/fixtures/announcements publicly
 - Roles gate who can do what
 
-**Non-goals for Phase 1A:** vMix overlays, QR check-in, Paystack, multi-season abstraction, Futbin scraper, social graphics, full 12-role matrix, WhatsApp/SMS, mobile app.
+**Non-goals for Phase 1A:** vMix overlays, QR check-in, payment gateway integration (Paystack dropped entirely 2026-04-21), multi-season abstraction, Futbin scraper, social graphics, full 12-role matrix, WhatsApp/SMS, mobile app.
 
 **Success criteria:**
 1. Run a full simulated match day locally: admin creates fixture → ref marks attendance → admin enters result → standings recompute → audit log captures everything → announcement sent → public page reflects it.
@@ -460,7 +460,7 @@ Never ship dev seed to prod (check `NODE_ENV`).
 
 - vMix overlay rendering + websocket bridge
 - QR code check-in
-- Paystack payment collection + caution fee ledger
+- Payment gateway integration of any kind (Paystack dropped entirely 2026-04-21; caution fee ledger, when built in Phase 2, will be manual bank-transfer tracking only)
 - Multi-season / multi-division abstraction (hard-coded single season)
 - Futbin scraper
 - Social media / weekly graphic generation

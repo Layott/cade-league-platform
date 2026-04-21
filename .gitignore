@@ -18,6 +18,7 @@ build/
 # Editors / OS
 .vscode/
 .idea/
+.claude/
 .DS_Store
 Thumbs.db
 
