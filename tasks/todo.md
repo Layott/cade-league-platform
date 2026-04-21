@@ -1,6 +1,138 @@
 # Tasks — Active Work
 
-Active plan: **Plan 8 — Admin brand polish + unified navigation** (complete 2026-04-20).
+Active plan: **Plan 9 — Phase 1B Part A: Full 12-role matrix + DB-backed permissions + admin role editor**. Spec: `docs/superpowers/specs/2026-04-21-plan-9-roles-and-db-perms.md`. Plan 8 complete 2026-04-20.
+
+Parallel Phase 1B/2 specs drafted 2026-04-21:
+- Plan 9 (active) — `docs/superpowers/specs/2026-04-21-plan-9-roles-and-db-perms.md`
+- Plan 10 — `docs/superpowers/specs/2026-04-21-plan-10-squad-submissions.md` (squad submissions + Friday change window)
+- Plan 11 — `docs/superpowers/specs/2026-04-21-plan-11-void-propagation-and-warnings.md` (void-match + warnings ladder)
+- Plan 12 — `docs/superpowers/specs/2026-04-21-plan-12-vmix-overlay-bridge.md` (Phase 2 prep: broadcast)
+- Plan 13 — `docs/superpowers/specs/2026-04-21-plan-13-orgs-disputes-content.md` (Phase 2 prep: governance)
+
+Paystack purged from all scope docs 2026-04-21 (no gateway ever — manual ledger only).
+
+## Plan 9 Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-9-roles-and-db-perms.md`.
+
+### Migrations
+
+- [x] 1. Migration `20260428000001_user_roles_expand.sql` — widen role CHECK to 12 values. Verify via `supabase db query`.
+- [x] 2. Migration `20260428000002_role_permissions.sql` — create table (PK role+permission, CHECK on role + permission format) + `attach_audit`. Verify trigger attached.
+- [x] 3. Migration `20260428000003_role_permissions_seed.sql` — seed from `src/perms.ts` map with `ON CONFLICT DO NOTHING`. Verify row counts (admin=1, moderator=9, player=4, others=0).
+- [x] 4. Extend `supabase/tests/audit_smoke.sql` with `role_permissions` insert/delete assertions. `npm run audit:smoke` green.
+
+### Server modules
+
+- [x] 5. Expand `RoleName` in `apps/web/src/perms.ts` to the 12 roles. Add header comment: "SEED ONLY — runtime reads DB via `lib/perms-db.ts`." Keep sync `hasPerm` as fallback. Rename `perms.test.ts` → `perms.seed.test.ts`, add "12 roles in union" assertion.
+- [x] 6. Create `apps/web/src/server/roles/schemas.ts` — Zod for `togglePermission`, `bulkSaveMatrix`, `assignRole`, `removeRole`.
+- [x] 7. TDD `apps/web/src/server/roles/cache.ts` + `cache.test.ts` — 4 tests (hit within TTL, miss after expiry, invalidate(role), invalidate()).
+- [x] 8. TDD `apps/web/src/server/roles/permissions.ts` + `permissions.test.ts` — 6 tests covering `listAllPermissions`, `listPermissionsForRole`, `togglePermission` (grant/revoke/idempotent), `bulkSaveMatrix` (diff + invalidate).
+- [x] 9. TDD `apps/web/src/server/roles/users.ts` + `users.test.ts` — 4 tests covering `listUsersWithRoles`, `assignRole` (upsert + idempotent), `removeRole` (soft-delete).
+- [x] 10. Create `apps/web/src/server/roles/index.ts` re-export surface.
+- [x] 11. TDD `apps/web/src/lib/perms-db.ts` + `lib/perms-db.test.ts` — 6 tests (admin wildcard, multi-role union, viewer public-only, empty-role deny, cache hit on repeat, `requirePermAsync` throws).
+- [x] 12. Swap every `requirePerm`/`hasPerm` call in `app/api/**` + middleware + admin route pages to `requirePermAsync`/`hasPermAsync`. One commit per folder.
+
+### UI
+
+- [x] 13. Extend `components/admin/AdminSubnav.tsx` TABS with Roles + Users. Extend `StatusPill` tone map with 8 new role tones (loc, idc, referee, technical, production, design, coach, team_manager).
+- [x] 14. Build `app/admin/roles/page.tsx` server component — matrix table via `DataTable`, checkbox per cell, `saveMatrix` server action, optimistic UI client wrapper. Gate with `requirePermAsync(sb, actor, 'roles.edit')`. Lock the `admin × *` cell server-side + UI-side.
+- [x] 15. Build `app/admin/users/page.tsx` (list) + `app/admin/users/[id]/page.tsx` (detail) — role chips via `StatusPill`, add/remove-role server actions, audit-trail section.
+- [x] 16. Confirm no non-admin path reaches `/admin/roles` or `/admin/users`: double-gate page + server action.
+
+### Tests + verification
+
+- [x] 17. Write E2E `apps/web/tests/e2e/admin-roles.spec.ts` — 3 scenarios: matrix toggle round-trip, role assign/remove with audit assertion, default-deny for new `design` user.
+- [x] 18. Audit existing E2E specs for hard-coded 3-role types; widen to 12-role union where typed. (No hard-coded role literals found in test specs.)
+- [x] 19. Verification gate — `npm run test` (112 pass), `npm run lint` clean, `npm run build` (29 routes), `npm --workspace apps/web run e2e` 26/26 pass, `npm run db:push` 30/30, `npm run audit:smoke` green.
+- [x] 20. Commit in slices (migrations → server → UI → tests). Push pending user approval. Plan 9 review below.
+
+### Plan 9 review — 2026-04-21
+
+Four logical commits on `main`, all green:
+
+| Command | Result |
+|---------|--------|
+| `npm run test` (vitest) | 112 passed (24 files) — up from 85 |
+| `npm run lint` | clean |
+| `npm run build` | 29 routes compiled (27 → 29; +/admin/roles, +/admin/users, +/admin/users/[id]) |
+| `npm --workspace apps/web run e2e` | 26 passed (22 existing + 4 new in admin-roles.spec.ts) |
+| `npm run audit:smoke` | green; `role_permissions` insert/delete assertion added |
+| `npm run db:push` | 30/30 migrations applied to cloud |
+| `audit_events where entity_type='role_permissions'` | 22 rows (14 seed + 2 smoke-loop + toggle writes) |
+
+Design decisions:
+
+- **DB-backed perms, 30s process-local cache.** `role_permissions` table is
+  the runtime source of truth. `src/perms.ts` is now the seed doc and a
+  sync fallback. Cache in `server/roles/cache.ts` keyed by role, 30s TTL,
+  invalidated by every write through `togglePermission` /
+  `bulkSaveMatrix`.
+- **Admin wildcard locked.** `admin × *` row is hard-rejected server-side
+  in both `togglePermission` and `bulkSaveMatrix` (error: "admin wildcard
+  is locked"). UI renders the cell disabled with a tooltip. Prevents an
+  admin from one-click-locking every admin out.
+- **DELETE-before-INSERT ordering in bulkSaveMatrix** (spec §8 Risk 2) so
+  a same-diff revoke+regrant doesn't race itself to a no-op.
+- **Role chip tone palette.** 8 new tones in StatusPill
+  (sky/violet/teal/magenta/lime/rose/indigo/copper) + a `roleTone(role)`
+  helper + `ROLE_TONES` map. Admin stays signal-green; every other role
+  gets a unique colour readable on the dark brand surface.
+- **Permission universe on /admin/roles.** Rendered as the union of (all
+  currently-granted rows) ∪ (PERMS seed map) ∪ (enforced constants like
+  `roles.edit`, `users.edit`). Wildcard `*` sorts first; everything else
+  alphabetical. Monospaced — perms are identifiers, they should look like
+  code.
+- **Task 18 no-op:** grep confirmed zero hard-coded `"admin"|"moderator"|"player"`
+  unions or `RoleName` imports inside `apps/web/tests/e2e/*`. Nothing to
+  widen.
+
+Open items:
+
+- `/admin/users` detail "Sessions" link points at
+  `/admin/security/sessions?userId=<id>` — the existing sessions page may
+  not yet filter by `?userId`. Left as a link; follow-up plan to wire the
+  filter.
+
+## Plan 14 Tasks
+
+Spec: `docs/superpowers/specs/2026-04-21-plan-14-stats-screenshot-ocr.md`.
+
+### Migrations + env
+
+- [ ] 1. Write migration `20260504000001_match_stat_screenshots.sql` (table + partial indexes + audit trigger). `npm run db:push`; verify in `supabase db query`.
+- [ ] 2. Write migration `20260504000002_ocr_usage_log.sql` (append-only: UPDATE + DELETE blocked via trigger). Push; verify exception raised on UPDATE attempt.
+- [ ] 3. Write migration `20260504000003_storage_match_stat_screenshots_bucket.sql` (private bucket). Push; verify `public=false`.
+- [ ] 4. Write migration `20260504000005_stats_ocr_perms_seed.sql` — insert `stats.screenshot.upload`, `stats.screenshot.review`, `stats.screenshot.delete`, `stats.ocr.rerun` into `role_permissions` with `ON CONFLICT DO NOTHING`. Verify row counts.
+- [ ] 5. Add `ANTHROPIC_API_KEY=`, `OCR_DISABLED=`, `OCR_DAILY_CAP_USD_CENTS=100` to `.env.example`. Set Vercel prod secret for `ANTHROPIC_API_KEY`.
+- [ ] 6. `npm --workspace apps/web install @anthropic-ai/sdk node-tesseract-ocr sharp`. Commit lockfile.
+
+### Server modules (TDD)
+
+- [ ] 7. Create `apps/web/src/server/stats_ocr/schemas.ts` per spec §4.2 Zod shape.
+- [ ] 8. TDD `schemas.test.ts` — 4 tests (round-trip, out-of-range rejection, nullable survival).
+- [ ] 9. Create `stats_ocr/storage.ts` + `storage.test.ts` — signed upload + signed read helpers, path format `matches/{matchId}/{screenshotId}.{ext}`.
+- [ ] 10. TDD `stats_ocr/parse.claude.ts` + `parse.claude.test.ts` — ≥3 tests (cache_control ephemeral marker, temperature 0 + max_tokens 2000, JSON retry on invalid JSON, Zod failure throws `ParseShapeError`).
+- [ ] 11. TDD `stats_ocr/parse.tesseract.ts` + `parse.tesseract.test.ts` — ≥2 tests (region crop coords hit, heuristic string→int, unreadable→null not 0).
+- [ ] 12. TDD `stats_ocr/parse.ts` dispatcher + `parse.test.ts` — ≥4 tests (`OCR_DISABLED=1` returns disabled, `ANTHROPIC_API_KEY` → Claude path, no key → Tesseract, `BudgetExceededError` when daily cap hit).
+- [ ] 13. TDD `stats_ocr/review.ts` + `review.test.ts` — ≥4 tests (idempotent double-apply, partial correction preserves non-edited fields, reject requires reason, score-contradiction `ConflictError`).
+- [ ] 14. TDD `stats_ocr/usage.ts` + `usage.test.ts` — ≥2 tests (`logUsage` insert shape, `claudeCostCents(1500,500)` exact integer).
+- [ ] 15. Create `stats_ocr/index.ts` re-export surface.
+
+### Permissions + UI
+
+- [ ] 16. Update `apps/web/src/perms.ts` seed map with four new `stats.*` perms. Add `perms.seed.test.ts` assertion: `player` role denied `stats.screenshot.upload`.
+- [ ] 17. Wire `requirePermAsync(sb, actor, 'stats.*')` in every new page + server action. Double-gate page + action.
+- [ ] 18. Build `/admin/match-days/[id]/stats-upload/page.tsx` + `actions.ts` — dropzone, list of screenshots with status pills, `uploadScreenshotAction` + `triggerParseAction`.
+- [ ] 19. Build `/admin/match-days/[id]/stats-upload/[screenshotId]/review/page.tsx` — side-by-side image + editable form + Confirm / Reject / Re-run buttons; player resolution selects.
+- [ ] 20. Extend `/players/[id]/page.tsx` with "Recent match stats" card filtered to `parse_status='confirmed'` only. Preserve ISR `revalidate=60`.
+
+### Tests + verification
+
+- [ ] 21. Write `apps/web/tests/e2e/stats-screenshot-ocr.spec.ts` — upload → parse (OCR_DISABLED mode for determinism) → review → correct one field → confirm → public page reflects. Self-cleaning.
+- [ ] 22. Append `match_stat_screenshots` smoke queries to `supabase/tests/audit_smoke.sql`; `npm run audit:smoke` green.
+- [ ] 23. Verification gate — `npm run test` (≥97 pass), `npm run lint` clean, `npm run build` (new routes present), `npm --workspace apps/web run e2e` all pass, `npm run db:push` 34/34, `npm run audit:smoke` green.
+- [ ] 24. Commit in slices (migrations → server → UI → tests). Push. Add Plan 14 review section to this file.
 
 ## Plan 8 Tasks
 
