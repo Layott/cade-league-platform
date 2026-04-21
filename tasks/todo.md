@@ -100,45 +100,76 @@ Spec: `docs/superpowers/specs/2026-04-21-plan-12-vmix-overlay-bridge.md`.
 
 ### Migrations + perms seed
 
-- [ ] 1. Migration `20260503000001_broadcast_tables.sql` — create `overlay_templates`, `stream_sessions`, `overlay_events` with constraints + indexes per spec §3. Renumbered from spec's `20260421_*` to keep monotonic order past `20260428000003`.
-- [ ] 2. Migration `20260503000002_broadcast_audit.sql` — attach `audit_row_change()` to all three new tables.
-- [ ] 3. Verify `user_roles.role` CHECK already contains `'production'` (added in `20260428000001_user_roles_expand.sql`). If present, skip migration 3; else add `20260503000003_user_roles_add_production.sql`. Expected: skip.
-- [ ] 4. Migration `20260503000003_overlay_templates_seed.sql` — seed 7 overlay templates (`scorebar`, `lower_third`, `standings_widget`, `player_card`, `punishment_ticker`, `intro`, `outro`) with matching `html_route`.
-- [ ] 5. Migration `20260503000004_broadcast_perms_seed.sql` — grant `broadcast.trigger`+`broadcast.manage` to admin (via wildcard already) and `broadcast.trigger` to `production` with `ON CONFLICT DO NOTHING`.
-- [ ] 6. Update `apps/web/src/perms.ts` seed doc: add `broadcast.trigger` to `production` role; admin wildcard already covers. Keep seed contract test green.
+- [x] 1. Migration `20260503000001_broadcast_tables.sql` — create `overlay_templates`, `stream_sessions`, `overlay_events` with constraints + indexes per spec §3. Renumbered from spec's `20260421_*` to keep monotonic order past `20260428000003`.
+- [x] 2. Migration `20260503000002_broadcast_audit.sql` — attach `audit_row_change()` to all three new tables.
+- [x] 3. Verified `user_roles.role` CHECK already contained `'production'`; skipped separate migration.
+- [x] 4. Migration `20260503000003_overlay_templates_seed.sql` — seeded 7 overlay templates.
+- [x] 5. Migration `20260503000004_broadcast_perms_seed.sql` — granted `broadcast.trigger` to `production`.
+- [x] 6. Updated `apps/web/src/perms.ts` seed doc: `production: ["broadcast.trigger"]`. Seed contract tests + Plan 12 assertions green.
 
 ### Server modules (TDD)
 
-- [ ] 7. Create `apps/web/src/server/overlays/schemas.ts` — 7 Zod schemas per spec §5.2.
-- [ ] 8. Create `apps/web/src/server/overlays/registry.ts` — `TEMPLATE_KEY → { schema, route }` const map.
-- [ ] 9. TDD `overlays/schemas.test.ts` + `registry.test.ts` — ≥3 tests (schema round-trip, registry CHECK-constraint parity, realtime event-name formation).
-- [ ] 10. TDD `overlays/autofill.ts` + `autofill.test.ts` — ≥2 tests (scorebar from match, punishment_ticker filters `public_visible=true`).
-- [ ] 11. TDD `server/broadcast/realtime.ts` + `realtime.test.ts` — thin `publish(sessionId, event, payload)` wrapper; mockable.
-- [ ] 12. TDD `server/broadcast/sessions.ts` + `sessions.test.ts` — ≥3 tests (start rejects when active exists, start creates row, end clears active overlays).
-- [ ] 13. TDD `server/broadcast/events.ts` + `events.test.ts` — ≥4 tests (rejects unknown templateKey, rejects bad payload, writes row + publishes once, clearOverlay sets cleared_at + publishes).
-- [ ] 14. Add `server/broadcast/permissions.ts` re-export surface for `broadcast.trigger`/`broadcast.manage`.
+- [x] 7. `apps/web/src/server/overlays/schemas.ts` — 7 Zod schemas.
+- [x] 8. `apps/web/src/server/overlays/registry.ts` — TEMPLATE_REGISTRY + REALTIME channel/event constants.
+- [x] 9. `overlays/schemas.test.ts` (8 tests) + `registry.test.ts` (6 tests) — CHECK parity asserted.
+- [x] 10. `overlays/autofill.ts` + `autofill.test.ts` (5 tests) — 5 data-bound helpers.
+- [x] 11. `server/broadcast/realtime.ts` + `realtime.test.ts` (3 tests).
+- [x] 12. `server/broadcast/sessions.ts` + `sessions.test.ts` (4 tests) — start rejects when active, end clears + publishes.
+- [x] 13. `server/broadcast/events.ts` + `events.test.ts` (6 tests) — schema rejection, single publish, cleared broadcast.
+- [x] 14. `server/broadcast/permissions.ts` + `server/broadcast/index.ts` — re-export surface.
 
 ### API routes
 
-- [ ] 15. Add 6 API routes under `apps/web/src/app/api/broadcast/` per spec §5.3. Use `requirePermAsync` for gated routes. `/sessions/:id/active` stays unauthenticated (headless browser source).
+- [x] 15. 6 API routes under `apps/web/src/app/api/broadcast/`. Gated with `requirePermAsync`; `/sessions/:id/active` unauth + `Cache-Control: no-store`.
 
 ### Overlay route group
 
-- [ ] 16. Create `(overlay)` route group with `layout.tsx` — transparent body, no SiteChrome. Add `/overlay/*` to `SiteChromeClient` HIDDEN_PREFIXES so global chrome doesn't leak in.
-- [ ] 17. Create 7 overlay pages under `(overlay)/overlay/<key>/page.tsx` — Client Components that hydrate + subscribe via Supabase Realtime.
+- [x] 16. `(overlay)/layout.tsx` + `OverlayBodyTransparent` client effect + `SiteChromeClient` HIDDEN_PREFIXES extended to `/overlay`. `globals.css` adds `html.overlay-mode` rules.
+- [x] 17. 7 overlay pages under `(overlay)/overlay/<key>/page.tsx` + shared `useOverlayChannel` hook + `OverlayFrame` fade-in shell. All pages Suspense-wrap `useSearchParams` per Next.js 15.
 
 ### Admin UI
 
-- [ ] 18. Create `/admin/broadcast/page.tsx` — match_day picker + start/end session.
-- [ ] 19. Create `/admin/broadcast/[sessionId]/page.tsx` — trigger grid + active overlays panel + session controls.
-- [ ] 20. Add "Broadcast" tab to `AdminSubnav`.
+- [x] 18. `/admin/broadcast/page.tsx` — match_day picker + start/end session.
+- [x] 19. `/admin/broadcast/[sessionId]/page.tsx` — 3-col layout: trigger grid + active overlays panel + session controls.
+- [x] 20. "Broadcast" tab added to `AdminSubnav`.
 
 ### Tests + verification
 
-- [ ] 21. Write E2E `apps/web/tests/e2e/broadcast-overlay.spec.ts` per spec §7.
-- [ ] 22. Docs: append operator workflow + Realtime pre-flight note to `README.md`.
-- [ ] 23. Verification gate — `npm run test`, `npm run lint`, `npm run build` (dev server killed), `npm --workspace apps/web run e2e`, `npm run audit:smoke`, `npm run db:push`.
-- [ ] 24. Commit in slices (migrations → server → API → overlay routes → admin UI → E2E → docs). Push. Add Plan 12 review section.
+- [x] 21. `apps/web/tests/e2e/broadcast-overlay.spec.ts` — 2 tests (full flow + 401/403 route gating).
+- [x] 22. `README.md` — Broadcast section with operator workflow, Realtime pre-flight, URLs, permission matrix.
+- [~] 23. Verification gate: unit tests for Plan 12 slice 52/52 green; lint clean; audit:smoke green; db:push 4/4 applied. Full `npm run build` + `npm run test` + `npm run e2e` blocked by concurrent Plan 10/11/13/14 in-flight commits (attendance penalty export, orgs ledger Zod errors, precedents DataTable prop mismatch). My slice verified in isolation; wave-level verification deferred per CLAUDE.md guidance ("don't declare a plan complete during the churn").
+- [x] 24. Committed in 5 slices (DB → server → API → overlay → admin + E2E).
+
+### Plan 12 review — 2026-04-21
+
+Five logical commits on `main`, all my Plan 12 code green:
+
+| Command | Result |
+|---------|--------|
+| `npm run test` (Plan 12 slice only: broadcast + overlays + perms.seed) | 52/52 passed |
+| `npm run lint` | clean (2 warnings from another agent's `squads/submit.ts`) |
+| `npm run db:push` | 4/4 migrations applied (20260503000001–000004) |
+| `npm run audit:smoke` | green |
+| `overlay_templates` rowcount | 7 |
+| `audit_events where entity_type='overlay_templates' and action='insert'` | 7 rows (one per seeded template) |
+
+Design decisions:
+
+- **Migration renumbering.** Spec called for `20260421_*`. Plan 9 already shipped `20260428000003_role_permissions_seed.sql`, so I renumbered to `20260503000001..000004` to keep monotonic cloud ordering. Left the spec's filename guidance untouched in the doc.
+- **Three migrations, not four.** `20260428000001_user_roles_expand.sql` already includes `'production'` in the CHECK, so the spec's migration 3 would have been a no-op. Skipped per spec instructions.
+- **Admin wildcard already covers broadcast.\*.** Only added one row (`production` × `broadcast.trigger`). No `admin × broadcast.*` rows — the `admin × *` wildcard from Plan 9 subsumes them and seed contract test asserts this.
+- **Chrome escape via HIDDEN_PREFIXES.** Root layout's `<SiteChrome>` can't be undone at the route-group level, so I extended `SiteChromeClient.HIDDEN_PREFIXES` with `/overlay`. Belt + braces: a client effect also adds `.overlay-mode` to `<html>` + `<body>` so the `!important` transparent-background rule in `globals.css` wins over any stray colour.
+- **Suspense wrapping per Next.js 15.** `useSearchParams()` in a client component forces a CSR bailout during prerender; wrapping in `<Suspense fallback={null}>` lets the build succeed without dropping `dynamic = "force-dynamic"`.
+- **void-to-use trick for unused userId.** `endSession(sb, sessionId, userId)` and `clearOverlay(sb, eventId, userId)` retain `userId` in the signature for future audit-context wiring. `void userId` keeps lint quiet without reaching for an eslint-disable that modern flat config doesn't honour.
+- **Template registry as single source of truth.** A unit test asserts `TEMPLATE_KEYS.sort() === DB_TEMPLATE_TYPES.sort()`; drift between code and the CHECK constraint triggers a failing test before a migration can land.
+- **Realtime fire-and-forget.** `publish()` awaits `channel.send()` then immediately `removeChannel` — no long-lived subscription on the server. The DB row is the durable record; realtime is only the wake-up signal.
+- **Hydration endpoint has `Cache-Control: no-store`.** Stops vMix browser sources from pinning stale overlay state after a redeploy (spec §10 risk 2).
+- **Starter JSON in trigger grid.** Each card pre-fills a schema-valid starter payload so one-click triggering works during a manual smoke test without the operator having to type valid JSON.
+
+Open items:
+
+- **Full wave verification deferred.** Other agents were mid-commit on Plan 10 (squads), Plan 11 (precedents + attendance penalty), Plan 13 (orgs/disputes/appeals), Plan 14 (OCR) while I was landing Plan 12. Those broke `npm run build` (DataTable prop mismatch in plan-11 precedents page, missing `flatLadder` export in plan-11 attendance penalty) and `npm run test` (Plan 13 orgs ledger Zod errors, Plan 13 disputes stub mock mismatches). My Plan 12 slice tested in isolation is green; the next wave verification pass should cover the combined state once the concurrent work settles.
+- **E2E not executed.** Playwright needs a clean build; blocked by the same concurrent churn. E2E spec is written and ready to run once the build is green.
 
 ## Plan 14 Tasks
 
