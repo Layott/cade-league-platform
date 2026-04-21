@@ -226,16 +226,26 @@ test("player submits 3 posts; moderator verifies 2 → Met=true; reject 1 → Me
   await adminPage.getByTestId(`content-actions-${postIds[2]}`).click();
   await adminPage.getByTestId(`content-verify-${postIds[2]}`).click();
 
-  // Confirm via DB the two verifications landed.
-  await new Promise((r) => setTimeout(r, 500));
-  const { data: verified } = await sb
-    .from("content_posts")
-    .select("id, verification_status")
-    .in("id", [postIds[0], postIds[2]]);
-  for (const row of (verified ?? []) as {
-    id: string;
-    verification_status: string;
-  }[]) {
+  // Confirm via DB the two verifications landed. Next.js serializes
+  // server-action dispatches per-session, so poll rather than guess at a
+  // fixed wait (two sequential round-trips in dev can take >1s each).
+  const deadline = Date.now() + 15_000;
+  let verified: Array<{ id: string; verification_status: string }> = [];
+  while (Date.now() < deadline) {
+    const { data } = await sb
+      .from("content_posts")
+      .select("id, verification_status")
+      .in("id", [postIds[0], postIds[2]]);
+    verified = (data ?? []) as typeof verified;
+    if (
+      verified.length === 2 &&
+      verified.every((r) => r.verification_status === "verified")
+    ) {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  for (const row of verified) {
     expect(row.verification_status).toBe("verified");
   }
   await adminCtx.close();

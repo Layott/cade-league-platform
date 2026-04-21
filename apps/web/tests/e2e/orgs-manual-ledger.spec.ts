@@ -95,11 +95,16 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
   await page.getByTestId("org-cac-input").fill(cacNumber);
   await page.getByTestId("org-create-submit").click();
 
-  // 2. Landed on detail page.
-  await expect(page).toHaveURL(/\/admin\/orgs\/[0-9a-f-]+/);
+  // 2. Landed on detail page. Cold compile of the detail route in dev can
+  // eat a chunk of the default 5s.
+  await expect(page).toHaveURL(/\/admin\/orgs\/[0-9a-f-]+/, {
+    timeout: 30_000,
+  });
   const url = page.url();
   const orgId = url.split("/").pop()!;
-  await expect(page.getByTestId("org-players-table")).toBeVisible();
+  await expect(page.getByTestId("org-players-table")).toBeVisible({
+    timeout: 30_000,
+  });
 
   // 3. Link 2 players.
   for (const p of players!.slice(0, 2)) {
@@ -108,17 +113,25 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
     await expect(page).toHaveURL(/\/admin\/orgs\/[0-9a-f-]+/);
   }
 
-  // 4. Record first ledger entry: deposit 50_000.
+  // 4. Record first ledger entry: deposit 50_000. Cold-compile of the
+  // /ledger/new segment can eat >5s on a warm-but-not-compiled dev
+  // server, so give the form a generous visibility window.
   await page.getByTestId("ledger-new-btn").click();
-  await expect(page.getByTestId("ledger-new-form")).toBeVisible();
+  await expect(page.getByTestId("ledger-new-form")).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByTestId("ledger-entry-type").selectOption("deposit");
   await page.getByTestId("ledger-amount").fill("50000");
   await page.getByTestId("ledger-reference").fill("initial caution fee");
   await page.getByTestId("ledger-submit").click();
 
-  // 5. Back on detail; assert ledger row + balance.
+  // 5. Back on detail; assert ledger row + balance. The recordLedgerEntry
+  // server action redirects to `/admin/orgs/<id>#ledger`, so wait until the
+  // URL has left `/ledger/new` before asserting on the detail page. Cold
+  // compile of the detail route can push this past the default 5s.
   await expect(page).toHaveURL(
-    new RegExp(`/admin/orgs/${orgId}`),
+    new RegExp(`/admin/orgs/${orgId}(?:[#?]|$)`),
+    { timeout: 30_000 },
   );
   const ledger = page.getByTestId("org-ledger-table");
   await expect(ledger).toBeVisible();
@@ -126,11 +139,17 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
 
   // 6. Record fine_deduction 5_000.
   await page.getByTestId("ledger-new-btn").click();
+  await expect(page.getByTestId("ledger-new-form")).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByTestId("ledger-entry-type").selectOption("fine_deduction");
   await page.getByTestId("ledger-amount").fill("5000");
   await page.getByTestId("ledger-reference").fill("forfeit sanction");
   await page.getByTestId("ledger-submit").click();
-  await expect(page).toHaveURL(new RegExp(`/admin/orgs/${orgId}`));
+  await expect(page).toHaveURL(
+    new RegExp(`/admin/orgs/${orgId}(?:[#?]|$)`),
+    { timeout: 30_000 },
+  );
 
   // 7. Assert balance in info panel == 45,000.
   const { data: org } = await sb

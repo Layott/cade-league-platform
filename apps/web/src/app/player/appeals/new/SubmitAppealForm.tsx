@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import {
   FormField,
   textareaClass,
@@ -25,6 +26,7 @@ export function SubmitAppealForm({ caseId }: { caseId: string }) {
           try {
             await submitAppealAction(fd);
           } catch (err) {
+            if (isRedirectError(err)) throw err;
             setError((err as Error).message);
           }
         })

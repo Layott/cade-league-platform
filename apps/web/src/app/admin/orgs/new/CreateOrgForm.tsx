@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import {
   FormField,
   inputClass,
@@ -25,6 +26,9 @@ export function CreateOrgForm({ users }: { users: UserOption[] }) {
           try {
             await createOrgAction(fd);
           } catch (err) {
+            // Next.js uses a thrown "redirect" error to trigger navigation
+            // from server actions; rethrow so the framework can handle it.
+            if (isRedirectError(err)) throw err;
             setError((err as Error).message);
           }
         })

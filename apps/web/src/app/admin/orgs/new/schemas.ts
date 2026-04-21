@@ -11,18 +11,18 @@ export const createOrgFormSchema = z.object({
     .string()
     .trim()
     .max(64)
-    .optional()
+    .nullish()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
   cacCertPath: z
     .string()
     .trim()
     .max(500)
-    .optional()
+    .nullish()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
   contactRepUserId: z
     .string()
     .trim()
-    .optional()
+    .nullish()
     .transform((v) => (v && v.length > 0 ? v : undefined))
     .refine(
       (v) => !v || /^[0-9a-f-]{36}$/i.test(v),
@@ -31,11 +31,20 @@ export const createOrgFormSchema = z.object({
 });
 export type CreateOrgForm = z.infer<typeof createOrgFormSchema>;
 
+// FormData.get() returns string | File | null. Coerce to string | undefined
+// so the zod schema can accept missing-optional fields without treating them
+// as the wrong type.
+function str(fd: FormData, key: string): string | undefined {
+  const v = fd.get(key);
+  if (v == null) return undefined;
+  return typeof v === "string" ? v : undefined;
+}
+
 export function parseCreateOrgForm(fd: FormData): CreateOrgForm {
   return createOrgFormSchema.parse({
-    name: fd.get("name"),
-    cacNumber: fd.get("cacNumber"),
-    cacCertPath: fd.get("cacCertPath"),
-    contactRepUserId: fd.get("contactRepUserId"),
+    name: str(fd, "name"),
+    cacNumber: str(fd, "cacNumber"),
+    cacCertPath: str(fd, "cacCertPath"),
+    contactRepUserId: str(fd, "contactRepUserId"),
   });
 }

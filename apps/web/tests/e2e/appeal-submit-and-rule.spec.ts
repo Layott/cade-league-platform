@@ -297,17 +297,40 @@ test("player submits appeal → admin assigns 3-member panel → rules → statu
   await adminPage.getByTestId("appeal-panel-save").click();
   await adminPage.waitForURL(/\/admin\/appeals\/[0-9a-f-]+/);
 
-  // Verify status flipped to under_review.
-  const { data: afterAssign } = await sb
-    .from("appeals")
-    .select("status, panel_member_user_ids")
-    .eq("id", appealId)
-    .single();
-  expect((afterAssign as { status: string }).status).toBe("under_review");
-  expect(
-    (afterAssign as { panel_member_user_ids: string[] })
-      .panel_member_user_ids.length,
-  ).toBe(3);
+  // Verify status flipped to under_review. Server actions on the same
+  // detail URL don't trigger a URL change, so poll instead of sampling.
+  const waitFor = async <T extends { status: string }>(
+    fetchRow: () => Promise<T | null>,
+    want: string,
+  ): Promise<T> => {
+    const deadline = Date.now() + 15_000;
+    let last: T | null = null;
+    while (Date.now() < deadline) {
+      last = await fetchRow();
+      if (last && last.status === want) return last;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error(
+      `timed out waiting for appeal status=${want}; last=${JSON.stringify(last)}`,
+    );
+  };
+
+  const afterAssign = await waitFor(
+    async () => {
+      const { data } = await sb
+        .from("appeals")
+        .select("status, panel_member_user_ids")
+        .eq("id", appealId)
+        .maybeSingle();
+      return data as {
+        status: string;
+        panel_member_user_ids: string[];
+      } | null;
+    },
+    "under_review",
+  );
+  expect(afterAssign.status).toBe("under_review");
+  expect(afterAssign.panel_member_user_ids.length).toBe(3);
 
   // Rule on appeal.
   await adminPage
@@ -316,12 +339,22 @@ test("player submits appeal → admin assigns 3-member panel → rules → statu
   await adminPage.getByTestId("appeal-rule-btn").click();
   await adminPage.waitForURL(/\/admin\/appeals\/[0-9a-f-]+/);
 
-  const { data: finalRow } = await sb
-    .from("appeals")
-    .select("status, ruled_at, ruling")
-    .eq("id", appealId)
-    .single();
-  expect((finalRow as { status: string }).status).toBe("ruled");
+  const finalRow = await waitFor(
+    async () => {
+      const { data } = await sb
+        .from("appeals")
+        .select("status, ruled_at, ruling")
+        .eq("id", appealId)
+        .maybeSingle();
+      return data as {
+        status: string;
+        ruled_at: string | null;
+        ruling: string | null;
+      } | null;
+    },
+    "ruled",
+  );
+  expect(finalRow.status).toBe("ruled");
   expect((finalRow as { ruled_at: string | null }).ruled_at).not.toBeNull();
   expect((finalRow as { ruling: string | null }).ruling).toContain("Uphold");
 
