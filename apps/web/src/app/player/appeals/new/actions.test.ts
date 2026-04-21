@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { submitAppealFormSchema } from "./actions";
+import { submitAppealFormSchema } from "./schemas";
 
 const CID = "00000000-0000-4000-8000-00000000aaaa";
 

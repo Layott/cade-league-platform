@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ruleDisputeFormSchema, assignDisputeFormSchema } from "./actions";
+import { ruleDisputeFormSchema, assignDisputeFormSchema } from "./schemas";
 
 const DID = "00000000-0000-4000-8000-00000000dddd";
 const UID = "00000000-0000-4000-8000-00000000aaaa";

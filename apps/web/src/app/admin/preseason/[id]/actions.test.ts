@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { saveAttendanceFormSchema } from "./actions";
+import { saveAttendanceFormSchema } from "./schemas";
 
 const SID = "00000000-0000-4000-8000-000000000001";
 const P1 = "00000000-0000-4000-8000-000000000002";

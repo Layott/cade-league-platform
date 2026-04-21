@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createOrgFormSchema } from "./actions";
+import { createOrgFormSchema } from "./schemas";
 
 describe("createOrgFormSchema (Plan 13B)", () => {
   it("rejects empty name", () => {

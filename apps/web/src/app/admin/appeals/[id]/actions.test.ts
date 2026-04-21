@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   assignPanelFormSchema,
   ruleAppealFormSchema,
-} from "./actions";
+} from "./schemas";
 
 const AID = "00000000-0000-4000-8000-00000000eeee";
 const U1 = "00000000-0000-4000-8000-000000000011";

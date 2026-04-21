@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { submitDisputeFormSchema } from "./actions";
+import { submitDisputeFormSchema } from "./schemas";
 
 describe("submitDisputeFormSchema (Plan 13B)", () => {
   it("rejects description < 20 chars", () => {

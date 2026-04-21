@@ -1,29 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { gate } from "@/lib/server-actor";
 import { markAttendance, cancelShoot, completeShoot } from "@/server/preseason";
+import { parseSaveAttendanceForm } from "./schemas";
 
 /**
  * Plan 13B — preseason attendance save. Iterates per-player, skipping
  * rows on failure. `markAttendance` is idempotent so retries are safe.
  */
-
-export const saveAttendanceFormSchema = z.object({
-  shootId: z.string().uuid(),
-  playerIds: z
-    .array(z.string().uuid())
-    .min(0)
-    .max(200),
-});
-export type SaveAttendanceForm = z.infer<typeof saveAttendanceFormSchema>;
-
-export function parseSaveAttendanceForm(fd: FormData): SaveAttendanceForm {
-  const shootId = String(fd.get("shootId") ?? "");
-  const playerIds = (fd.getAll("playerIds[]") as string[]).filter(Boolean);
-  return saveAttendanceFormSchema.parse({ shootId, playerIds });
-}
 
 export async function saveAttendanceAction(formData: FormData): Promise<void> {
   const { sb, userId } = await gate("preseason.manage");
