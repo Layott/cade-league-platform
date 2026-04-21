@@ -20,6 +20,7 @@
     "seed:players": "node scripts/seed-players.mjs",
     "seed:plan13": "node scripts/seed-plan13.mjs",
     "plan13:scenario-a": "node scripts/plan13-scenario-a-smoke.mjs",
+    "overlay:synth-sounds": "node scripts/synth-overlay-sounds.mjs",
     "backup": "bash scripts/backup.sh"
   },
   "engines": {

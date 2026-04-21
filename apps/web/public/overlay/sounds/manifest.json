@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-04-21T15:59:16.113Z",
+  "sample_rate": 44100,
+  "channels": 2,
+  "bit_depth": 16,
+  "format": "wav",
+  "files": {
+    "intro_long": {
+      "path": "/overlay/sounds/stingers/intro_long.wav",
+      "duration_ms": 10000,
+      "size_kb": 1722.7
+    },
+    "stinger_normal": {
+      "path": "/overlay/sounds/stingers/stinger_normal.wav",
+      "duration_ms": 2000,
+      "size_kb": 344.57
+    },
+    "stinger_replay": {
+      "path": "/overlay/sounds/stingers/stinger_replay.wav",
+      "duration_ms": 2000,
+      "size_kb": 344.57
+    },
+    "stinger_goal": {
+      "path": "/overlay/sounds/stingers/stinger_goal.wav",
+      "duration_ms": 2000,
+      "size_kb": 344.57
+    },
+    "stinger_winner": {
+      "path": "/overlay/sounds/stingers/stinger_winner.wav",
+      "duration_ms": 2000,
+      "size_kb": 344.57
+    },
+    "timer_tick": {
+      "path": "/overlay/sounds/ui/timer_tick.wav",
+      "duration_ms": 200,
+      "size_kb": 34.5
+    },
+    "timer_end": {
+      "path": "/overlay/sounds/ui/timer_end.wav",
+      "duration_ms": 600,
+      "size_kb": 103.4
+    },
+    "notification": {
+      "path": "/overlay/sounds/ui/notification.wav",
+      "duration_ms": 400,
+      "size_kb": 68.95
+    },
+    "trigger_in": {
+      "path": "/overlay/sounds/ui/trigger_in.wav",
+      "duration_ms": 300,
+      "size_kb": 51.72
+    },
+    "trigger_out": {
+      "path": "/overlay/sounds/ui/trigger_out.wav",
+      "duration_ms": 300,
+      "size_kb": 51.72
+    },
+    "brand_logo_thump": {
+      "path": "/overlay/sounds/brand/logo_thump.wav",
+      "duration_ms": 1200,
+      "size_kb": 206.76
+    }
+  }
+}
