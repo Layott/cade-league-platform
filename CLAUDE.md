@@ -64,6 +64,7 @@ Locked across all phases — do not deviate without user approval:
 8. **Timezone `Africa/Lagos` (WAT).** All date/time arithmetic via `date-fns-tz` `formatInTimeZone` / `apps/web/src/lib/time.ts` / `lib/businessDays.ts`. No DST.
 9. **Hard-coded Elite 2025-2026 season.** No multi-season/multi-division abstraction. 13 players, round-robin once = 78 matches.
 10. **Server Actions in `.ts` files carrying `"use server"` export ONLY async functions.** Sync schemas/types/parsers live in sibling `schemas.ts`. Next.js rejects sync exports under `"use server"`.
+11. **Verify-before-show is mandatory.** Never surface a UI surface to the user (overlays, admin pages, review harnesses) without first driving it end-to-end myself — trigger every button, visit every route, confirm no runtime errors in the server log or browser console, check that entry + exit animations render. Either via `npx next dev -p 3030` + Playwright smoke OR Claude-in-Chrome browser automation. If I cannot test a surface, say so explicitly and do NOT claim it is ready for review. This rule is load-bearing — user corrected me on this 2026-04-21 after Plan 16 harness shipped with crashing triggers + missing animations + decentered stingers.
 
 ## Roles (post-Plan 9)
 

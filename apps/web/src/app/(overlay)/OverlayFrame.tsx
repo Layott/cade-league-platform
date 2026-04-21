@@ -1,39 +1,76 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ENTER, EXIT } from "@/lib/motion";
 import type { OverlayState } from "./useOverlayChannel";
 
 /**
- * Shared visual chrome for every overlay stub page. Renders:
- *   - an optional debug HUD (connection state + last event ts) when
- *     `NEXT_PUBLIC_OVERLAY_DEBUG=1`, guarded by a `?debug=1` query.
- *   - the visible card which fades in when `payload` is non-null and
- *     out when null. 300ms CSS transition.
+ * Shared visual chrome for every overlay stub page.
  *
- * Positioning is absolute to the viewport edges so the broadcast tool
- * (OBS, vMix, Streamlabs, etc.) can key/crop.
+ * Renders:
+ *   - optional debug HUD (connection state + last event) when
+ *     `NEXT_PUBLIC_OVERLAY_DEBUG=1` AND `?debug=1` is in the URL.
+ *   - the visible card, animated in/out via framer-motion AnimatePresence
+ *     using motion tokens from `@/lib/motion`.
+ *
+ * `position` variants:
+ *   - `fullscreen` — children fill 100vw × 100vh; no positional wrapper,
+ *     no translate. For stingers, starting-soon, stream-ended.
+ *   - `bottom-left` | `bottom-center` | `top-right` | `center` — classic
+ *     positional placements for small widgets.
+ *
+ * A new `motionKey` prop re-mounts the card (re-running enter/exit) when
+ * it changes. Design-preview uses this with the cycle counter so each
+ * 8-second loop restages the animation.
  */
+export type OverlayPosition =
+  | "bottom-left"
+  | "bottom-center"
+  | "top-right"
+  | "center"
+  | "fullscreen";
+
 export function OverlayFrame({
   state,
   debug,
   position = "bottom-left",
+  motionKey,
   children,
 }: {
   state: OverlayState;
   debug: boolean;
-  position?: "bottom-left" | "bottom-center" | "top-right" | "center";
+  position?: OverlayPosition;
+  motionKey?: string | number;
   children: ReactNode;
 }) {
   const visible = state.payload !== null;
+  const key = motionKey ?? state.eventId ?? "overlay";
 
-  const posClass =
-    position === "bottom-center"
-      ? "left-1/2 bottom-8 -translate-x-1/2"
+  const isFullscreen = position === "fullscreen";
+
+  const posStyle: React.CSSProperties = isFullscreen
+    ? { position: "fixed", inset: 0 }
+    : position === "bottom-center"
+      ? { position: "fixed", left: "50%", bottom: 32, transform: "translateX(-50%)" }
       : position === "top-right"
-        ? "top-8 right-8"
+        ? { position: "fixed", top: 32, right: 32 }
         : position === "center"
-          ? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-          : "bottom-8 left-8";
+          ? {
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            }
+          : { position: "fixed", left: 32, bottom: 32 };
+
+  const enterFrom = isFullscreen
+    ? { opacity: 0, scale: 1.04 }
+    : { opacity: 0, y: 8, scale: 0.98 };
+  const enterTo = { opacity: 1, y: 0, scale: 1 };
+  const exitTo = isFullscreen
+    ? { opacity: 0, scale: 0.96 }
+    : { opacity: 0, y: 8, scale: 0.98 };
 
   return (
     <div
@@ -59,33 +96,37 @@ export function OverlayFrame({
             fontSize: 11,
             border: "1px solid rgba(107,205,6,0.4)",
             zIndex: 9999,
+            pointerEvents: "none",
           }}
         >
           {state.connected ? "conn" : "off"} ·{" "}
-          {state.eventId ? state.eventId.slice(0, 8) : "—"} ·{" "}
+          {state.eventId ? state.eventId.slice(0, 12) : "—"} ·{" "}
           {state.lastEventAt
             ? new Date(state.lastEventAt).toLocaleTimeString()
             : "—"}
         </div>
       ) : null}
-      <div
-        className={`absolute ${posClass}`}
-        style={{
-          opacity: visible ? 1 : 0,
-          transform: `${
-            position === "bottom-center"
-              ? "translateX(-50%)"
-              : position === "center"
-                ? "translate(-50%, -50%)"
-                : ""
-          } translateY(${visible ? "0" : "8px"})`,
-          transition: "opacity 300ms ease, transform 300ms ease",
-          pointerEvents: visible ? "auto" : "none",
-        }}
-        data-testid="overlay-card"
-      >
-        {visible ? children : null}
-      </div>
+      <AnimatePresence mode="wait">
+        {visible ? (
+          <motion.div
+            key={String(key)}
+            initial={enterFrom}
+            animate={enterTo}
+            exit={exitTo}
+            transition={{ ...ENTER }}
+            style={{
+              ...posStyle,
+              pointerEvents: "auto",
+              ...(isFullscreen
+                ? { width: "100vw", height: "100vh" }
+                : {}),
+            }}
+            data-testid="overlay-card"
+          >
+            {children}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
@@ -96,3 +137,8 @@ export function getDebugFlag(): boolean {
   const sp = new URLSearchParams(window.location.search);
   return sp.get("debug") === "1";
 }
+
+// Re-export motion so template pages can use it without a separate import.
+export { motion, AnimatePresence } from "framer-motion";
+// Token re-exports — keeps per-template files from hand-rolling imports.
+export { ENTER, EXIT };

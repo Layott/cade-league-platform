@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { ZodType } from "zod";
 import { usePreviewMode } from "@/lib/overlay-preview";
 import { useOverlayChannel } from "../useOverlayChannel";
-import { OverlayFrame, getDebugFlag } from "../OverlayFrame";
+import { OverlayFrame, getDebugFlag, type OverlayPosition } from "../OverlayFrame";
 import type { TemplateKey } from "@/server/overlays/registry";
 
 /**
@@ -16,14 +16,14 @@ import type { TemplateKey } from "@/server/overlays/registry";
  * realtime channel supplies it. Callers render their template-specific
  * visual inside the `render` prop.
  *
- * The stub wraps every overlay in `<OverlayFrame>`, adds a debug HUD
- * when `NEXT_PUBLIC_OVERLAY_DEBUG=1`, and exposes the preview cycle
- * counter so animated templates can re-key themselves per cycle.
+ * Every render is keyed by the cycle counter so preview mode re-runs the
+ * AnimatePresence enter/exit every 8s. Production mode re-runs on each
+ * new `eventId` from the realtime channel.
  */
 export type PreviewStubProps<T> = {
   templateKey: TemplateKey;
   schema: ZodType<T>;
-  position?: "bottom-left" | "bottom-center" | "top-right" | "center";
+  position?: OverlayPosition;
   render: (payload: T, ctx: { cycle: number; preview: boolean }) => React.ReactNode;
 };
 
@@ -52,9 +52,8 @@ function Inner<T>({
     return schema.safeParse(activePayload);
   }, [activePayload, schema]);
 
-  // In preview mode we force-show the card (no real session) by
-  // synthesising an OverlayState whose `payload` is non-null so
-  // OverlayFrame fades in.
+  // In preview mode, synthesize an OverlayState with a per-cycle eventId
+  // so AnimatePresence can restage enter/exit on each loop.
   const syntheticState = preview.enabled
     ? {
         ...channel,
@@ -63,18 +62,26 @@ function Inner<T>({
           parsed && parsed.success
             ? (parsed.data as unknown as Record<string, unknown>)
             : null,
-        eventId: `preview-${preview.cycle}`,
+        eventId: `preview-${templateKey}-${preview.cycle}`,
         lastEventAt: Date.now(),
       }
     : channel;
+
+  const motionKey = preview.enabled
+    ? `preview-${preview.cycle}`
+    : channel.eventId ?? "static";
 
   return (
     <OverlayFrame
       state={syntheticState}
       debug={getDebugFlag() || preview.enabled}
       position={position}
+      motionKey={motionKey}
     >
-      <div data-template-slot={templateKey}>
+      <div
+        data-template-slot={templateKey}
+        style={{ width: "100%", height: "100%" }}
+      >
         {parsed && parsed.success
           ? render(parsed.data as T, {
               cycle: preview.cycle,
