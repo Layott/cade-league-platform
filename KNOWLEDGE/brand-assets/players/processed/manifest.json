@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-21T15:07:48Z",
+  "generated_at": "2026-04-21T15:25:24Z",
   "source_dir": "KNOWLEDGE\\brand-assets\\players",
   "output_dir": "KNOWLEDGE\\brand-assets\\players\\processed",
   "players": {
@@ -10,11 +10,14 @@
         {
           "pose_index": 1,
           "source": "ADEFOLA 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "adefola/headshot_01.png",
+            "headshot_nobg": "adefola/headshot_01_nobg.png",
             "card": "adefola/card_01.png",
-            "fullbody": "adefola/fullbody_01.png"
+            "card_nobg": "adefola/card_01_nobg.png",
+            "fullbody": "adefola/fullbody_01.png",
+            "fullbody_nobg": "adefola/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -25,11 +28,14 @@
         {
           "pose_index": 2,
           "source": "ADEFOLA 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "adefola/headshot_02.png",
+            "headshot_nobg": "adefola/headshot_02_nobg.png",
             "card": "adefola/card_02.png",
-            "fullbody": "adefola/fullbody_02.png"
+            "card_nobg": "adefola/card_02_nobg.png",
+            "fullbody": "adefola/fullbody_02.png",
+            "fullbody_nobg": "adefola/fullbody_02_nobg.png"
           },
           "face_detected": false,
           "skipped_variants": [
@@ -40,11 +46,14 @@
         {
           "pose_index": 3,
           "source": "ADEFOLA 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "adefola/headshot_03.png",
+            "headshot_nobg": "adefola/headshot_03_nobg.png",
             "card": "adefola/card_03.png",
-            "fullbody": "adefola/fullbody_03.png"
+            "card_nobg": "adefola/card_03_nobg.png",
+            "fullbody": "adefola/fullbody_03.png",
+            "fullbody_nobg": "adefola/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -64,8 +73,11 @@
           "source_resolution": "6024x4024",
           "variants": {
             "headshot": "anife/headshot_01.png",
+            "headshot_nobg": "anife/headshot_01_nobg.png",
             "card": "anife/card_01.png",
-            "fullbody": "anife/fullbody_01.png"
+            "card_nobg": "anife/card_01_nobg.png",
+            "fullbody": "anife/fullbody_01.png",
+            "fullbody_nobg": "anife/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -76,11 +88,14 @@
         {
           "pose_index": 2,
           "source": "ANIFE 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "anife/headshot_02.png",
+            "headshot_nobg": "anife/headshot_02_nobg.png",
             "card": "anife/card_02.png",
-            "fullbody": "anife/fullbody_02.png"
+            "card_nobg": "anife/card_02_nobg.png",
+            "fullbody": "anife/fullbody_02.png",
+            "fullbody_nobg": "anife/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -91,11 +106,14 @@
         {
           "pose_index": 3,
           "source": "ANIFE 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "anife/headshot_03.png",
+            "headshot_nobg": "anife/headshot_03_nobg.png",
             "card": "anife/card_03.png",
-            "fullbody": "anife/fullbody_03.png"
+            "card_nobg": "anife/card_03_nobg.png",
+            "fullbody": "anife/fullbody_03.png",
+            "fullbody_nobg": "anife/fullbody_03_nobg.png"
           },
           "face_detected": false,
           "skipped_variants": [
@@ -106,11 +124,14 @@
         {
           "pose_index": 4,
           "source": "ANIFE 4.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "anife/headshot_04.png",
+            "headshot_nobg": "anife/headshot_04_nobg.png",
             "card": "anife/card_04.png",
-            "fullbody": "anife/fullbody_04.png"
+            "card_nobg": "anife/card_04_nobg.png",
+            "fullbody": "anife/fullbody_04.png",
+            "fullbody_nobg": "anife/fullbody_04_nobg.png"
           },
           "face_detected": false,
           "skipped_variants": [
@@ -121,11 +142,14 @@
         {
           "pose_index": 5,
           "source": "ANIFE 5.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "anife/headshot_05.png",
+            "headshot_nobg": "anife/headshot_05_nobg.png",
             "card": "anife/card_05.png",
-            "fullbody": "anife/fullbody_05.png"
+            "card_nobg": "anife/card_05_nobg.png",
+            "fullbody": "anife/fullbody_05.png",
+            "fullbody_nobg": "anife/fullbody_05_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -142,11 +166,14 @@
         {
           "pose_index": 1,
           "source": "BAJI JNR 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "baji_jnr/headshot_01.png",
+            "headshot_nobg": "baji_jnr/headshot_01_nobg.png",
             "card": "baji_jnr/card_01.png",
-            "fullbody": "baji_jnr/fullbody_01.png"
+            "card_nobg": "baji_jnr/card_01_nobg.png",
+            "fullbody": "baji_jnr/fullbody_01.png",
+            "fullbody_nobg": "baji_jnr/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -157,11 +184,14 @@
         {
           "pose_index": 2,
           "source": "BAJI JNR 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "baji_jnr/headshot_02.png",
+            "headshot_nobg": "baji_jnr/headshot_02_nobg.png",
             "card": "baji_jnr/card_02.png",
-            "fullbody": "baji_jnr/fullbody_02.png"
+            "card_nobg": "baji_jnr/card_02_nobg.png",
+            "fullbody": "baji_jnr/fullbody_02.png",
+            "fullbody_nobg": "baji_jnr/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -172,11 +202,14 @@
         {
           "pose_index": 3,
           "source": "BAJI JNR 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "baji_jnr/headshot_03.png",
+            "headshot_nobg": "baji_jnr/headshot_03_nobg.png",
             "card": "baji_jnr/card_03.png",
-            "fullbody": "baji_jnr/fullbody_03.png"
+            "card_nobg": "baji_jnr/card_03_nobg.png",
+            "fullbody": "baji_jnr/fullbody_03.png",
+            "fullbody_nobg": "baji_jnr/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -187,11 +220,14 @@
         {
           "pose_index": 4,
           "source": "BAJI JNR 4.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "baji_jnr/headshot_04.png",
+            "headshot_nobg": "baji_jnr/headshot_04_nobg.png",
             "card": "baji_jnr/card_04.png",
-            "fullbody": "baji_jnr/fullbody_04.png"
+            "card_nobg": "baji_jnr/card_04_nobg.png",
+            "fullbody": "baji_jnr/fullbody_04.png",
+            "fullbody_nobg": "baji_jnr/fullbody_04_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -208,11 +244,14 @@
         {
           "pose_index": 1,
           "source": "DADABOI 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "dadaboi/headshot_01.png",
+            "headshot_nobg": "dadaboi/headshot_01_nobg.png",
             "card": "dadaboi/card_01.png",
-            "fullbody": "dadaboi/fullbody_01.png"
+            "card_nobg": "dadaboi/card_01_nobg.png",
+            "fullbody": "dadaboi/fullbody_01.png",
+            "fullbody_nobg": "dadaboi/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -223,11 +262,14 @@
         {
           "pose_index": 2,
           "source": "DADABOI 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "dadaboi/headshot_02.png",
+            "headshot_nobg": "dadaboi/headshot_02_nobg.png",
             "card": "dadaboi/card_02.png",
-            "fullbody": "dadaboi/fullbody_02.png"
+            "card_nobg": "dadaboi/card_02_nobg.png",
+            "fullbody": "dadaboi/fullbody_02.png",
+            "fullbody_nobg": "dadaboi/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -238,11 +280,14 @@
         {
           "pose_index": 3,
           "source": "DADABOI 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "dadaboi/headshot_03.png",
+            "headshot_nobg": "dadaboi/headshot_03_nobg.png",
             "card": "dadaboi/card_03.png",
-            "fullbody": "dadaboi/fullbody_03.png"
+            "card_nobg": "dadaboi/card_03_nobg.png",
+            "fullbody": "dadaboi/fullbody_03.png",
+            "fullbody_nobg": "dadaboi/fullbody_03_nobg.png"
           },
           "face_detected": false,
           "skipped_variants": [
@@ -253,11 +298,14 @@
         {
           "pose_index": 4,
           "source": "DADABOI 4.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "dadaboi/headshot_04.png",
+            "headshot_nobg": "dadaboi/headshot_04_nobg.png",
             "card": "dadaboi/card_04.png",
-            "fullbody": "dadaboi/fullbody_04.png"
+            "card_nobg": "dadaboi/card_04_nobg.png",
+            "fullbody": "dadaboi/fullbody_04.png",
+            "fullbody_nobg": "dadaboi/fullbody_04_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -277,8 +325,11 @@
           "source_resolution": "246x491",
           "variants": {
             "headshot": "faruk/headshot_01.png",
+            "headshot_nobg": "faruk/headshot_01_nobg.png",
             "card": "faruk/card_01.png",
-            "fullbody": "faruk/fullbody_01.png"
+            "card_nobg": "faruk/card_01_nobg.png",
+            "fullbody": "faruk/fullbody_01.png",
+            "fullbody_nobg": "faruk/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -289,11 +340,14 @@
         {
           "pose_index": 2,
           "source": "FARUK 2.CR3",
-          "source_resolution": "6742x4498",
+          "source_resolution": "4498x6742",
           "variants": {
             "headshot": "faruk/headshot_02.png",
+            "headshot_nobg": "faruk/headshot_02_nobg.png",
             "card": "faruk/card_02.png",
-            "fullbody": "faruk/fullbody_02.png"
+            "card_nobg": "faruk/card_02_nobg.png",
+            "fullbody": "faruk/fullbody_02.png",
+            "fullbody_nobg": "faruk/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -304,11 +358,14 @@
         {
           "pose_index": 3,
           "source": "FARUK 3.CR3",
-          "source_resolution": "6742x4498",
+          "source_resolution": "4498x6742",
           "variants": {
             "headshot": "faruk/headshot_03.png",
+            "headshot_nobg": "faruk/headshot_03_nobg.png",
             "card": "faruk/card_03.png",
-            "fullbody": "faruk/fullbody_03.png"
+            "card_nobg": "faruk/card_03_nobg.png",
+            "fullbody": "faruk/fullbody_03.png",
+            "fullbody_nobg": "faruk/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -319,11 +376,14 @@
         {
           "pose_index": 4,
           "source": "FARUK 4.CR3",
-          "source_resolution": "6742x4498",
+          "source_resolution": "4498x6742",
           "variants": {
             "headshot": "faruk/headshot_04.png",
+            "headshot_nobg": "faruk/headshot_04_nobg.png",
             "card": "faruk/card_04.png",
-            "fullbody": "faruk/fullbody_04.png"
+            "card_nobg": "faruk/card_04_nobg.png",
+            "fullbody": "faruk/fullbody_04.png",
+            "fullbody_nobg": "faruk/fullbody_04_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -343,8 +403,11 @@
           "source_resolution": "3264x4928",
           "variants": {
             "headshot": "guru/headshot_01.png",
+            "headshot_nobg": "guru/headshot_01_nobg.png",
             "card": "guru/card_01.png",
-            "fullbody": "guru/fullbody_01.png"
+            "card_nobg": "guru/card_01_nobg.png",
+            "fullbody": "guru/fullbody_01.png",
+            "fullbody_nobg": "guru/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -364,8 +427,11 @@
           "source_resolution": "466x945",
           "variants": {
             "headshot": "kaykay/headshot_01.png",
+            "headshot_nobg": "kaykay/headshot_01_nobg.png",
             "card": "kaykay/card_01.png",
-            "fullbody": "kaykay/fullbody_01.png"
+            "card_nobg": "kaykay/card_01_nobg.png",
+            "fullbody": "kaykay/fullbody_01.png",
+            "fullbody_nobg": "kaykay/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -382,11 +448,14 @@
         {
           "pose_index": 1,
           "source": "KILLER FREAK 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "killer_freak/headshot_01.png",
+            "headshot_nobg": "killer_freak/headshot_01_nobg.png",
             "card": "killer_freak/card_01.png",
-            "fullbody": "killer_freak/fullbody_01.png"
+            "card_nobg": "killer_freak/card_01_nobg.png",
+            "fullbody": "killer_freak/fullbody_01.png",
+            "fullbody_nobg": "killer_freak/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -397,13 +466,16 @@
         {
           "pose_index": 2,
           "source": "KILLER FREAK 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "killer_freak/headshot_02.png",
+            "headshot_nobg": "killer_freak/headshot_02_nobg.png",
             "card": "killer_freak/card_02.png",
-            "fullbody": "killer_freak/fullbody_02.png"
+            "card_nobg": "killer_freak/card_02_nobg.png",
+            "fullbody": "killer_freak/fullbody_02.png",
+            "fullbody_nobg": "killer_freak/fullbody_02_nobg.png"
           },
-          "face_detected": true,
+          "face_detected": false,
           "skipped_variants": [
             "wide"
           ],
@@ -412,11 +484,14 @@
         {
           "pose_index": 3,
           "source": "KILLER FREAK 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "killer_freak/headshot_03.png",
+            "headshot_nobg": "killer_freak/headshot_03_nobg.png",
             "card": "killer_freak/card_03.png",
-            "fullbody": "killer_freak/fullbody_03.png"
+            "card_nobg": "killer_freak/card_03_nobg.png",
+            "fullbody": "killer_freak/fullbody_03.png",
+            "fullbody_nobg": "killer_freak/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -433,13 +508,16 @@
         {
           "pose_index": 1,
           "source": "KINGNONEX 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "kingnonex/headshot_01.png",
+            "headshot_nobg": "kingnonex/headshot_01_nobg.png",
             "card": "kingnonex/card_01.png",
-            "fullbody": "kingnonex/fullbody_01.png"
+            "card_nobg": "kingnonex/card_01_nobg.png",
+            "fullbody": "kingnonex/fullbody_01.png",
+            "fullbody_nobg": "kingnonex/fullbody_01_nobg.png"
           },
-          "face_detected": true,
+          "face_detected": false,
           "skipped_variants": [
             "wide"
           ],
@@ -448,11 +526,14 @@
         {
           "pose_index": 2,
           "source": "KINGNONEX 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "kingnonex/headshot_02.png",
+            "headshot_nobg": "kingnonex/headshot_02_nobg.png",
             "card": "kingnonex/card_02.png",
-            "fullbody": "kingnonex/fullbody_02.png"
+            "card_nobg": "kingnonex/card_02_nobg.png",
+            "fullbody": "kingnonex/fullbody_02.png",
+            "fullbody_nobg": "kingnonex/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -463,11 +544,14 @@
         {
           "pose_index": 3,
           "source": "KINGNONEX 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "kingnonex/headshot_03.png",
+            "headshot_nobg": "kingnonex/headshot_03_nobg.png",
             "card": "kingnonex/card_03.png",
-            "fullbody": "kingnonex/fullbody_03.png"
+            "card_nobg": "kingnonex/card_03_nobg.png",
+            "fullbody": "kingnonex/fullbody_03.png",
+            "fullbody_nobg": "kingnonex/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -484,11 +568,14 @@
         {
           "pose_index": 1,
           "source": "MITCH 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "mitch/headshot_01.png",
+            "headshot_nobg": "mitch/headshot_01_nobg.png",
             "card": "mitch/card_01.png",
-            "fullbody": "mitch/fullbody_01.png"
+            "card_nobg": "mitch/card_01_nobg.png",
+            "fullbody": "mitch/fullbody_01.png",
+            "fullbody_nobg": "mitch/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -499,11 +586,14 @@
         {
           "pose_index": 2,
           "source": "MITCH 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "mitch/headshot_02.png",
+            "headshot_nobg": "mitch/headshot_02_nobg.png",
             "card": "mitch/card_02.png",
-            "fullbody": "mitch/fullbody_02.png"
+            "card_nobg": "mitch/card_02_nobg.png",
+            "fullbody": "mitch/fullbody_02.png",
+            "fullbody_nobg": "mitch/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -514,11 +604,14 @@
         {
           "pose_index": 3,
           "source": "MITCH 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "mitch/headshot_03.png",
+            "headshot_nobg": "mitch/headshot_03_nobg.png",
             "card": "mitch/card_03.png",
-            "fullbody": "mitch/fullbody_03.png"
+            "card_nobg": "mitch/card_03_nobg.png",
+            "fullbody": "mitch/fullbody_03.png",
+            "fullbody_nobg": "mitch/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -535,11 +628,14 @@
         {
           "pose_index": 1,
           "source": "MR OGA 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "mr_oga/headshot_01.png",
+            "headshot_nobg": "mr_oga/headshot_01_nobg.png",
             "card": "mr_oga/card_01.png",
-            "fullbody": "mr_oga/fullbody_01.png"
+            "card_nobg": "mr_oga/card_01_nobg.png",
+            "fullbody": "mr_oga/fullbody_01.png",
+            "fullbody_nobg": "mr_oga/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -550,11 +646,14 @@
         {
           "pose_index": 2,
           "source": "MR OGA 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "mr_oga/headshot_02.png",
+            "headshot_nobg": "mr_oga/headshot_02_nobg.png",
             "card": "mr_oga/card_02.png",
-            "fullbody": "mr_oga/fullbody_02.png"
+            "card_nobg": "mr_oga/card_02_nobg.png",
+            "fullbody": "mr_oga/fullbody_02.png",
+            "fullbody_nobg": "mr_oga/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -565,11 +664,14 @@
         {
           "pose_index": 3,
           "source": "MR OGA 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "mr_oga/headshot_03.png",
+            "headshot_nobg": "mr_oga/headshot_03_nobg.png",
             "card": "mr_oga/card_03.png",
-            "fullbody": "mr_oga/fullbody_03.png"
+            "card_nobg": "mr_oga/card_03_nobg.png",
+            "fullbody": "mr_oga/fullbody_03.png",
+            "fullbody_nobg": "mr_oga/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -586,11 +688,14 @@
         {
           "pose_index": 1,
           "source": "TACTICAL 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "tactical/headshot_01.png",
+            "headshot_nobg": "tactical/headshot_01_nobg.png",
             "card": "tactical/card_01.png",
-            "fullbody": "tactical/fullbody_01.png"
+            "card_nobg": "tactical/card_01_nobg.png",
+            "fullbody": "tactical/fullbody_01.png",
+            "fullbody_nobg": "tactical/fullbody_01_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -601,11 +706,14 @@
         {
           "pose_index": 2,
           "source": "TACTICAL 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "tactical/headshot_02.png",
+            "headshot_nobg": "tactical/headshot_02_nobg.png",
             "card": "tactical/card_02.png",
-            "fullbody": "tactical/fullbody_02.png"
+            "card_nobg": "tactical/card_02_nobg.png",
+            "fullbody": "tactical/fullbody_02.png",
+            "fullbody_nobg": "tactical/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -616,11 +724,14 @@
         {
           "pose_index": 3,
           "source": "TACTICAL 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "tactical/headshot_03.png",
+            "headshot_nobg": "tactical/headshot_03_nobg.png",
             "card": "tactical/card_03.png",
-            "fullbody": "tactical/fullbody_03.png"
+            "card_nobg": "tactical/card_03_nobg.png",
+            "fullbody": "tactical/fullbody_03.png",
+            "fullbody_nobg": "tactical/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -637,11 +748,14 @@
         {
           "pose_index": 1,
           "source": "WOLEVATION 1.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "wolevation/headshot_01.png",
+            "headshot_nobg": "wolevation/headshot_01_nobg.png",
             "card": "wolevation/card_01.png",
-            "fullbody": "wolevation/fullbody_01.png"
+            "card_nobg": "wolevation/card_01_nobg.png",
+            "fullbody": "wolevation/fullbody_01.png",
+            "fullbody_nobg": "wolevation/fullbody_01_nobg.png"
           },
           "face_detected": false,
           "skipped_variants": [
@@ -652,11 +766,14 @@
         {
           "pose_index": 2,
           "source": "WOLEVATION 2.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "wolevation/headshot_02.png",
+            "headshot_nobg": "wolevation/headshot_02_nobg.png",
             "card": "wolevation/card_02.png",
-            "fullbody": "wolevation/fullbody_02.png"
+            "card_nobg": "wolevation/card_02_nobg.png",
+            "fullbody": "wolevation/fullbody_02.png",
+            "fullbody_nobg": "wolevation/fullbody_02_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -667,11 +784,14 @@
         {
           "pose_index": 3,
           "source": "WOLEVATION 3.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "wolevation/headshot_03.png",
+            "headshot_nobg": "wolevation/headshot_03_nobg.png",
             "card": "wolevation/card_03.png",
-            "fullbody": "wolevation/fullbody_03.png"
+            "card_nobg": "wolevation/card_03_nobg.png",
+            "fullbody": "wolevation/fullbody_03.png",
+            "fullbody_nobg": "wolevation/fullbody_03_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
@@ -682,11 +802,14 @@
         {
           "pose_index": 4,
           "source": "WOLEVATION 4.ARW",
-          "source_resolution": "6024x4024",
+          "source_resolution": "4024x6024",
           "variants": {
             "headshot": "wolevation/headshot_04.png",
+            "headshot_nobg": "wolevation/headshot_04_nobg.png",
             "card": "wolevation/card_04.png",
-            "fullbody": "wolevation/fullbody_04.png"
+            "card_nobg": "wolevation/card_04_nobg.png",
+            "fullbody": "wolevation/fullbody_04.png",
+            "fullbody_nobg": "wolevation/fullbody_04_nobg.png"
           },
           "face_detected": true,
           "skipped_variants": [
