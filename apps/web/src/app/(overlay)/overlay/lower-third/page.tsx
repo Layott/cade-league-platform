@@ -33,8 +33,8 @@ function LowerThirdInner() {
           style={{
             padding: "16px 24px",
             background: "rgba(7,8,11,0.92)",
-            border: "1px solid rgba(0,255,136,0.35)",
-            borderLeft: "4px solid #00ff88",
+            border: "1px solid rgba(107,205,6,0.35)",
+            borderLeft: "4px solid var(--primary)",
             color: "#fff",
             maxWidth: 480,
           }}
@@ -42,7 +42,7 @@ function LowerThirdInner() {
           <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
             <span
               className="tabular"
-              style={{ color: "#00ff88", fontSize: 14, fontWeight: 700 }}
+              style={{ color: "var(--primary)", fontSize: 14, fontWeight: 700 }}
             >
               #{parsed.data.jerseyNumber}
             </span>
@@ -68,7 +68,7 @@ function LowerThirdInner() {
               <span>W {parsed.data.stats.w}</span>
               <span>D {parsed.data.stats.d}</span>
               <span>L {parsed.data.stats.l}</span>
-              <span style={{ color: "#00ff88", fontWeight: 700 }}>
+              <span style={{ color: "var(--primary)", fontWeight: 700 }}>
                 {parsed.data.stats.pts} PTS
               </span>
             </div>

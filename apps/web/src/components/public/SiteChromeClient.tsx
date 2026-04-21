@@ -157,7 +157,7 @@ function SiteHeader({
                 "inline-flex items-center gap-2 rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] transition-colors " +
                 (adminActive
                   ? "border-[var(--signal)] bg-[var(--signal)] text-[var(--signal-ink)]"
-                  : "border-[rgba(0,255,136,0.45)] bg-[rgba(0,255,136,0.08)] text-[var(--signal)] hover:bg-[rgba(0,255,136,0.16)]")
+                  : "border-[rgba(107,205,6,0.45)] bg-[rgba(107,205,6,0.08)] text-[var(--primary)] hover:bg-[rgba(107,205,6,0.16)]")
               }
               data-testid="nav-admin-link"
             >
@@ -228,7 +228,7 @@ function SiteHeader({
               "whitespace-nowrap rounded-sm px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-colors " +
               (adminActive
                 ? "bg-[var(--signal)] text-[var(--signal-ink)]"
-                : "border border-[rgba(0,255,136,0.45)] text-[var(--signal)]")
+                : "border border-[rgba(107,205,6,0.45)] text-[var(--primary)]")
             }
           >
             Admin

@@ -32,8 +32,8 @@ function StandingsWidgetInner() {
           style={{
             padding: "14px 18px",
             background: "rgba(7,8,11,0.93)",
-            border: "1px solid rgba(0,255,136,0.35)",
-            borderTop: "4px solid #00ff88",
+            border: "1px solid rgba(107,205,6,0.35)",
+            borderTop: "4px solid var(--primary)",
             color: "#fff",
             minWidth: 280,
           }}
@@ -42,7 +42,7 @@ function StandingsWidgetInner() {
             className="font-display"
             style={{
               fontSize: 12,
-              color: "#00ff88",
+              color: "var(--primary)",
               textTransform: "uppercase",
               letterSpacing: "0.22em",
               fontWeight: 700,
@@ -72,7 +72,7 @@ function StandingsWidgetInner() {
                   </td>
                   <td
                     style={{
-                      color: "#00ff88",
+                      color: "var(--primary)",
                       fontWeight: 700,
                       padding: "2px 4px",
                       textAlign: "right",

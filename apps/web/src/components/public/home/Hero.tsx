@@ -60,7 +60,7 @@ export function Hero({ seasonYearRange, divisionName }: Props) {
               <span className="relative z-10">LEAGUE</span>
               <span
                 aria-hidden
-                className="absolute inset-y-2 left-0 right-0 origin-left bg-[repeating-linear-gradient(135deg,rgba(0,255,136,0.18)_0_4px,transparent_4px_12px)]"
+                className="absolute inset-y-2 left-0 right-0 origin-left bg-[repeating-linear-gradient(135deg,rgba(107,205,6,0.18)_0_4px,transparent_4px_12px)]"
               />
             </span>
           </h1>

@@ -31,7 +31,7 @@ export function ViolationChip({ v }: { v: Violation }) {
 export function ViolationList({ items }: { items: Violation[] }) {
   if (items.length === 0) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-sm border border-[rgba(0,255,136,0.35)] bg-[rgba(0,255,136,0.1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--signal)]">
+      <span className="inline-flex items-center gap-1.5 rounded-sm border border-[rgba(107,205,6,0.35)] bg-[rgba(107,205,6,0.1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
         no violations
       </span>
     );

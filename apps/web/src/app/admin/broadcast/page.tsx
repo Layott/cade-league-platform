@@ -192,7 +192,7 @@ export default async function BroadcastPage({
       {selected ? (
         active ? (
           <div
-            className="flex flex-col gap-2 rounded-sm border border-[var(--signal)] bg-[rgba(0,255,136,0.06)] p-5 md:flex-row md:items-center md:justify-between"
+            className="flex flex-col gap-2 rounded-sm border border-[var(--primary)] bg-[rgba(107,205,6,0.06)] p-5 md:flex-row md:items-center md:justify-between"
             data-testid="active-session-card"
           >
             <div>

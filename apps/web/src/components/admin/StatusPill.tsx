@@ -8,7 +8,9 @@ import type { ReactNode } from "react";
 
 type Tone =
   | "neutral"
-  | "signal"
+  | "primary"
+  | "signal" // deprecated alias of "primary" — kept for back-compat
+  | "secondary"
   | "amber"
   | "flare"
   | "crimson"
@@ -22,11 +24,18 @@ type Tone =
   | "indigo"
   | "copper";
 
+const PRIMARY_TONE =
+  "border-[rgba(107,205,6,0.35)] bg-[rgba(107,205,6,0.1)] text-[var(--primary)]";
+
 const TONE_STYLES: Record<Tone, string> = {
   neutral:
     "border-[var(--ink-4)] bg-[var(--ink-3)] text-[var(--chalk-1)]",
-  signal:
-    "border-[rgba(0,255,136,0.35)] bg-[rgba(0,255,136,0.1)] text-[var(--signal)]",
+  primary: PRIMARY_TONE,
+  // Deprecated alias — renders identically to `primary`. Existing call sites
+  // may pass tone="signal" until they migrate.
+  signal: PRIMARY_TONE,
+  secondary:
+    "border-[rgba(254,3,109,0.35)] bg-[rgba(254,3,109,0.1)] text-[var(--secondary)]",
   amber:
     "border-[rgba(255,176,32,0.35)] bg-[rgba(255,176,32,0.1)] text-[var(--amber)]",
   flare:
@@ -151,10 +160,10 @@ export function StatusPill({
       }
       {...rest}
     >
-      {resolvedTone === "signal" ? (
+      {resolvedTone === "signal" || resolvedTone === "primary" ? (
         <span
           aria-hidden
-          className="h-1.5 w-1.5 rounded-full bg-[var(--signal)] pulse-dot"
+          className="h-1.5 w-1.5 rounded-full bg-[var(--primary)] pulse-dot"
         />
       ) : null}
       {label}

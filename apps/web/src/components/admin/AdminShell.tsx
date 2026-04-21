@@ -32,7 +32,7 @@ export function AdminShell({
             <span aria-hidden>←</span> Back to site
           </Link>
           <span
-            className="inline-flex items-center gap-2 rounded-sm border border-[rgba(0,255,136,0.3)] bg-[rgba(0,255,136,0.06)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--signal)]"
+            className="inline-flex items-center gap-2 rounded-sm border border-[rgba(107,205,6,0.3)] bg-[rgba(107,205,6,0.06)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--primary)]"
             aria-label="Admin console"
           >
             <span

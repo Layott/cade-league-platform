@@ -55,9 +55,9 @@ export function OverlayFrame({
             left: 8,
             padding: "4px 8px",
             background: "rgba(0,0,0,0.6)",
-            color: "#00ff88",
+            color: "var(--primary)",
             fontSize: 11,
-            border: "1px solid rgba(0,255,136,0.4)",
+            border: "1px solid rgba(107,205,6,0.4)",
             zIndex: 9999,
           }}
         >

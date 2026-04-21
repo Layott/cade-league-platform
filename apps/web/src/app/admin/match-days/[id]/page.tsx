@@ -353,7 +353,7 @@ function PlayerChip({
         className={
           "flex h-9 w-9 items-center justify-center rounded-full border-2 font-display text-xs font-bold tabular " +
           (side === "home"
-            ? "border-[var(--signal)] bg-[rgba(0,255,136,0.08)] text-[var(--signal)]"
+            ? "border-[var(--primary)] bg-[rgba(107,205,6,0.08)] text-[var(--primary)]"
             : "border-[var(--ink-5)] bg-[var(--ink-3)] text-[var(--chalk-1)]")
         }
       >

@@ -32,11 +32,11 @@ function PlayerCardInner() {
           style={{
             padding: "22px 32px",
             background: "rgba(7,8,11,0.94)",
-            border: "1px solid rgba(0,255,136,0.45)",
-            borderLeft: "6px solid #00ff88",
+            border: "1px solid rgba(107,205,6,0.45)",
+            borderLeft: "6px solid var(--primary)",
             color: "#fff",
             minWidth: 360,
-            boxShadow: "0 0 32px -6px rgba(0,255,136,0.28)",
+            boxShadow: "0 0 32px -6px rgba(107,205,6,0.28)",
           }}
         >
           <div
@@ -88,7 +88,7 @@ function PlayerCardInner() {
                   style={{
                     fontSize: 18,
                     fontWeight: 700,
-                    color: k === "PTS" ? "#00ff88" : "#fff",
+                    color: k === "PTS" ? "var(--primary)" : "#fff",
                   }}
                 >
                   {v}

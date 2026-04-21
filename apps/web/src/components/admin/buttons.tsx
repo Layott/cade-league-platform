@@ -29,7 +29,7 @@ export function PrimaryButton({
         BASE +
         " " +
         SIZE[size] +
-        " border border-[var(--signal)] bg-[var(--signal)] text-[var(--signal-ink)] shadow-[0_0_0_1px_rgba(0,255,136,0.25),0_10px_30px_-12px_rgba(0,255,136,0.5)] hover:bg-[#3dffa4] hover:shadow-[0_0_0_1px_rgba(0,255,136,0.5),0_12px_36px_-10px_rgba(0,255,136,0.6)] " +
+        " border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-ink)] shadow-[0_0_0_1px_rgba(107,205,6,0.25),0_10px_30px_-12px_rgba(107,205,6,0.5)] hover:bg-[#82e21a] hover:shadow-[0_0_0_1px_rgba(107,205,6,0.5),0_12px_36px_-10px_rgba(107,205,6,0.6)] " +
         className
       }
     >

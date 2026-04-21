@@ -89,7 +89,7 @@ export default async function PlayerSquadChangePage({
       />
 
       {sp.ok === "1" ? (
-        <div className="rounded-sm border border-[rgba(0,255,136,0.35)] bg-[rgba(0,255,136,0.08)] p-3 text-sm text-[var(--signal)]">
+        <div className="rounded-sm border border-[rgba(107,205,6,0.35)] bg-[rgba(107,205,6,0.08)] p-3 text-sm text-[var(--primary)]">
           Swap recorded. Referee authorization logged.
         </div>
       ) : null}

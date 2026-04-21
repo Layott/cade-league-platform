@@ -33,7 +33,7 @@ function OutroInner() {
           style={{
             padding: "40px 60px",
             background: "rgba(7,8,11,0.96)",
-            border: "2px solid #00ff88",
+            border: "2px solid var(--primary)",
             color: "#fff",
             textAlign: "center",
           }}
@@ -41,7 +41,7 @@ function OutroInner() {
           <div
             style={{
               fontSize: 14,
-              color: "#00ff88",
+              color: "var(--primary)",
               textTransform: "uppercase",
               letterSpacing: "0.28em",
               fontWeight: 700,

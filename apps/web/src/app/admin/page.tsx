@@ -148,7 +148,7 @@ export default async function AdminHome() {
             className={
               "group relative overflow-hidden rounded-sm border bg-[var(--ink-2)] p-4 transition-colors " +
               (s.tone === "signal"
-                ? "border-[var(--ink-4)] hover:border-[rgba(0,255,136,0.35)]"
+                ? "border-[var(--ink-4)] hover:border-[rgba(107,205,6,0.35)]"
                 : s.tone === "amber"
                   ? "border-[var(--ink-4)] hover:border-[rgba(255,176,32,0.35)]"
                   : "border-[var(--ink-4)]")
@@ -245,7 +245,7 @@ export default async function AdminHome() {
                   className={
                     "inline-flex items-center justify-center rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] " +
                     (row.action === "insert"
-                      ? "border-[rgba(0,255,136,0.4)] bg-[rgba(0,255,136,0.08)] text-[var(--signal)]"
+                      ? "border-[rgba(107,205,6,0.4)] bg-[rgba(107,205,6,0.08)] text-[var(--primary)]"
                       : row.action === "update"
                         ? "border-[rgba(255,176,32,0.4)] bg-[rgba(255,176,32,0.08)] text-[var(--amber)]"
                         : "border-[rgba(255,91,59,0.4)] bg-[rgba(255,91,59,0.08)] text-[var(--flare)]")

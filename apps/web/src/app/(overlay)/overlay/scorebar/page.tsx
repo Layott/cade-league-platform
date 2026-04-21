@@ -37,12 +37,12 @@ function ScorebarInner() {
             gap: 16,
             padding: "14px 28px",
             background: "rgba(7,8,11,0.9)",
-            border: "1px solid rgba(0,255,136,0.45)",
-            borderLeft: "4px solid #00ff88",
+            border: "1px solid rgba(107,205,6,0.45)",
+            borderLeft: "4px solid var(--primary)",
             color: "#fff",
             fontSize: 22,
             letterSpacing: "-0.01em",
-            boxShadow: "0 0 24px -4px rgba(0,255,136,0.22)",
+            boxShadow: "0 0 24px -4px rgba(107,205,6,0.22)",
           }}
         >
           <span data-testid="scorebar-home-name" style={{ fontWeight: 600 }}>
@@ -54,7 +54,7 @@ function ScorebarInner() {
             style={{
               fontSize: 30,
               fontWeight: 700,
-              color: "#00ff88",
+              color: "var(--primary)",
               minWidth: 100,
               textAlign: "center",
             }}
