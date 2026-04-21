@@ -76,8 +76,12 @@ export async function startSession(
 export async function endSession(
   sb: SupabaseClient,
   sessionId: string,
-  _userId: string,
+  userId: string,
 ): Promise<{ clearedCount: number }> {
+  // Retained in signature for audit context tagging. Currently only
+  // referenced in the publish payload so downstream subscribers know
+  // which operator ended the session.
+  void userId;
   const now = new Date().toISOString();
 
   // 1. Clear any still-active overlay events for this session.

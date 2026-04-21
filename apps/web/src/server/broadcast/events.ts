@@ -106,8 +106,12 @@ export async function triggerOverlay(
 export async function clearOverlay(
   sb: SupabaseClient,
   eventId: string,
-  _userId: string,
+  userId: string,
 ): Promise<void> {
+  // Retained in signature for future explicit audit context; the DB
+  // audit trigger reads `app.current_user_id` which the API layer
+  // must SET LOCAL before calling this helper.
+  void userId;
   const now = new Date().toISOString();
 
   // We need the session id to know which channel to publish on.

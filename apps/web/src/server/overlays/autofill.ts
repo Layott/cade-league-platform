@@ -21,14 +21,6 @@ import {
  * returns `null` so the UI can fall back to manual entry.
  */
 
-type MatchJoinRow = {
-  id: string;
-  home_score: number | null;
-  away_score: number | null;
-  home_player: { id: string; users: { display_name: string | null } | null } | null;
-  away_player: { id: string; users: { display_name: string | null } | null } | null;
-};
-
 export async function buildScorebarPayload(
   sb: SupabaseClient,
   matchId: string,
