@@ -27,7 +27,11 @@ export default function UpNextBugPage() {
 function UpNextInner() {
   const sp = useSearchParams();
   const sessionId = sp?.get("session") ?? null;
-  const state = useOverlayChannel(sessionId, "up_next_bug");
+  // Plan 42.1 — optional slot filter; default primary for back-compat.
+  const slotRaw = sp?.get("slot") ?? null;
+  const slot: "primary" | "secondary" =
+    slotRaw === "secondary" ? "secondary" : "primary";
+  const state = useOverlayChannel(sessionId, "up_next_bug", slot);
   const parsed = state.payload
     ? upNextBugSchema.safeParse(state.payload)
     : null;

@@ -30,7 +30,13 @@ export default function ScoreBugPage() {
 function ScoreBugInner() {
   const sp = useSearchParams();
   const sessionId = sp?.get("session") ?? null;
-  const state = useOverlayChannel(sessionId, "score_bug");
+  // Plan 42.1 — `?slot=primary|secondary` filters the score_bug feed to
+  // the matching match slot. Default 'primary' so legacy single-match
+  // bookmarks keep working.
+  const slotRaw = sp?.get("slot") ?? null;
+  const slot: "primary" | "secondary" =
+    slotRaw === "secondary" ? "secondary" : "primary";
+  const state = useOverlayChannel(sessionId, "score_bug", slot);
   const parsed = state.payload ? scoreBugSchema.safeParse(state.payload) : null;
 
   return (

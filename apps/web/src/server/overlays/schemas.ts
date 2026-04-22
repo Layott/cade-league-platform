@@ -14,6 +14,19 @@ import { z } from "zod";
  *   - admin/broadcast/[sessionId] trigger grid (schema-driven form)
  */
 
+/**
+ * Plan 42.1 — optional per-payload match slot discriminator. Present on
+ * payloads for match-aware overlays (score_bug, lower_third, up_next_bug,
+ * h2h_*, stinger_goal/miss, leaderboard_animated, top_scorers,
+ * match_scores_day, orgs_roster, coach_intros, player_penalties).
+ * Overlay subscribers filter incoming realtime payloads by this field;
+ * missing / null is treated as 'primary' for back-compat with Plan 42.
+ */
+export const matchSlotSchema = z
+  .enum(["primary", "secondary"])
+  .optional();
+export type MatchSlot = z.infer<typeof matchSlotSchema>;
+
 /** Shared optional stinger / whoosh slot key. */
 export const soundSlotSchema = z
   .enum([
@@ -83,6 +96,7 @@ export const lowerThirdSchema = z.object({
     })
     .optional(),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type LowerThirdPayload = z.infer<typeof lowerThirdSchema>;
 
@@ -175,6 +189,7 @@ export const stingerGoalSchema = z.object({
   scorerDisplayName: z.string().trim().min(1).max(80).optional(),
   scorerPhotoUrl: photoUrlSchema.optional(),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type StingerGoalPayload = z.infer<typeof stingerGoalSchema>;
 
@@ -186,6 +201,7 @@ export const stingerMissSchema = z.object({
   scorerDisplayName: z.string().trim().min(1).max(80).optional(),
   scorerPhotoUrl: photoUrlSchema.optional(),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type StingerMissPayload = z.infer<typeof stingerMissSchema>;
 
@@ -276,18 +292,21 @@ const h2hPlayerSchema = z.object({
 export const h2h2Schema = z.object({
   players: z.array(h2hPlayerSchema).length(2),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type H2H2Payload = z.infer<typeof h2h2Schema>;
 
 export const h2h3Schema = z.object({
   players: z.array(h2hPlayerSchema).length(3),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type H2H3Payload = z.infer<typeof h2h3Schema>;
 
 export const h2h5Schema = z.object({
   players: z.array(h2hPlayerSchema).min(3).max(5),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type H2H5Payload = z.infer<typeof h2h5Schema>;
 
@@ -307,6 +326,7 @@ export const leaderboardAnimatedSchema = z.object({
     .min(1)
     .max(20),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type LeaderboardAnimatedPayload = z.infer<typeof leaderboardAnimatedSchema>;
 
@@ -322,6 +342,7 @@ export const scoreBugSchema = z.object({
     .length(2),
   matchId: z.string().uuid().optional(),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type ScoreBugPayload = z.infer<typeof scoreBugSchema>;
 
@@ -330,6 +351,7 @@ export const upNextBugSchema = z.object({
   away: playerLiteSchema,
   kickoffAt: z.string().datetime(),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type UpNextBugPayload = z.infer<typeof upNextBugSchema>;
 
@@ -348,6 +370,7 @@ export const matchScoresDaySchema = z.object({
     .max(40)
     .default([]),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type MatchScoresDayPayload = z.infer<typeof matchScoresDaySchema>;
 
@@ -386,6 +409,7 @@ export const topScorersSchema = z.object({
     .max(10)
     .default([]),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type TopScorersPayload = z.infer<typeof topScorersSchema>;
 
@@ -396,6 +420,7 @@ export const orgsRosterSchema = z.object({
   }),
   players: z.array(playerLiteSchema).max(20).default([]),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type OrgsRosterPayload = z.infer<typeof orgsRosterSchema>;
 
@@ -403,6 +428,7 @@ export const coachIntrosSchema = z.object({
   coach: playerLiteSchema,
   players: z.array(playerLiteSchema).max(10).default([]),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type CoachIntrosPayload = z.infer<typeof coachIntrosSchema>;
 
@@ -425,5 +451,6 @@ export const playerPenaltiesSchema = z.object({
     .max(20)
     .default([]),
   soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
 });
 export type PlayerPenaltiesPayload = z.infer<typeof playerPenaltiesSchema>;

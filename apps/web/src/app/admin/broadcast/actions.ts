@@ -116,6 +116,17 @@ export async function triggerOverlayAction(formData: FormData) {
     throw new Error("payload must be valid JSON");
   }
 
+  // Plan 42.1 — the slot-capable templates render a radio button that posts
+  // a `slot` form field. When present, override whatever is embedded in the
+  // payload JSON so the radio is the source of truth.
+  const slotRaw = formData.get("slot");
+  if (slotRaw === "primary" || slotRaw === "secondary") {
+    payload = {
+      ...(payload as Record<string, unknown>),
+      slot: slotRaw,
+    };
+  }
+
   const { sb, publicUserId } = await gate("broadcast.trigger");
   await triggerOverlay(sb, {
     sessionId,
@@ -314,17 +325,29 @@ export async function resetClockAction(formData: FormData) {
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 
-// -- Plan 42: match flow (select/start/end + score controls) --------------
+// -- Plan 42 / 42.1: match flow (select/start/end + score controls) -------
+//
+// Plan 42.1 — every action reads a `slot` form field ('primary' or
+// 'secondary') so the admin UI can drive two concurrent matches.
+
+function readSlot(formData: FormData): "primary" | "secondary" {
+  const raw = String(formData.get("slot") ?? "primary");
+  return raw === "secondary" ? "secondary" : "primary";
+}
 
 export async function selectAndStartMatchAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   const matchId = String(formData.get("matchId") ?? "");
   if (!sessionId) throw new Error("sessionId required");
   if (!matchId) throw new Error("matchId required");
+  const slot = readSlot(formData);
 
   const { publicUserId, roles } = await resolveAuthed();
   const sb = getServiceRoleSupabase();
-  await startMatch(sb, sessionId, matchId, { userId: publicUserId, roles });
+  await startMatch(sb, sessionId, matchId, slot, {
+    userId: publicUserId,
+    roles,
+  });
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 
@@ -338,12 +361,14 @@ export async function scoreBugDeltaAction(formData: FormData) {
   }
   const delta = Number(deltaRaw);
   if (!Number.isFinite(delta)) throw new Error("delta must be numeric");
+  const slot = readSlot(formData);
 
   const { publicUserId, roles } = await resolveAuthed();
   const sb = getServiceRoleSupabase();
   await updateScoreBug(
     sb,
     sessionId,
+    slot,
     side === "home" ? { homeDelta: delta } : { awayDelta: delta },
     { userId: publicUserId, roles },
   );
@@ -353,11 +378,13 @@ export async function scoreBugDeltaAction(formData: FormData) {
 export async function resetScoreBugAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   if (!sessionId) throw new Error("sessionId required");
+  const slot = readSlot(formData);
   const { publicUserId, roles } = await resolveAuthed();
   const sb = getServiceRoleSupabase();
   await updateScoreBug(
     sb,
     sessionId,
+    slot,
     { reset: true },
     { userId: publicUserId, roles },
   );
@@ -378,12 +405,14 @@ export async function endMatchAction(formData: FormData) {
   if (!Number.isInteger(awayScore) || awayScore < 0) {
     throw new Error("awayScore must be a non-negative integer");
   }
+  const slot = readSlot(formData);
 
   const { publicUserId, roles } = await resolveAuthed();
   const sb = getServiceRoleSupabase();
   await endMatch(
     sb,
     sessionId,
+    slot,
     { homeScore, awayScore, notes },
     { userId: publicUserId, roles },
   );

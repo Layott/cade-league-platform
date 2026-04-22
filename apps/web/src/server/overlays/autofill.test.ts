@@ -205,6 +205,18 @@ describe("buildScoreBugFromMatch", () => {
     expect(payload?.players[1].displayName).toBe("Faruk");
     expect(payload?.players[1].score).toBe(0);
     expect(payload?.matchId).toBe(sampleMatch.id);
+    // Plan 42.1 — no slot passed → no slot field on payload.
+    expect((payload as { slot?: string } | null)?.slot).toBeUndefined();
+  });
+
+  it("Plan 42.1 — attaches `slot: primary` when slot is passed", () => {
+    const payload = buildScoreBugFromMatch(sampleMatch, "primary");
+    expect(payload?.slot).toBe("primary");
+  });
+
+  it("Plan 42.1 — attaches `slot: secondary` when slot is passed", () => {
+    const payload = buildScoreBugFromMatch(sampleMatch, "secondary");
+    expect(payload?.slot).toBe("secondary");
   });
 
   it("returns null when both players are absent", () => {
@@ -238,6 +250,12 @@ describe("buildLowerThirdFromPlayer", () => {
     expect(payload?.displayName).toBe("Adefola");
     expect(payload?.gamerTag).toBe("ADEFOLA");
     expect(payload?.jerseyNumber).toBe(10);
+    expect((payload as { slot?: string } | null)?.slot).toBeUndefined();
+  });
+
+  it("Plan 42.1 — attaches slot when passed", () => {
+    const payload = buildLowerThirdFromPlayer(sampleMatch.homePlayer, "secondary");
+    expect(payload?.slot).toBe("secondary");
   });
 
   it("returns null on null input", () => {
@@ -268,6 +286,21 @@ describe("buildH2HFromMatch", () => {
     expect(out?.players).toHaveLength(2);
     expect(out?.players[0].h2hStats).toEqual({ w: 3, d: 1, l: 0 });
     expect(out?.players[1].h2hStats).toEqual({ w: 1, d: 2, l: 2 });
+    expect((out as { slot?: string } | null)?.slot).toBeUndefined();
+  });
+
+  it("Plan 42.1 — propagates slot when passed", async () => {
+    const standingsChain = {
+      select: vi.fn(() => standingsChain),
+      eq: vi.fn(() => standingsChain),
+      is: vi.fn(() => standingsChain),
+      maybeSingle: vi.fn(() =>
+        Promise.resolve({ data: { wins: 0, draws: 0, losses: 0 }, error: null }),
+      ),
+    };
+    const sb = { from: vi.fn(() => standingsChain) };
+    const out = await buildH2HFromMatch(sb as never, sampleMatch, "secondary");
+    expect(out?.slot).toBe("secondary");
   });
 
   it("returns null when either player is missing", async () => {
@@ -284,7 +317,12 @@ describe("buildH2HFromMatch", () => {
 describe("buildUpNextFromNextMatch", () => {
   it("returns null when the session has no rows matching scope", async () => {
     const sessionChain = chain({
-      data: { match_day_id: "md-1", current_match_id: null },
+      data: {
+        match_day_id: "md-1",
+        current_match_id: null,
+        primary_match_id: null,
+        secondary_match_id: null,
+      },
       error: null,
     });
     const matchesChain = chain({ data: [], error: null });
@@ -310,6 +348,17 @@ describe("buildUpNextFromNextMatch", () => {
     const out = await buildUpNextFromNextMatch(
       sb as never,
       "22222222-2222-4222-8222-222222222222",
+    );
+    expect(out).toBeNull();
+  });
+
+  it("Plan 42.1 — accepts optional slot param without throwing", async () => {
+    const sessionChain = chain({ data: null, error: null });
+    const sb = { from: vi.fn(() => sessionChain) };
+    const out = await buildUpNextFromNextMatch(
+      sb as never,
+      "22222222-2222-4222-8222-222222222222",
+      "primary",
     );
     expect(out).toBeNull();
   });

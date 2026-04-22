@@ -7,6 +7,12 @@
  * fields (e.g. `winnerDisplayName` for stinger_winner). A unit test in
  * `starter-payloads.test.ts` schema-validates every entry to prevent
  * regression when new templates are added.
+ *
+ * Plan 42.1 — slot-capable templates (score_bug, lower_third, up_next_bug,
+ * h2h_*, stinger_goal/miss, leaderboard_animated, top_scorers,
+ * match_scores_day, orgs_roster, coach_intros, player_penalties) include
+ * `slot: "primary"` as a sidecar default. The admin UI also exposes a slot
+ * radio which overrides the payload field at submit time.
  */
 
 export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
@@ -22,6 +28,7 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
     displayName: "Player Name",
     gamerTag: "GAMER_TAG",
     jerseyNumber: 10,
+    slot: "primary",
   },
   standings_widget: {
     topN: 3,
@@ -65,10 +72,12 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
   stinger_goal: {
     scorerDisplayName: "SCORER",
     soundSlot: "stinger-goal",
+    slot: "primary",
   },
   stinger_miss: {
     scorerDisplayName: "SHOOTER",
     soundSlot: "stinger-miss",
+    slot: "primary",
   },
   stinger_winner: {
     winnerDisplayName: "CHAMPION",
@@ -101,13 +110,14 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
     ],
     ticker: "ELITE DIV 1 · MD1 · LIVE",
   },
-  // Plan 16 — matchups
+  // Plan 16 — matchups (Plan 42.1 — slot-capable)
   h2h_2: {
     players: [
       { displayName: "PLAYER 1", h2hStats: { w: 0, d: 0, l: 0 } },
       { displayName: "PLAYER 2", h2hStats: { w: 0, d: 0, l: 0 } },
     ],
     soundSlot: "whoosh-long",
+    slot: "primary",
   },
   h2h_3: {
     players: [
@@ -115,6 +125,7 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
       { displayName: "PLAYER 2" },
       { displayName: "PLAYER 3" },
     ],
+    slot: "primary",
   },
   h2h_5: {
     players: [
@@ -124,8 +135,9 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
       { displayName: "PLAYER 4" },
       { displayName: "PLAYER 5" },
     ],
+    slot: "primary",
   },
-  // Plan 16 — data displays
+  // Plan 16 — data displays (Plan 42.1 — slot-capable)
   leaderboard_animated: {
     topN: 5,
     rows: [
@@ -135,21 +147,25 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
       { rank: 4, displayName: "Anon-04", pts: 7, gd: 1 },
       { rank: 5, displayName: "Anon-05", pts: 6, gd: -1 },
     ],
+    slot: "primary",
   },
   score_bug: {
     players: [
       { displayName: "HOME", score: 0 },
       { displayName: "AWAY", score: 0 },
     ],
+    slot: "primary",
   },
   up_next_bug: {
     home: { displayName: "HOME" },
     away: { displayName: "AWAY" },
     kickoffAt: "2026-04-22T00:00:00.000Z",
+    slot: "primary",
   },
   match_scores_day: {
     matchDayLabel: "MD 1",
     rows: [],
+    slot: "primary",
   },
   // Plan 16 — full-screen
   starting_soon_basic: { subtitle: "Match Day 1 begins shortly" },
@@ -158,13 +174,14 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
     subtitle: "Thanks for watching",
     socials: { twitter: "@cade_league", instagram: "@cade_league" },
   },
-  // Plan 16 — stats
+  // Plan 16 — stats (Plan 42.1 — slot-capable)
   top_scorers: {
     rows: [
       { rank: 1, displayName: "Anon-01", goals: 14 },
       { rank: 2, displayName: "Anon-02", goals: 11 },
       { rank: 3, displayName: "Anon-03", goals: 9 },
     ],
+    slot: "primary",
   },
   orgs_roster: {
     org: { name: "CADE ESPORTS" },
@@ -173,14 +190,17 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
       { displayName: "PLAYER 2" },
       { displayName: "PLAYER 3" },
     ],
+    slot: "primary",
   },
   coach_intros: {
     coach: { displayName: "Coach K" },
     players: [{ displayName: "PLAYER 1" }, { displayName: "PLAYER 2" }],
+    slot: "primary",
   },
   player_penalties: {
     rows: [
       { displayName: "Player Name", count: 1, sanctionType: "warning" },
     ],
+    slot: "primary",
   },
 };

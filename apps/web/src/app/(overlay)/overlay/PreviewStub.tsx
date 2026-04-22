@@ -43,8 +43,14 @@ function Inner<T>({
 }: PreviewStubProps<T>) {
   const sp = useSearchParams();
   const sessionId = sp?.get("session") ?? null;
+  // Plan 42.1 — URL `?slot=primary|secondary` routes match-aware overlays
+  // to the corresponding match slot. Default undefined so non-match-aware
+  // templates (scorebar, standings, intro, etc.) bypass slot filtering.
+  const slotRaw = sp?.get("slot") ?? null;
+  const slot: "primary" | "secondary" | undefined =
+    slotRaw === "primary" || slotRaw === "secondary" ? slotRaw : undefined;
   const preview = usePreviewMode();
-  const channel = useOverlayChannel(sessionId, templateKey);
+  const channel = useOverlayChannel(sessionId, templateKey, slot);
 
   const activePayload = preview.enabled ? preview.payload : channel.payload;
   const parsed = useMemo(() => {

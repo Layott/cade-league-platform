@@ -334,13 +334,18 @@ function resolveName(p: MatchPlayerLite | null): string {
 }
 
 /**
- * Plan 42 — score_bug payload pre-filled from a live match.
+ * Plan 42 / 42.1 — score_bug payload pre-filled from a live match.
  * Starts at 0-0 regardless of DB state; admin increments via
- * `match_flow.updateScoreBug`.
+ * `match_flow.updateScoreBug`. The optional `slot` ('primary' |
+ * 'secondary') is propagated as a sidecar field on the payload so overlay
+ * pages can filter by `?slot=` (Plan 42.1 two-match broadcast).
  */
-export function buildScoreBugFromMatch(match: MatchLite): ScoreBugPayload | null {
+export function buildScoreBugFromMatch(
+  match: MatchLite,
+  slot?: "primary" | "secondary",
+): (ScoreBugPayload & { slot?: "primary" | "secondary" }) | null {
   if (!match.homePlayer && !match.awayPlayer) return null;
-  return scoreBugSchema.parse({
+  const parsed = scoreBugSchema.parse({
     players: [
       {
         displayName: resolveName(match.homePlayer),
@@ -355,36 +360,42 @@ export function buildScoreBugFromMatch(match: MatchLite): ScoreBugPayload | null
     ],
     matchId: match.id,
   });
+  return slot ? { ...parsed, slot } : parsed;
 }
 
 /**
- * Plan 42 — lower_third payload pre-filled from one side of a match.
- * Uses the normal (non-transparent) headshot to match the existing lower-
- * third renderer. Stats are omitted so the admin can choose to include them
- * via the editable panel.
+ * Plan 42 / 42.1 — lower_third payload pre-filled from one side of a
+ * match. Uses the normal (non-transparent) headshot to match the existing
+ * lower-third renderer. Stats are omitted so the admin can choose to
+ * include them via the editable panel. The optional `slot` (Plan 42.1) is
+ * added as a sidecar field.
  */
 export function buildLowerThirdFromPlayer(
   player: MatchPlayerLite | null,
-): LowerThirdPayload | null {
+  slot?: "primary" | "secondary",
+): (LowerThirdPayload & { slot?: "primary" | "secondary" }) | null {
   if (!player) return null;
-  return lowerThirdSchema.parse({
+  const parsed = lowerThirdSchema.parse({
     playerId: player.id,
     displayName: resolveName(player),
     gamerTag: player.gamerTag ?? "—",
     jerseyNumber: player.jerseyNumber ?? 0,
     photoUrl: resolvePhoto(player.gamerTag ?? null, "normal"),
   });
+  return slot ? { ...parsed, slot } : parsed;
 }
 
 /**
- * Plan 42 — h2h_2 payload pre-filled from a match.
+ * Plan 42 / 42.1 — h2h_2 payload pre-filled from a match.
  * Loads each player's seasonal W/D/L from `standings` in parallel; on any
  * read error the stats are omitted but the displayName + photos still land.
+ * Optional `slot` sidecar propagated for Plan 42.1 per-slot routing.
  */
 export async function buildH2HFromMatch(
   sb: SupabaseClient,
   match: MatchLite,
-): Promise<H2H2Payload | null> {
+  slot?: "primary" | "secondary",
+): Promise<(H2H2Payload & { slot?: "primary" | "secondary" }) | null> {
   if (!match.homePlayer || !match.awayPlayer) return null;
 
   async function statsFor(playerId: string): Promise<
@@ -405,7 +416,7 @@ export async function buildH2HFromMatch(
     statsFor(match.awayPlayer.id),
   ]);
 
-  return h2h2Schema.parse({
+  const parsed = h2h2Schema.parse({
     players: [
       {
         displayName: resolveName(match.homePlayer),
@@ -421,31 +432,43 @@ export async function buildH2HFromMatch(
       },
     ],
   });
+  return slot ? { ...parsed, slot } : parsed;
 }
 
 /**
- * Plan 42 — up_next_bug pre-filled from the next scheduled match on the
- * session's match_day. Used when the producer wants to tease the next
+ * Plan 42 / 42.1 — up_next_bug pre-filled from the next scheduled match on
+ * the session's match_day. Used when the producer wants to tease the next
  * fixture during a BRB window. Returns null when no upcoming match exists.
+ * The optional `slot` sidecar is propagated for Plan 42.1 per-slot routing.
  */
 export async function buildUpNextFromNextMatch(
   sb: SupabaseClient,
   sessionId: string,
-): Promise<UpNextBugPayload | null> {
-  // Resolve the session → match_day.
+  slot?: "primary" | "secondary",
+): Promise<(UpNextBugPayload & { slot?: "primary" | "secondary" }) | null> {
+  // Resolve the session → match_day. Read both legacy + new match-id
+  // columns so we can exclude whichever slot is live when excluding the
+  // "current" match from the "next" lookup.
   const { data: sessRaw } = await sb
     .from("stream_sessions")
-    .select("match_day_id, current_match_id")
+    .select(
+      "match_day_id, current_match_id, primary_match_id, secondary_match_id",
+    )
     .eq("id", sessionId)
     .is("deleted_at", null)
     .maybeSingle();
   const sess = sessRaw as
-    | { match_day_id: string; current_match_id: string | null }
+    | {
+        match_day_id: string;
+        current_match_id: string | null;
+        primary_match_id: string | null;
+        secondary_match_id: string | null;
+      }
     | null;
   if (!sess) return null;
 
   // Find the next scheduled match on this match_day (excluding current
-  // match + already-completed/forfeited/voided rows).
+  // match ids from either slot + already-completed/forfeited/voided rows).
   const baseQuery = sb
     .from("matches")
     .select(
@@ -473,9 +496,19 @@ export async function buildUpNextFromNextMatch(
     .order("scheduled_time", { ascending: true })
     .limit(1);
 
-  const { data } = sess.current_match_id
-    ? await baseQuery.neq("id", sess.current_match_id)
-    : await baseQuery;
+  // Exclude whichever slot is currently active. Prefer the new columns
+  // then fall back to the legacy `current_match_id`.
+  const exclusions = [
+    sess.primary_match_id,
+    sess.secondary_match_id,
+    sess.current_match_id,
+  ].filter((x): x is string => !!x);
+
+  let query = baseQuery;
+  for (const excl of exclusions) {
+    query = query.neq("id", excl);
+  }
+  const { data } = await query;
 
   const rows = data as unknown as
     | {
@@ -508,7 +541,7 @@ export async function buildUpNextFromNextMatch(
   const time = next.scheduled_time ?? "00:00:00";
   const kickoffAt = new Date(`${date}T${time}Z`).toISOString();
 
-  return upNextBugSchema.parse({
+  const parsed = upNextBugSchema.parse({
     home: {
       displayName: home.users?.display_name ?? home.gamer_tag ?? "—",
       gamerTag: home.gamer_tag ?? undefined,
@@ -521,6 +554,7 @@ export async function buildUpNextFromNextMatch(
     },
     kickoffAt,
   });
+  return slot ? { ...parsed, slot } : parsed;
 }
 
 // Re-export for barrel import convenience.

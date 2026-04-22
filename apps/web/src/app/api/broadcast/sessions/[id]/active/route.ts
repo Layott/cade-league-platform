@@ -48,10 +48,16 @@ export async function GET(
   if (!gate.ok) return gate.response;
 
   const templateKey = req.nextUrl.searchParams.get("template_key");
+  // Plan 42.1 — optional `slot` narrows a template-specific lookup to the
+  // active row whose payload.slot matches (primary also matches payloads
+  // that omit the slot field, for Plan 42 back-compat).
+  const slotRaw = req.nextUrl.searchParams.get("slot");
+  const slot: "primary" | "secondary" | undefined =
+    slotRaw === "primary" || slotRaw === "secondary" ? slotRaw : undefined;
 
   let body: unknown;
   if (templateKey) {
-    body = await getActiveForTemplate(sb, id, templateKey);
+    body = await getActiveForTemplate(sb, id, templateKey, slot);
   } else {
     body = await listActiveOverlays(sb, id);
   }

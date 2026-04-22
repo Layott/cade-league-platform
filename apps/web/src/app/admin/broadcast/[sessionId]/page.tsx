@@ -48,9 +48,14 @@ type SessionRow = {
   started_at: string;
   ended_at: string | null;
   notes: string | null;
-  // Plan 42 — current-match pin.
+  // Plan 42 — current-match pin (deprecated alias for primary_match_id).
   current_match_id: string | null;
   match_started_at: string | null;
+  // Plan 42.1 — dual-slot match pins.
+  primary_match_id: string | null;
+  primary_match_started_at: string | null;
+  secondary_match_id: string | null;
+  secondary_match_started_at: string | null;
 };
 
 /** Editable templates upgraded to the rich panel in Plan 37. The slot
@@ -62,6 +67,27 @@ const EDITABLE_TEMPLATES: ReadonlyArray<TemplateKey> = [
 ];
 const MULTI_INSTANCE_TEMPLATES: ReadonlySet<TemplateKey> = new Set([
   "lower_third",
+]);
+
+/** Plan 42.1 — templates that render match-specific data and therefore
+ *  participate in the dual-slot routing model. The trigger-card slot
+ *  selector appears only for these; other templates (standings, intros,
+ *  etc.) ignore slot entirely. */
+const SLOT_CAPABLE_TEMPLATES: ReadonlySet<TemplateKey> = new Set([
+  "score_bug",
+  "lower_third",
+  "up_next_bug",
+  "h2h_2",
+  "h2h_3",
+  "h2h_5",
+  "stinger_goal",
+  "stinger_miss",
+  "leaderboard_animated",
+  "top_scorers",
+  "match_scores_day",
+  "orgs_roster",
+  "coach_intros",
+  "player_penalties",
 ]);
 
 async function resolveAdmin() {
@@ -102,7 +128,7 @@ export default async function BroadcastSessionPage({
   const { data: sessionRaw } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at",
+      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at, primary_match_id, primary_match_started_at, secondary_match_id, secondary_match_started_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -128,21 +154,23 @@ export default async function BroadcastSessionPage({
 
   // Parallel fetch: active overlays + per-template presets + multi-instance
   // active rows + match_clock state + (Plan 42) selectable matches + active
-  // score_bug row to derive the current-match digest.
+  // score_bug rows (Plan 42.1 — one per slot).
   const [
     active,
     presetsAll,
     lowerThirdInstances,
     clock,
     selectableMatches,
-    activeScoreBug,
+    primaryScoreBug,
+    secondaryScoreBug,
   ] = await Promise.all([
     listActiveOverlays(sb, session.id),
     listPresets(sb),
     listActiveInstances(sb, session.id, "lower_third"),
     getClock(sb, session.id),
     listSelectableMatches(sb, session.id, { scope: "today" }),
-    getActiveForTemplate(sb, session.id, "score_bug"),
+    getActiveForTemplate(sb, session.id, "score_bug", "primary"),
+    getActiveForTemplate(sb, session.id, "score_bug", "secondary"),
   ]);
 
   const presetsByTemplate = new Map<string, typeof presetsAll>();
@@ -169,30 +197,49 @@ export default async function BroadcastSessionPage({
     (k) => !EDITABLE_TEMPLATES.includes(k),
   );
 
-  // Plan 42 — derive the current-match digest from session + live score_bug.
-  let currentMatchDigest: CurrentMatchDigest | null = null;
-  if (session.current_match_id) {
-    const bugPayload = (activeScoreBug?.payload ?? null) as {
+  // Plan 42 / 42.1 — derive a digest per slot from session + live score_bug
+  // rows. Each slot is independent: primary can be live with secondary idle
+  // or vice versa.
+  function deriveDigest(
+    slot: "primary" | "secondary",
+    matchId: string | null,
+    bug: typeof primaryScoreBug,
+  ): CurrentMatchDigest | null {
+    if (!matchId) return null;
+    const bugPayload = (bug?.payload ?? null) as {
       players?: Array<{ displayName: string; score: number }>;
     } | null;
     const players = bugPayload?.players ?? [];
-    currentMatchDigest = {
-      matchId: session.current_match_id,
+    return {
+      slot,
+      matchId,
       homeDisplayName: players[0]?.displayName ?? "Home",
       awayDisplayName: players[1]?.displayName ?? "Away",
       homeScore: players[0]?.score ?? 0,
       awayScore: players[1]?.score ?? 0,
     };
   }
+  const primaryDigest = deriveDigest(
+    "primary",
+    session.primary_match_id ?? session.current_match_id,
+    primaryScoreBug,
+  );
+  const secondaryDigest = deriveDigest(
+    "secondary",
+    session.secondary_match_id,
+    secondaryScoreBug,
+  );
 
-  // Plan 42 — pre-fill scorer default on stinger_goal from the current
-  // match's home player when a match is pinned. Overrides the static
-  // STARTER_PAYLOADS entry for just that template.
+  // Plan 42 / 42.1 — pre-fill scorer default on stinger_goal from the
+  // PRIMARY match's home player when a primary match is pinned. Overrides
+  // the static STARTER_PAYLOADS entry for just that template. Secondary
+  // goals are triggered manually via the slot selector on the trigger card.
   const starterOverrides: Record<string, Record<string, unknown>> = {};
-  if (currentMatchDigest) {
+  if (primaryDigest) {
     starterOverrides.stinger_goal = {
-      scorerDisplayName: currentMatchDigest.homeDisplayName,
+      scorerDisplayName: primaryDigest.homeDisplayName,
       soundSlot: "stinger-goal",
+      slot: "primary",
     };
   }
 
@@ -241,17 +288,23 @@ export default async function BroadcastSessionPage({
         }
       />
 
-      {/* Match control — Plan 42 (mount above clock so select/start/end
-          is the primary producer action on the page). */}
+      {/* Match control — Plan 42 / 42.1 (dual-slot side-by-side; mounted
+          above clock so select/start/end is the producer's primary action). */}
       <MatchControlPanel
         sessionId={session.id}
         selectable={selectableMatches}
-        current={currentMatchDigest}
+        primaryCurrent={primaryDigest}
+        secondaryCurrent={secondaryDigest}
         isLive={isLive}
       />
 
-      {/* Match clock — Plan 37 */}
-      <MatchClockPanel sessionId={session.id} clock={clock} isLive={isLive} />
+      {/* Match clock — Plan 37. Shared across both match slots. */}
+      <div className="space-y-1">
+        <MatchClockPanel sessionId={session.id} clock={clock} isLive={isLive} />
+        <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+          Match clock — shared across both slots
+        </div>
+      </div>
 
       {/* Editable rich panels */}
       <div className="space-y-4">
@@ -298,6 +351,10 @@ export default async function BroadcastSessionPage({
               const tpl = TEMPLATE_REGISTRY[key];
               const starter =
                 starterOverrides[key] ?? STARTER_PAYLOADS[key] ?? {};
+              // Plan 42.1 — match-aware templates get a slot selector that
+              // flows the slot through the payload so the overlay `?slot=`
+              // filter picks it up. Non-match templates skip the selector.
+              const isSlotCapable = SLOT_CAPABLE_TEMPLATES.has(key);
               return (
                 <div
                   key={key}
@@ -336,6 +393,33 @@ export default async function BroadcastSessionPage({
                       name="templateKey"
                       value={key}
                     />
+                    {isSlotCapable ? (
+                      <fieldset
+                        className="flex items-center gap-3 rounded-sm border border-[var(--ink-4)]/50 bg-[var(--ink-3)]/30 px-2 py-1"
+                        data-testid={`trigger-slot-${key}`}
+                      >
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+                          Slot
+                        </span>
+                        <label className="flex items-center gap-1 text-[10px] text-[var(--chalk-1)]">
+                          <input
+                            type="radio"
+                            name="slot"
+                            value="primary"
+                            defaultChecked
+                          />
+                          primary
+                        </label>
+                        <label className="flex items-center gap-1 text-[10px] text-[var(--chalk-1)]">
+                          <input
+                            type="radio"
+                            name="slot"
+                            value="secondary"
+                          />
+                          secondary
+                        </label>
+                      </fieldset>
+                    ) : null}
                     <textarea
                       name="payload"
                       rows={5}

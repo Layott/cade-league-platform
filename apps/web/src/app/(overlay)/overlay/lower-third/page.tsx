@@ -40,7 +40,11 @@ export default function LowerThirdPage() {
 function LowerThirdInner() {
   const sp = useSearchParams();
   const sessionId = sp?.get("session") ?? null;
-  const state = useOverlayInstances(sessionId, "lower_third");
+  // Plan 42.1 — optional slot filter; default primary for back-compat.
+  const slotRaw = sp?.get("slot") ?? null;
+  const slot: "primary" | "secondary" =
+    slotRaw === "secondary" ? "secondary" : "primary";
+  const state = useOverlayInstances(sessionId, "lower_third", slot);
 
   return (
     <div

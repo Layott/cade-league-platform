@@ -199,6 +199,10 @@ export async function getActiveForTemplate(
   sb: SupabaseClient,
   sessionId: string,
   templateKey: string,
+  /** Plan 42.1 — when set, only returns the active row whose payload.slot
+   *  matches. `primary` also matches rows without a slot field (back-compat
+   *  with Plan 42 single-slot). Rows are scanned newest-first. */
+  slotFilter?: "primary" | "secondary",
 ): Promise<ActiveOverlay | null> {
   if (!isTemplateKey(templateKey)) return null;
 
@@ -211,6 +215,11 @@ export async function getActiveForTemplate(
     .maybeSingle();
   if (!tpl) return null;
 
+  // When slot filter is active, fetch the last handful and scan in
+  // memory — there should be at most 2 active rows per template at any
+  // time (one per slot). When no filter, keep the existing limit-1 fast
+  // path.
+  const fetchLimit = slotFilter ? 10 : 1;
   const { data } = await sb
     .from("overlay_events")
     .select(
@@ -221,27 +230,39 @@ export async function getActiveForTemplate(
     .is("cleared_at", null)
     .is("deleted_at", null)
     .order("triggered_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(fetchLimit);
 
-  if (!data) return null;
-
-  const r = data as {
+  const rows = (data ?? []) as {
     id: string;
     stream_session_id: string;
     template_id: string;
     payload: Record<string, unknown>;
     triggered_at: string;
     cleared_at: string | null;
-  };
+  }[];
+
+  let pick: (typeof rows)[number] | null = null;
+  if (slotFilter) {
+    pick =
+      rows.find((r) => {
+        const s =
+          (r.payload as { slot?: string } | null | undefined)?.slot ??
+          "primary";
+        return s === slotFilter;
+      }) ?? null;
+  } else {
+    pick = rows[0] ?? null;
+  }
+  if (!pick) return null;
+
   return {
-    id: r.id,
-    stream_session_id: r.stream_session_id,
-    template_id: r.template_id,
+    id: pick.id,
+    stream_session_id: pick.stream_session_id,
+    template_id: pick.template_id,
     template_key: templateKey,
-    payload: r.payload,
-    triggered_at: r.triggered_at,
-    cleared_at: r.cleared_at,
+    payload: pick.payload,
+    triggered_at: pick.triggered_at,
+    cleared_at: pick.cleared_at,
   };
 }
 

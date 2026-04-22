@@ -43,9 +43,15 @@ const EMPTY_BY_SLOT: Record<number, OverlayInstance | null> = {
   3: null,
 };
 
+/**
+ * Plan 42.1 — optional `slotFilter` narrows multi-instance overlays to
+ * payloads whose `slot` field matches. Payloads without a `slot` default
+ * to 'primary' (back-compat with Plan 42 single-slot).
+ */
 export function useOverlayInstances(
   sessionId: string | null,
   templateKey: TemplateKey,
+  slotFilter?: "primary" | "secondary",
 ): OverlayInstancesState {
   const [state, setState] = useState<OverlayInstancesState>({
     bySlot: { ...EMPTY_BY_SLOT },
@@ -55,6 +61,12 @@ export function useOverlayInstances(
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
+
+    const slotMatches = (p: Record<string, unknown> | null | undefined) => {
+      if (!slotFilter) return true;
+      const s = (p as { slot?: string } | null | undefined)?.slot ?? "primary";
+      return s === slotFilter;
+    };
 
     // 1. Hydrate from REST.
     fetch(
@@ -69,6 +81,7 @@ export function useOverlayInstances(
         setState((s) => {
           const next: Record<number, OverlayInstance | null> = { ...s.bySlot };
           for (const r of rows) {
+            if (!slotMatches(r.payload)) continue;
             next[r.instance_slot] = {
               instanceId: r.id,
               instanceSlot: r.instance_slot,
@@ -103,6 +116,7 @@ export function useOverlayInstances(
         }) => {
           const p = msg.payload;
           if (!p || p.templateKey !== templateKey) return;
+          if (!slotMatches(p.payload)) return;
           setState((s) => ({
             ...s,
             bySlot: {
@@ -154,7 +168,7 @@ export function useOverlayInstances(
       cancelled = true;
       sb.removeChannel(channel);
     };
-  }, [sessionId, templateKey]);
+  }, [sessionId, templateKey, slotFilter]);
 
   return state;
 }

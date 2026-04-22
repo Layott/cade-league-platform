@@ -8,7 +8,7 @@ import {
   type MatchLite,
   type MatchPlayerLite,
 } from "@/server/overlays/autofill";
-import { triggerOverlay, getActiveForTemplate } from "./events";
+import { triggerOverlay, listActiveOverlays } from "./events";
 import {
   setClock,
   resetClock,
@@ -16,25 +16,41 @@ import {
 } from "@/server/overlays/match_clock";
 
 /**
- * Plan 42 — match-flow orchestration for the broadcast control panel.
+ * Plan 42 / 42.1 — match-flow orchestration for the broadcast control panel.
  *
- * startMatch pins a `matches.id` onto `stream_sessions.current_match_id`,
- * flips the match `scheduled → in_progress`, spawns a score_bug overlay
- * auto-filled from the two players, initializes a stopped match_clock,
- * and broadcasts `match.started`.
+ * Plan 42.1 extension: CADE broadcasts TWO concurrent matches — a
+ * `primary` match on-stream and a `secondary` match off-stream. Every
+ * entry point now takes a `slot: 'primary' | 'secondary'` parameter and
+ * writes to the matching `<slot>_match_id` column on `stream_sessions`.
  *
- * updateScoreBug mutates the current score_bug payload (home/away ±1 or
- * reset) and republishes the payload on the session channel alongside a
- * dedicated `score.changed` event.
- *
- * endMatch writes the final `match_results` row, flips the match to
- * `completed`, clears `current_match_id`, and broadcasts `match.ended`.
+ * Score-bug mechanics: a single score_bug overlay_events row is kept
+ * active PER SLOT, discriminated by the `slot` field on its payload.
+ * Subscribing overlay pages filter incoming events by the URL's
+ * `?slot=primary|secondary` (default primary) so both slots can render
+ * independently on two browser sources.
  *
  * Every public entry point requires `broadcast.match_control`.
  */
 
 const PERM_MATCH_CONTROL = "broadcast.match_control";
 const SCORE_BUG_KEY = "score_bug";
+
+export type MatchSlot = "primary" | "secondary";
+
+function slotColumns(slot: MatchSlot): {
+  matchCol: "primary_match_id" | "secondary_match_id";
+  startedCol: "primary_match_started_at" | "secondary_match_started_at";
+} {
+  return slot === "primary"
+    ? {
+        matchCol: "primary_match_id",
+        startedCol: "primary_match_started_at",
+      }
+    : {
+        matchCol: "secondary_match_id",
+        startedCol: "secondary_match_started_at",
+      };
+}
 
 export type SelectableMatch = {
   id: string;
@@ -226,39 +242,75 @@ async function loadMatchForFlow(
 }
 
 /**
- * Plan 42 — startMatch.
+ * Plan 42.1 — find the current active score_bug overlay_events row whose
+ * payload.slot matches the given slot. Single query via listActiveOverlays
+ * to keep the scan narrow (we only care about the score_bug template).
+ */
+async function findScoreBugForSlot(
+  sb: SupabaseClient,
+  sessionId: string,
+  slot: MatchSlot,
+): Promise<{ id: string; payload: Record<string, unknown> } | null> {
+  const active = await listActiveOverlays(sb, sessionId);
+  const match = active.find(
+    (a) =>
+      a.template_key === SCORE_BUG_KEY &&
+      (a.payload as { slot?: string } | null)?.slot === slot,
+  );
+  if (!match) return null;
+  return { id: match.id, payload: match.payload };
+}
+
+/**
+ * Plan 42 / 42.1 — startMatch.
  *
- * Idempotent if the supplied match is already the session's current match:
- * re-runs re-publish a fresh score_bug payload but do not write a new
- * match_results row or double-flip the match status.
+ * Pins `matchId` onto `stream_sessions.<slot>_match_id`, flips the match
+ * `scheduled → in_progress`, spawns a score_bug overlay auto-filled from
+ * the two players (tagged with `slot` for per-slot subscription filtering),
+ * initializes a stopped match_clock (shared across both slots), and
+ * broadcasts `match.started` carrying the slot.
  *
- * Rejects when the session already has a DIFFERENT current_match_id —
- * callers must endMatch first. Perm: broadcast.match_control.
+ * Idempotent when the supplied match is already the slot's current match.
+ * Rejects when the slot already holds a DIFFERENT match id — callers must
+ * endMatch that slot first. The OTHER slot is untouched.
+ *
+ * Perm: broadcast.match_control.
  */
 export async function startMatch(
   sb: SupabaseClient,
   sessionId: string,
   matchId: string,
+  slot: MatchSlot,
   actor: Actor,
-): Promise<{ matchId: string; startedAt: string }> {
+): Promise<{ matchId: string; slot: MatchSlot; startedAt: string }> {
   await requirePermAsync(sb, actor, PERM_MATCH_CONTROL);
+  const { matchCol, startedCol } = slotColumns(slot);
 
   // 1. Session + match must exist.
   const { data: sessRaw } = await sb
     .from("stream_sessions")
-    .select("id, current_match_id, ended_at")
+    .select(
+      "id, primary_match_id, secondary_match_id, ended_at",
+    )
     .eq("id", sessionId)
     .is("deleted_at", null)
     .maybeSingle();
   const sess = sessRaw as
-    | { id: string; current_match_id: string | null; ended_at: string | null }
+    | {
+        id: string;
+        primary_match_id: string | null;
+        secondary_match_id: string | null;
+        ended_at: string | null;
+      }
     | null;
   if (!sess) throw new Error(`session not found: ${sessionId}`);
   if (sess.ended_at) throw new Error(`session already ended: ${sessionId}`);
 
-  if (sess.current_match_id && sess.current_match_id !== matchId) {
+  const existingForSlot =
+    slot === "primary" ? sess.primary_match_id : sess.secondary_match_id;
+  if (existingForSlot && existingForSlot !== matchId) {
     throw new Error(
-      `session already has active match ${sess.current_match_id}; endMatch first`,
+      `${slot} slot already has active match ${existingForSlot}; endMatch first`,
     );
   }
 
@@ -267,17 +319,18 @@ export async function startMatch(
 
   const startedAt = new Date().toISOString();
 
-  // 2. Pin the match on the session.
+  // 2. Pin the match on the given slot.
   {
+    const update: Record<string, unknown> = {
+      [matchCol]: matchId,
+      [startedCol]: startedAt,
+      updated_at: startedAt,
+    };
     const { error } = await sb
       .from("stream_sessions")
-      .update({
-        current_match_id: matchId,
-        match_started_at: startedAt,
-        updated_at: startedAt,
-      })
+      .update(update)
       .eq("id", sessionId);
-    if (error) throw new Error(`pin current_match failed: ${error.message}`);
+    if (error) throw new Error(`pin ${slot}_match failed: ${error.message}`);
   }
 
   // 3. Flip match status → in_progress if it was scheduled.
@@ -290,12 +343,14 @@ export async function startMatch(
     if (error) throw new Error(`match status flip failed: ${error.message}`);
   }
 
-  // 4. Spawn / replace score_bug overlay pre-filled from the match.
-  const scoreBugPayload = buildScoreBugFromMatch(toMatchLite(match));
-  if (scoreBugPayload) {
-    // Clear any existing live score_bug first so the new event is the single
-    // active row. `triggerOverlay` always inserts a new event row.
-    const existing = await getActiveForTemplate(sb, sessionId, SCORE_BUG_KEY);
+  // 4. Spawn / replace score_bug overlay FOR THIS SLOT. Clear any existing
+  //    slot-tagged row first so the new event is the single active row per
+  //    slot; the other slot's score_bug is untouched.
+  const scoreBugBase = buildScoreBugFromMatch(toMatchLite(match));
+  let scoreBugPayload: Record<string, unknown> | null = null;
+  if (scoreBugBase) {
+    scoreBugPayload = { ...scoreBugBase, slot };
+    const existing = await findScoreBugForSlot(sb, sessionId, slot);
     if (existing) {
       const { error } = await sb
         .from("overlay_events")
@@ -314,22 +369,30 @@ export async function startMatch(
     });
   }
 
-  // 5. Initialize the match_clock at 0 / stopped.
-  await resetClock(sb, sessionId, actor.userId ?? "");
+  // 5. Initialize the match_clock at 0 / stopped. The clock is shared
+  //    across both slots per Plan 42.1 spec — only reset on first start
+  //    to avoid stomping on an already-running clock for the other slot.
+  const existingClock = await getClock(sb, sessionId);
+  if (!existingClock) {
+    await resetClock(sb, sessionId, actor.userId ?? "");
+  }
 
   // 6. Broadcast `match.started`.
   try {
     await publish(sb, sessionId, REALTIME.eventMatchStarted, {
       matchId,
+      slot,
       startedAt,
-      home: scoreBugPayload?.players[0] ?? null,
-      away: scoreBugPayload?.players[1] ?? null,
+      home:
+        (scoreBugPayload?.players as Array<unknown> | undefined)?.[0] ?? null,
+      away:
+        (scoreBugPayload?.players as Array<unknown> | undefined)?.[1] ?? null,
     });
   } catch {
     // swallow — durable rows already written.
   }
 
-  return { matchId, startedAt };
+  return { matchId, slot, startedAt };
 }
 
 export type ScoreDelta = {
@@ -339,39 +402,52 @@ export type ScoreDelta = {
 };
 
 /**
- * Plan 42 — updateScoreBug.
+ * Plan 42 / 42.1 — updateScoreBug.
  *
- * Reads the active score_bug overlay_events row, applies a ±1 delta per
- * side (clamped ≥0) OR a full reset to 0-0, and re-triggers the overlay so
- * subscribers receive the new payload via `overlay.triggered`. Also emits
- * a `score.changed` event for dedicated consumers (match-card UIs etc).
+ * Reads the active score_bug overlay_events row tagged with the given slot,
+ * applies a ±1 delta per side (clamped 0..99) OR a full reset, and re-
+ * triggers the overlay (preserving the `slot` field) so per-slot
+ * subscribers receive the update via `overlay.triggered`. Also emits
+ * `score.changed` carrying the slot.
  */
 export async function updateScoreBug(
   sb: SupabaseClient,
   sessionId: string,
+  slot: MatchSlot,
   delta: ScoreDelta,
   actor: Actor,
-): Promise<{ home: number; away: number }> {
+): Promise<{ home: number; away: number; slot: MatchSlot }> {
   await requirePermAsync(sb, actor, PERM_MATCH_CONTROL);
 
   const { data: sessRaw } = await sb
     .from("stream_sessions")
-    .select("id, current_match_id, ended_at")
+    .select(
+      "id, primary_match_id, secondary_match_id, ended_at",
+    )
     .eq("id", sessionId)
     .is("deleted_at", null)
     .maybeSingle();
   const sess = sessRaw as
-    | { id: string; current_match_id: string | null; ended_at: string | null }
+    | {
+        id: string;
+        primary_match_id: string | null;
+        secondary_match_id: string | null;
+        ended_at: string | null;
+      }
     | null;
   if (!sess) throw new Error(`session not found: ${sessionId}`);
   if (sess.ended_at) throw new Error(`session already ended: ${sessionId}`);
-  if (!sess.current_match_id) {
-    throw new Error(`no current_match for session ${sessionId}`);
+  const slotMatchId =
+    slot === "primary" ? sess.primary_match_id : sess.secondary_match_id;
+  if (!slotMatchId) {
+    throw new Error(`no current_match for ${slot} slot on session ${sessionId}`);
   }
 
-  const existing = await getActiveForTemplate(sb, sessionId, SCORE_BUG_KEY);
+  const existing = await findScoreBugForSlot(sb, sessionId, slot);
   if (!existing) {
-    throw new Error(`no active score_bug to update for session ${sessionId}`);
+    throw new Error(
+      `no active score_bug for ${slot} slot on session ${sessionId}`,
+    );
   }
 
   const payload = existing.payload as {
@@ -381,6 +457,7 @@ export async function updateScoreBug(
       score: number;
     }>;
     matchId?: string;
+    slot?: string;
   };
 
   if (!Array.isArray(payload.players) || payload.players.length !== 2) {
@@ -408,11 +485,12 @@ export async function updateScoreBug(
       { ...home, score: homeScore },
       { ...away, score: awayScore },
     ],
-    matchId: payload.matchId ?? sess.current_match_id,
+    matchId: payload.matchId ?? slotMatchId,
+    slot,
   };
 
-  // Clear old event + trigger new one so the single-active overlay contract
-  // stays intact. triggerOverlay validates + inserts + publishes
+  // Clear old event + trigger new one so the single-active-per-slot
+  // contract stays intact. triggerOverlay validates + inserts + publishes
   // overlay.triggered.
   {
     const now = new Date().toISOString();
@@ -434,7 +512,8 @@ export async function updateScoreBug(
   // consumers. Overlay pages already received overlay.triggered above.
   try {
     await publish(sb, sessionId, REALTIME.eventScoreChanged, {
-      matchId: sess.current_match_id,
+      matchId: slotMatchId,
+      slot,
       homeScore,
       awayScore,
     });
@@ -442,7 +521,7 @@ export async function updateScoreBug(
     // swallow
   }
 
-  return { home: homeScore, away: awayScore };
+  return { home: homeScore, away: awayScore, slot };
 }
 
 export type FinalScores = {
@@ -452,20 +531,22 @@ export type FinalScores = {
 };
 
 /**
- * Plan 42 — endMatch.
+ * Plan 42 / 42.1 — endMatch.
  *
- * Writes the final `match_results` row (result_type='normal'), flips the
- * match to `completed`, clears `current_match_id` on the session, resets
- * the match_clock, and broadcasts `match.ended`. When a result already
- * exists it is updated in place instead of inserted (idempotent re-ends
- * after admin correction). Perm: broadcast.match_control.
+ * Writes the final `match_results` row for the slot's current match
+ * (result_type='normal'), flips that match to `completed`, clears ONLY the
+ * named slot's `*_match_id` on the session, resets score_bug for the
+ * slot, and broadcasts `match.ended`. The OTHER slot is untouched. When
+ * both slots are cleared the clock is stopped; when the OTHER slot is
+ * still active the clock keeps running.
  */
 export async function endMatch(
   sb: SupabaseClient,
   sessionId: string,
+  slot: MatchSlot,
   finalScores: FinalScores,
   actor: Actor,
-): Promise<{ matchId: string; endedAt: string }> {
+): Promise<{ matchId: string; slot: MatchSlot; endedAt: string }> {
   await requirePermAsync(sb, actor, PERM_MATCH_CONTROL);
 
   if (!Number.isInteger(finalScores.homeScore) || finalScores.homeScore < 0) {
@@ -475,24 +556,34 @@ export async function endMatch(
     throw new Error("awayScore must be a non-negative integer");
   }
 
+  const { matchCol, startedCol } = slotColumns(slot);
+
   const { data: sessRaw } = await sb
     .from("stream_sessions")
-    .select("id, current_match_id")
+    .select(
+      "id, primary_match_id, secondary_match_id",
+    )
     .eq("id", sessionId)
     .is("deleted_at", null)
     .maybeSingle();
   const sess = sessRaw as
-    | { id: string; current_match_id: string | null }
+    | {
+        id: string;
+        primary_match_id: string | null;
+        secondary_match_id: string | null;
+      }
     | null;
   if (!sess) throw new Error(`session not found: ${sessionId}`);
-  if (!sess.current_match_id) {
-    throw new Error(`no current_match on session ${sessionId}`);
+  const slotMatchId =
+    slot === "primary" ? sess.primary_match_id : sess.secondary_match_id;
+  if (!slotMatchId) {
+    throw new Error(`no current_match for ${slot} slot on session ${sessionId}`);
   }
-  const matchId = sess.current_match_id;
+  const matchId = slotMatchId;
   const endedAt = new Date().toISOString();
 
-  // 1. Upsert match_results. There is a unique constraint on match_id so we
-  //    check first and either update or insert.
+  // 1. Upsert match_results. Unique constraint on match_id → check then
+  //    update / insert.
   const { data: existingResult } = await sb
     .from("match_results")
     .select("id")
@@ -535,18 +626,22 @@ export async function endMatch(
     if (error) throw new Error(`match completed flip failed: ${error.message}`);
   }
 
-  // 3. Clear current_match on the session.
+  // 3. Clear the NAMED slot only.
   {
+    const update: Record<string, unknown> = {
+      [matchCol]: null,
+      [startedCol]: null,
+      updated_at: endedAt,
+    };
     const { error } = await sb
       .from("stream_sessions")
-      .update({ current_match_id: null, updated_at: endedAt })
+      .update(update)
       .eq("id", sessionId);
-    if (error) throw new Error(`clear current_match failed: ${error.message}`);
+    if (error) throw new Error(`clear ${slot}_match failed: ${error.message}`);
   }
 
-  // 4. Clear any active score_bug overlay event — the ladder / standings
-  //    recompute is handled by the match_results trigger.
-  const existingBug = await getActiveForTemplate(sb, sessionId, SCORE_BUG_KEY);
+  // 4. Clear the slot-tagged score_bug (leave the other slot intact).
+  const existingBug = await findScoreBugForSlot(sb, sessionId, slot);
   if (existingBug) {
     const { error } = await sb
       .from("overlay_events")
@@ -556,24 +651,30 @@ export async function endMatch(
     if (error) throw new Error(`clear score_bug failed: ${error.message}`);
   }
 
-  // 5. Stop the clock.
-  try {
-    // Only reset if a clock exists; keep best-effort.
-    if (await getClock(sb, sessionId)) {
-      await setClock(sb, sessionId, {
-        mode: "stopped",
-        secondsRemaining: 0,
-        userId: actor.userId ?? "",
-      });
+  // 5. Stop the clock ONLY when both slots are now empty.
+  const otherSlotStillActive =
+    slot === "primary"
+      ? !!sess.secondary_match_id
+      : !!sess.primary_match_id;
+  if (!otherSlotStillActive) {
+    try {
+      if (await getClock(sb, sessionId)) {
+        await setClock(sb, sessionId, {
+          mode: "stopped",
+          secondsRemaining: 0,
+          userId: actor.userId ?? "",
+        });
+      }
+    } catch {
+      // swallow — durable writes above already committed.
     }
-  } catch {
-    // swallow — durable writes above already committed.
   }
 
   // 6. Broadcast `match.ended`.
   try {
     await publish(sb, sessionId, REALTIME.eventMatchEnded, {
       matchId,
+      slot,
       endedAt,
       result: {
         homeScore: finalScores.homeScore,
@@ -584,7 +685,7 @@ export async function endMatch(
     // swallow
   }
 
-  return { matchId, endedAt };
+  return { matchId, slot, endedAt };
 }
 
 // Typed error re-export so callers don't need a second perms-db import.

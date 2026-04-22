@@ -32,9 +32,17 @@ type ActiveResponse = {
   triggered_at: string;
 } | null;
 
+/**
+ * Plan 42.1 — optional `slotFilter` lets overlay pages opt into slot
+ * routing. When a slot is provided, the hook only accepts payloads whose
+ * `slot` field matches (payloads without a `slot` default to 'primary').
+ * Hydration picks the first matching active row from the list endpoint
+ * (the single-active endpoint doesn't discriminate by slot).
+ */
 export function useOverlayChannel(
   sessionId: string | null,
   templateKey: TemplateKey,
+  slotFilter?: "primary" | "secondary",
 ): OverlayState {
   const [state, setState] = useState<OverlayState>({
     eventId: null,
@@ -48,17 +56,27 @@ export function useOverlayChannel(
 
     let cancelled = false;
 
-    // 1. Hydrate from the REST endpoint.
-    fetch(
-      `/api/broadcast/sessions/${encodeURIComponent(
-        sessionId,
-      )}/active?template_key=${encodeURIComponent(templateKey)}`,
-      { cache: "no-store" },
-    )
+    // Helper: does an incoming payload match our slot filter?
+    const slotMatches = (p: Record<string, unknown> | null | undefined) => {
+      if (!slotFilter) return true;
+      const s = (p as { slot?: string } | null | undefined)?.slot ?? "primary";
+      return s === slotFilter;
+    };
+
+    // 1. Hydrate from the REST endpoint. When slot filtering is active,
+    //    forward `?slot=` so the server-side helper picks the slot-tagged
+    //    row (or a slot-less row when slot===primary, for Plan 42 back-
+    //    compat).
+    const baseUrl = `/api/broadcast/sessions/${encodeURIComponent(
+      sessionId,
+    )}/active?template_key=${encodeURIComponent(templateKey)}`;
+    const activeUrl = slotFilter ? `${baseUrl}&slot=${slotFilter}` : baseUrl;
+
+    fetch(activeUrl, { cache: "no-store" })
       .then((r) => r.json() as Promise<ActiveResponse>)
       .then((active) => {
         if (cancelled) return;
-        if (active && active.payload) {
+        if (active && active.payload && slotMatches(active.payload)) {
           setState((s) => ({
             ...s,
             eventId: active.id,
@@ -84,6 +102,7 @@ export function useOverlayChannel(
         (msg: { payload: { eventId: string; templateKey: string; payload: Record<string, unknown> } }) => {
           const p = msg.payload;
           if (!p || p.templateKey !== templateKey) return;
+          if (!slotMatches(p.payload)) return;
           setState({
             eventId: p.eventId,
             payload: p.payload,
@@ -134,7 +153,7 @@ export function useOverlayChannel(
       cancelled = true;
       sb.removeChannel(channel);
     };
-  }, [sessionId, templateKey]);
+  }, [sessionId, templateKey, slotFilter]);
 
   return state;
 }
