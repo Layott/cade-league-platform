@@ -42,3 +42,13 @@ export {
 } from "./week";
 export * from "./schemas";
 export { ConflictError, ValidationError, PermissionError } from "./errors";
+// Plan 23 — FCDB review enrichment for /admin/squads/[id].
+export {
+  reviewSquadAgainstFCDB,
+  acceptFcdbCandidate,
+} from "./fcdb_review";
+export type {
+  SquadItemReview,
+  SquadItemReviewStatus,
+  SquadFcdbReviewSummary,
+} from "./fcdb_review";
