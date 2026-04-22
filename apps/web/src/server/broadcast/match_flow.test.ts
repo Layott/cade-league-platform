@@ -42,7 +42,13 @@ vi.mock("@/server/overlays/match_clock", () => ({
   getClock: vi.fn().mockResolvedValue({ stream_session_id: "s" }),
 }));
 
-import { startMatch, updateScoreBug, endMatch, listSelectableMatches } from "./match_flow";
+import {
+  startMatch,
+  updateScoreBug,
+  endMatch,
+  listSelectableMatches,
+  clearScoreBug,
+} from "./match_flow";
 import { PermissionError } from "@/lib/perms-db";
 
 // -- tiny query-builder stub ------------------------------------------------
@@ -723,5 +729,125 @@ describe("listSelectableMatches", () => {
       scope: "today",
     });
     expect(out).toEqual([]);
+  });
+});
+
+// =========================================================================
+// Plan 45 — clearScoreBug (trigger-OFF button)
+// =========================================================================
+
+describe("clearScoreBug", () => {
+  it("perm-gated on broadcast.match_control", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new PermissionError("missing permission: broadcast.match_control"),
+    );
+    await expect(
+      clearScoreBug(mkSb({}) as never, SESSION_ID, "primary", actorAdmin),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it("no-ops when no active score_bug exists for the slot", async () => {
+    listActiveOverlaysMock.mockResolvedValueOnce([]);
+    const sb = mkSb({
+      overlay_events: makeQuery({ data: null, error: null }),
+    });
+    const out = await clearScoreBug(
+      sb as never,
+      SESSION_ID,
+      "primary",
+      actorAdmin,
+    );
+    expect(out).toEqual({ slot: "primary", cleared: false });
+  });
+
+  it("clears the slot-tagged score_bug + publishes overlay.cleared", async () => {
+    listActiveOverlaysMock.mockResolvedValueOnce([
+      {
+        id: "ev-primary",
+        stream_session_id: SESSION_ID,
+        template_id: "tpl",
+        template_key: "score_bug",
+        payload: {
+          players: [
+            { displayName: "H", score: 2 },
+            { displayName: "A", score: 1 },
+          ],
+          slot: "primary",
+        },
+        triggered_at: "2026-04-22T00:00:00Z",
+        cleared_at: null,
+      },
+    ]);
+    const sb = mkSb({
+      overlay_events: makeQuery({ data: null, error: null }),
+    });
+    const out = await clearScoreBug(
+      sb as never,
+      SESSION_ID,
+      "primary",
+      actorAdmin,
+    );
+    expect(out).toEqual({ slot: "primary", cleared: true });
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.anything(),
+      SESSION_ID,
+      "overlay.cleared",
+      expect.objectContaining({
+        eventId: "ev-primary",
+        templateKey: "score_bug",
+        slot: "primary",
+      }),
+    );
+  });
+
+  it("only clears the named slot when both slots are live", async () => {
+    listActiveOverlaysMock.mockResolvedValueOnce([
+      {
+        id: "ev-primary",
+        stream_session_id: SESSION_ID,
+        template_id: "tpl",
+        template_key: "score_bug",
+        payload: {
+          players: [
+            { displayName: "P1-H", score: 1 },
+            { displayName: "P1-A", score: 0 },
+          ],
+          slot: "primary",
+        },
+        triggered_at: "2026-04-22T00:00:00Z",
+        cleared_at: null,
+      },
+      {
+        id: "ev-secondary",
+        stream_session_id: SESSION_ID,
+        template_id: "tpl",
+        template_key: "score_bug",
+        payload: {
+          players: [
+            { displayName: "P2-H", score: 2 },
+            { displayName: "P2-A", score: 1 },
+          ],
+          slot: "secondary",
+        },
+        triggered_at: "2026-04-22T00:00:00Z",
+        cleared_at: null,
+      },
+    ]);
+    const sb = mkSb({
+      overlay_events: makeQuery({ data: null, error: null }),
+    });
+    const out = await clearScoreBug(
+      sb as never,
+      SESSION_ID,
+      "secondary",
+      actorAdmin,
+    );
+    expect(out).toEqual({ slot: "secondary", cleared: true });
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.anything(),
+      SESSION_ID,
+      "overlay.cleared",
+      expect.objectContaining({ eventId: "ev-secondary" }),
+    );
   });
 });

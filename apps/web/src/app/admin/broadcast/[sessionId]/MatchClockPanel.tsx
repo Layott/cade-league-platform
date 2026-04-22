@@ -3,24 +3,25 @@ import {
   SecondaryButton,
   DangerButton,
 } from "@/components/admin/buttons";
-import { inputClass } from "@/components/admin/FormField";
 import { formatWat } from "@/lib/time";
 import type { ClockState } from "@/server/overlays/match_clock";
 import {
-  setClockAction,
   startClockAction,
   pauseClockAction,
   resumeClockAction,
   adjustClockAction,
   resetClockAction,
 } from "../actions";
+import { StructuredMatchClockForm } from "./forms/StructuredMatchClockForm";
 
 /**
- * Plan 37 — match-clock control panel.
+ * Plan 37 / Plan 45 — match-clock control panel.
  *
- * Single row of controls bound to the per-session match_clock row.
- * Live state shown as a static snapshot (server-rendered); the overlay
- * tab uses `useMatchClock` for the realtime tick.
+ * Single row of controls bound to the per-session match_clock row. Plan 45
+ * swapped the raw `secondsRemaining` number input for minutes + seconds
+ * fields via `<StructuredMatchClockForm>`. Live state shown as a static
+ * snapshot (server-rendered); the overlay tab uses `useMatchClock` for the
+ * realtime tick.
  */
 
 export function MatchClockPanel({
@@ -62,52 +63,12 @@ export function MatchClockPanel({
         </div>
       </div>
 
-      {/* Set clock form */}
-      <form
-        action={setClockAction}
-        className="grid gap-2 md:grid-cols-[1fr_120px_140px_auto]"
-        data-testid="set-clock-form"
-      >
-        <input type="hidden" name="sessionId" value={sessionId} />
-        <input
-          type="text"
-          name="label"
-          placeholder="Label (e.g. WARMUP)"
-          maxLength={40}
-          defaultValue={clock?.label ?? ""}
-          className={inputClass}
-          data-testid="clock-label"
-        />
-        <input
-          type="number"
-          name="secondsRemaining"
-          min={0}
-          max={359999}
-          placeholder="Seconds"
-          defaultValue={seconds}
-          className={inputClass}
-          data-testid="clock-seconds"
-        />
-        <select
-          name="mode"
-          defaultValue={clock?.mode ?? "countdown"}
-          className={inputClass + " appearance-none"}
-          data-testid="clock-mode"
-        >
-          <option value="countdown">Countdown</option>
-          <option value="countup">Countup</option>
-          <option value="paused">Paused</option>
-          <option value="stopped">Stopped</option>
-        </select>
-        <PrimaryButton
-          type="submit"
-          size="sm"
-          disabled={!isLive}
-          data-testid="clock-set-btn"
-        >
-          Set
-        </PrimaryButton>
-      </form>
+      {/* Plan 45 — structured set-clock form (minutes + seconds + label). */}
+      <StructuredMatchClockForm
+        sessionId={sessionId}
+        isLive={isLive}
+        clock={clock}
+      />
 
       {/* Control buttons row */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -150,7 +111,7 @@ export function MatchClockPanel({
             type="submit"
             size="sm"
             disabled={!isLive}
-            data-testid="clock-reset"
+            data-testid="clock-reset-controls"
           >
             Reset
           </DangerButton>

@@ -524,6 +524,47 @@ export async function updateScoreBug(
   return { home: homeScore, away: awayScore, slot };
 }
 
+/**
+ * Plan 45 — clearScoreBug.
+ *
+ * Clears the active score_bug overlay for the given slot WITHOUT touching the
+ * underlying match row. Used by the "Trigger OFF" button on the structured
+ * score_bug form when the producer wants to take the bug off-stream without
+ * ending the match. Idempotent — if no active bug exists for the slot it
+ * resolves silently. Broadcasts `instance.cleared` so overlay pages animate
+ * out.
+ */
+export async function clearScoreBug(
+  sb: SupabaseClient,
+  sessionId: string,
+  slot: MatchSlot,
+  actor: Actor,
+): Promise<{ slot: MatchSlot; cleared: boolean }> {
+  await requirePermAsync(sb, actor, PERM_MATCH_CONTROL);
+
+  const existing = await findScoreBugForSlot(sb, sessionId, slot);
+  if (!existing) return { slot, cleared: false };
+
+  const now = new Date().toISOString();
+  const { error } = await sb
+    .from("overlay_events")
+    .update({ cleared_at: now })
+    .eq("id", existing.id)
+    .is("cleared_at", null);
+  if (error) throw new Error(`clearScoreBug failed: ${error.message}`);
+
+  try {
+    await publish(sb, sessionId, REALTIME.eventCleared, {
+      eventId: existing.id,
+      templateKey: SCORE_BUG_KEY,
+      slot,
+    });
+  } catch {
+    // swallow
+  }
+  return { slot, cleared: true };
+}
+
 export type FinalScores = {
   homeScore: number;
   awayScore: number;

@@ -191,12 +191,13 @@ test("Plan 37 — preset CRUD + multi-instance lower-third + live clock", async 
   await expect(overlayPage.getByTestId("lower-third-slot-1")).toBeVisible();
 
   // 6. Match-clock: set countdown 5:00 → start.
+  // Plan 45 — minutes + seconds inputs replaced the raw seconds field.
   const clockPanel = page.getByTestId("match-clock-panel");
   await expect(clockPanel).toBeVisible();
   await clockPanel.getByTestId("clock-label").fill("WARMUP");
-  await clockPanel.getByTestId("clock-seconds").fill("300");
-  await clockPanel.getByTestId("clock-mode").selectOption("countdown");
-  await clockPanel.getByTestId("clock-set-btn").click();
+  await clockPanel.getByTestId("clock-minutes").fill("5");
+  await clockPanel.getByTestId("clock-seconds").fill("0");
+  await clockPanel.getByTestId("clock-set").click();
   await page.waitForLoadState("networkidle");
   await clockPanel.getByTestId("clock-start").click();
 

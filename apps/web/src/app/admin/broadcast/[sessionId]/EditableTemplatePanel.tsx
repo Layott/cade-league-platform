@@ -13,6 +13,8 @@ import {
 } from "@/server/overlays/registry";
 import type { Preset } from "@/server/overlays/presets";
 import type { ActiveInstance } from "@/server/overlays/instances";
+import type { SelectableMatch } from "@/server/broadcast/match_flow";
+import type { UnplayedMatch } from "@/server/matches/unplayed";
 import {
   triggerOverlayAction,
   triggerInstanceAction,
@@ -23,18 +25,21 @@ import {
   loadPresetAction,
 } from "../actions";
 import { STARTER_PAYLOADS } from "./starter-payloads";
+import { StructuredScoreBugForm } from "./forms/StructuredScoreBugForm";
+import { StructuredUpNextForm } from "./forms/StructuredUpNextForm";
+import { StructuredStartingSoonForm } from "./forms/StructuredStartingSoonForm";
+import { StructuredBrbForm } from "./forms/StructuredBrbForm";
+import { StructuredFeaturedCommentForm } from "./forms/StructuredFeaturedCommentForm";
 
 /**
- * Plan 37 — rich panel for editable templates. Three columns:
+ * Plan 37 / Plan 45 — rich panel for editable templates.
  *
- *   1. Presets list (left)        — load / delete preset
- *   2. Edit + trigger form (mid)  — slot picker + payload textarea + save
- *   3. Active instances (right)   — per-slot live rows + clear
- *
- * For non-multi-instance templates the slot picker is hidden and the
- * "Trigger" button calls `triggerOverlayAction` instead of
- * `triggerInstanceAction`. The "Active" column shows the single live row
- * via the legacy events feed (passed in via `activeSingle`).
+ * Plan 37 originals: presets list + JSON textarea + active instances.
+ * Plan 45: for a fixed set of templateKeys the JSON textarea is REPLACED
+ * with a dedicated structured form. The presets list + Save-preset slots
+ * stay available below via the generic JSON form (so existing presets can
+ * still be loaded). Falls back to generic JSON textarea for every other
+ * template.
  */
 
 export type EditableTemplatePanelProps = {
@@ -51,18 +56,38 @@ export type EditableTemplatePanelProps = {
     triggered_at: string;
   } | null;
   multiInstance: boolean;
+  /** Plan 45 — extra context for the structured forms. */
+  selectable?: SelectableMatch[];
+  unplayed?: UnplayedMatch[];
 };
 
-export function EditableTemplatePanel({
-  sessionId,
-  templateKey,
-  isLive,
-  presets,
-  activeInstances,
-  activeSingle,
-  multiInstance,
-}: EditableTemplatePanelProps) {
-  const tpl = TEMPLATE_REGISTRY[templateKey];
+/**
+ * Templates that render a structured form INSTEAD of the JSON textarea.
+ * Keep in sync with the form files under ./forms/. (match_clock has its
+ * own standalone MatchClockPanel above this list — not an overlay template
+ * so not handled here.)
+ */
+const STRUCTURED_KEYS = new Set<string>([
+  "score_bug",
+  "up_next_bug",
+  "starting_soon_timer",
+  "layout_brb_full",
+  "featured_comment",
+]);
+
+export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
+  const {
+    sessionId,
+    templateKey,
+    isLive,
+    presets,
+    activeInstances,
+    activeSingle,
+    multiInstance,
+    selectable,
+    unplayed,
+  } = props;
+  const tpl = TEMPLATE_REGISTRY[templateKey as TemplateKey] ?? null;
   const starter = STARTER_PAYLOADS[templateKey] ?? {};
   const label = templateKey
     .split("_")
@@ -70,6 +95,7 @@ export function EditableTemplatePanel({
     .join(" ");
   const slots = multiInstance ? [1, 2, 3] : null;
   const slotLabels = ["bottom", "mid", "top"];
+  const isStructured = STRUCTURED_KEYS.has(templateKey);
 
   return (
     <div
@@ -82,18 +108,60 @@ export function EditableTemplatePanel({
             {label}
           </div>
           <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-            {tpl.route}
+            {tpl ? tpl.route : "match_clock (no route)"}
           </div>
         </div>
-        <Link
-          href={`${getTemplateRoute(templateKey)}?session=${sessionId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
-        >
-          Preview ↗
-        </Link>
+        {tpl ? (
+          <Link
+            href={`${getTemplateRoute(templateKey as TemplateKey)}?session=${sessionId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
+          >
+            Preview ↗
+          </Link>
+        ) : null}
       </div>
+
+      {/* Structured form path — renders a dedicated component for the
+          templateKey. Presets + save-preset still available below. */}
+      {isStructured ? (
+        <div
+          className="mb-4 space-y-3"
+          data-testid={`structured-form-${templateKey}`}
+        >
+          {templateKey === "score_bug" ? (
+            <StructuredScoreBugForm
+              sessionId={sessionId}
+              isLive={isLive}
+              selectable={selectable ?? []}
+              activeSingle={activeSingle ?? null}
+            />
+          ) : null}
+          {templateKey === "up_next_bug" ? (
+            <StructuredUpNextForm
+              sessionId={sessionId}
+              isLive={isLive}
+              unplayed={unplayed ?? []}
+            />
+          ) : null}
+          {templateKey === "starting_soon_timer" ? (
+            <StructuredStartingSoonForm
+              sessionId={sessionId}
+              isLive={isLive}
+            />
+          ) : null}
+          {templateKey === "layout_brb_full" ? (
+            <StructuredBrbForm sessionId={sessionId} isLive={isLive} />
+          ) : null}
+          {templateKey === "featured_comment" ? (
+            <StructuredFeaturedCommentForm
+              sessionId={sessionId}
+              isLive={isLive}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* Presets list */}
@@ -171,55 +239,61 @@ export function EditableTemplatePanel({
           </ul>
         </div>
 
-        {/* Edit + Trigger form */}
-        <form
-          action={multiInstance ? triggerInstanceAction : triggerOverlayAction}
-          className="space-y-2"
-          data-testid={`trigger-form-${templateKey}`}
-        >
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-            Edit & trigger
-          </h3>
-          <input type="hidden" name="sessionId" value={sessionId} />
-          <input type="hidden" name="templateKey" value={templateKey} />
-
-          {slots ? (
-            <div className="flex items-center gap-3 text-[11px]">
-              {slots.map((slot, i) => (
-                <label key={slot} className="flex items-center gap-1">
-                  <input
-                    type="radio"
-                    name="instanceSlot"
-                    value={slot}
-                    defaultChecked={i === 0}
-                    data-testid={`slot-radio-${templateKey}-${slot}`}
-                  />
-                  <span className="text-[var(--chalk-2)]">
-                    {slot} · {slotLabels[i]}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ) : null}
-
-          <textarea
-            name="payload"
-            rows={6}
-            defaultValue={JSON.stringify(starter, null, 2)}
-            data-testid={`trigger-payload-${templateKey}`}
-            className={textareaClass}
-          />
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <PrimaryButton
-              type="submit"
-              size="sm"
-              disabled={!isLive}
-              data-testid={`trigger-btn-${templateKey}`}
-            >
-              {multiInstance ? "Trigger to slot" : "Trigger"}
-            </PrimaryButton>
+        {/* Edit + Trigger form — hidden for structured templates. */}
+        {isStructured ? (
+          <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)] md:col-span-1">
+            Structured form above replaces the raw JSON editor.
           </div>
-        </form>
+        ) : (
+          <form
+            action={multiInstance ? triggerInstanceAction : triggerOverlayAction}
+            className="space-y-2"
+            data-testid={`trigger-form-${templateKey}`}
+          >
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+              Edit & trigger
+            </h3>
+            <input type="hidden" name="sessionId" value={sessionId} />
+            <input type="hidden" name="templateKey" value={templateKey} />
+
+            {slots ? (
+              <div className="flex items-center gap-3 text-[11px]">
+                {slots.map((slot, i) => (
+                  <label key={slot} className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      name="instanceSlot"
+                      value={slot}
+                      defaultChecked={i === 0}
+                      data-testid={`slot-radio-${templateKey}-${slot}`}
+                    />
+                    <span className="text-[var(--chalk-2)]">
+                      {slot} · {slotLabels[i]}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            <textarea
+              name="payload"
+              rows={6}
+              defaultValue={JSON.stringify(starter, null, 2)}
+              data-testid={`trigger-payload-${templateKey}`}
+              className={textareaClass}
+            />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <PrimaryButton
+                type="submit"
+                size="sm"
+                disabled={!isLive}
+                data-testid={`trigger-btn-${templateKey}`}
+              >
+                {multiInstance ? "Trigger to slot" : "Trigger"}
+              </PrimaryButton>
+            </div>
+          </form>
+        )}
 
         {/* Save preset (separate small form) + Active list */}
         <div className="space-y-3">

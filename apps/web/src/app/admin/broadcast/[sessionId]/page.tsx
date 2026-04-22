@@ -26,6 +26,7 @@ import { listPresets } from "@/server/overlays/presets";
 import { listActiveInstances } from "@/server/overlays/instances";
 import { getClock } from "@/server/overlays/match_clock";
 import { listSelectableMatches } from "@/server/broadcast/match_flow";
+import { listUnplayedMatchesToday } from "@/server/matches/unplayed";
 import {
   triggerOverlayAction,
   clearOverlayAction,
@@ -63,12 +64,16 @@ type SessionRow = {
   youtube_bound_at: string | null;
 };
 
-/** Editable templates upgraded to the rich panel in Plan 37. The slot
+/** Editable templates upgraded to the rich panel in Plan 37, extended in
+ *  Plan 45 with structured forms for the most-used templates. The slot
  *  picker only appears when the template is also multi-instance. */
 const EDITABLE_TEMPLATES: ReadonlyArray<TemplateKey> = [
   "lower_third",
   "score_bug",
   "up_next_bug",
+  "starting_soon_timer",
+  "layout_brb_full",
+  "featured_comment",
 ];
 const MULTI_INSTANCE_TEMPLATES: ReadonlySet<TemplateKey> = new Set([
   "lower_third",
@@ -168,6 +173,7 @@ export default async function BroadcastSessionPage({
     selectableMatches,
     primaryScoreBug,
     secondaryScoreBug,
+    unplayedToday,
   ] = await Promise.all([
     listActiveOverlays(sb, session.id),
     listPresets(sb),
@@ -176,6 +182,7 @@ export default async function BroadcastSessionPage({
     listSelectableMatches(sb, session.id, { scope: "today" }),
     getActiveForTemplate(sb, session.id, "score_bug", "primary"),
     getActiveForTemplate(sb, session.id, "score_bug", "secondary"),
+    listUnplayedMatchesToday(sb, session.id),
   ]);
 
   const presetsByTemplate = new Map<string, typeof presetsAll>();
@@ -349,6 +356,8 @@ export default async function BroadcastSessionPage({
                     : null
               }
               multiInstance={MULTI_INSTANCE_TEMPLATES.has(key)}
+              selectable={selectableMatches}
+              unplayed={unplayedToday}
             />
           ))}
         </div>

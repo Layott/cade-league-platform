@@ -475,5 +475,12 @@ export const featuredCommentSchema = z.object({
   displaySeconds: z.coerce.number().int().min(3).max(30).default(10),
   soundSlot: soundSlotSchema,
   slot: matchSlotSchema,
+  /**
+   * Plan 45 — optional raw CSS injected inside the card wrapper scoped via a
+   * unique `data-fc-scope` attribute. Overlay page strips `</style>`,
+   * `<script>`, and `javascript:` URLs before injection. Max 4000 chars
+   * keeps the payload under the realtime-broadcast size budget.
+   */
+  cssOverrides: z.string().max(4000).optional(),
 });
 export type FeaturedCommentPayload = z.infer<typeof featuredCommentSchema>;

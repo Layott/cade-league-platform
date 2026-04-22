@@ -33,6 +33,7 @@ import {
   startMatch,
   endMatch,
   updateScoreBug,
+  clearScoreBug,
 } from "@/server/broadcast/match_flow";
 
 /**
@@ -393,6 +394,20 @@ export async function resetScoreBugAction(formData: FormData) {
     { reset: true },
     { userId: publicUserId, roles },
   );
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+/**
+ * Plan 45 — take the score_bug off-stream for a slot without ending the
+ * match. Gated on `broadcast.match_control` via `clearScoreBug`.
+ */
+export async function clearScoreBugAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  const slot = readSlot(formData);
+  const { publicUserId, roles } = await resolveAuthed();
+  const sb = getServiceRoleSupabase();
+  await clearScoreBug(sb, sessionId, slot, { userId: publicUserId, roles });
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 

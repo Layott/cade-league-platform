@@ -1,11 +1,57 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useId, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOverlayChannel } from "../../useOverlayChannel";
 import { featuredCommentSchema } from "@/server/overlays/schemas";
 import { ENTER, EXIT } from "@/lib/motion";
+
+/**
+ * Plan 45 — minimal CSS sanitizer for admin-authored overrides. Strips:
+ *   - `</style>` (breaks out of our injected tag)
+ *   - `<script>` tags (script injection)
+ *   - `javascript:` URL schemes (script injection via background-image etc)
+ *   - HTML-comment terminators that could break the style element
+ *
+ * The remaining content is echoed verbatim into a scoped <style> element.
+ * Accepting CSS from a trusted admin only — production-grade sanitisation
+ * would require a full parser (e.g. postcss).
+ */
+function sanitizeCssOverrides(raw: string): string {
+  return raw
+    .replace(/<\s*\/\s*style\s*>/gi, "")
+    .replace(/<\s*script[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, "")
+    .replace(/<\s*script[^>]*>/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/-->/g, "");
+}
+
+/**
+ * Scope every selector in a CSS block by prefixing with
+ * `[data-fc-scope="<id>"]`. Handles `@media` + `@supports` blocks by
+ * scoping inner rules, skips `@keyframes` + `@font-face`. Not a real CSS
+ * parser — enough for typical override snippets.
+ */
+function scopeCss(raw: string, scopeId: string): string {
+  const scope = `[data-fc-scope="${scopeId}"]`;
+  const cleaned = sanitizeCssOverrides(raw);
+  // Split on top-level `}` boundaries that follow a selector+`{`. This is
+  // intentionally simplistic; admin-authored snippets are expected to be
+  // small and well-formed.
+  return cleaned.replace(/([^{}]+)\{([^{}]*)\}/g, (_match, sel: string, body: string) => {
+    const trimmed = sel.trim();
+    if (!trimmed || trimmed.startsWith("@")) {
+      // Leave at-rules untouched (e.g. @keyframes, @font-face, @media).
+      return `${trimmed} { ${body} }`;
+    }
+    const scoped = trimmed
+      .split(",")
+      .map((s) => `${scope} ${s.trim()}`)
+      .join(", ");
+    return `${scoped} { ${body} }`;
+  });
+}
 
 /**
  * Plan 44 — Featured YouTube Chat Comment overlay.
@@ -40,6 +86,7 @@ function FeaturedCommentInner() {
   const slot: "primary" | "secondary" | undefined =
     slotRaw === "primary" || slotRaw === "secondary" ? slotRaw : undefined;
   const state = useOverlayChannel(sessionId, "featured_comment", slot);
+  const scopeId = useId().replace(/:/g, "_");
 
   // Self-clear: after `displaySeconds` has elapsed since the last event
   // we locally mark the card as expired so AnimatePresence exits even if
@@ -99,7 +146,16 @@ function FeaturedCommentInner() {
               pointerEvents: "auto",
             }}
             data-testid="featured-comment-card"
+            data-fc-scope={scopeId}
           >
+            {parsed.cssOverrides ? (
+              <style
+                data-testid="fc-css-injected"
+                dangerouslySetInnerHTML={{
+                  __html: scopeCss(parsed.cssOverrides, scopeId),
+                }}
+              />
+            ) : null}
             <FeaturedCommentCard data={parsed} />
             {/* Exit fade-out uses a faster EXIT token on the wrapper via
                 AnimatePresence above — the explicit `exit` prop overrides
@@ -119,6 +175,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
     <>
       {/* Pink accent bar — 8 px, mirrors lower-third card */}
       <div
+        className="fc-accent"
         style={{
           width: "8px",
           background: "var(--secondary, #fe036d)",
@@ -127,6 +184,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
       />
       {/* Avatar slot — 140 × 140, green border */}
       <div
+        className="fc-avatar"
         style={{
           position: "relative",
           width: "140px",
@@ -179,6 +237,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
       </div>
       {/* Body panel */}
       <div
+        className="fc-card"
         style={{
           minWidth: "420px",
           padding: "18px 32px 22px 24px",
@@ -220,6 +279,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
           <span>YT Live Chat</span>
         </div>
         <div
+          className="fc-author"
           style={{
             fontFamily: "AghartiWide, sans-serif",
             fontWeight: 900,
@@ -234,6 +294,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
           {data.authorName}
         </div>
         <div
+          className="fc-message"
           style={{
             marginTop: "4px",
             fontFamily: "Quedora, sans-serif",
