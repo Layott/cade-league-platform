@@ -81,7 +81,11 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(GENERIC_AUTH_ERROR)}`);
   }
 
-  const { data: pub } = await sb
+  // Post-auth bookkeeping reads PII columns (email, last_login_at)
+  // that anon + authenticated don't hold SELECT grants on after Plan 39
+  // C2. Elevate to service-role for the lookup + recordLogin.
+  const svc = getServiceRoleSupabase();
+  const { data: pub } = await svc
     .from("users")
     .select("id")
     .eq("supabase_auth_id", data.user.id)
@@ -91,7 +95,7 @@ export async function login(formData: FormData) {
   }
 
   const h = await headers();
-  await recordLogin(sb, {
+  await recordLogin(svc, {
     publicUserId: pub.id,
     ipAddress: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0",
     userAgent: h.get("user-agent") ?? "",
