@@ -5,11 +5,17 @@ import {
   punishmentTickerSchema,
   playerCardSchema,
   lowerThirdSchema,
+  scoreBugSchema,
+  upNextBugSchema,
+  h2h2Schema,
   type ScorebarPayload,
   type StandingsWidgetPayload,
   type PunishmentTickerPayload,
   type PlayerCardPayload,
   type LowerThirdPayload,
+  type ScoreBugPayload,
+  type UpNextBugPayload,
+  type H2H2Payload,
 } from "./schemas";
 import { getPlayerHeadshotUrl } from "@/lib/player-photos";
 
@@ -292,6 +298,231 @@ export async function buildLowerThirdPayload(
   });
 }
 
+// -- Plan 42 — match-aware autofill helpers -------------------------------
+//
+// The builders below accept DB rows already loaded by the caller (typically
+// `match_flow.startMatch`). Keeping the DB reads in the caller lets a single
+// transaction-ish function batch fetches; these builders stay pure mappers
+// that emit schema-valid payloads. Each returns `null` on missing inputs so
+// the caller can fall back to the STARTER_PAYLOADS stub.
+
+/** Shape used by the match-aware autofill builders. */
+export type MatchPlayerLite = {
+  id: string;
+  gamerTag: string | null;
+  displayName: string | null;
+  jerseyNumber?: number | null;
+};
+
+export type MatchLite = {
+  id: string;
+  homePlayer: MatchPlayerLite | null;
+  awayPlayer: MatchPlayerLite | null;
+};
+
+function resolvePhoto(
+  gamerTag: string | null,
+  variant: "transparent" | "normal" = "transparent",
+): string | undefined {
+  if (!gamerTag) return undefined;
+  return getPlayerHeadshotUrl(gamerTag, variant, 1) ?? undefined;
+}
+
+function resolveName(p: MatchPlayerLite | null): string {
+  if (!p) return "—";
+  return p.displayName ?? p.gamerTag ?? "—";
+}
+
+/**
+ * Plan 42 — score_bug payload pre-filled from a live match.
+ * Starts at 0-0 regardless of DB state; admin increments via
+ * `match_flow.updateScoreBug`.
+ */
+export function buildScoreBugFromMatch(match: MatchLite): ScoreBugPayload | null {
+  if (!match.homePlayer && !match.awayPlayer) return null;
+  return scoreBugSchema.parse({
+    players: [
+      {
+        displayName: resolveName(match.homePlayer),
+        photoUrl: resolvePhoto(match.homePlayer?.gamerTag ?? null),
+        score: 0,
+      },
+      {
+        displayName: resolveName(match.awayPlayer),
+        photoUrl: resolvePhoto(match.awayPlayer?.gamerTag ?? null),
+        score: 0,
+      },
+    ],
+    matchId: match.id,
+  });
+}
+
+/**
+ * Plan 42 — lower_third payload pre-filled from one side of a match.
+ * Uses the normal (non-transparent) headshot to match the existing lower-
+ * third renderer. Stats are omitted so the admin can choose to include them
+ * via the editable panel.
+ */
+export function buildLowerThirdFromPlayer(
+  player: MatchPlayerLite | null,
+): LowerThirdPayload | null {
+  if (!player) return null;
+  return lowerThirdSchema.parse({
+    playerId: player.id,
+    displayName: resolveName(player),
+    gamerTag: player.gamerTag ?? "—",
+    jerseyNumber: player.jerseyNumber ?? 0,
+    photoUrl: resolvePhoto(player.gamerTag ?? null, "normal"),
+  });
+}
+
+/**
+ * Plan 42 — h2h_2 payload pre-filled from a match.
+ * Loads each player's seasonal W/D/L from `standings` in parallel; on any
+ * read error the stats are omitted but the displayName + photos still land.
+ */
+export async function buildH2HFromMatch(
+  sb: SupabaseClient,
+  match: MatchLite,
+): Promise<H2H2Payload | null> {
+  if (!match.homePlayer || !match.awayPlayer) return null;
+
+  async function statsFor(playerId: string): Promise<
+    { w: number; d: number; l: number } | undefined
+  > {
+    const { data } = await sb
+      .from("standings")
+      .select("wins, draws, losses")
+      .eq("player_id", playerId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    const row = data as { wins: number; draws: number; losses: number } | null;
+    return row ? { w: row.wins, d: row.draws, l: row.losses } : undefined;
+  }
+
+  const [hs, as] = await Promise.all([
+    statsFor(match.homePlayer.id),
+    statsFor(match.awayPlayer.id),
+  ]);
+
+  return h2h2Schema.parse({
+    players: [
+      {
+        displayName: resolveName(match.homePlayer),
+        gamerTag: match.homePlayer.gamerTag ?? undefined,
+        photoUrl: resolvePhoto(match.homePlayer.gamerTag),
+        h2hStats: hs,
+      },
+      {
+        displayName: resolveName(match.awayPlayer),
+        gamerTag: match.awayPlayer.gamerTag ?? undefined,
+        photoUrl: resolvePhoto(match.awayPlayer.gamerTag),
+        h2hStats: as,
+      },
+    ],
+  });
+}
+
+/**
+ * Plan 42 — up_next_bug pre-filled from the next scheduled match on the
+ * session's match_day. Used when the producer wants to tease the next
+ * fixture during a BRB window. Returns null when no upcoming match exists.
+ */
+export async function buildUpNextFromNextMatch(
+  sb: SupabaseClient,
+  sessionId: string,
+): Promise<UpNextBugPayload | null> {
+  // Resolve the session → match_day.
+  const { data: sessRaw } = await sb
+    .from("stream_sessions")
+    .select("match_day_id, current_match_id")
+    .eq("id", sessionId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const sess = sessRaw as
+    | { match_day_id: string; current_match_id: string | null }
+    | null;
+  if (!sess) return null;
+
+  // Find the next scheduled match on this match_day (excluding current
+  // match + already-completed/forfeited/voided rows).
+  const baseQuery = sb
+    .from("matches")
+    .select(
+      `
+      id,
+      scheduled_time,
+      match_day:match_day_id (
+        match_date
+      ),
+      home_player:home_player_id (
+        id,
+        gamer_tag,
+        users:users!players_user_id_fkey ( display_name )
+      ),
+      away_player:away_player_id (
+        id,
+        gamer_tag,
+        users:users!players_user_id_fkey ( display_name )
+      )
+      `,
+    )
+    .eq("match_day_id", sess.match_day_id)
+    .eq("status", "scheduled")
+    .is("deleted_at", null)
+    .order("scheduled_time", { ascending: true })
+    .limit(1);
+
+  const { data } = sess.current_match_id
+    ? await baseQuery.neq("id", sess.current_match_id)
+    : await baseQuery;
+
+  const rows = data as unknown as
+    | {
+        id: string;
+        scheduled_time: string | null;
+        match_day: { match_date: string } | null;
+        home_player: {
+          id: string;
+          gamer_tag: string | null;
+          users: { display_name: string | null } | null;
+        } | null;
+        away_player: {
+          id: string;
+          gamer_tag: string | null;
+          users: { display_name: string | null } | null;
+        } | null;
+      }[]
+    | null;
+
+  const next = rows?.[0];
+  if (!next || !next.home_player || !next.away_player) return null;
+
+  const home = next.home_player;
+  const away = next.away_player;
+
+  // Compose ISO kickoff: combine match_date + scheduled_time when present.
+  // Fall back to the match_date at 00:00Z when the time is missing so the
+  // Zod `.datetime()` parse still succeeds.
+  const date = next.match_day?.match_date ?? "1970-01-01";
+  const time = next.scheduled_time ?? "00:00:00";
+  const kickoffAt = new Date(`${date}T${time}Z`).toISOString();
+
+  return upNextBugSchema.parse({
+    home: {
+      displayName: home.users?.display_name ?? home.gamer_tag ?? "—",
+      gamerTag: home.gamer_tag ?? undefined,
+      photoUrl: resolvePhoto(home.gamer_tag),
+    },
+    away: {
+      displayName: away.users?.display_name ?? away.gamer_tag ?? "—",
+      gamerTag: away.gamer_tag ?? undefined,
+      photoUrl: resolvePhoto(away.gamer_tag),
+    },
+    kickoffAt,
+  });
+}
+
 // Re-export for barrel import convenience.
 export const autofill = {
   scorebar: buildScorebarPayload,
@@ -299,4 +530,9 @@ export const autofill = {
   punishmentTicker: buildPunishmentTickerPayload,
   playerCard: buildPlayerCardPayload,
   lowerThird: buildLowerThirdPayload,
+  // Plan 42
+  scoreBugFromMatch: buildScoreBugFromMatch,
+  lowerThirdFromPlayer: buildLowerThirdFromPlayer,
+  h2hFromMatch: buildH2HFromMatch,
+  upNextFromNextMatch: buildUpNextFromNextMatch,
 };

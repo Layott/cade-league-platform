@@ -415,4 +415,11 @@ export const REALTIME = {
   eventInstanceTriggered: "instance.triggered" as const,
   eventInstanceCleared: "instance.cleared" as const,
   eventClockChanged: "clock.changed" as const,
+  // Plan 42 — match-flow events broadcast on the session channel alongside
+  // per-overlay updates. Carry the matchId + home/away digest so subscribers
+  // can refresh without re-querying. Published by the match_flow server
+  // module (startMatch / endMatch / updateScoreBug).
+  eventMatchStarted: "match.started" as const,
+  eventMatchEnded: "match.ended" as const,
+  eventScoreChanged: "score.changed" as const,
 };

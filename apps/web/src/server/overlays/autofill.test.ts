@@ -3,6 +3,11 @@ import {
   buildScorebarPayload,
   buildPunishmentTickerPayload,
   buildStandingsWidgetPayload,
+  buildScoreBugFromMatch,
+  buildLowerThirdFromPlayer,
+  buildH2HFromMatch,
+  buildUpNextFromNextMatch,
+  type MatchLite,
 } from "./autofill";
 
 /**
@@ -169,5 +174,143 @@ describe("buildStandingsWidgetPayload", () => {
       pts: 9,
       gd: 5,
     });
+  });
+});
+
+// -- Plan 42 — match-aware autofill builders -------------------------------
+
+const sampleMatch: MatchLite = {
+  id: "11111111-1111-4111-8111-111111111111",
+  homePlayer: {
+    id: "22222222-2222-4222-8222-222222222222",
+    gamerTag: "ADEFOLA",
+    displayName: "Adefola",
+    jerseyNumber: 10,
+  },
+  awayPlayer: {
+    id: "33333333-3333-4333-8333-333333333333",
+    gamerTag: "FARUK",
+    displayName: "Faruk",
+    jerseyNumber: 7,
+  },
+};
+
+describe("buildScoreBugFromMatch", () => {
+  it("emits schema-valid score_bug starting at 0-0 with both display names", () => {
+    const payload = buildScoreBugFromMatch(sampleMatch);
+    expect(payload).not.toBeNull();
+    expect(payload?.players).toHaveLength(2);
+    expect(payload?.players[0].displayName).toBe("Adefola");
+    expect(payload?.players[0].score).toBe(0);
+    expect(payload?.players[1].displayName).toBe("Faruk");
+    expect(payload?.players[1].score).toBe(0);
+    expect(payload?.matchId).toBe(sampleMatch.id);
+  });
+
+  it("returns null when both players are absent", () => {
+    const payload = buildScoreBugFromMatch({
+      id: "m-1",
+      homePlayer: null,
+      awayPlayer: null,
+    });
+    expect(payload).toBeNull();
+  });
+
+  it("falls back to '—' when a player row has neither displayName nor gamerTag", () => {
+    const payload = buildScoreBugFromMatch({
+      id: "44444444-4444-4444-8444-444444444444",
+      homePlayer: {
+        id: "55555555-5555-4555-8555-555555555555",
+        gamerTag: null,
+        displayName: null,
+        jerseyNumber: null,
+      },
+      awayPlayer: sampleMatch.awayPlayer,
+    });
+    expect(payload?.players[0].displayName).toBe("—");
+  });
+});
+
+describe("buildLowerThirdFromPlayer", () => {
+  it("emits schema-valid lower_third payload from a player row", () => {
+    const payload = buildLowerThirdFromPlayer(sampleMatch.homePlayer);
+    expect(payload?.playerId).toBe("22222222-2222-4222-8222-222222222222");
+    expect(payload?.displayName).toBe("Adefola");
+    expect(payload?.gamerTag).toBe("ADEFOLA");
+    expect(payload?.jerseyNumber).toBe(10);
+  });
+
+  it("returns null on null input", () => {
+    expect(buildLowerThirdFromPlayer(null)).toBeNull();
+  });
+});
+
+describe("buildH2HFromMatch", () => {
+  it("loads seasonal stats for both players and returns a schema-valid h2h_2", async () => {
+    // Stub standings so both maybeSingle calls resolve to fake W/D/L rows.
+    let call = 0;
+    const standingsChain = {
+      select: vi.fn(() => standingsChain),
+      eq: vi.fn(() => standingsChain),
+      is: vi.fn(() => standingsChain),
+      maybeSingle: vi.fn(() => {
+        call += 1;
+        const data = call === 1
+          ? { wins: 3, draws: 1, losses: 0 }
+          : { wins: 1, draws: 2, losses: 2 };
+        return Promise.resolve({ data, error: null });
+      }),
+    };
+    const sb = {
+      from: vi.fn(() => standingsChain),
+    };
+    const out = await buildH2HFromMatch(sb as never, sampleMatch);
+    expect(out?.players).toHaveLength(2);
+    expect(out?.players[0].h2hStats).toEqual({ w: 3, d: 1, l: 0 });
+    expect(out?.players[1].h2hStats).toEqual({ w: 1, d: 2, l: 2 });
+  });
+
+  it("returns null when either player is missing", async () => {
+    const sb = { from: vi.fn() };
+    const out = await buildH2HFromMatch(sb as never, {
+      id: "66666666-6666-4666-8666-666666666666",
+      homePlayer: sampleMatch.homePlayer,
+      awayPlayer: null,
+    });
+    expect(out).toBeNull();
+  });
+});
+
+describe("buildUpNextFromNextMatch", () => {
+  it("returns null when the session has no rows matching scope", async () => {
+    const sessionChain = chain({
+      data: { match_day_id: "md-1", current_match_id: null },
+      error: null,
+    });
+    const matchesChain = chain({ data: [], error: null });
+    const sb = {
+      from: vi.fn((table: string) => {
+        if (table === "stream_sessions") return sessionChain;
+        if (table === "matches") return matchesChain;
+        throw new Error(`unexpected: ${table}`);
+      }),
+    };
+    const out = await buildUpNextFromNextMatch(
+      sb as never,
+      "22222222-2222-4222-8222-222222222222",
+    );
+    expect(out).toBeNull();
+  });
+
+  it("returns null when the session doesn't exist", async () => {
+    const sessionChain = chain({ data: null, error: null });
+    const sb = {
+      from: vi.fn(() => sessionChain),
+    };
+    const out = await buildUpNextFromNextMatch(
+      sb as never,
+      "22222222-2222-4222-8222-222222222222",
+    );
+    expect(out).toBeNull();
   });
 });

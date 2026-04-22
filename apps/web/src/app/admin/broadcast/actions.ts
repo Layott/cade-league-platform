@@ -29,6 +29,11 @@ import {
   adjustClock,
   resetClock,
 } from "@/server/overlays/match_clock";
+import {
+  startMatch,
+  endMatch,
+  updateScoreBug,
+} from "@/server/broadcast/match_flow";
 
 /**
  * Admin server actions for the broadcast control panel. All actions
@@ -306,5 +311,81 @@ export async function resetClockAction(formData: FormData) {
   if (!sessionId) throw new Error("sessionId required");
   const { sb, publicUserId } = await gate("match_clock.manage");
   await resetClock(sb, sessionId, publicUserId);
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+// -- Plan 42: match flow (select/start/end + score controls) --------------
+
+export async function selectAndStartMatchAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const matchId = String(formData.get("matchId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  if (!matchId) throw new Error("matchId required");
+
+  const { publicUserId, roles } = await resolveAuthed();
+  const sb = getServiceRoleSupabase();
+  await startMatch(sb, sessionId, matchId, { userId: publicUserId, roles });
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function scoreBugDeltaAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const side = String(formData.get("side") ?? "");
+  const deltaRaw = String(formData.get("delta") ?? "0");
+  if (!sessionId) throw new Error("sessionId required");
+  if (side !== "home" && side !== "away") {
+    throw new Error("side must be 'home' or 'away'");
+  }
+  const delta = Number(deltaRaw);
+  if (!Number.isFinite(delta)) throw new Error("delta must be numeric");
+
+  const { publicUserId, roles } = await resolveAuthed();
+  const sb = getServiceRoleSupabase();
+  await updateScoreBug(
+    sb,
+    sessionId,
+    side === "home" ? { homeDelta: delta } : { awayDelta: delta },
+    { userId: publicUserId, roles },
+  );
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function resetScoreBugAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  const { publicUserId, roles } = await resolveAuthed();
+  const sb = getServiceRoleSupabase();
+  await updateScoreBug(
+    sb,
+    sessionId,
+    { reset: true },
+    { userId: publicUserId, roles },
+  );
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function endMatchAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const homeRaw = String(formData.get("homeScore") ?? "0");
+  const awayRaw = String(formData.get("awayScore") ?? "0");
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  if (!sessionId) throw new Error("sessionId required");
+  const homeScore = Number(homeRaw);
+  const awayScore = Number(awayRaw);
+  if (!Number.isInteger(homeScore) || homeScore < 0) {
+    throw new Error("homeScore must be a non-negative integer");
+  }
+  if (!Number.isInteger(awayScore) || awayScore < 0) {
+    throw new Error("awayScore must be a non-negative integer");
+  }
+
+  const { publicUserId, roles } = await resolveAuthed();
+  const sb = getServiceRoleSupabase();
+  await endMatch(
+    sb,
+    sessionId,
+    { homeScore, awayScore, notes },
+    { userId: publicUserId, roles },
+  );
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }

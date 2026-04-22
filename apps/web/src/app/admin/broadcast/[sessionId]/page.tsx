@@ -18,10 +18,14 @@ import {
   getTemplateRoute,
   type TemplateKey,
 } from "@/server/overlays/registry";
-import { listActiveOverlays } from "@/server/broadcast/events";
+import {
+  listActiveOverlays,
+  getActiveForTemplate,
+} from "@/server/broadcast/events";
 import { listPresets } from "@/server/overlays/presets";
 import { listActiveInstances } from "@/server/overlays/instances";
 import { getClock } from "@/server/overlays/match_clock";
+import { listSelectableMatches } from "@/server/broadcast/match_flow";
 import {
   triggerOverlayAction,
   clearOverlayAction,
@@ -30,6 +34,10 @@ import {
 import { STARTER_PAYLOADS } from "./starter-payloads";
 import { EditableTemplatePanel } from "./EditableTemplatePanel";
 import { MatchClockPanel } from "./MatchClockPanel";
+import {
+  MatchControlPanel,
+  type CurrentMatchDigest,
+} from "./MatchControlPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +48,9 @@ type SessionRow = {
   started_at: string;
   ended_at: string | null;
   notes: string | null;
+  // Plan 42 — current-match pin.
+  current_match_id: string | null;
+  match_started_at: string | null;
 };
 
 /** Editable templates upgraded to the rich panel in Plan 37. The slot
@@ -91,7 +102,7 @@ export default async function BroadcastSessionPage({
   const { data: sessionRaw } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, session_tag, started_at, ended_at, notes",
+      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -116,12 +127,22 @@ export default async function BroadcastSessionPage({
   }
 
   // Parallel fetch: active overlays + per-template presets + multi-instance
-  // active rows + match_clock state.
-  const [active, presetsAll, lowerThirdInstances, clock] = await Promise.all([
+  // active rows + match_clock state + (Plan 42) selectable matches + active
+  // score_bug row to derive the current-match digest.
+  const [
+    active,
+    presetsAll,
+    lowerThirdInstances,
+    clock,
+    selectableMatches,
+    activeScoreBug,
+  ] = await Promise.all([
     listActiveOverlays(sb, session.id),
     listPresets(sb),
     listActiveInstances(sb, session.id, "lower_third"),
     getClock(sb, session.id),
+    listSelectableMatches(sb, session.id, { scope: "today" }),
+    getActiveForTemplate(sb, session.id, "score_bug"),
   ]);
 
   const presetsByTemplate = new Map<string, typeof presetsAll>();
@@ -147,6 +168,33 @@ export default async function BroadcastSessionPage({
   const legacyTemplates = TEMPLATE_KEYS.filter(
     (k) => !EDITABLE_TEMPLATES.includes(k),
   );
+
+  // Plan 42 — derive the current-match digest from session + live score_bug.
+  let currentMatchDigest: CurrentMatchDigest | null = null;
+  if (session.current_match_id) {
+    const bugPayload = (activeScoreBug?.payload ?? null) as {
+      players?: Array<{ displayName: string; score: number }>;
+    } | null;
+    const players = bugPayload?.players ?? [];
+    currentMatchDigest = {
+      matchId: session.current_match_id,
+      homeDisplayName: players[0]?.displayName ?? "Home",
+      awayDisplayName: players[1]?.displayName ?? "Away",
+      homeScore: players[0]?.score ?? 0,
+      awayScore: players[1]?.score ?? 0,
+    };
+  }
+
+  // Plan 42 — pre-fill scorer default on stinger_goal from the current
+  // match's home player when a match is pinned. Overrides the static
+  // STARTER_PAYLOADS entry for just that template.
+  const starterOverrides: Record<string, Record<string, unknown>> = {};
+  if (currentMatchDigest) {
+    starterOverrides.stinger_goal = {
+      scorerDisplayName: currentMatchDigest.homeDisplayName,
+      soundSlot: "stinger-goal",
+    };
+  }
 
   return (
     <div className="space-y-8">
@@ -191,6 +239,15 @@ export default async function BroadcastSessionPage({
             </Link>
           </div>
         }
+      />
+
+      {/* Match control — Plan 42 (mount above clock so select/start/end
+          is the primary producer action on the page). */}
+      <MatchControlPanel
+        sessionId={session.id}
+        selectable={selectableMatches}
+        current={currentMatchDigest}
+        isLive={isLive}
       />
 
       {/* Match clock — Plan 37 */}
@@ -239,7 +296,8 @@ export default async function BroadcastSessionPage({
           <div className="grid gap-4 md:grid-cols-2">
             {legacyTemplates.map((key) => {
               const tpl = TEMPLATE_REGISTRY[key];
-              const starter = STARTER_PAYLOADS[key] ?? {};
+              const starter =
+                starterOverrides[key] ?? STARTER_PAYLOADS[key] ?? {};
               return (
                 <div
                   key={key}

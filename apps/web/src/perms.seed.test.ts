@@ -104,10 +104,11 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(PERMS.player).toContain("squads.submit.own");
   });
 
-  it("production seed holds broadcast.trigger + match_clock.manage (Plan 12 + Plan 37)", () => {
+  it("production seed holds broadcast.trigger + match_clock.manage + broadcast.match_control (Plan 12 + 37 + 42)", () => {
     expect(PERMS.production).toEqual([
       "broadcast.trigger",
       "match_clock.manage",
+      "broadcast.match_control",
     ]);
   });
 
@@ -126,12 +127,22 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(hasPerm({ userId: null, roles: ["player"] }, "broadcast.manage")).toBe(false);
   });
 
-  it("admin seed is wildcard + explicit squads.reopen (Plan 41)", () => {
-    // Admin still wins everything via '*'; we seed squads.reopen explicitly
-    // so the role_permissions table stays self-documenting for future role
-    // editors. See supabase/migrations/20260509000001_plan41_squads_reopen_perm_seed.sql.
+  it("admin seed is wildcard + explicit squads.reopen + broadcast.match_control (Plans 41, 42)", () => {
+    // Admin still wins everything via '*'; we seed explicit entries so the
+    // role_permissions table stays self-documenting for future role editors.
+    // See supabase/migrations/20260509000001_plan41_squads_reopen_perm_seed.sql
+    // and supabase/migrations/20260509000101_plan42_broadcast_perms_seed.sql.
     expect(PERMS.admin).toContain("*");
     expect(PERMS.admin).toContain("squads.reopen");
+    expect(PERMS.admin).toContain("broadcast.match_control");
+  });
+
+  it("admin + production hold broadcast.match_control; others do not (Plan 42)", () => {
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "broadcast.match_control")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["production"] }, "broadcast.match_control")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["moderator"] }, "broadcast.match_control")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["player"] }, "broadcast.match_control")).toBe(false);
+    expect(hasPerm({ userId: null, roles: ["viewer"] }, "broadcast.match_control")).toBe(false);
   });
 
   it("moderator has stats.screenshot.upload + review (Plan 14)", () => {

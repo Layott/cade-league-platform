@@ -31,12 +31,17 @@ export const ROLE_NAMES = [
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMS: Record<RoleName, readonly string[]> = {
-  admin: ["*", "squads.reopen"],
+  admin: ["*", "squads.reopen", "broadcast.match_control"],
   loc: ["squads.validate", "squads.change_authorize"],
   idc: [],
   referee: ["squads.validate", "squads.change_authorize"],
   technical: [],
-  production: ["broadcast.trigger", "match_clock.manage"],
+  production: [
+    "broadcast.trigger",
+    "match_clock.manage",
+    // Plan 42 — match-aware overlays (select/start/end match + score controls)
+    "broadcast.match_control",
+  ],
   design: [],
   moderator: [
     "announcements.*",
