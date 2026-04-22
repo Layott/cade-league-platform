@@ -12,6 +12,7 @@ import {
 // Migrations:
 //   - 20260503000003_overlay_templates_seed.sql  (Plan 12, 7 keys)
 //   - 20260505000003_plan16_overlay_template_types.sql (Plan 16, +20)
+//   - 20260508000010_plan16_stinger_miss.sql (Plan 16 amended, +1)
 const DB_TEMPLATE_TYPES = [
   // Plan 12
   "lower_third",
@@ -26,6 +27,7 @@ const DB_TEMPLATE_TYPES = [
   "stinger_normal",
   "stinger_replay",
   "stinger_goal",
+  "stinger_miss",
   "stinger_winner",
   "layout_4pip",
   "layout_2pip",
@@ -96,18 +98,25 @@ describe("overlay registry", () => {
     expect(REALTIME.eventSessionEnded).toBe("session.ended");
   });
 
-  it("listTemplatesByGroup returns 27 templates across 7 groups", () => {
+  it("listTemplatesByGroup returns 34 templates across 7 groups (27 existing + Plan-16-amended stinger_miss; 7 legacy)", () => {
     const groups = listTemplatesByGroup();
     expect(groups).toHaveLength(7);
     const total = groups.reduce((acc, g) => acc + g.templates.length, 0);
     expect(total).toBe(TEMPLATE_KEYS.length);
+    expect(TEMPLATE_KEYS.length).toBe(34);
   });
 
   it("every stinger template defaults to its dedicated sound slot", () => {
     expect(TEMPLATE_REGISTRY.stinger_intro.defaultSoundSlot).toBe("stinger-intro");
     expect(TEMPLATE_REGISTRY.stinger_goal.defaultSoundSlot).toBe("stinger-goal");
+    expect(TEMPLATE_REGISTRY.stinger_miss.defaultSoundSlot).toBe("stinger-miss");
     expect(TEMPLATE_REGISTRY.stinger_winner.defaultSoundSlot).toBe(
       "stinger-winner",
     );
+  });
+
+  it("stinger_miss route maps to /overlay/stinger-miss", () => {
+    expect(getTemplateRoute("stinger_miss")).toBe("/overlay/stinger-miss");
+    expect(isTemplateKey("stinger_miss")).toBe(true);
   });
 });

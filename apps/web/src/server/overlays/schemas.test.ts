@@ -12,6 +12,7 @@ import {
   stingerIntroSchema,
   stingerNormalSchema,
   stingerGoalSchema,
+  stingerMissSchema,
   stingerWinnerSchema,
   layout4PipSchema,
   layout2PipSchema,
@@ -153,6 +154,24 @@ describe("Plan 16 — soundSlot field", () => {
   it("stinger_goal allows all optional fields absent", () => {
     const p = stingerGoalSchema.parse({});
     expect(p.scorerDisplayName).toBeUndefined();
+  });
+
+  it("stinger_miss accepts empty payload + new stinger-miss soundSlot", () => {
+    const empty = stingerMissSchema.parse({});
+    expect(empty.scorerDisplayName).toBeUndefined();
+    const withSlot = stingerMissSchema.parse({ soundSlot: "stinger-miss" });
+    expect(withSlot.soundSlot).toBe("stinger-miss");
+    const withScorer = stingerMissSchema.parse({
+      scorerDisplayName: "DAPO",
+      scorerPhotoUrl: "/players/dapo/headshot_01.png",
+      soundSlot: "stinger-miss",
+    });
+    expect(withScorer.scorerDisplayName).toBe("DAPO");
+    expect(withScorer.scorerPhotoUrl).toBe("/players/dapo/headshot_01.png");
+  });
+
+  it("soundSlotSchema accepts 'stinger-miss'", () => {
+    expect(soundSlotSchema.parse("stinger-miss")).toBe("stinger-miss");
   });
 
   it("stinger_winner requires winnerDisplayName", () => {

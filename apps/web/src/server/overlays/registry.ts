@@ -13,6 +13,7 @@ import {
   stingerNormalSchema,
   stingerReplaySchema,
   stingerGoalSchema,
+  stingerMissSchema,
   stingerWinnerSchema,
   // Plan 16 — layouts
   layout4PipSchema,
@@ -60,11 +61,12 @@ export const TEMPLATE_KEYS = [
   "punishment_ticker",
   "intro",
   "outro",
-  // Plan 16 stingers (5)
+  // Plan 16 stingers (6 — `stinger_miss` added in Plan 16 amendment)
   "stinger_intro",
   "stinger_normal",
   "stinger_replay",
   "stinger_goal",
+  "stinger_miss",
   "stinger_winner",
   // Plan 16 layouts (7)
   "layout_4pip",
@@ -194,6 +196,13 @@ export const TEMPLATE_REGISTRY: Record<TemplateKey, TemplateEntry> = {
     group: "stingers",
     label: "Goal Stinger (2s)",
     defaultSoundSlot: "stinger-goal",
+  },
+  stinger_miss: {
+    schema: stingerMissSchema,
+    route: "/overlay/stinger-miss",
+    group: "stingers",
+    label: "Miss Stinger (2s)",
+    defaultSoundSlot: "stinger-miss",
   },
   stinger_winner: {
     schema: stingerWinnerSchema,

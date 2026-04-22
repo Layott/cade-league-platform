@@ -25,6 +25,7 @@ export type OverlaySoundSlot =
   | "stinger-normal"
   | "stinger-replay"
   | "stinger-goal"
+  | "stinger-miss"
   | "stinger-winner"
   | "whoosh-short"
   | "whoosh-long"
@@ -49,6 +50,11 @@ export function resolveSoundUrl(slot: OverlaySoundSlot | undefined): string | nu
       return OVERLAY_SOUNDS.stingers.replay;
     case "stinger-goal":
       return OVERLAY_SOUNDS.stingers.goal;
+    case "stinger-miss":
+      // Plan 16 amended — asset pending. Until `stinger-miss.mp3`
+      // is supplied + registered in `overlay-sounds.ts`, the slot
+      // validates + renders silent (resolver returns `null`).
+      return null;
     case "stinger-winner":
       return OVERLAY_SOUNDS.stingers.winner;
     case "whoosh-short":

@@ -21,6 +21,7 @@ export const soundSlotSchema = z
     "stinger-normal",
     "stinger-replay",
     "stinger-goal",
+    "stinger-miss",
     "stinger-winner",
     "whoosh-short",
     "whoosh-long",
@@ -176,6 +177,17 @@ export const stingerGoalSchema = z.object({
   soundSlot: soundSlotSchema,
 });
 export type StingerGoalPayload = z.infer<typeof stingerGoalSchema>;
+
+// Plan 16 amended — miss stinger (sibling of goal stinger).
+// Scorer fields mirror stingerGoalSchema so the admin trigger form auto-
+// renders the same inputs; title / sub-title animation diverges per the
+// 04b_stinger_miss.html reference (strike-through + reticle).
+export const stingerMissSchema = z.object({
+  scorerDisplayName: z.string().trim().min(1).max(80).optional(),
+  scorerPhotoUrl: photoUrlSchema.optional(),
+  soundSlot: soundSlotSchema,
+});
+export type StingerMissPayload = z.infer<typeof stingerMissSchema>;
 
 export const stingerWinnerSchema = z.object({
   winnerDisplayName: z.string().trim().min(1).max(80),
