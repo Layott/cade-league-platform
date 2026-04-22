@@ -46,10 +46,13 @@ async function resolveAdmin() {
 
 export default async function UserDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ otp?: string }>;
 }) {
   const { id } = await params;
+  const { otp } = await searchParams;
   const sb = await resolveAdmin();
 
   const { data: user } = await sb
@@ -99,6 +102,27 @@ export default async function UserDetailPage({
           </Link>
         }
       />
+
+      {otp ? (
+        <section
+          data-testid="otp-flash"
+          className="rounded-sm border border-[var(--signal)] bg-[rgba(107,205,6,0.06)] p-5"
+        >
+          <h2 className="font-display text-base font-bold text-[var(--signal)]">
+            One-time password generated
+          </h2>
+          <p className="mt-1 text-xs text-[var(--chalk-2)]">
+            Copy this now — it will not be shown again. Hand it to the user
+            via a secure channel; they should reset on first login.
+          </p>
+          <code
+            className="mt-3 block break-all rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-2 font-mono text-sm text-[var(--chalk-0)]"
+            data-testid="otp-value"
+          >
+            {otp}
+          </code>
+        </section>
+      ) : null}
 
       <section
         aria-labelledby="roles-heading"
@@ -259,7 +283,7 @@ export default async function UserDetailPage({
               id="reset-password-input"
               name="new_password"
               type="text"
-              minLength={8}
+              minLength={12}
               required
               className={inputClass + " font-mono"}
               data-testid="reset-password-input"

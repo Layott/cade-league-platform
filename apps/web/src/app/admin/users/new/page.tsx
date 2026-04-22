@@ -108,14 +108,14 @@ export default async function NewUserPage() {
           <FormField
             label="Password (optional)"
             htmlFor="new-user-password"
-            hint="Leave blank to issue the dev default; the user must reset on first login."
+            hint="Leave blank to auto-generate a random one-time password (shown ONCE on the next page). 12 chars min if you set your own."
           >
             <input
               id="new-user-password"
               name="password"
               type="text"
               className={inputClass + " font-mono"}
-              minLength={8}
+              minLength={12}
               data-testid="new-user-password"
             />
           </FormField>

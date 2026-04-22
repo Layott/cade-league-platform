@@ -4,7 +4,7 @@ import {
   updateUserSchema,
   resetUserPasswordSchema,
   softDeleteUserSchema,
-  DEFAULT_DEV_PASSWORD,
+  generateOneTimePassword,
 } from "./schemas";
 
 describe("createUserSchema", () => {
@@ -76,21 +76,21 @@ describe("updateUserSchema", () => {
 });
 
 describe("resetUserPasswordSchema", () => {
-  it("enforces 8-char minimum", () => {
+  it("enforces 12-char minimum (Plan 39 raised from 8)", () => {
     expect(() =>
       resetUserPasswordSchema.parse({
         id: "11111111-1111-4111-8111-111111111111",
-        newPassword: "short",
+        newPassword: "abcd1234",
       }),
     ).toThrow();
   });
 
-  it("accepts an 8-char password", () => {
+  it("accepts a 12-char password", () => {
     const out = resetUserPasswordSchema.parse({
       id: "11111111-1111-4111-8111-111111111111",
-      newPassword: "abcd1234",
+      newPassword: "abcd12345678",
     });
-    expect(out.newPassword).toBe("abcd1234");
+    expect(out.newPassword).toBe("abcd12345678");
   });
 });
 
@@ -102,8 +102,17 @@ describe("softDeleteUserSchema", () => {
   });
 });
 
-describe("DEFAULT_DEV_PASSWORD", () => {
-  it("is the documented dev placeholder", () => {
-    expect(DEFAULT_DEV_PASSWORD).toBe("dev-temp-2026");
+describe("generateOneTimePassword (Plan 39 — replaces DEFAULT_DEV_PASSWORD)", () => {
+  it("returns a base64url string at least 12 chars long", () => {
+    const pw = generateOneTimePassword();
+    expect(pw.length).toBeGreaterThanOrEqual(12);
+    // base64url alphabet: A-Z a-z 0-9 _ -
+    expect(pw).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("returns a different string on each call", () => {
+    const a = generateOneTimePassword();
+    const b = generateOneTimePassword();
+    expect(a).not.toBe(b);
   });
 });

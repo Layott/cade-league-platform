@@ -210,15 +210,34 @@ describe("createUser", () => {
     });
   });
 
-  it("falls back to DEFAULT_DEV_PASSWORD when password missing", async () => {
+  it("auto-generates a random password when password missing (Plan 39)", async () => {
     const { sb, auth } = mkSb({ mirroredUserId: "u-1" });
-    await createUser(sb, adminActor, {
+    const created = await createUser(sb, adminActor, {
       email: "new@cade.local",
       displayName: "Newbie",
     });
     const args = (auth.admin.createUser as ReturnType<typeof vi.fn>).mock
       .calls[0][0];
-    expect(args.password).toBe("dev-temp-2026");
+    // Never the old hardcoded value.
+    expect(args.password).not.toBe("dev-temp-2026");
+    // base64url, comfortably long.
+    expect(args.password).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(args.password.length).toBeGreaterThanOrEqual(12);
+    // The generated password is surfaced ONCE in the response so the UI
+    // can show a one-time flash.
+    expect(created.usedGeneratedPassword).toBe(true);
+    expect(created.generatedPassword).toBe(args.password);
+  });
+
+  it("does NOT surface a generated password when admin supplies one", async () => {
+    const { sb } = mkSb({ mirroredUserId: "u-1" });
+    const created = await createUser(sb, adminActor, {
+      email: "new@cade.local",
+      displayName: "Newbie",
+      password: "supersecret-value-from-admin",
+    });
+    expect(created.usedGeneratedPassword).toBe(false);
+    expect(created.generatedPassword).toBeNull();
   });
 
   it("updates display_name on the mirrored row", async () => {

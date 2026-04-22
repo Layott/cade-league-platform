@@ -3,7 +3,62 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { recordLogin } from "@/server/auth/sessions";
+
+const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+const LOCKOUT_THRESHOLD = 5;
+const GENERIC_AUTH_ERROR = "Invalid email or password";
+
+/**
+ * Plan 39 (M2) — failed-login lockout.
+ *
+ * If the user identified by `email` already has ≥5 `login_failed` rows in
+ * the last 15 minutes, deny the attempt before calling Supabase Auth.
+ * Read goes via the service-role client so we can scan auth_events
+ * regardless of RLS posture (Plan 39 C3 enables RLS on the table).
+ */
+async function isLockedOut(email: string): Promise<boolean> {
+  const svc = getServiceRoleSupabase();
+  const { data: pub } = await svc
+    .from("users")
+    .select("id")
+    .eq("email", email)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!pub?.id) return false;
+
+  const since = new Date(Date.now() - LOCKOUT_WINDOW_MS).toISOString();
+  const { count } = await svc
+    .from("auth_events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", pub.id)
+    .eq("event_type", "login_failed")
+    .gte("created_at", since);
+  return (count ?? 0) >= LOCKOUT_THRESHOLD;
+}
+
+async function recordFailure(
+  sb: Awaited<ReturnType<typeof getServerSupabase>>,
+  email: string,
+  reason: string,
+): Promise<void> {
+  // Resolve user_id (if any) so the lockout counter has a key. Failed
+  // attempts against unknown emails still get recorded (user_id null) for
+  // forensics — they just can't trigger the lockout path.
+  const svc = getServiceRoleSupabase();
+  const { data: pub } = await svc
+    .from("users")
+    .select("id")
+    .eq("email", email)
+    .is("deleted_at", null)
+    .maybeSingle();
+  await sb.from("auth_events").insert({
+    user_id: pub?.id ?? null,
+    event_type: "login_failed",
+    metadata: { email, reason },
+  });
+}
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "");
@@ -11,14 +66,19 @@ export async function login(formData: FormData) {
   const next = String(formData.get("next") ?? "/admin");
 
   const sb = await getServerSupabase();
+
+  if (await isLockedOut(email)) {
+    redirect(
+      `/login?error=${encodeURIComponent(
+        "Too many failed attempts. Try again in 15 minutes.",
+      )}`,
+    );
+  }
+
   const { error, data } = await sb.auth.signInWithPassword({ email, password });
   if (error || !data.user) {
-    await sb.from("auth_events").insert({
-      user_id: null,
-      event_type: "login_failed",
-      metadata: { email, reason: error?.message ?? "unknown" },
-    });
-    redirect(`/login?error=${encodeURIComponent("Invalid email or password")}`);
+    await recordFailure(sb, email, error?.message ?? "unknown");
+    redirect(`/login?error=${encodeURIComponent(GENERIC_AUTH_ERROR)}`);
   }
 
   const { data: pub } = await sb

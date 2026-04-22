@@ -28,7 +28,7 @@ const jerseyNumberSchema = z
 
 const passwordSchema = z
   .string()
-  .min(8, { message: "password must be at least 8 chars" })
+  .min(12, { message: "password must be at least 12 chars" })
   .max(128);
 
 const roleSchema = z.enum(ROLE_NAMES);
@@ -67,10 +67,17 @@ export const restoreUserSchema = z.object({
 });
 export type RestoreUserInput = z.infer<typeof restoreUserSchema>;
 
-/**
- * Default placeholder password used when an admin creates a user without
- * supplying one. Dev-only convenience: in production a warning is logged
- * by the server action when this fallback is used. The user is expected
- * to reset on first login.
- */
-export const DEFAULT_DEV_PASSWORD = "dev-temp-2026";
+// Plan 39: DEFAULT_DEV_PASSWORD removed (security audit C1, CVSS-Critical).
+// Server now generates a cryptographically random password when admin omits
+// the field; the generated value is surfaced to the admin ONCE in the
+// success-flash UI (never logged, never persisted).
+//
+// Helper kept here so the schema layer owns password generation rules
+// (Node-only — never import from a client component).
+export function generateOneTimePassword(): string {
+  // 16 bytes → 22 url-safe base64 chars; comfortably > min(12) bound below.
+  // Using sync API; this runs only inside the createUser server path.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { randomBytes } = require("node:crypto") as typeof import("node:crypto");
+  return randomBytes(16).toString("base64url");
+}

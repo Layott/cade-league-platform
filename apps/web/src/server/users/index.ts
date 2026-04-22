@@ -7,7 +7,7 @@ import {
   resetUserPasswordSchema,
   softDeleteUserSchema,
   restoreUserSchema,
-  DEFAULT_DEV_PASSWORD,
+  generateOneTimePassword,
   type CreateUserInput,
   type UpdateUserInput,
   type ResetUserPasswordInput,
@@ -29,7 +29,15 @@ import {
 export type CreatedUser = {
   id: string;
   supabase_auth_id: string;
-  usedDefaultPassword: boolean;
+  /**
+   * True when the admin omitted the password and the server generated one.
+   * The generated value is returned in `generatedPassword` so the admin can
+   * surface it ONCE in the success flash. It is never persisted anywhere
+   * else and never logged.
+   */
+  usedGeneratedPassword: boolean;
+  /** Present only when usedGeneratedPassword === true. */
+  generatedPassword: string | null;
 };
 
 /**
@@ -68,16 +76,11 @@ export async function createUser(
   await requirePermAsync(sb, actor, "users.create");
   const input = createUserSchema.parse(rawInput);
 
-  const password = input.password ?? DEFAULT_DEV_PASSWORD;
-  const usedDefaultPassword = !input.password;
-
-  if (usedDefaultPassword && process.env.NODE_ENV === "production") {
-    // Production safety net — the placeholder is dev-only. Surface this in
-    // logs so an operator notices and rotates the password (or wires Resend).
-    console.warn(
-      `[users.create] using DEFAULT_DEV_PASSWORD for ${input.email} — admin must trigger a reset email.`,
-    );
-  }
+  // Plan 39 — never reuse a hardcoded default. If the admin omits a password
+  // we generate a cryptographically random one and hand it back to the
+  // caller exactly ONCE in the response so the success-flash can show it.
+  const usedGeneratedPassword = !input.password;
+  const password = input.password ?? generateOneTimePassword();
 
   // 1. Create the auth.users row. The Plan 1 trigger mirrors it into
   //    public.users with display_name = split_part(email, '@', 1).
@@ -146,7 +149,8 @@ export async function createUser(
   return {
     id: publicUserId,
     supabase_auth_id: authUser.id,
-    usedDefaultPassword,
+    usedGeneratedPassword,
+    generatedPassword: usedGeneratedPassword ? password : null,
   };
 }
 
@@ -313,7 +317,7 @@ export async function restoreUser(
 }
 
 export {
-  DEFAULT_DEV_PASSWORD,
+  generateOneTimePassword,
   createUserSchema,
   updateUserSchema,
   resetUserPasswordSchema,

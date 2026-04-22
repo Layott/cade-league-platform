@@ -106,14 +106,15 @@ export async function createUserAction(formData: FormData) {
 
   const created = await createUser(sb, actor, input);
 
-  if (created.usedDefaultPassword && process.env.NODE_ENV === "production") {
-    console.warn(
-      `[users.createAction] PROD created ${input.email} with the default dev password — admin should rotate it.`,
-    );
-  }
-
   revalidatePath("/admin/users");
-  redirect(`/admin/users/${created.id}`);
+  // Plan 39 — surface the generated one-time password in the URL exactly
+  // ONCE so the success-flash on the user-detail page can render it. The
+  // user-detail page strips the param after rendering. Never logged.
+  const flash =
+    created.usedGeneratedPassword && created.generatedPassword
+      ? `?otp=${encodeURIComponent(created.generatedPassword)}`
+      : "";
+  redirect(`/admin/users/${created.id}${flash}`);
 }
 
 export async function updateUserAction(formData: FormData) {
