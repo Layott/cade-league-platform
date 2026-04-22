@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addBusinessDays, isBusinessDay } from "./businessDays";
+import { addBusinessDays, businessDaysBetween, isBusinessDay } from "./businessDays";
 import { formatInTimeZone } from "date-fns-tz";
 import { APP_TIMEZONE } from "./time";
 
@@ -64,6 +64,59 @@ describe("addBusinessDays", () => {
 
   it("rejects invalid base", () => {
     expect(() => addBusinessDays(new Date("not-a-date"), 5)).toThrow();
+  });
+});
+
+describe("businessDaysBetween", () => {
+  it("same calendar day returns 0", () => {
+    const a = new Date("2026-05-04T09:00:00+01:00");
+    const b = new Date("2026-05-04T23:00:00+01:00");
+    expect(businessDaysBetween(a, b)).toBe(0);
+  });
+
+  it("Monday → Tuesday returns 1", () => {
+    expect(
+      businessDaysBetween(
+        new Date("2026-05-04T10:00:00+01:00"),
+        new Date("2026-05-05T10:00:00+01:00"),
+      ),
+    ).toBe(1);
+  });
+
+  it("Monday → following Monday returns 5 (weekend skipped)", () => {
+    expect(
+      businessDaysBetween(
+        new Date("2026-05-04T10:00:00+01:00"),
+        new Date("2026-05-11T10:00:00+01:00"),
+      ),
+    ).toBe(5);
+  });
+
+  it("Friday → Monday returns 1 (weekend skipped)", () => {
+    expect(
+      businessDaysBetween(
+        new Date("2026-05-08T10:00:00+01:00"),
+        new Date("2026-05-11T10:00:00+01:00"),
+      ),
+    ).toBe(1);
+  });
+
+  it("later earlier than earlier returns 0 (never negative)", () => {
+    expect(
+      businessDaysBetween(
+        new Date("2026-05-11T10:00:00+01:00"),
+        new Date("2026-05-04T10:00:00+01:00"),
+      ),
+    ).toBe(0);
+  });
+
+  it("across two weekends (two full weeks) returns 10", () => {
+    expect(
+      businessDaysBetween(
+        new Date("2026-05-04T10:00:00+01:00"),
+        new Date("2026-05-18T10:00:00+01:00"),
+      ),
+    ).toBe(10);
   });
 });
 

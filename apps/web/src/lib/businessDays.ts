@@ -84,3 +84,49 @@ export function isBusinessDay(
   const isoDow = Number(formatInTimeZone(d, tz, "i")); // 1=Mon..7=Sun
   return isoDow >= 1 && isoDow <= 5;
 }
+
+/**
+ * Count of full business days elapsed between two instants, when both are
+ * viewed in `tz`. Weekends don't count. If `later` is earlier than `earlier`
+ * we return 0 (never negative). Same-calendar-day returns 0. Tomorrow-business
+ * returns 1. Monday → following Monday returns 5 (weekend skipped).
+ *
+ * Holidays intentionally not modelled (same contract as `addBusinessDays`).
+ */
+export function businessDaysBetween(
+  earlier: Date | string,
+  later: Date | string,
+  tz: string = APP_TIMEZONE,
+): number {
+  const a = earlier instanceof Date ? earlier : new Date(earlier);
+  const b = later instanceof Date ? later : new Date(later);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) {
+    throw new RangeError("businessDaysBetween: invalid date input");
+  }
+  if (b.getTime() <= a.getTime()) return 0;
+
+  // Extract calendar-date strings in the target timezone (e.g. "2026-04-22")
+  // to guarantee day boundaries match WAT, not UTC.
+  const aDateStr = formatInTimeZone(a, tz, "yyyy-MM-dd");
+  const bDateStr = formatInTimeZone(b, tz, "yyyy-MM-dd");
+  if (aDateStr === bDateStr) return 0;
+
+  // Walk calendar days from aDateStr → bDateStr, counting Mon-Fri transitions.
+  // Parse as local-neutral Date so getDay() reflects the calendar day we just
+  // serialized (no TZ round-trip needed since we're only comparing weekdays).
+  const [ay, am, ad] = aDateStr.split("-").map(Number);
+  const [by, bm, bd] = bDateStr.split("-").map(Number);
+  let cursor = new Date(ay, am - 1, ad);
+  const end = new Date(by, bm - 1, bd);
+  let count = 0;
+  while (cursor.getTime() < end.getTime()) {
+    cursor = new Date(
+      cursor.getFullYear(),
+      cursor.getMonth(),
+      cursor.getDate() + 1,
+    );
+    const dow = cursor.getDay(); // 0=Sun..6=Sat
+    if (dow !== 0 && dow !== 6) count += 1;
+  }
+  return count;
+}
