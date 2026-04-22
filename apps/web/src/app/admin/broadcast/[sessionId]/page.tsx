@@ -22,6 +22,7 @@ import {
   clearOverlayAction,
   endSessionAction,
 } from "../actions";
+import { STARTER_PAYLOADS } from "./starter-payloads";
 
 export const dynamic = "force-dynamic";
 
@@ -60,54 +61,6 @@ async function resolveAdmin() {
   }
   return sb;
 }
-
-// Sensible starter payload per template so the Trigger form is one-click
-// viable in the common case.
-const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
-  scorebar: {
-    homeName: "Home",
-    awayName: "Away",
-    homeScore: 0,
-    awayScore: 0,
-  },
-  lower_third: {
-    playerId: "00000000-0000-4000-8000-000000000000",
-    displayName: "Player Name",
-    gamerTag: "GAMER_TAG",
-    jerseyNumber: 10,
-  },
-  standings_widget: {
-    topN: 3,
-    rows: [
-      { rank: 1, displayName: "Anon-01", pts: 9, gd: 5 },
-      { rank: 2, displayName: "Anon-02", pts: 7, gd: 2 },
-      { rank: 3, displayName: "Anon-03", pts: 4, gd: 0 },
-    ],
-  },
-  player_card: {
-    playerId: "00000000-0000-4000-8000-000000000000",
-    displayName: "Player Name",
-    gamerTag: "GAMER_TAG",
-    seasonStats: { gp: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 },
-  },
-  punishment_ticker: {
-    items: [
-      {
-        playerName: "Player Name",
-        sanction: "warning",
-        magnitude: "-1 pt",
-        issuedAt: "2026-04-20",
-      },
-    ],
-  },
-  intro: {
-    matchDayLabel: "Match Day 01",
-    seasonLabel: "Elite 25/26",
-  },
-  outro: {
-    matchDayLabel: "Match Day 01",
-  },
-};
 
 export default async function BroadcastSessionPage({
   params,
