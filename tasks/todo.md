@@ -1,6 +1,25 @@
 # Tasks — Active Work
 
-Active plan: **Plan 9 — Phase 1B Part A: Full 12-role matrix + DB-backed permissions + admin role editor**. Spec: `docs/superpowers/specs/2026-04-21-plan-9-roles-and-db-perms.md`. Plan 8 complete 2026-04-20.
+Active plan: **Plan 23 — FCDB squad validation in the ref-review surface**. Spec: `docs/superpowers/specs/2026-04-22-plan-23-fcdb-squad-validation.md`. Earlier plans archived below.
+
+## Plan 23 tasks (active 2026-04-22)
+
+- [x] 1. Spec drafted at `docs/superpowers/specs/2026-04-22-plan-23-fcdb-squad-validation.md`. This todo updated.
+- [ ] 2. Migration `20260507000001_squad_items_fcdb_link.sql` — add `resolved_fc_player_id` FK + partial index. `npm run db:push`.
+- [ ] 3. `apps/web/src/server/squads/fcdb_review.ts` + `fcdb_review.test.ts` — `reviewSquadAgainstFCDB` + `acceptFcdbCandidate`, ≥10 unit tests covering empty-FCDB, resolved/ambiguous/fuzzy/unknown paths, perm denial, FK validation.
+- [ ] 4. Re-export from `server/squads/index.ts`.
+- [ ] 5. New `apps/web/src/components/squads/FcdbBadge.tsx` — pure-Tailwind client component, ≤5 KB gzipped.
+- [ ] 6. Edit `apps/web/src/app/admin/squads/[id]/page.tsx` — call review, render summary chip + per-row badges.
+- [ ] 7. Add `acceptFcdbCandidateAction` to `apps/web/src/app/admin/squads/[id]/actions.ts`.
+- [ ] 8. E2E `apps/web/tests/e2e/squad-fcdb-review.spec.ts` — empty-FCDB tolerant.
+- [ ] 9. Verification gate: lint + targeted vitest + targeted Playwright + dev-server smoke (curl + log scan).
+- [ ] 10. Commit per slice + push via PAT URL.
+
+---
+
+## Archived plans
+
+Plan 9 — Phase 1B Part A: Full 12-role matrix + DB-backed permissions + admin role editor (spec: `docs/superpowers/specs/2026-04-21-plan-9-roles-and-db-perms.md`). Plan 8 complete 2026-04-20.
 
 Parallel Phase 1B/2 specs drafted 2026-04-21:
 - Plan 9 (active) — `docs/superpowers/specs/2026-04-21-plan-9-roles-and-db-perms.md`
