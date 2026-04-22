@@ -21,6 +21,14 @@ import { H2HGrid } from "@/components/profile/H2HGrid";
 import { SanctionsList } from "@/components/profile/SanctionsList";
 import { SquadStatusWidget } from "@/components/profile/SquadStatusWidget";
 import { SectionHeader } from "@/components/admin/SectionHeader";
+import Link from "next/link";
+
+const STAFF_ROLES = new Set(["admin", "loc", "idc", "referee", "production", "moderator"]);
+function consoleLinkForRoles(roles: readonly string[]): { href: string; label: string } {
+  if (roles.some((r) => STAFF_ROLES.has(r))) return { href: "/admin", label: "Back to console" };
+  if (roles.includes("player")) return { href: "/player", label: "Back to player dashboard" };
+  return { href: "/", label: "Back to home" };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -206,12 +214,24 @@ export default async function ProfileSelfPage({
     }
   }
 
+  const back = consoleLinkForRoles(roles);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 md:px-6 md:py-10">
+      <div className="flex items-center justify-between">
+        <Link
+          href={back.href}
+          className="inline-flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--chalk-1)] transition-colors hover:border-[var(--signal)] hover:text-[var(--signal)]"
+          data-testid="profile-back-link"
+        >
+          <span aria-hidden>←</span>
+          {back.label}
+        </Link>
+      </div>
       <SectionHeader
         eyebrow="Profile"
         title={profile.displayName || "Your profile"}
-        description="Edit your display name, photo, and bio. Role assignments + email live on the admin surface."
+        description="Edit your display name and bio. Photo + role assignments + email live on the admin surface."
       />
       <ProfilePanel
         profile={profile}

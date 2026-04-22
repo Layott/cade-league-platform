@@ -189,26 +189,17 @@ export function ProfilePanel({ profile, editable, actorUserId }: Props) {
                 data-testid="edit-display-name"
               />
             </FormField>
-            <FormField
-              label="Photo URL"
-              htmlFor="profile-photo-url"
-              hint={
-                profile.hasPlayerRow
-                  ? "http(s) URL or site-relative path"
-                  : "Available once a player row exists (Plan 41)."
-              }
-            >
-              <input
-                id="profile-photo-url"
-                name="photo_url"
-                type="text"
-                defaultValue={profile.photoUrl ?? ""}
-                maxLength={2048}
-                className={inputClass}
-                disabled={!profile.hasPlayerRow}
-                data-testid="edit-photo-url"
-              />
-            </FormField>
+            {/*
+              Photo URL input hidden by default — players have their photo
+              pre-populated from brand assets; non-players don't need a
+              photo at all. Pass the existing value through so the server
+              action doesn't clear it on save.
+            */}
+            <input
+              type="hidden"
+              name="photo_url"
+              value={profile.photoUrl ?? ""}
+            />
             <div className="md:col-span-2">
               <FormField
                 label="Bio"
