@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import type { SquadItemReview } from "@/server/squads";
+import { selectClass } from "@/components/admin/FormField";
+import { PrimaryButton } from "@/components/admin/buttons";
 
 /**
  * Plan 23 — per-row FCDB validation chip rendered inline with each
@@ -150,7 +152,7 @@ export function FcdbBadge({ review, onPickAction }: FcdbBadgeProps) {
                   value={pickedId}
                   onChange={(e) => setPickedId(e.target.value)}
                   required
-                  className="flex-1 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 text-[11px] text-[var(--chalk-1)]"
+                  className={selectClass + " flex-1 px-2 py-1 text-[11px]"}
                   data-testid={`fcdb-pick-select-${review.itemId}`}
                 >
                   <option value="">— select —</option>
@@ -166,14 +168,14 @@ export function FcdbBadge({ review, onPickAction }: FcdbBadgeProps) {
                     </option>
                   ))}
                 </select>
-                <button
+                <PrimaryButton
                   type="submit"
+                  size="sm"
                   disabled={isPending || !pickedId}
-                  className="rounded-sm border border-[var(--primary)] bg-[var(--primary)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ink-1)] disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid={`fcdb-pick-submit-${review.itemId}`}
                 >
-                  {isPending ? "…" : "lock"}
-                </button>
+                  {isPending ? "…" : "Lock"}
+                </PrimaryButton>
               </form>
             ) : null}
           </>
