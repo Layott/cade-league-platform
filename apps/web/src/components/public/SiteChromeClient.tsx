@@ -37,14 +37,14 @@ function isActive(pathname: string, href: string): boolean {
 export function SiteChromeClient({
   authenticated,
   isStaff,
-  displayName,
-  unread,
+  userBadge,
+  announcementBell,
   children,
 }: {
   authenticated: boolean;
   isStaff: boolean;
-  displayName: string | null;
-  unread: number;
+  userBadge: ReactNode;
+  announcementBell: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname() ?? "/";
@@ -60,8 +60,8 @@ export function SiteChromeClient({
         pathname={pathname}
         authenticated={authenticated}
         isStaff={isStaff}
-        displayName={displayName}
-        unread={unread}
+        userBadge={userBadge}
+        announcementBell={announcementBell}
       />
       <main className="flex-1">{children}</main>
       <SiteFooter />
@@ -73,14 +73,14 @@ function SiteHeader({
   pathname,
   authenticated,
   isStaff,
-  displayName,
-  unread,
+  userBadge,
+  announcementBell,
 }: {
   pathname: string;
   authenticated: boolean;
   isStaff: boolean;
-  displayName: string | null;
-  unread: number;
+  userBadge: ReactNode;
+  announcementBell: ReactNode;
 }) {
   const adminActive = pathname.startsWith("/admin");
   return (
@@ -127,28 +127,7 @@ function SiteHeader({
           })}
         </nav>
         <div className="flex items-center gap-2">
-          {authenticated ? (
-            <Link
-              href="/admin/announcements"
-              aria-label={
-                unread > 0
-                  ? `Notifications: ${unread} unread`
-                  : "Notifications"
-              }
-              className="relative inline-flex h-8 w-8 items-center justify-center rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] text-[var(--chalk-1)] transition-colors hover:border-[var(--signal)] hover:text-[var(--signal)]"
-              data-testid="bell"
-            >
-              <BellIcon />
-              {unread > 0 ? (
-                <span
-                  className="absolute -top-1.5 -right-1.5 min-w-[18px] rounded-full bg-[var(--flare)] px-1 py-0.5 text-[10px] font-bold leading-none text-white tabular"
-                  data-testid="bell-count"
-                >
-                  {unread > 99 ? "99+" : unread}
-                </span>
-              ) : null}
-            </Link>
-          ) : null}
+          {announcementBell}
 
           {isStaff ? (
             <Link
@@ -174,29 +153,7 @@ function SiteHeader({
             </Link>
           ) : null}
 
-          {authenticated ? (
-            <form action="/logout" method="post" className="hidden sm:block">
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-transparent px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--chalk-2)] transition-colors hover:border-[var(--flare)] hover:text-[var(--flare)]"
-                data-testid="nav-sign-out"
-                title={displayName ? `Sign out ${displayName}` : "Sign out"}
-              >
-                Sign out
-              </button>
-            </form>
-          ) : (
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--chalk-1)] transition-colors hover:border-[var(--signal)] hover:text-[var(--signal)]"
-            >
-              <span
-                aria-hidden
-                className="h-1.5 w-1.5 rounded-full bg-[var(--signal)] pulse-dot"
-              />
-              Staff
-            </Link>
-          )}
+          {userBadge}
         </div>
       </div>
       {/* Mobile nav row */}
@@ -317,22 +274,3 @@ function CadeMark({ small = false }: { small?: boolean }) {
   );
 }
 
-function BellIcon() {
-  return (
-    <svg
-      aria-hidden
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M8 2v1" />
-      <path d="M4 7a4 4 0 1 1 8 0c0 3 1 4 1 4H3s1-1 1-4Z" />
-      <path d="M6.5 13a1.6 1.6 0 0 0 3 0" />
-    </svg>
-  );
-}

@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { getUnreadCountForAuthUser } from "@/lib/notifications/unreadCount";
 import { SiteChromeClient } from "./SiteChromeClient";
+import { UserBadge } from "./UserBadge";
+import { AnnouncementBell } from "./AnnouncementBell";
 
 /**
  * SiteChrome is a Server Component wrapper that reads the current session
@@ -15,8 +16,6 @@ import { SiteChromeClient } from "./SiteChromeClient";
 
 export async function SiteChrome({ children }: { children: ReactNode }) {
   let isStaff = false;
-  let displayName: string | null = null;
-  let unread = 0;
   let authenticated = false;
 
   try {
@@ -29,26 +28,26 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
       authenticated = true;
       const { data: pub } = await sb
         .from("users")
-        .select("id, display_name")
+        .select("id")
         .eq("supabase_auth_id", user.id)
         .maybeSingle();
 
       if (pub) {
-        displayName = pub.display_name ?? null;
         const { data: rolesRows } = await sb
           .from("user_roles")
           .select("role")
           .eq("user_id", pub.id)
           .is("deleted_at", null);
         const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
-        isStaff = roles.some((r) => r === "admin" || r === "moderator");
-      }
-
-      // Unread count for the bell (any authenticated user with a public users row).
-      try {
-        unread = await getUnreadCountForAuthUser(sb);
-      } catch {
-        unread = 0;
+        isStaff = roles.some(
+          (r) =>
+            r === "admin" ||
+            r === "moderator" ||
+            r === "loc" ||
+            r === "idc" ||
+            r === "referee" ||
+            r === "production",
+        );
       }
     }
   } catch {
@@ -56,12 +55,16 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
     // crashing the entire site. The /admin middleware still gates writes.
   }
 
+  // UserBadge (server component) + AnnouncementBell (client) rendered in
+  // the server parent so the client shell can slot them without having to
+  // compute auth itself. UserBadge falls back to a Sign-in link when the
+  // session read fails, so this stays safe under auth errors.
   return (
     <SiteChromeClient
       authenticated={authenticated}
       isStaff={isStaff}
-      displayName={displayName}
-      unread={unread}
+      userBadge={<UserBadge />}
+      announcementBell={authenticated ? <AnnouncementBell /> : null}
     >
       {children}
     </SiteChromeClient>

@@ -209,19 +209,17 @@ export async function adjustClock(
   const cur = await getClock(sb, sessionId);
   // Auto-init to 0/stopped on first adjust — matches the UX intent of
   // "press +30 to start at 30 seconds" without a separate Start-clock step.
-  const base = cur ?? {
-    mode: "stopped" as ClockMode,
-    secondsRemaining: 0,
-    setAt: new Date().toISOString(),
-    label: null,
-  };
-  const display = computeDisplay(base, Date.now());
+  // For the fallback path, `display` is simply 0 (no tick elapsed on a
+  // just-initialised clock), so skip computeDisplay entirely.
+  const display = cur ? computeDisplay(cur, Date.now()) : 0;
+  const mode: ClockMode = cur?.mode ?? "stopped";
+  const label = cur?.label ?? null;
   const next = Math.max(0, display + deltaSeconds);
   return upsertClock(sb, sessionId, {
-    mode: base.mode,
+    mode,
     secondsRemaining: next,
     setAt: new Date().toISOString(),
-    label: base.label,
+    label,
     userId,
   });
 }
