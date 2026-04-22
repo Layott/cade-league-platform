@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { getProfileView } from "@/server/profile/read";
 import {
   getSeasonStats,
@@ -43,7 +44,13 @@ export default async function ProfileSelfPage({
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) redirect("/login?next=/profile");
 
-  const { data: pub } = await sb
+  // Plan 39 C2 revoked anon+authenticated SELECT on users.email + other PII
+  // columns, so every server read touching those columns must use the
+  // service-role client. /profile routes are already self-gated by the
+  // auth.getUser() check above and getProfileView's actor check.
+  const svc = getServiceRoleSupabase();
+
+  const { data: pub } = await svc
     .from("users")
     .select("id")
     .eq("supabase_auth_id", auth.user.id)
@@ -51,14 +58,14 @@ export default async function ProfileSelfPage({
     .maybeSingle();
   if (!pub) redirect("/login?next=/profile");
 
-  const { data: roleRows } = await sb
+  const { data: roleRows } = await svc
     .from("user_roles")
     .select("role")
     .eq("user_id", pub.id)
     .is("deleted_at", null);
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
 
-  const profile = await getProfileView(sb, {
+  const profile = await getProfileView(svc, {
     userId: pub.id as string,
     roles,
   });
@@ -72,8 +79,8 @@ export default async function ProfileSelfPage({
   let playerBlock: React.ReactNode = null;
   if (hasPlayerRole) {
     const [season, playerRow] = await Promise.all([
-      getActiveSeason(sb),
-      sb
+      getActiveSeason(svc),
+      svc
         .from("players")
         .select("id")
         .eq("user_id", pub.id)
@@ -86,15 +93,15 @@ export default async function ProfileSelfPage({
       const now = new Date();
       const [stats, form, streaks, history, h2h, sanctions, squadStatus] =
         await Promise.all([
-          getSeasonStats(sb, playerRow.id, season.id),
-          getFormLastN(sb, playerRow.id, season.id, 5),
-          getCurrentStreaks(sb, playerRow.id, season.id),
-          getMatchHistory(sb, playerRow.id, season.id, {
+          getSeasonStats(svc, playerRow.id, season.id),
+          getFormLastN(svc, playerRow.id, season.id, 5),
+          getCurrentStreaks(svc, playerRow.id, season.id),
+          getMatchHistory(svc, playerRow.id, season.id, {
             page: mhPage,
             pageSize: PAGE_SIZE,
           }),
-          getH2HGrid(sb, playerRow.id, season.id),
-          sb
+          getH2HGrid(svc, playerRow.id, season.id),
+          svc
             .from("disciplinary_actions")
             .select(
               "id, disciplinary_case_id, sanction_type, magnitude, incident_type, issued_at, effective_from, effective_until, notes",
@@ -103,10 +110,10 @@ export default async function ProfileSelfPage({
             .is("deleted_at", null)
             .order("issued_at", { ascending: false })
             .then((r) => r.data ?? []),
-          getCurrentSquadStatus(sb, playerRow.id, now),
+          getCurrentSquadStatus(svc, playerRow.id, now),
         ]);
 
-      const { data: appealedRows } = await sb
+      const { data: appealedRows } = await svc
         .from("appeals")
         .select("disciplinary_action_id, status")
         .in(

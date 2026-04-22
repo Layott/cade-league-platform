@@ -31,7 +31,13 @@ export default async function ProfileByIdPage({
   const { data: auth } = await userClient.auth.getUser();
   if (!auth.user) redirect(`/login?next=/profile/${targetUserId}`);
 
-  const { data: pub } = await userClient
+  // Plan 39 C2 revoked anon/authenticated SELECT on users.email —
+  // getProfileView reads email so use service-role throughout. The
+  // route is self-gated by the auth.getUser check above;
+  // getProfileView itself enforces the admin cross-view perm check.
+  const svc = getServiceRoleSupabase();
+
+  const { data: pub } = await svc
     .from("users")
     .select("id")
     .eq("supabase_auth_id", auth.user.id)
@@ -39,17 +45,15 @@ export default async function ProfileByIdPage({
     .maybeSingle();
   if (!pub) redirect(`/login?next=/profile/${targetUserId}`);
 
-  const { data: roleRows } = await userClient
+  const { data: roleRows } = await svc
     .from("user_roles")
     .select("role")
     .eq("user_id", pub.id)
     .is("deleted_at", null);
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
 
-  // Self-targeted URL collapses to the self page view (no perm elevation
-  // needed); route still valid + avoids mis-rendering as cross-view.
   const isSelf = targetUserId === pub.id;
-  const sb = isSelf ? userClient : getServiceRoleSupabase();
+  const sb = svc;
 
   let profile;
   try {

@@ -186,7 +186,7 @@ export function AnnouncementsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="announcements-title"
-        className="relative flex max-h-[85vh] w-full max-w-[640px] flex-col overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl"
+        className="relative flex h-[80vh] max-h-[800px] min-h-[500px] w-full max-w-[640px] flex-col overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl"
         data-testid="announcements-modal"
       >
         <header className="flex items-center justify-between gap-3 border-b border-[var(--ink-4)] bg-[var(--ink-2)] px-5 py-4">

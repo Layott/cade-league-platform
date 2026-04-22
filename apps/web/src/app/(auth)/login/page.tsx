@@ -117,7 +117,12 @@ export default async function LoginPage({
               </div>
             ) : null}
 
-            <input type="hidden" name="next" value={sp.next ?? "/admin"} />
+            {/* Only forward `next` when the user landed here via a
+                middleware redirect (e.g. /admin/something → /login?next=…).
+                No explicit next = role-aware default in the server action. */}
+            {sp.next ? (
+              <input type="hidden" name="next" value={sp.next} />
+            ) : null}
 
             <FormField label="Email">
               <input
