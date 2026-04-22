@@ -3,8 +3,9 @@
 -- Supersedes the synthetic Berger-table seed in
 -- `supabase/seed/plan18_fixtures.sql`. The synthetic seed laid out 13 rounds
 -- of 6 matches across Saturdays from 2025-11-01; this real schedule is 8
--- match-days (mixed Sat/Sun, weekly cadence with one gap) totalling 78
--- fixtures, copy-pasted verbatim from the LOC announcement.
+-- match-days (Saturdays + Sundays from 2026-04-26 through 2026-05-30,
+-- with one weekend skipped before the finale) totalling 78 fixtures,
+-- copy-pasted verbatim from the LOC announcement.
 --
 -- Key shape changes vs Plan 18:
 --   * 8 match-days instead of 13.
@@ -17,10 +18,15 @@
 --     so the UI can render them in the announced order regardless of
 --     `scheduled_time` (which the LOC schedule leaves blank).
 --
--- Date assumption flagged for user confirmation:
---   * The LOC text wrote "23rd May" for DAY 2. With DAY 1 = Sun 2026-04-26
---     and weekly cadence, DAY 2 must be Sat 2026-05-02. Hard-coded as
---     2026-05-02 here. Edit + re-run if the LOC date is actually different.
+-- Calendar (verified against the 2026 calendar — every day is a real Sat/Sun):
+--   DAY 1  Sun 2026-04-26 (10 matches)
+--   DAY 2  Sat 2026-05-02 (11 matches)
+--   DAY 3  Sun 2026-05-03  (9 matches)
+--   DAY 4  Sat 2026-05-09 (11 matches)
+--   DAY 5  Sun 2026-05-10 (10 matches)
+--   DAY 6  Sat 2026-05-16 (10 matches)
+--   DAY 7  Sun 2026-05-17  (9 matches)
+--   DAY 8  Sat 2026-05-30  (8 matches, finale — weekend of 5/23-5/24 skipped)
 --
 -- This seed is destructive within the active season's match domain:
 -- it soft-deletes every existing match_day + match (those rows live on for
@@ -85,12 +91,12 @@ begin
   values
     (v_season_id, date '2026-04-26', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
     (v_season_id, date '2026-05-02', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
-    (v_season_id, date '2026-05-04', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
+    (v_season_id, date '2026-05-03', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
+    (v_season_id, date '2026-05-09', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
     (v_season_id, date '2026-05-10', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
-    (v_season_id, date '2026-05-11', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
+    (v_season_id, date '2026-05-16', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
     (v_season_id, date '2026-05-17', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
-    (v_season_id, date '2026-05-18', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled'),
-    (v_season_id, date '2026-05-25', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled');
+    (v_season_id, date '2026-05-30', time '09:00', time '10:00', 'CADE Studio, Lagos', 'scheduled');
 end
 $seed$;
 
@@ -248,416 +254,416 @@ select md.season_id, md.id,
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
                            and md.match_date = date '2026-05-02' and md.deleted_at is null;
 
--- DAY 3 — Sunday 2026-05-04 (rest: KAYKAY, GURU) — 9 matches
+-- DAY 3 — Sunday 2026-05-03 (rest: KAYKAY, GURU) — 9 matches
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        1, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
        2, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
        3, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        4, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        5, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        6, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
        7, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        8, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        9, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-04' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-03' and md.deleted_at is null;
 
--- DAY 4 — Saturday 2026-05-10 (rest: KILLER_FREAK, WOLEVATION) — 11 matches
+-- DAY 4 — Saturday 2026-05-09 (rest: KILLER_FREAK, WOLEVATION) — 11 matches
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        1, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        2, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
        3, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        4, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        5, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        6, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        7, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
        8, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        9, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        10, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        11, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-09' and md.deleted_at is null;
+
+-- DAY 5 — Sunday 2026-05-10 (rest: ADEFOLA, ANIFE) — 10 matches
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
+       1, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
+       2, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
+       3, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
+       4, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
+       5, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
+       6, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
+       7, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
+       8, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
+       9, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
+                           and md.match_date = date '2026-05-10' and md.deleted_at is null;
+insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
+select md.season_id, md.id,
+       (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
+       (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
+       10, 'scheduled'
+  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
                            and md.match_date = date '2026-05-10' and md.deleted_at is null;
 
--- DAY 5 — Sunday 2026-05-11 (rest: ADEFOLA, ANIFE) — 10 matches
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
-       1, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
-       2, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
-       3, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
-       4, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
-       5, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
-       6, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
-       7, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
-       8, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
-       9, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
-select md.season_id, md.id,
-       (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
-       (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
-       10, 'scheduled'
-  from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-11' and md.deleted_at is null;
-
--- DAY 6 — Saturday 2026-05-17 (rest: MR_OGA, BAJI_JNR) — 10 matches
+-- DAY 6 — Saturday 2026-05-16 (rest: MR_OGA, BAJI_JNR) — 10 matches
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
        1, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
        2, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        3, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        4, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        5, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
        6, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        7, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        8, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        9, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
        10, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-16' and md.deleted_at is null;
 
--- DAY 7 — Sunday 2026-05-18 (rest: DADABOI, MITCH) — 9 matches
+-- DAY 7 — Sunday 2026-05-17 (rest: DADABOI, MITCH) — 9 matches
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        1, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        2, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
        3, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        4, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        5, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        6, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        7, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        8, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
        9, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-18' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-17' and md.deleted_at is null;
 
--- DAY 8 — Sunday 2026-05-25 (rest: none) — 8 matches
+-- DAY 8 — Saturday 2026-05-30 (rest: none) — 8 matches (finale; weekend gap before)
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'DADABOI'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        1, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'MITCH'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        2, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'BAJI_JNR'     and p.deleted_at is null),
        3, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'GURU'         and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'WOLEVATION'   and p.deleted_at is null),
        4, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ADEFOLA'      and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KAYKAY'       and p.deleted_at is null),
        5, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'MR_OGA'       and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'TACTICAL'     and p.deleted_at is null),
        6, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'ANIFE'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KINGNONEX'    and p.deleted_at is null),
        7, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 insert into public.matches (season_id, match_day_id, home_player_id, away_player_id, match_order, status)
 select md.season_id, md.id,
        (select p.id from public.players p where p.gamer_tag = 'FARUK'        and p.deleted_at is null),
        (select p.id from public.players p where p.gamer_tag = 'KILLER_FREAK' and p.deleted_at is null),
        8, 'scheduled'
   from public.match_days md where md.season_id = (select id from public.seasons where status='active' and deleted_at is null limit 1)
-                           and md.match_date = date '2026-05-25' and md.deleted_at is null;
+                           and md.match_date = date '2026-05-30' and md.deleted_at is null;
 
 -- 4. Verification — raise if any home/away id is NULL (means a gamer_tag
 -- failed to resolve), if total is not 78, or if any participant has != 12
