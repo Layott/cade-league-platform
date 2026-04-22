@@ -1,6 +1,8 @@
+import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publish } from "./realtime";
 import { REALTIME } from "@/server/overlays/registry";
+import { requirePermAsync } from "@/lib/perms-db";
 
 /**
  * Plan 12 — stream session lifecycle.
@@ -9,6 +11,11 @@ import { REALTIME } from "@/server/overlays/registry";
  * endSession() first clears any still-active overlay events, then sets
  * `ended_at`, then pushes a session.ended broadcast so any still-open
  * overlay browser sources blank themselves.
+ *
+ * Plan 39 M3 — every new session is minted with a `view_token` that the
+ * unauthenticated `/api/broadcast/sessions/:id/active` endpoint requires.
+ * Historical pre-M3 rows carry `view_token IS NULL` and remain publicly
+ * readable (see migration comment for threat model).
  */
 
 export type StartSessionInput = {
@@ -27,6 +34,14 @@ export type StreamSessionRow = {
   started_by_user_id: string;
   notes: string | null;
 };
+
+/**
+ * Plan 39 M3: mint a 32-byte base64url view_token. Unpadded length is 43
+ * characters; stripping any `=` padding keeps the token URL-safe.
+ */
+export function generateViewToken(): string {
+  return randomBytes(32).toString("base64url");
+}
 
 export async function getActiveSession(
   sb: SupabaseClient,
@@ -47,13 +62,16 @@ export async function getActiveSession(
 export async function startSession(
   sb: SupabaseClient,
   input: StartSessionInput,
-): Promise<{ id: string }> {
+): Promise<{ id: string; viewToken: string }> {
   const existing = await getActiveSession(sb, input.matchDayId);
   if (existing) {
     throw new Error(
       `stream session already active for match_day ${input.matchDayId}`,
     );
   }
+
+  // Plan 39 M3: mint a per-session view_token at create time.
+  const viewToken = generateViewToken();
 
   const { data, error } = await sb
     .from("stream_sessions")
@@ -62,6 +80,7 @@ export async function startSession(
       started_by_user_id: input.userId,
       session_tag: input.tag ?? null,
       notes: input.notes ?? null,
+      view_token: viewToken,
     })
     .select("id")
     .single();
@@ -70,7 +89,34 @@ export async function startSession(
       `startSession failed: ${error?.message ?? "no row returned"}`,
     );
   }
-  return { id: data.id };
+  return { id: data.id, viewToken };
+}
+
+/**
+ * Plan 39 M3: rotate the view_token for a live session. Any browser
+ * source still using the old `?t=` value will start getting 401 on its
+ * next /active poll — intended behaviour when an operator suspects the
+ * token leaked. Requires `broadcast.manage` — enforced via perms-db.
+ *
+ * Returns the new token so the caller can surface it in the admin UI.
+ */
+export async function rotateViewToken(
+  sb: SupabaseClient,
+  sessionId: string,
+  actor: { userId: string; roles: readonly string[] },
+): Promise<{ viewToken: string }> {
+  await requirePermAsync(sb, actor, "broadcast.manage");
+
+  const newToken = generateViewToken();
+  const { error } = await sb
+    .from("stream_sessions")
+    .update({ view_token: newToken })
+    .eq("id", sessionId)
+    .is("deleted_at", null);
+  if (error) {
+    throw new Error(`rotateViewToken failed: ${error.message}`);
+  }
+  return { viewToken: newToken };
 }
 
 export async function endSession(
