@@ -6,6 +6,7 @@ import {
   PitchLayout,
   formationLabel,
   getFormationSlots,
+  FORMATION_GROUPS,
   type FormationKey,
   type SlotPosition,
 } from "./PitchLayout";
@@ -29,7 +30,6 @@ import type { CardSearchResult } from "@/server/fcdb/search";
  * instead of mounting this component — we don't branch read-only here.
  */
 
-const FORMATIONS: FormationKey[] = ["433", "442", "4231", "352"];
 const MAX_SUBS = 7;
 
 export type SquadPickerBuilderProps = {
@@ -82,6 +82,59 @@ export function SquadPickerBuilder({
     setDialogTarget({ kind: "slot", slot });
     setDialogOpen(true);
   }, []);
+
+  /**
+   * Remap filled slots when the formation changes. Strategy: for each
+   * destination slot (in order), find the first unconsumed source slot that
+   * shares the same position label. Remaining filled cards that don't match
+   * are dropped onto the subs bench if space is available; otherwise cleared.
+   */
+  const switchFormation = useCallback(
+    (next: FormationKey) => {
+      if (next === formation) return;
+      const prevDefs = getFormationSlots(formation);
+      const nextDefs = getFormationSlots(next);
+
+      const filled = prevDefs
+        .map((d) => ({ label: d.label, card: slots[d.slotIndex] ?? null }))
+        .filter((x) => x.card !== null) as Array<{
+        label: string;
+        card: CardSearchResult;
+      }>;
+
+      const remapped: Record<number, CardSearchResult | null> = {};
+      for (let i = 0; i < 11; i++) remapped[i] = null;
+
+      const consumed = new Set<number>();
+      nextDefs.forEach((slot) => {
+        const matchIdx = filled.findIndex(
+          (f, i) => !consumed.has(i) && f.label === slot.label,
+        );
+        if (matchIdx >= 0) {
+          remapped[slot.slotIndex] = filled[matchIdx].card;
+          consumed.add(matchIdx);
+        }
+      });
+
+      // Push unmatched cards onto the subs bench (first empty slots).
+      const leftover = filled.filter((_, i) => !consumed.has(i)).map((x) => x.card);
+      if (leftover.length > 0) {
+        setSubs((currentSubs) => {
+          const nextSubs = [...currentSubs];
+          for (const card of leftover) {
+            const emptyIdx = nextSubs.findIndex((s) => s === null);
+            if (emptyIdx === -1) break;
+            nextSubs[emptyIdx] = card;
+          }
+          return nextSubs;
+        });
+      }
+
+      setSlots(remapped);
+      setFormation(next);
+    },
+    [formation, slots],
+  );
 
   const openSub = useCallback((index: number) => {
     setDialogTarget({ kind: "sub", index });
@@ -209,27 +262,45 @@ export function SquadPickerBuilder({
       <div className="flex flex-col gap-4">
         <div
           data-testid="formation-switcher"
-          className="flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-2"
+          className="flex flex-wrap items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-2"
         >
-          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+          <label
+            htmlFor="formation-select"
+            className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]"
+          >
             Formation
-          </span>
-          {FORMATIONS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              data-testid={`formation-${f}`}
-              onClick={() => setFormation(f)}
-              className={
-                "rounded-sm px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors " +
-                (formation === f
-                  ? "bg-[var(--signal)] text-black"
-                  : "bg-[var(--ink-1)] text-[var(--chalk-2)] hover:text-[var(--signal)]")
-              }
-            >
-              {formationLabel(f)}
-            </button>
-          ))}
+          </label>
+          <select
+            id="formation-select"
+            data-testid="formation-select"
+            value={formation}
+            onChange={(e) => switchFormation(e.target.value as FormationKey)}
+            className="rounded-sm bg-[var(--ink-1)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--chalk-1)] focus:outline-none focus:ring-1 focus:ring-[var(--signal)]"
+          >
+            {FORMATION_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.keys.map((f) => (
+                  <option key={f} value={f} data-testid={`formation-option-${f}`}>
+                    {formationLabel(f)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          {/* Hidden buttons preserve the historical data-testid for legacy
+              tests that click `formation-433` / `formation-442` etc. */}
+          <div className="sr-only" aria-hidden="true">
+            {FORMATION_GROUPS.flatMap((g) => g.keys).map((f) => (
+              <button
+                key={f}
+                type="button"
+                data-testid={`formation-${f}`}
+                onClick={() => switchFormation(f)}
+              >
+                {formationLabel(f)}
+              </button>
+            ))}
+          </div>
         </div>
 
         <PitchLayout

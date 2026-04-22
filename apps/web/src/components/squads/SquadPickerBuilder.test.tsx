@@ -100,6 +100,55 @@ describe("SquadPickerBuilder", () => {
     expect(slot0.getAttribute("data-card-id")).toBeTruthy();
   });
 
+  it("preserves GK + CB picks when swapping from 4-3-3 to 5-3-2", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (String(url).startsWith("/api/fcdb/search")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ results: [mkCard()] }),
+        });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    render(
+      <SquadPickerBuilder
+        weekStartDate="2026-04-16"
+        rule={null}
+        submitAction={vi.fn()}
+        requestUploadUrlAction={vi.fn()}
+      />,
+    );
+
+    // Fill GK (slot 0) + both CBs (slots 2, 3 in 4-3-3).
+    for (const idx of [0, 2, 3]) {
+      fireEvent.click(screen.getByTestId(`pitch-slot-${idx}`));
+      fireEvent.change(screen.getByTestId("card-search-input"), {
+        target: { value: `Name${idx}00` },
+      });
+      const row = await screen.findByTestId("card-search-result-0");
+      fireEvent.click(row.querySelector("button[type='button']")!);
+    }
+
+    // Swap to 5-3-2 via the hidden testid-shim button.
+    fireEvent.click(screen.getByTestId("formation-532"));
+
+    // In 5-3-2: GK stays at slot 0, and the three CBs map into 2/3/4.
+    const gkSlot = screen.getByTestId("pitch-slot-0");
+    expect(gkSlot.getAttribute("data-card-id")).toBeTruthy();
+
+    // At least two CB slots in 5-3-2 should carry cards (remap up to two
+    // 4-3-3 CBs into the three 5-3-2 CB slots).
+    const cbFilled =
+      [2, 3, 4].filter(
+        (i) =>
+          screen
+            .getByTestId(`pitch-slot-${i}`)
+            .getAttribute("data-card-id") !== null,
+      ).length;
+    expect(cbFilled).toBeGreaterThanOrEqual(2);
+  });
+
   it("enables submit button once 11 slots + screenshot landed", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (String(url).startsWith("/api/fcdb/search")) {
