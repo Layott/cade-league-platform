@@ -8,8 +8,10 @@ import {
   approveSubmission,
   rejectSubmission,
   acceptFcdbCandidate,
+  reopenSubmission,
 } from "@/server/squads";
 import type { Actor } from "@/perms";
+import { reopenSubmissionSchema } from "./schemas";
 
 async function loadActor(sb: Awaited<ReturnType<typeof getServerSupabase>>): Promise<Actor> {
   const {
@@ -80,4 +82,22 @@ export async function acceptFcdbCandidateAction(
   const svc = getServiceRoleSupabase();
   await acceptFcdbCandidate(svc, actor, itemId, fcPlayerId);
   if (submissionId) revalidatePath(`/admin/squads/${submissionId}`);
+}
+
+/**
+ * Plan 41 §3.5 — admin reopens a locked squad submission. Flips
+ * validation_status back to 'pending' so the player can resubmit, clears
+ * validator stamps, and notifies the player (notifications.type =
+ * 'squad_reopened'). Redirects back to the same detail page.
+ */
+export async function reopenSubmissionAction(
+  submissionId: string,
+): Promise<void> {
+  const parsed = reopenSubmissionSchema.parse({ submissionId });
+  const sb = await getServerSupabase();
+  const actor = await loadActor(sb);
+  await reopenSubmission(sb, actor, parsed.submissionId);
+  revalidatePath(`/admin/squads/${parsed.submissionId}`);
+  revalidatePath("/admin/squads");
+  redirect(`/admin/squads/${parsed.submissionId}`);
 }

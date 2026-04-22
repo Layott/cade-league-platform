@@ -2,6 +2,8 @@ export { createSubmission, lockSubmission } from "./submit";
 export type { CreateSubmissionResult } from "./submit";
 export { replaceItemsForSubmission } from "./items";
 export { approveSubmission, rejectSubmission } from "./review";
+export { reopenSubmission } from "./reopen";
+export type { ReopenResult } from "./reopen";
 export { requestChange } from "./change";
 export { getRuleForSeason, upsertRule } from "./rules";
 export type { SquadRuleRow } from "./rules";

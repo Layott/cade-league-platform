@@ -126,8 +126,12 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(hasPerm({ userId: null, roles: ["player"] }, "broadcast.manage")).toBe(false);
   });
 
-  it("admin seed is the single '*' wildcard row (do not split)", () => {
-    expect(PERMS.admin).toEqual(["*"]);
+  it("admin seed is wildcard + explicit squads.reopen (Plan 41)", () => {
+    // Admin still wins everything via '*'; we seed squads.reopen explicitly
+    // so the role_permissions table stays self-documenting for future role
+    // editors. See supabase/migrations/20260509000001_plan41_squads_reopen_perm_seed.sql.
+    expect(PERMS.admin).toContain("*");
+    expect(PERMS.admin).toContain("squads.reopen");
   });
 
   it("moderator has stats.screenshot.upload + review (Plan 14)", () => {

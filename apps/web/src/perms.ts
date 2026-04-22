@@ -31,7 +31,7 @@ export const ROLE_NAMES = [
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMS: Record<RoleName, readonly string[]> = {
-  admin: ["*"],
+  admin: ["*", "squads.reopen"],
   loc: ["squads.validate", "squads.change_authorize"],
   idc: [],
   referee: ["squads.validate", "squads.change_authorize"],

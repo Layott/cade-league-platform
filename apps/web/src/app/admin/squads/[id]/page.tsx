@@ -29,7 +29,9 @@ import {
   approveAction,
   rejectAction,
   acceptFcdbCandidateAction,
+  reopenSubmissionAction,
 } from "./actions";
+import { ReopenSubmissionButton } from "@/components/admin/ReopenSubmissionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -270,16 +272,31 @@ export default async function AdminSquadDetailPage({
         </div>
       ) : (
         <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4 text-xs text-[var(--chalk-2)]">
-          {submission.validation_status === "rejected" && submission.rejection_reason ? (
-            <>
-              <span className="font-semibold uppercase tracking-[0.18em] text-[var(--flare)]">
-                Rejected:
-              </span>{" "}
-              {submission.rejection_reason}
-            </>
-          ) : (
-            <>Decision locked — no further action.</>
-          )}
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {submission.validation_status === "rejected" &&
+              submission.rejection_reason ? (
+                <>
+                  <span className="font-semibold uppercase tracking-[0.18em] text-[var(--flare)]">
+                    Rejected:
+                  </span>{" "}
+                  {submission.rejection_reason}
+                </>
+              ) : (
+                <>Decision locked — reopen to let the player resubmit.</>
+              )}
+            </div>
+            {submission.validation_status === "approved" ||
+            submission.validation_status === "rejected" ? (
+              <ReopenSubmissionButton
+                submissionId={submission.id}
+                priorStatus={
+                  submission.validation_status as "approved" | "rejected"
+                }
+                reopenAction={reopenSubmissionAction}
+              />
+            ) : null}
+          </div>
         </section>
       )}
     </div>
