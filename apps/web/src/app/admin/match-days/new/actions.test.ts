@@ -7,10 +7,6 @@ const redirectMock = vi.hoisted(() => vi.fn((url: string) => {
 }));
 
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
-vi.mock("next/dist/client/components/redirect", () => ({
-  isRedirectError: (e: unknown) =>
-    e instanceof Error && typeof (e as { digest?: string }).digest === "string",
-}));
 
 const createMatchDayMock = vi.hoisted(() => vi.fn());
 vi.mock("@/server/matches/match-days", () => ({
@@ -44,6 +40,8 @@ describe("createMatchDayAction — error paths (Plan 26b regression)", () => {
   beforeEach(() => {
     redirectMock.mockClear();
     createMatchDayMock.mockReset();
+    // Default season lookup returns a season; tests that need empty override.
+    seasonsQuery.maybeSingle.mockResolvedValue({ data: seasonRow, error: null });
   });
 
   it("redirects with duplicate-date when unique constraint fires", async () => {
