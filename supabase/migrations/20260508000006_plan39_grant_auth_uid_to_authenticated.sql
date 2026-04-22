@@ -1,0 +1,31 @@
+-- Plan 39 C2 second follow-up — re-grant SELECT(supabase_auth_id) to the
+-- `authenticated` role.
+--
+-- Background: Plan 39 C2 (20260508000001) revoked table-wide SELECT on
+-- public.users and re-granted only (id, display_name, created_at,
+-- updated_at, deleted_at) to anon AND authenticated. The first C2
+-- follow-up (20260508000004) scoped the self-policies to `authenticated`
+-- only — but authenticated ALSO lacks SELECT on supabase_auth_id, so the
+-- EXISTS subqueries in those policies still raise 42501 at plan time for
+-- logged-in users.
+--
+-- Observable breakage: signed-in users (e.g. admin hitting /) see
+-- "permission denied for table users" on listStandings because the
+-- PostgREST embed evaluates players_self_read_any whose subquery reads
+-- users.supabase_auth_id.
+--
+-- Fix: grant SELECT(supabase_auth_id) back to `authenticated`. The
+-- column is the Supabase-auth UUID — not PII in the sense Plan 39 was
+-- locking down (email, phone). Authenticated callers already know their
+-- own UUID via auth.uid(); being able to read the column on rows they
+-- are permitted to see is table stakes for "is this my row?" policies.
+-- Anon stays blocked — the PII-protection intent is preserved.
+
+grant select (supabase_auth_id) on public.users to authenticated;
+
+-- Sanity:
+--   select grantee, column_name from information_schema.column_privileges
+--    where table_schema='public' and table_name='users'
+--      and privilege_type='SELECT' and grantee='authenticated'
+--    order by column_name;
+-- Expected: created_at, deleted_at, display_name, id, supabase_auth_id, updated_at.
