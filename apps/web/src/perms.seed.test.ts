@@ -104,8 +104,11 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(PERMS.player).toContain("squads.submit.own");
   });
 
-  it("production seed holds broadcast.trigger (Plan 12)", () => {
-    expect(PERMS.production).toEqual(["broadcast.trigger"]);
+  it("production seed holds broadcast.trigger + match_clock.manage (Plan 12 + Plan 37)", () => {
+    expect(PERMS.production).toEqual([
+      "broadcast.trigger",
+      "match_clock.manage",
+    ]);
   });
 
   it("admin matches broadcast.trigger and broadcast.manage via wildcard", () => {

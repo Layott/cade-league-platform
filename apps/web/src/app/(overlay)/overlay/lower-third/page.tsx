@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOverlayInstances } from "../../useOverlayInstances";
 import { lowerThirdSchema } from "@/server/overlays/schemas";
-import { ENTER, EXIT } from "@/lib/motion";
+import { ENTER } from "@/lib/motion";
 
 /**
  * Plan 37 — multi-instance lower-third overlay.
@@ -82,8 +82,6 @@ function LowerThirdInner() {
           );
         })}
       </AnimatePresence>
-      {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
-      {EXIT.duration /* keep token import live */}
     </div>
   );
 }
