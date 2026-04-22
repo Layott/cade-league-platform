@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const ADMIN_ROLES = new Set(["admin", "moderator"]);
+// Plan 39 M1 — widened so non-admin staff roles (loc, idc, referee,
+// production) can reach /admin/*. Per-page + per-action perm checks (via
+// requirePermAsync) still gate every individual surface, so this is purely
+// "may you cross the /admin/* threshold." `viewer`, `coach`, `team_manager`,
+// `player`, `design`, `technical` stay out.
+const ADMIN_ROLES = new Set([
+  "admin",
+  "loc",
+  "idc",
+  "referee",
+  "production",
+  "moderator",
+]);
 const PLAYER_AREA_ROLES = new Set([
   "admin",
   "moderator",

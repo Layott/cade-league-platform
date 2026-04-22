@@ -4,17 +4,17 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { requirePermAsync } from "@/lib/perms-db";
 import { restore } from "@/server/trash";
 import { isTrashEntityType } from "@/server/trash/entities";
 
 /**
  * Server Action: restore a soft-deleted row.
  *
- * Admin gating is enforced by middleware at /admin/*. We additionally verify
- * the user has an active session here (belt-and-suspenders). The actual UPDATE
- * runs via the service-role client because the Trash UI needs to clear
- * deleted_at on tables whose RLS policies may not allow the user's own JWT
- * to write (e.g. seasons, disciplinary_actions).
+ * Plan 39 C4 — re-check perms here. Middleware admits both `admin` and
+ * `moderator` to /admin/*; only `admin` should be able to restore deleted
+ * rows. Per-action perm re-check enforces that boundary regardless of
+ * which roles middleware happens to whitelist.
  */
 export async function restoreAction(formData: FormData) {
   const entityType = String(formData.get("entityType") ?? "");
@@ -29,7 +29,23 @@ export async function restoreAction(formData: FormData) {
     throw new Error("forbidden");
   }
 
+  // Resolve the public user id + roles for the perm check.
+  const { data: pub } = await userSb
+    .from("users")
+    .select("id")
+    .eq("supabase_auth_id", auth.user.id)
+    .maybeSingle();
+  if (!pub) throw new Error("forbidden");
+  const { data: roleRows } = await userSb
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", pub.id)
+    .is("deleted_at", null);
+  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+
   const svc = getServiceRoleSupabase();
+  await requirePermAsync(svc, { userId: pub.id, roles }, "trash.restore");
+
   await restore(svc, entityType, id, auth.user.id);
 
   revalidatePath(`/admin/trash/${entityType}`);
