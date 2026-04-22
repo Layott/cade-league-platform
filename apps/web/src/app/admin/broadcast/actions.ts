@@ -149,10 +149,15 @@ export async function clearOverlayAction(formData: FormData) {
 // -- Plan 37: presets --------------------------------------------------
 
 function parsePayload(raw: string): unknown {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed || trimmed === "undefined") return {};
   try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error("payload must be valid JSON");
+    return JSON.parse(trimmed);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown parse error";
+    // Surface the exact parser hint (e.g. "Unexpected token ',' ...") so the
+    // admin can find the typo instead of staring at a generic red error.
+    throw new Error(`payload must be valid JSON — ${msg}`);
   }
 }
 
