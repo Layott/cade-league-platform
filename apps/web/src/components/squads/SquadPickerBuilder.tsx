@@ -363,7 +363,12 @@ export function SquadPickerBuilder({
       </div>
 
       <div className="flex flex-col gap-3">
-        <LiveTotalsBar slots={slots} subs={subs} rule={rule} />
+        <LiveTotalsBar
+          slots={slots}
+          subs={subs}
+          rule={rule}
+          formation={formation}
+        />
 
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3 text-xs">
           <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">

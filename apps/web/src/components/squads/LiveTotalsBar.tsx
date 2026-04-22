@@ -1,20 +1,26 @@
 "use client";
 
-import { useMemo } from "react";
-import { calculateChemistry } from "@/lib/chemistry";
+import { useMemo, useState } from "react";
+import { computeChemistry, type SlotFill, type ChemistryCard } from "@/lib/chemistry";
 import type { CardSearchResult } from "@/server/fcdb/search";
+import {
+  getFormationSlots,
+  type FormationKey,
+} from "./PitchLayout";
 
 /**
- * Plan 30 — always-visible totals bar.
+ * Plan 30.1 — always-visible totals bar.
  *
- * Reads the parent's picker state (slot map + subs array), computes:
+ * Reads the parent's picker state (slot map + subs array + formation), computes:
  *   - Coins spent / budget cap
  *   - Nigerian card count (by `nationIso === 'NG'`)
- *   - Chemistry (simplified heuristic)
+ *   - Chemistry (full FC26 rules — tier-based, positional gate, icon/hero)
  *   - Banned-type violations (count of cards whose itemType ∈ bannedTypes)
  *
  * Null prices render as "—" and a "some prices missing" warning renders
  * once per squad — the submission is still allowed; ref review flags it.
+ *
+ * Out-of-position warnings surface as an amber strip under the totals bar.
  */
 
 export type LiveTotalsRule = {
@@ -27,6 +33,9 @@ export type LiveTotalsBarProps = {
   slots: Record<number, CardSearchResult | null>;
   subs: Array<CardSearchResult | null>;
   rule: LiveTotalsRule | null;
+  /** Optional — required for full FC26 chemistry (positional gate). If
+   * omitted, chem falls back to 0 and a note is shown. */
+  formation?: FormationKey;
 };
 
 function formatCoins(n: number | null): string {
@@ -36,16 +45,28 @@ function formatCoins(n: number | null): string {
   return String(n);
 }
 
-export function LiveTotalsBar({ slots, subs, rule }: LiveTotalsBarProps) {
-  const allCards = useMemo(() => {
+function cardToChem(card: CardSearchResult): ChemistryCard {
+  return {
+    club: card.club,
+    league: card.league,
+    nation: card.nation,
+    position: card.position,
+    positionsAlt: card.positionsAlt,
+    itemType: card.itemType,
+    name: card.name,
+  };
+}
+
+export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarProps) {
+  const [chemBreakdownOpen, setChemBreakdownOpen] = useState(false);
+
+  const totals = useMemo(() => {
     const starters = Object.values(slots).filter(
       (c): c is CardSearchResult => !!c,
     );
     const benched = subs.filter((c): c is CardSearchResult => !!c);
-    return [...starters, ...benched];
-  }, [slots, subs]);
+    const allCards = [...starters, ...benched];
 
-  const totals = useMemo(() => {
     let coins = 0;
     let priceMissing = 0;
     let nigerianCount = 0;
@@ -59,20 +80,52 @@ export function LiveTotalsBar({ slots, subs, rule }: LiveTotalsBarProps) {
       if ((c.nationIso ?? "").toUpperCase() === "NG") nigerianCount += 1;
       if (bannedSet.has((c.itemType ?? "").toLowerCase())) bannedCount += 1;
     }
-    const chem = calculateChemistry(
-      allCards.map((c) => ({
-        club: c.club,
-        league: c.league,
-        nation: c.nation,
-      })),
-    );
-    return { coins, priceMissing, nigerianCount, bannedCount, chem };
-  }, [allCards, rule]);
+
+    // Full FC26 chemistry requires the formation (for per-slot position
+    // codes). If it's not given (should not happen in practice — picker
+    // always passes it), default to 0 with a note.
+    let totalChem = 0;
+    let warnings: string[] = [];
+    let perSlot: number[] = [];
+    if (formation) {
+      const defs = getFormationSlots(formation);
+      const starting: SlotFill[] = defs.map((d) => {
+        const c = slots[d.slotIndex] ?? null;
+        return {
+          card: c ? cardToChem(c) : null,
+          positionInLineup: d.label,
+        };
+      });
+      const subFills: SlotFill[] = subs.map((c) => ({
+        card: c ? cardToChem(c) : null,
+        // Subs don't have a lineup position — we use the card's canonical
+        // position so an in-pos-for-their-own-position sub can still earn
+        // tier chem. If no card, use an empty string so null slots yield 0.
+        positionInLineup: c ? c.position : "",
+      }));
+      const chem = computeChemistry(starting, formation, subFills);
+      totalChem = chem.totalChem;
+      warnings = chem.warnings;
+      perSlot = chem.perSlot;
+    }
+
+    return {
+      coins,
+      priceMissing,
+      nigerianCount,
+      bannedCount,
+      totalChem,
+      warnings,
+      perSlot,
+    };
+  }, [slots, subs, rule, formation]);
 
   const overBudget =
     rule != null && totals.coins > rule.maxBudgetCoins;
   const shortNigerian =
     rule != null && totals.nigerianCount < rule.minNigerianItems;
+
+  const formationDefs = formation ? getFormationSlots(formation) : [];
 
   return (
     <div
@@ -92,12 +145,20 @@ export function LiveTotalsBar({ slots, subs, rule }: LiveTotalsBarProps) {
           accent={shortNigerian ? "warn" : "ok"}
           testId="totals-nigerian"
         />
-        <Stat
-          label="Chem"
-          value={String(totals.chem)}
-          accent="ok"
-          testId="totals-chem"
-        />
+        <button
+          type="button"
+          onClick={() => setChemBreakdownOpen((o) => !o)}
+          className="text-left"
+          data-testid="totals-chem-toggle"
+          aria-expanded={chemBreakdownOpen}
+        >
+          <Stat
+            label="Chem"
+            value={`${totals.totalChem}/33`}
+            accent="ok"
+            testId="totals-chem"
+          />
+        </button>
         <Stat
           label="Banned"
           value={String(totals.bannedCount)}
@@ -105,6 +166,51 @@ export function LiveTotalsBar({ slots, subs, rule }: LiveTotalsBarProps) {
           testId="totals-banned"
         />
       </div>
+
+      {chemBreakdownOpen && formation ? (
+        <div
+          data-testid="totals-chem-breakdown"
+          className="rounded-sm bg-[var(--ink-3)] px-2 py-1 text-[10px] text-[var(--chalk-2)]"
+        >
+          <div className="mb-1 font-semibold uppercase tracking-[0.14em] text-[var(--chalk-3)]">
+            Per-slot chem
+          </div>
+          <div className="grid grid-cols-4 gap-x-3 gap-y-0.5">
+            {formationDefs.map((d, i) => (
+              <div key={d.slotIndex} className="flex justify-between font-mono">
+                <span className="text-[var(--chalk-3)]">{d.label}</span>
+                <span className="text-[var(--chalk-1)]">
+                  {totals.perSlot[i] ?? 0}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {totals.warnings.length > 0 ? (
+        <div
+          data-testid="totals-chem-warnings"
+          className="rounded-sm border border-[#ffb020] bg-[rgba(255,176,32,0.08)] px-2 py-1 text-[11px] text-[#ffcc4d]"
+        >
+          <div className="font-semibold uppercase tracking-[0.14em]">
+            {totals.warnings.length} card
+            {totals.warnings.length === 1 ? "" : "s"} out of position — chem
+            penalty applies
+          </div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {totals.warnings.slice(0, 5).map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+            {totals.warnings.length > 5 ? (
+              <li className="italic">
+                +{totals.warnings.length - 5} more…
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
+
       {totals.priceMissing > 0 ? (
         <div
           data-testid="totals-price-missing"
