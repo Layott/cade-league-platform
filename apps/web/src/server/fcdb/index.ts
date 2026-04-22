@@ -22,3 +22,6 @@ export type {
   FCItemType,
 } from "./types";
 export { slugify, stripDiacritics } from "./slug";
+// Plan 30 — picker typeahead search.
+export { searchCards, searchCardsInputSchema } from "./search";
+export type { CardSearchResult, SearchCardsInput } from "./search";

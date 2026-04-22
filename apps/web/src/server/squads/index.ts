@@ -1,5 +1,12 @@
 export { createSubmission, lockSubmission } from "./submit";
 export type { CreateSubmissionResult } from "./submit";
+// Plan 30 — picker-flow bridge.
+export {
+  submitPickerSquad,
+  pickerSlotSchema,
+  submitPickerInputSchema,
+} from "./submit_picker";
+export type { PickerSlotInput, SubmitPickerInput } from "./submit_picker";
 export { replaceItemsForSubmission } from "./items";
 export { approveSubmission, rejectSubmission } from "./review";
 export { reopenSubmission } from "./reopen";

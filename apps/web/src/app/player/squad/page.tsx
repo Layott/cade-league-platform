@@ -2,15 +2,30 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import {
   getCurrentWeekSubmissionForPlayer,
+  getRuleForSeason,
   weekStartThursday,
   thursdayDeadline,
 } from "@/server/squads";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
-import { SubmitForm } from "./SubmitForm";
+import { SquadPickerBuilder } from "@/components/squads/SquadPickerBuilder";
+import {
+  requestUploadUrlAction,
+  submitPickerAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Plan 30 — player squad page, Futbin-style picker.
+ *
+ * The page is a server component. If the player already has a live
+ * submission for the current week we render a read-only summary — no
+ * in-place editing, the Friday change window still uses its own route.
+ * Otherwise we mount <SquadPickerBuilder /> with the active rule payload
+ * so the totals bar can render budget + Nigerian thresholds.
+ */
 
 export default async function PlayerSquadPage() {
   const sb = await getServerSupabase();
@@ -44,9 +59,34 @@ export default async function PlayerSquadPage() {
     );
   }
 
+  const { data: season } = await sb
+    .from("seasons")
+    .select("id")
+    .is("deleted_at", null)
+    .eq("status", "active")
+    .maybeSingle();
+
   const weekStart = weekStartThursday(new Date());
   const deadline = thursdayDeadline(weekStart);
   const existing = await getCurrentWeekSubmissionForPlayer(sb, player.id, weekStart);
+
+  // Load the live rule for the totals bar. Safe against missing season or
+  // missing rule row (picker renders with rule=null).
+  let rule = null;
+  if (season?.id) {
+    try {
+      const raw = await getRuleForSeason(sb, season.id);
+      if (raw) {
+        rule = {
+          maxBudgetCoins: raw.max_budget_coins,
+          minNigerianItems: raw.min_nigerian_items,
+          bannedItemTypes: raw.banned_item_types,
+        };
+      }
+    } catch {
+      rule = null;
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -89,7 +129,12 @@ export default async function PlayerSquadPage() {
           </ul>
         </section>
       ) : (
-        <SubmitForm />
+        <SquadPickerBuilder
+          weekStartDate={weekStart}
+          rule={rule}
+          submitAction={submitPickerAction}
+          requestUploadUrlAction={requestUploadUrlAction}
+        />
       )}
     </div>
   );
