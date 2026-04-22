@@ -19,7 +19,10 @@ export async function publish(
   event:
     | typeof REALTIME.eventTriggered
     | typeof REALTIME.eventCleared
-    | typeof REALTIME.eventSessionEnded,
+    | typeof REALTIME.eventSessionEnded
+    | typeof REALTIME.eventInstanceTriggered
+    | typeof REALTIME.eventInstanceCleared
+    | typeof REALTIME.eventClockChanged,
   payload: Record<string, unknown>,
 ): Promise<PublishResult> {
   const channel = sb.channel(REALTIME.channel(sessionId));

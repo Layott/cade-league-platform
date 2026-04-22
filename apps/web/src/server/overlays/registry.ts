@@ -402,4 +402,8 @@ export const REALTIME = {
   eventTriggered: "overlay.triggered" as const,
   eventCleared: "overlay.cleared" as const,
   eventSessionEnded: "session.ended" as const,
+  // Plan 37 — multi-instance + match clock additions
+  eventInstanceTriggered: "instance.triggered" as const,
+  eventInstanceCleared: "instance.cleared" as const,
+  eventClockChanged: "clock.changed" as const,
 };
