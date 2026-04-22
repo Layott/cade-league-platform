@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /**
- * Plan 13A seed: 2 organizations, 1 contract, 1 caution deposit, 1 preseason
- * shoot with sample attendance. Idempotent — looks up by name first.
+ * Plan 13A seed: 2 organizations, 1 contract, 1 caution deposit. Idempotent
+ * — looks up by name first.
+ *
+ * Plan 33 (2026-04-22): preseason-shoot seeding removed when the preseason
+ * feature was dropped. Tables soft-archived in cloud; new dev seeds no
+ * longer create preseason rows.
  *
  * Required env:
  *   NEXT_PUBLIC_SUPABASE_URL
@@ -116,67 +120,9 @@ async function getActiveSeasonId() {
   return data?.id ?? null;
 }
 
-async function seedPreseasonShoot(seasonId) {
-  const shootDate = "2026-04-28";
-  const { data: existing } = await sb
-    .from("preseason_shoots")
-    .select("*")
-    .eq("season_id", seasonId)
-    .eq("shoot_date", shootDate)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (existing) {
-    console.log(`preseason shoot exists: ${shootDate} → ${existing.id}`);
-    return existing;
-  }
-  const { data, error } = await sb
-    .from("preseason_shoots")
-    .insert({
-      season_id: seasonId,
-      shoot_date: shootDate,
-      type: "photo",
-      location: "Lekki Studios",
-      status: "scheduled",
-    })
-    .select("*")
-    .single();
-  if (error) throw error;
-  console.log(`preseason shoot created: ${shootDate} → ${data.id}`);
-  return data;
-}
-
-async function seedShootAttendance(shoot) {
-  const { data: players } = await sb
-    .from("players")
-    .select("id, gamer_tag")
-    .is("deleted_at", null)
-    .limit(5);
-  if (!players || players.length === 0) {
-    console.log("no players found; skipping attendance seed");
-    return;
-  }
-  for (let i = 0; i < players.length; i += 1) {
-    const p = players[i];
-    const attended = i % 2 === 0; // ~half attended
-    const { data: ex } = await sb
-      .from("preseason_shoot_attendance")
-      .select("id")
-      .eq("shoot_id", shoot.id)
-      .eq("player_id", p.id)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (ex) {
-      console.log(`attendance exists for ${p.gamer_tag} → skip`);
-      continue;
-    }
-    await sb.from("preseason_shoot_attendance").insert({
-      shoot_id: shoot.id,
-      player_id: p.id,
-      attended_bool: attended,
-    });
-    console.log(`attendance inserted: ${p.gamer_tag} attended=${attended}`);
-  }
-}
+// Plan 33 (2026-04-22): seedPreseasonShoot + seedShootAttendance removed
+// when the preseason-shoot feature was dropped. Cloud tables soft-archived
+// (see migration 20260507000020_drop_content_preseason_features.sql).
 
 async function seedContract(org, seasonId) {
   const { data: player } = await sb
@@ -234,8 +180,7 @@ async function seedContract(org, seasonId) {
 
   await seedContract(crown, seasonId);
 
-  const shoot = await seedPreseasonShoot(seasonId);
-  await seedShootAttendance(shoot);
+  // Plan 33: preseason-shoot seed removed.
 
   console.log("plan13 seed complete");
 })().catch((err) => {

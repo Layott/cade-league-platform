@@ -23,8 +23,6 @@ const TABS = [
   { href: "/admin/orgs", label: "Orgs" },
   { href: "/admin/disputes", label: "Disputes" },
   { href: "/admin/appeals", label: "Appeals" },
-  { href: "/admin/content", label: "Content" },
-  { href: "/admin/preseason", label: "Preseason" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/broadcast", label: "Broadcast" },
   { href: "/admin/roles", label: "Roles" },

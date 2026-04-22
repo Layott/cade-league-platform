@@ -54,8 +54,8 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "disputes.rule",
     "appeals.read",
     "appeals.rule",
-    "content.verify",
-    "preseason.manage",
+    // Plan 33 (2026-04-22) — `content.verify` + `preseason.manage` removed
+    // when content obligations + preseason shoots features were dropped.
     // Plan 14 — stats OCR review (delete + re-run stay admin-only).
     "stats.screenshot.upload",
     "stats.screenshot.review",
@@ -74,8 +74,8 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "disputes.read.own",
     "appeals.submit",
     "appeals.read.own",
-    "content.submit",
-    "content.read.own",
+    // Plan 33 (2026-04-22) — `content.submit` + `content.read.own` removed
+    // when content obligations feature was dropped.
   ],
   viewer: [],
 } as const;

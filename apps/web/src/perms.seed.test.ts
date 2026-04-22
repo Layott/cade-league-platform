@@ -150,16 +150,16 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(hasPerm({ userId: null, roles: ["moderator"] }, "stats.ocr.rerun")).toBe(false);
   });
 
-  // Plan 13A — governance perms (orgs/disputes/appeals/content/preseason).
-  it("moderator can read orgs and review disputes/appeals/content/preseason", () => {
+  // Plan 13A — governance perms (orgs/disputes/appeals).
+  // Plan 33 (2026-04-22) dropped content obligations + preseason shoots;
+  // `content.*` and `preseason.manage` are no longer seeded on any role.
+  it("moderator can read orgs and review disputes/appeals", () => {
     const roles = ["moderator"] as const;
     expect(hasPerm({ userId: null, roles }, "orgs.read")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "disputes.read")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "disputes.rule")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "appeals.read")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "appeals.rule")).toBe(true);
-    expect(hasPerm({ userId: null, roles }, "content.verify")).toBe(true);
-    expect(hasPerm({ userId: null, roles }, "preseason.manage")).toBe(true);
   });
 
   it("moderator cannot edit orgs or write to ledger (admin-only)", () => {
@@ -168,26 +168,22 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(hasPerm({ userId: null, roles }, "orgs.ledger.write")).toBe(false);
   });
 
-  it("player can submit + read own disputes/appeals/content", () => {
+  it("player can submit + read own disputes/appeals", () => {
     const roles = ["player"] as const;
     expect(hasPerm({ userId: null, roles }, "disputes.submit")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "disputes.read.own")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "appeals.submit")).toBe(true);
     expect(hasPerm({ userId: null, roles }, "appeals.read.own")).toBe(true);
-    expect(hasPerm({ userId: null, roles }, "content.submit")).toBe(true);
-    expect(hasPerm({ userId: null, roles }, "content.read.own")).toBe(true);
   });
 
-  it("player cannot rule or verify — only admin + moderator can", () => {
+  it("player cannot rule — only admin + moderator can", () => {
     const roles = ["player"] as const;
     expect(hasPerm({ userId: null, roles }, "disputes.rule")).toBe(false);
     expect(hasPerm({ userId: null, roles }, "appeals.rule")).toBe(false);
-    expect(hasPerm({ userId: null, roles }, "content.verify")).toBe(false);
-    expect(hasPerm({ userId: null, roles }, "preseason.manage")).toBe(false);
     expect(hasPerm({ userId: null, roles }, "orgs.edit")).toBe(false);
   });
 
-  it("admin via wildcard matches every Plan 13A perm", () => {
+  it("admin via wildcard matches every retained Plan 13A perm", () => {
     const roles = ["admin"] as const;
     for (const p of [
       "orgs.read",
@@ -196,10 +192,23 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
       "orgs.ledger.write",
       "disputes.rule",
       "appeals.rule",
-      "content.verify",
-      "preseason.manage",
     ]) {
       expect(hasPerm({ userId: null, roles }, p)).toBe(true);
+    }
+  });
+
+  it("Plan 33: content + preseason perms are no longer seeded on any role", () => {
+    const dropped = [
+      "content.submit",
+      "content.verify",
+      "content.read.own",
+      "preseason.manage",
+    ];
+    for (const r of ROLE_NAMES) {
+      if (r === "admin") continue; // wildcard matches everything by design.
+      for (const p of dropped) {
+        expect(PERMS[r]).not.toContain(p);
+      }
     }
   });
 });

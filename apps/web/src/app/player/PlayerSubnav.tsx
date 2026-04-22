@@ -7,15 +7,17 @@ import { usePathname } from "next/navigation";
  * Plan 13B — Player subnav. Mirrors AdminSubnav's tab-strip pattern but
  * runs on the default (non-admin-dark) background so the player console
  * stays visually distinct from /admin. Every `player` role holder sees
- * every tab (Plan 13A seeded disputes/appeals/content perms on player);
- * any surface the viewer lacks perm for still denies at page-level.
+ * every tab (Plan 13A seeded disputes/appeals perms on player); any
+ * surface the viewer lacks perm for still denies at page-level.
+ *
+ * Plan 33 (2026-04-22): "Content" tab removed — content obligations
+ * feature was dropped per user direction.
  */
 
 const TABS = [
   { href: "/player/squad", label: "Squad" },
   { href: "/player/disputes", label: "Disputes" },
   { href: "/player/appeals", label: "Appeals" },
-  { href: "/player/content", label: "Content" },
   { href: "/player/profile", label: "Profile" },
 ];
 

@@ -27,8 +27,6 @@ const TAB_PERMS: Array<{ href: string; perm: string }> = [
   { href: "/admin/orgs", perm: "orgs.read" },
   { href: "/admin/disputes", perm: "disputes.read" },
   { href: "/admin/appeals", perm: "appeals.read" },
-  { href: "/admin/content", perm: "content.verify" },
-  { href: "/admin/preseason", perm: "preseason.manage" },
   { href: "/admin/announcements", perm: "announcements.read" },
   { href: "/admin/broadcast", perm: "broadcast.manage" },
   { href: "/admin/roles", perm: "roles.manage" },
