@@ -1,0 +1,3302 @@
+[
+  {
+    "slug": "malen",
+    "name": "Malen",
+    "rating": 87,
+    "variant": "POTM Serie A"
+  },
+  {
+    "slug": "azaz",
+    "name": "Azaz",
+    "rating": 88,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "acuna",
+    "name": "Acuña",
+    "rating": 89,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "de_gea",
+    "name": "De Gea",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "moore",
+    "name": "Moore",
+    "rating": 88,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "valverde",
+    "name": "Valverde",
+    "rating": 90,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "rice",
+    "name": "Rice",
+    "rating": 91,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "kane",
+    "name": "Kane",
+    "rating": 92,
+    "variant": "POTM Bundesliga"
+  },
+  {
+    "slug": "mendy",
+    "name": "Mendy",
+    "rating": 87,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "sanchez",
+    "name": "Sánchez",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "adams",
+    "name": "Adams",
+    "rating": 88,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "giroud",
+    "name": "Giroud",
+    "rating": 89,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "goncalo_ramos",
+    "name": "Gonçalo Ramos",
+    "rating": 88,
+    "variant": "Moments"
+  },
+  {
+    "slug": "undav",
+    "name": "Undav",
+    "rating": 88,
+    "variant": "POTM Bundesliga"
+  },
+  {
+    "slug": "mead",
+    "name": "Mead",
+    "rating": 89,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "gabriel_sara",
+    "name": "Gabriel Sara",
+    "rating": 89,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "zicai",
+    "name": "Zicai",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "hauge",
+    "name": "Hauge",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "mbemba",
+    "name": "Mbemba",
+    "rating": 88,
+    "variant": "Moments"
+  },
+  {
+    "slug": "david_raya",
+    "name": "David Raya",
+    "rating": 92,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "ederson",
+    "name": "Ederson",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "saliba",
+    "name": "Saliba",
+    "rating": 90,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "shaw",
+    "name": "Shaw",
+    "rating": 91,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "haraslin",
+    "name": "Haraslín",
+    "rating": 89,
+    "variant": "UECL Road to the Knockouts"
+  },
+  {
+    "slug": "al_birekan",
+    "name": "Al Birekan",
+    "rating": 88,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "juan_mata",
+    "name": "Juan Mata",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "pedro",
+    "name": "Pedro",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "bruno_fernandes",
+    "name": "Bruno Fernandes",
+    "rating": 90,
+    "variant": "POTM Premier League"
+  },
+  {
+    "slug": "joao_pedro",
+    "name": "João Pedro",
+    "rating": 89,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "suarez",
+    "name": "Suárez",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "fernandez",
+    "name": "Fernández",
+    "rating": 91,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "y_lmaz",
+    "name": "Yılmaz",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "saka",
+    "name": "Saka",
+    "rating": 90,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "yeremy_pino",
+    "name": "Yeremy Pino",
+    "rating": 87,
+    "variant": "UECL Road to the Knockouts"
+  },
+  {
+    "slug": "skoras",
+    "name": "Skóraś",
+    "rating": 88,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "mane",
+    "name": "Mané",
+    "rating": 88,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "thauvin",
+    "name": "Thauvin",
+    "rating": 88,
+    "variant": "POTM Ligue 1"
+  },
+  {
+    "slug": "pavlovic",
+    "name": "Pavlović",
+    "rating": 89,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "lookman",
+    "name": "Lookman",
+    "rating": 88,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "mikautadze",
+    "name": "Mikautadze",
+    "rating": 87,
+    "variant": "POTM LALIGA EA SPORTS"
+  },
+  {
+    "slug": "fishlock",
+    "name": "Fishlock",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "wifi",
+    "name": "Wifi",
+    "rating": 87,
+    "variant": "POTM LIGA F"
+  },
+  {
+    "slug": "endrick",
+    "name": "Endrick",
+    "rating": 87,
+    "variant": "POTM Ligue 1"
+  },
+  {
+    "slug": "gakpo",
+    "name": "Gakpo",
+    "rating": 89,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "ter_stegen",
+    "name": "ter Stegen",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "pogba",
+    "name": "Pogba",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "sugita",
+    "name": "Sugita",
+    "rating": 87,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "rodrigo_mora",
+    "name": "Rodrigo Mora",
+    "rating": 87,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "sissoko",
+    "name": "Sissoko",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "hazard",
+    "name": "Hazard",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "cambiaso",
+    "name": "Cambiaso",
+    "rating": 87,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "mkhitaryan",
+    "name": "Mkhitaryan",
+    "rating": 88,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "vardy",
+    "name": "Vardy",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "gotze",
+    "name": "Götze",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "guirassy",
+    "name": "Guirassy",
+    "rating": 89,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "hamano",
+    "name": "Hamano",
+    "rating": 88,
+    "variant": "UWCL Road to the Knockouts"
+  },
+  {
+    "slug": "vitinha",
+    "name": "Vitinha",
+    "rating": 91,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "garnacho",
+    "name": "Garnacho",
+    "rating": 89,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "diaz",
+    "name": "Díaz",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "tillman",
+    "name": "Tillman",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "popp",
+    "name": "Popp",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "zappacosta",
+    "name": "Zappacosta",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "zinchenko",
+    "name": "Zinchenko",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "kvaratskhelia",
+    "name": "Kvaratskhelia",
+    "rating": 88,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "carvajal",
+    "name": "Carvajal",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "nunez",
+    "name": "Núñez",
+    "rating": 90,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "modric",
+    "name": "Modrić",
+    "rating": 89,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "simons",
+    "name": "Simons",
+    "rating": 88,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "muriqi",
+    "name": "Muriqi",
+    "rating": 87,
+    "variant": "POTM LALIGA EA SPORTS"
+  },
+  {
+    "slug": "zaniolo",
+    "name": "Zaniolo",
+    "rating": 86,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "calvert_lewin",
+    "name": "Calvert-Lewin",
+    "rating": 87,
+    "variant": "POTM Premier League"
+  },
+  {
+    "slug": "swanson",
+    "name": "Swanson",
+    "rating": 88,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "kostic",
+    "name": "Kostić",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "h_gh",
+    "name": "Høgh",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "haavi",
+    "name": "Haavi",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "athenea",
+    "name": "Athenea",
+    "rating": 87,
+    "variant": "POTM LIGA F"
+  },
+  {
+    "slug": "barcola",
+    "name": "Barcola",
+    "rating": 87,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "walker",
+    "name": "Walker",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "leroux",
+    "name": "Leroux",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "gordon",
+    "name": "Gordon",
+    "rating": 88,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "stankovic",
+    "name": "Stanković",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "young",
+    "name": "Young",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "olise",
+    "name": "Olise",
+    "rating": 88,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "bruno_guimaraes",
+    "name": "Bruno Guimarães",
+    "rating": 89,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "pavard",
+    "name": "Pavard",
+    "rating": 88,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "blas",
+    "name": "Blas",
+    "rating": 86,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "espino",
+    "name": "Espino",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "de_jong",
+    "name": "de Jong",
+    "rating": 89,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "maatsen",
+    "name": "Maatsen",
+    "rating": 89,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "goncalo_inacio",
+    "name": "Gonçalo Inácio",
+    "rating": 89,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "oguz",
+    "name": "Oğuz",
+    "rating": 86,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "kumagai",
+    "name": "Kumagai",
+    "rating": 88,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "jakobsson",
+    "name": "Jakobsson",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "lamine_yamal",
+    "name": "Lamine Yamal",
+    "rating": 91,
+    "variant": "POTM LALIGA EA SPORTS"
+  },
+  {
+    "slug": "hasegawa",
+    "name": "Hasegawa",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "lees_melou",
+    "name": "Lees-Melou",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "giroud",
+    "name": "Giroud",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "messi",
+    "name": "Messi",
+    "rating": 88,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "milner",
+    "name": "Milner",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "isco",
+    "name": "Isco",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "doku",
+    "name": "Doku",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "saad",
+    "name": "Saad",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "santi_cazorla",
+    "name": "Santi Cazorla",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "xhaka",
+    "name": "Xhaka",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "klostermann",
+    "name": "Klostermann",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "casemiro",
+    "name": "Casemiro",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "y_ld_z",
+    "name": "Yıldız",
+    "rating": 88,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "pajor",
+    "name": "Pajor",
+    "rating": 89,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "camavinga",
+    "name": "Camavinga",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "kane",
+    "name": "Kane",
+    "rating": 91,
+    "variant": "POTM Bundesliga"
+  },
+  {
+    "slug": "martinez",
+    "name": "Martínez",
+    "rating": 90,
+    "variant": "POTM Serie A"
+  },
+  {
+    "slug": "inaki_williams",
+    "name": "Iñaki Williams",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "pajor",
+    "name": "Pajor",
+    "rating": 89,
+    "variant": "POTM LIGA F"
+  },
+  {
+    "slug": "lala",
+    "name": "Lala",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "jimenez",
+    "name": "Jiménez",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "werner",
+    "name": "Werner",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "ane_etxezarreta",
+    "name": "Ane Etxezarreta",
+    "rating": 86,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "seidu",
+    "name": "Seidu",
+    "rating": 88,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "endrick",
+    "name": "Endrick",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "van_egmond",
+    "name": "van Egmond",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "estevao",
+    "name": "Estêvão",
+    "rating": 88,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "anyomi",
+    "name": "Anyomi",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "igor_thiago",
+    "name": "Igor Thiago",
+    "rating": 88,
+    "variant": "POTM Premier League"
+  },
+  {
+    "slug": "nwakaeme",
+    "name": "Nwakaeme",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "kane",
+    "name": "Kane",
+    "rating": 91,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "duranville",
+    "name": "Duranville",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "hegazi",
+    "name": "Hegazi",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "hofmann",
+    "name": "Hofmann",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "joao_moutinho",
+    "name": "João Moutinho",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "doucoure",
+    "name": "Doucouré",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "lemina",
+    "name": "Lemina",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "chiesa",
+    "name": "Chiesa",
+    "rating": 86,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "cherki",
+    "name": "Cherki",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "bonny",
+    "name": "Bonny",
+    "rating": 86,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "mari_jose",
+    "name": "Mari José",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "nuno_tavares",
+    "name": "Nuno Tavares",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "ruben_garcia",
+    "name": "Rubén García",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "olise",
+    "name": "Olise",
+    "rating": 88,
+    "variant": "POTM Bundesliga"
+  },
+  {
+    "slug": "dest",
+    "name": "Dest",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "eriksen",
+    "name": "Eriksen",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "zaroury",
+    "name": "Zaroury",
+    "rating": 86,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "gunter",
+    "name": "Günter",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "james",
+    "name": "James",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "vitinha",
+    "name": "Vitinha",
+    "rating": 90,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "tonali",
+    "name": "Tonali",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "jordi_alba",
+    "name": "Jordi Alba",
+    "rating": 88,
+    "variant": "End Of An Era"
+  },
+  {
+    "slug": "muller",
+    "name": "Müller",
+    "rating": 89,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "eder_militao",
+    "name": "Éder Militão",
+    "rating": 88,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "marc_bartra",
+    "name": "Marc Bartra",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "hollerbach",
+    "name": "Hollerbach",
+    "rating": 87,
+    "variant": "UECL Road to the Knockouts"
+  },
+  {
+    "slug": "salma_paralluelo",
+    "name": "Salma Paralluelo",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "nico_williams",
+    "name": "Nico Williams",
+    "rating": 87,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "di_natale",
+    "name": "Di Natale",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "haller",
+    "name": "Haller",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "kelly",
+    "name": "Kelly",
+    "rating": 88,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "palmer",
+    "name": "Palmer",
+    "rating": 89,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "ginola",
+    "name": "Ginola",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "joao_cancelo",
+    "name": "João Cancelo",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "imade",
+    "name": "Imade",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "koke",
+    "name": "Koke",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "berghuis",
+    "name": "Berghuis",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "santos",
+    "name": "Santos",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "trincao",
+    "name": "Trincão",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "lucas_paqueta",
+    "name": "Lucas Paquetá",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "doue",
+    "name": "Doué",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "blind",
+    "name": "Blind",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "haaland",
+    "name": "Haaland",
+    "rating": 91,
+    "variant": "POTM Premier League"
+  },
+  {
+    "slug": "lamine_yamal",
+    "name": "Lamine Yamal",
+    "rating": 90,
+    "variant": "POTM LALIGA EA SPORTS"
+  },
+  {
+    "slug": "press",
+    "name": "Press",
+    "rating": 88,
+    "variant": "End Of An Era"
+  },
+  {
+    "slug": "wijnaldum",
+    "name": "Wijnaldum",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "savinho",
+    "name": "Savinho",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "ishak",
+    "name": "Ishak",
+    "rating": 87,
+    "variant": "UECL Road to the Knockouts"
+  },
+  {
+    "slug": "james",
+    "name": "James",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "pope",
+    "name": "Pope",
+    "rating": 86,
+    "variant": "Moments"
+  },
+  {
+    "slug": "gogorza",
+    "name": "Gogorza",
+    "rating": 86,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "alba_redondo",
+    "name": "Alba Redondo",
+    "rating": 87,
+    "variant": "UWCL Road to the Knockouts"
+  },
+  {
+    "slug": "echegini",
+    "name": "Echegini",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "mcclean",
+    "name": "McClean",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "alex_baena",
+    "name": "Álex Baena",
+    "rating": 86,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "carter",
+    "name": "Carter",
+    "rating": 88,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "brown",
+    "name": "Brown",
+    "rating": 85,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "guirassy",
+    "name": "Guirassy",
+    "rating": 88,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "yedlin",
+    "name": "Yedlin",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "stam",
+    "name": "Stam",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "driouech",
+    "name": "Driouech",
+    "rating": 86,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "zeballos",
+    "name": "Zeballos",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "iturbe",
+    "name": "Iturbe",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "alaba",
+    "name": "Alaba",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "fabian_ruiz",
+    "name": "Fabián Ruiz",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "claudia_pina",
+    "name": "Claudia Pina",
+    "rating": 87,
+    "variant": "POTM LIGA F"
+  },
+  {
+    "slug": "gilmour",
+    "name": "Gilmour",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "mcgregor",
+    "name": "McGregor",
+    "rating": 87,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "zirkzee",
+    "name": "Zirkzee",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "unai_lopez",
+    "name": "Unai López",
+    "rating": 87,
+    "variant": "UECL Road to the Knockouts"
+  },
+  {
+    "slug": "osimhen",
+    "name": "Osimhen",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "parrott",
+    "name": "Parrott",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "matic",
+    "name": "Matić",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "williamson",
+    "name": "Williamson",
+    "rating": 88,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "rios",
+    "name": "Ríos",
+    "rating": 88,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "cristiano_ronaldo",
+    "name": "Cristiano Ronaldo",
+    "rating": 89,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "joelinton",
+    "name": "Joelinton",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "kluivert",
+    "name": "Kluivert",
+    "rating": 86,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "rodman",
+    "name": "Rodman",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "teze",
+    "name": "Teze",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "greenwood",
+    "name": "Greenwood",
+    "rating": 86,
+    "variant": "POTM Ligue 1"
+  },
+  {
+    "slug": "sotoca",
+    "name": "Sotoca",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "el_shaarawy",
+    "name": "El Shaarawy",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "garbino",
+    "name": "Garbino",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "adeyemi",
+    "name": "Adeyemi",
+    "rating": 86,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "man",
+    "name": "Man",
+    "rating": 86,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "bryan_zaragoza",
+    "name": "Bryan Zaragoza",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "murillo",
+    "name": "Murillo",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "tchouameni",
+    "name": "Tchouaméni",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "ulreich",
+    "name": "Ulreich",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "araya",
+    "name": "Araya",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "antony",
+    "name": "Antony",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "abedi_pele",
+    "name": "Abedi Pelé",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "pickett",
+    "name": "Pickett",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "toure",
+    "name": "Touré",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "stoger",
+    "name": "Stöger",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "shaw",
+    "name": "Shaw",
+    "rating": 90,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "olise",
+    "name": "Olise",
+    "rating": 87,
+    "variant": "POTM Bundesliga"
+  },
+  {
+    "slug": "kone",
+    "name": "Koné",
+    "rating": 88,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "alexsandro",
+    "name": "Alexsandro",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "nmecha",
+    "name": "Nmecha",
+    "rating": 86,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "hadj_moussa",
+    "name": "Hadj-Moussa",
+    "rating": 86,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "chery",
+    "name": "Chery",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "van_aanholt",
+    "name": "van Aanholt",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "sanchez",
+    "name": "Sanchez",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "vidal",
+    "name": "Vidal",
+    "rating": 88,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "holtby",
+    "name": "Holtby",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "paulo_futre",
+    "name": "Paulo Futre",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "gro",
+    "name": "Groß",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "geovany_quenda",
+    "name": "Geovany Quenda",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "ginter",
+    "name": "Ginter",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "igor_thiago",
+    "name": "Igor Thiago",
+    "rating": 87,
+    "variant": "POTM Premier League"
+  },
+  {
+    "slug": "mojica",
+    "name": "Mojica",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "le_tissier",
+    "name": "Le Tissier",
+    "rating": 88,
+    "variant": "UWCL Road to the Knockouts"
+  },
+  {
+    "slug": "matheus_cunha",
+    "name": "Matheus Cunha",
+    "rating": 87,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "pizzi",
+    "name": "Pizzi",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "traore",
+    "name": "Traoré",
+    "rating": 87,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "cauteruccio",
+    "name": "Cauteruccio",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "igor_jesus",
+    "name": "Igor Jesus",
+    "rating": 87,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "butel",
+    "name": "Butel",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "pedersen",
+    "name": "Pedersen",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "claudia_pina",
+    "name": "Claudia Pina",
+    "rating": 87,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "francescoli",
+    "name": "Francescoli",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "francisco_conceicao",
+    "name": "Francisco Conceição",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "hradecky",
+    "name": "Hrádecký",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "voller",
+    "name": "Völler",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "matheus_silva",
+    "name": "Matheus Silva",
+    "rating": 84,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "bakambu",
+    "name": "Bakambu",
+    "rating": 86,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "hoeness",
+    "name": "Hoeness",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "cristiano_ronaldo",
+    "name": "Cristiano Ronaldo",
+    "rating": 88,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "bacha",
+    "name": "Bacha",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "bernardo_silva",
+    "name": "Bernardo Silva",
+    "rating": 87,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "gilles",
+    "name": "Gilles",
+    "rating": 87,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "rios",
+    "name": "Ríos",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "harder",
+    "name": "Harder",
+    "rating": 87,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "hamsik",
+    "name": "Hamšík",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "zalazar",
+    "name": "Zalazar",
+    "rating": 86,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "lovren",
+    "name": "Lovren",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "lopez_munoz",
+    "name": "López Muñoz",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "olise",
+    "name": "Olise",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "y_ld_z",
+    "name": "Yıldız",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "bade",
+    "name": "Badé",
+    "rating": 86,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "de_bruyne",
+    "name": "De Bruyne",
+    "rating": 88,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "smalling",
+    "name": "Smalling",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "weir",
+    "name": "Weir",
+    "rating": 87,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "heaps",
+    "name": "Heaps",
+    "rating": 88,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "dudek",
+    "name": "Dudek",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "junior_messias",
+    "name": "Junior Messias",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "wieder",
+    "name": "Wieder",
+    "rating": 85,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "gwinn",
+    "name": "Gwinn",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "kelly",
+    "name": "Kelly",
+    "rating": 89,
+    "variant": "FoF: Answer the Call"
+  },
+  {
+    "slug": "riley",
+    "name": "Riley",
+    "rating": 88,
+    "variant": "End Of An Era"
+  },
+  {
+    "slug": "dimarco",
+    "name": "Dimarco",
+    "rating": 88,
+    "variant": "POTM Serie A"
+  },
+  {
+    "slug": "brooks",
+    "name": "Brooks",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "caufriez",
+    "name": "Caufriez",
+    "rating": 86,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "baum",
+    "name": "Baum",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "fabio_vieira",
+    "name": "Fábio Vieira",
+    "rating": 87,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "h_jbjerg",
+    "name": "Højbjerg",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "nelson_oliveira",
+    "name": "Nélson Oliveira",
+    "rating": 86,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "hegering",
+    "name": "Hegering",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "tosun",
+    "name": "Tosun",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "howard",
+    "name": "Howard",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "sergio_busquets",
+    "name": "Sergio Busquets",
+    "rating": 88,
+    "variant": "End Of An Era"
+  },
+  {
+    "slug": "morata",
+    "name": "Morata",
+    "rating": 87,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "matuidi",
+    "name": "Matuidi",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "burn",
+    "name": "Burn",
+    "rating": 86,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "kerolin_nicoli",
+    "name": "Kerolin Nicoli",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "cirjan",
+    "name": "Cîrjan",
+    "rating": 85,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "di_lorenzo",
+    "name": "Di Lorenzo",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "esther",
+    "name": "Esther",
+    "rating": 85,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "robertson",
+    "name": "Robertson",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "brand",
+    "name": "Brand",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "beier",
+    "name": "Beier",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "barzagli",
+    "name": "Barzagli",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "raspadori",
+    "name": "Raspadori",
+    "rating": 85,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "grimaldo",
+    "name": "Grimaldo",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "palmer",
+    "name": "Palmer",
+    "rating": 88,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "giuly",
+    "name": "Giuly",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "szoboszlai",
+    "name": "Szoboszlai",
+    "rating": 87,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "sneijder",
+    "name": "Sneijder",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "lauder",
+    "name": "Lauder",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "misic",
+    "name": "Mišić",
+    "rating": 85,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "necib",
+    "name": "Necib",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "aarons",
+    "name": "Aarons",
+    "rating": 85,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "mateta",
+    "name": "Mateta",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "grealish",
+    "name": "Grealish",
+    "rating": 85,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "balde",
+    "name": "Balde",
+    "rating": 86,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "al_owairan",
+    "name": "Al Owairan",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ndour",
+    "name": "Ndour",
+    "rating": 86,
+    "variant": "UECL Road to the Knockouts"
+  },
+  {
+    "slug": "elimbi_gilbert",
+    "name": "Elimbi Gilbert",
+    "rating": 86,
+    "variant": "UWCL Road to the Knockouts"
+  },
+  {
+    "slug": "keane",
+    "name": "Keane",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "otamendi",
+    "name": "Otamendi",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "gabriel_silva",
+    "name": "Gabriel Silva",
+    "rating": 85,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "quaresma",
+    "name": "Quaresma",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "catarina_macario",
+    "name": "Catarina Macario",
+    "rating": 87,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "eze",
+    "name": "Eze",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "dumfries",
+    "name": "Dumfries",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "burkardt",
+    "name": "Burkardt",
+    "rating": 86,
+    "variant": "POTM Bundesliga"
+  },
+  {
+    "slug": "rui_costa",
+    "name": "Rui Costa",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "dunn",
+    "name": "Dunn",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "reijnders",
+    "name": "Reijnders",
+    "rating": 87,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "bronze",
+    "name": "Bronze",
+    "rating": 88,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "jose_fonte",
+    "name": "José Fonte",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "vardy",
+    "name": "Vardy",
+    "rating": 87,
+    "variant": "POTM Serie A"
+  },
+  {
+    "slug": "mbeumo",
+    "name": "Mbeumo",
+    "rating": 86,
+    "variant": "POTM Premier League"
+  },
+  {
+    "slug": "atta",
+    "name": "Atta",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "kompany",
+    "name": "Kompany",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "marta_torrejon",
+    "name": "Marta Torrejón",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "marchisio",
+    "name": "Marchisio",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ze_roberto",
+    "name": "Zé Roberto",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "rice",
+    "name": "Rice",
+    "rating": 89,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "choupo_moting",
+    "name": "Choupo-Moting",
+    "rating": 86,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "bompastor",
+    "name": "Bompastor",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "zadorsky",
+    "name": "Zadorsky",
+    "rating": 87,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "marcos_leonardo",
+    "name": "Marcos Leonardo",
+    "rating": 85,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "berger",
+    "name": "Berger",
+    "rating": 88,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "makaay",
+    "name": "Makaay",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "fleming",
+    "name": "Fleming",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "alvarez",
+    "name": "Álvarez",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "forlan",
+    "name": "Forlán",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bobb",
+    "name": "Bobb",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "park_ji_sung",
+    "name": "Park Ji Sung",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "soucek",
+    "name": "Souček",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "honorat",
+    "name": "Honorat",
+    "rating": 85,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "okocha",
+    "name": "Okocha",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "aimar",
+    "name": "Aimar",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ivan_cavaleiro",
+    "name": "Ivan Cavaleiro",
+    "rating": 85,
+    "variant": "Time Warp"
+  },
+  {
+    "slug": "ndombele",
+    "name": "Ndombele",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "ljungberg",
+    "name": "Ljungberg",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "van_de_ven",
+    "name": "van de Ven",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "guler",
+    "name": "Güler",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "doumbia",
+    "name": "Doumbia",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "suzuki",
+    "name": "Suzuki",
+    "rating": 84,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "zielinski",
+    "name": "Zieliński",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "mctominay",
+    "name": "McTominay",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "stanciu",
+    "name": "Stanciu",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "kewell",
+    "name": "Kewell",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ayew",
+    "name": "Ayew",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "lizarazu",
+    "name": "Lizarazu",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "alexander_arnold",
+    "name": "Alexander-Arnold",
+    "rating": 87,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "taylor",
+    "name": "Taylor",
+    "rating": 84,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "orsolini",
+    "name": "Orsolini",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "benrahma",
+    "name": "Benrahma",
+    "rating": 85,
+    "variant": "SQUAD FOUNDATIONS"
+  },
+  {
+    "slug": "tevez",
+    "name": "Tévez",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "mctominay",
+    "name": "McTominay",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "joao_pedro",
+    "name": "João Pedro",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "naeher",
+    "name": "Naeher",
+    "rating": 88,
+    "variant": "Knockout Royalty"
+  },
+  {
+    "slug": "gomez",
+    "name": "Gomez",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "richards",
+    "name": "Richards",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "laudehr",
+    "name": "Laudehr",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bakayoko",
+    "name": "Bakayoko",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "oskarsson",
+    "name": "Óskarsson",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "gervinho",
+    "name": "Gervinho",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "smolarek",
+    "name": "Smolarek",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bentaleb",
+    "name": "Bentaleb",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "brolin",
+    "name": "Brolin",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "fernando_morientes",
+    "name": "Fernando Morientes",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "rosicky",
+    "name": "Rosický",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ramires",
+    "name": "Ramires",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "asllani",
+    "name": "Asllani",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "beasley",
+    "name": "Beasley",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "tierney",
+    "name": "Tierney",
+    "rating": 85,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "milito",
+    "name": "Milito",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ajibade",
+    "name": "Ajibade",
+    "rating": 83,
+    "variant": "Rare"
+  },
+  {
+    "slug": "donovan",
+    "name": "Donovan",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "viggosdottir",
+    "name": "Viggósdóttir",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "carles_gil",
+    "name": "Carles Gil",
+    "rating": 83,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "bronze",
+    "name": "Bronze",
+    "rating": 88,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "luany",
+    "name": "Luany",
+    "rating": 85,
+    "variant": "POTM LIGA F"
+  },
+  {
+    "slug": "hume",
+    "name": "Hume",
+    "rating": 84,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "cesc_fabregas",
+    "name": "Cesc Fàbregas",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "wesley",
+    "name": "Wesley",
+    "rating": 85,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "szoboszlai",
+    "name": "Szoboszlai",
+    "rating": 87,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "ojeda",
+    "name": "Ojeda",
+    "rating": 83,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "matsukubo",
+    "name": "Matsukubo",
+    "rating": 83,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "al_jaber",
+    "name": "Al Jaber",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "jensen",
+    "name": "Jensen",
+    "rating": 84,
+    "variant": "SQUAD FOUNDATIONS"
+  },
+  {
+    "slug": "bremer",
+    "name": "Bremer",
+    "rating": 88,
+    "variant": "FC Pro Live"
+  },
+  {
+    "slug": "maicon",
+    "name": "Maicon",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "eva_dios",
+    "name": "Eva Dios",
+    "rating": 85,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "sasic",
+    "name": "Šašić",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "govou",
+    "name": "Govou",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "imade",
+    "name": "Imade",
+    "rating": 85,
+    "variant": "POTM LIGA F"
+  },
+  {
+    "slug": "cambiasso",
+    "name": "Cambiasso",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "little",
+    "name": "Little",
+    "rating": 87,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "ibarbo",
+    "name": "Ibarbo",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "salgado_fernandez",
+    "name": "Salgado Fernández",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "kaminski",
+    "name": "Kamiński",
+    "rating": 83,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "king",
+    "name": "King",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "saint_maximin",
+    "name": "Saint-Maximin",
+    "rating": 79,
+    "variant": "Common"
+  },
+  {
+    "slug": "oyarzabal",
+    "name": "Oyarzabal",
+    "rating": 86,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "ke_ler",
+    "name": "Keßler",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "guzan",
+    "name": "Guzan",
+    "rating": 84,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "nakata",
+    "name": "Nakata",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "zigiotti",
+    "name": "Zigiotti",
+    "rating": 84,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "lucio",
+    "name": "Lúcio",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "stiller",
+    "name": "Stiller",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "solskj_r",
+    "name": "Solskjær",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "sanchez",
+    "name": "Sánchez",
+    "rating": 85,
+    "variant": "UCL Road to the Knockouts"
+  },
+  {
+    "slug": "georges",
+    "name": "Georges",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "ream",
+    "name": "Ream",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "dreyer",
+    "name": "Dreyer",
+    "rating": 84,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "leila_ouahabi",
+    "name": "Leila Ouahabi",
+    "rating": 85,
+    "variant": "Joga Bonito"
+  },
+  {
+    "slug": "semenyo",
+    "name": "Semenyo",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "mcmanaman",
+    "name": "McManaman",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bethune",
+    "name": "Bethune",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "gomes",
+    "name": "Gomes",
+    "rating": 83,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "thauvin",
+    "name": "Thauvin",
+    "rating": 86,
+    "variant": "POTM Ligue 1"
+  },
+  {
+    "slug": "girma",
+    "name": "Girma",
+    "rating": 87,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "bright",
+    "name": "Bright",
+    "rating": 88,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "thompson",
+    "name": "Thompson",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "marc_cucurella",
+    "name": "Marc Cucurella",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "udol",
+    "name": "Udol",
+    "rating": 86,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "papin",
+    "name": "Papin",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "uzun",
+    "name": "Uzun",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "mclean",
+    "name": "McLean",
+    "rating": 85,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "joao_neves",
+    "name": "João Neves",
+    "rating": 86,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "cometti",
+    "name": "Cometti",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "mandzukic",
+    "name": "Mandžukić",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bowen",
+    "name": "Bowen",
+    "rating": 86,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "litmanen",
+    "name": "Litmanen",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "evander",
+    "name": "Evander",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "terland",
+    "name": "Terland",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "collins",
+    "name": "Collins",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "calafiori",
+    "name": "Calafiori",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "ivan_romero",
+    "name": "Iván Romero",
+    "rating": 84,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "ricardo_carvalho",
+    "name": "Ricardo Carvalho",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bierhoff",
+    "name": "Bierhoff",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "dolores_silva",
+    "name": "Dolores Silva",
+    "rating": 84,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "capdevila",
+    "name": "Capdevila",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "hancko",
+    "name": "Hancko",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "schick",
+    "name": "Schick",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "huijsen",
+    "name": "Huijsen",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "guti",
+    "name": "Guti",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "de_rossi",
+    "name": "De Rossi",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "thauvin",
+    "name": "Thauvin",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "akliouche",
+    "name": "Akliouche",
+    "rating": 84,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "zamorano",
+    "name": "Zamorano",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "o_sullivan",
+    "name": "O'Sullivan",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "retegui",
+    "name": "Retegui",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "nico_paz",
+    "name": "Nico Paz",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "yates",
+    "name": "Yates",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "turner",
+    "name": "Turner",
+    "rating": 84,
+    "variant": "SQUAD FOUNDATIONS"
+  },
+  {
+    "slug": "gunter",
+    "name": "Günter",
+    "rating": 84,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "zambo_anguissa",
+    "name": "Zambo Anguissa",
+    "rating": 86,
+    "variant": "POTM Serie A"
+  },
+  {
+    "slug": "tillman",
+    "name": "Tillman",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "kohler",
+    "name": "Kohler",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "chukwuemeka",
+    "name": "Chukwuemeka",
+    "rating": 84,
+    "variant": "World Tour"
+  },
+  {
+    "slug": "pickford",
+    "name": "Pickford",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "vialli",
+    "name": "Vialli",
+    "rating": 89,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "damnjanovic",
+    "name": "Damnjanović",
+    "rating": 84,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "edvardsen",
+    "name": "Edvardsen",
+    "rating": 84,
+    "variant": "UEL Road to the Knockouts"
+  },
+  {
+    "slug": "pizarro",
+    "name": "Pizarro",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "matviienko",
+    "name": "Matviienko",
+    "rating": 84,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "mancini",
+    "name": "Mancini",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "cordoba",
+    "name": "Córdoba",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "di_lorenzo",
+    "name": "Di Lorenzo",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "de_roon",
+    "name": "de Roon",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "noor",
+    "name": "Noor",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "mbock",
+    "name": "Mbock",
+    "rating": 86,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "gueye",
+    "name": "Gueye",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "morton",
+    "name": "Morton",
+    "rating": 83,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "gimenez",
+    "name": "Giménez",
+    "rating": 87,
+    "variant": "Star Performer"
+  },
+  {
+    "slug": "cahill",
+    "name": "Cahill",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "riise",
+    "name": "Riise",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "le_guilly",
+    "name": "Le Guilly",
+    "rating": 84,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "dempsey",
+    "name": "Dempsey",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "pau_cubarsi",
+    "name": "Pau Cubarsí",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "provstgaard",
+    "name": "Provstgaard",
+    "rating": 85,
+    "variant": "Moments"
+  },
+  {
+    "slug": "zubimendi",
+    "name": "Zubimendi",
+    "rating": 86,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "kuyt",
+    "name": "Kuyt",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "bernal",
+    "name": "Bernal",
+    "rating": 84,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "saadane",
+    "name": "Saadane",
+    "rating": 83,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "kanu",
+    "name": "Kanu",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "spitse",
+    "name": "Spitse",
+    "rating": 85,
+    "variant": "Festival of Football: Captains"
+  },
+  {
+    "slug": "lauri",
+    "name": "Lauri",
+    "rating": 83,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "vignola",
+    "name": "Vignola",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "campos",
+    "name": "Campos",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "berbatov",
+    "name": "Berbatov",
+    "rating": 87,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "romero",
+    "name": "Romero",
+    "rating": 86,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "prince",
+    "name": "Prince",
+    "rating": 84,
+    "variant": "SQUAD FOUNDATIONS"
+  },
+  {
+    "slug": "aguerd",
+    "name": "Aguerd",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "viggosdottir",
+    "name": "Viggósdóttir",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "crouch",
+    "name": "Crouch",
+    "rating": 85,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "wubben_moy",
+    "name": "Wubben-Moy",
+    "rating": 85,
+    "variant": "Ratings Reload"
+  },
+  {
+    "slug": "mascherano",
+    "name": "Mascherano",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "tolisso",
+    "name": "Tolisso",
+    "rating": 85,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "roebuck",
+    "name": "Roebuck",
+    "rating": 85,
+    "variant": "Unbreakables"
+  },
+  {
+    "slug": "karl",
+    "name": "Karl",
+    "rating": 84,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "mvogo",
+    "name": "Mvogo",
+    "rating": 76,
+    "variant": "Common"
+  },
+  {
+    "slug": "lucia_rodriguez",
+    "name": "Lucía Rodríguez",
+    "rating": 84,
+    "variant": "SQUAD FOUNDATIONS"
+  },
+  {
+    "slug": "hendry",
+    "name": "Hendry",
+    "rating": 83,
+    "variant": "SQUAD FOUNDATIONS"
+  },
+  {
+    "slug": "marquez",
+    "name": "Márquez",
+    "rating": 88,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "walti",
+    "name": "Wälti",
+    "rating": 82,
+    "variant": "Rare"
+  },
+  {
+    "slug": "boattin",
+    "name": "Boattin",
+    "rating": 84,
+    "variant": "Rare"
+  },
+  {
+    "slug": "carragher",
+    "name": "Carragher",
+    "rating": 86,
+    "variant": "UT Heroes"
+  },
+  {
+    "slug": "chara",
+    "name": "Chará",
+    "rating": 83,
+    "variant": "Cornerstones"
+  },
+  {
+    "slug": "marcelo_grohe",
+    "name": "Marcelo Grohe",
+    "rating": 75,
+    "variant": "Common"
+  },
+  {
+    "slug": "patati",
+    "name": "Patati",
+    "rating": 73,
+    "variant": "Rare"
+  },
+  {
+    "slug": "ricardo_velho",
+    "name": "Ricardo Velho",
+    "rating": 76,
+    "variant": "Common"
+  },
+  {
+    "slug": "fabio_martins",
+    "name": "Fábio Martins",
+    "rating": 76,
+    "variant": "Rare"
+  },
+  {
+    "slug": "fitz",
+    "name": "Fitz",
+    "rating": 74,
+    "variant": "Rare"
+  },
+  {
+    "slug": "batna",
+    "name": "Batna",
+    "rating": 77,
+    "variant": "Rare"
+  },
+  {
+    "slug": "luna_diale",
+    "name": "Luna Diale",
+    "rating": 72,
+    "variant": "Rare"
+  },
+  {
+    "slug": "fabianski",
+    "name": "Fabiański",
+    "rating": 75,
+    "variant": "Common"
+  },
+  {
+    "slug": "alemao",
+    "name": "Alemão",
+    "rating": 73,
+    "variant": "Rare"
+  },
+  {
+    "slug": "sayoud",
+    "name": "Sâyoud",
+    "rating": 74,
+    "variant": "Rare"
+  },
+  {
+    "slug": "luquinhas",
+    "name": "Luquinhas",
+    "rating": 70,
+    "variant": "Rare"
+  },
+  {
+    "slug": "luquinhas",
+    "name": "Luquinhas",
+    "rating": 70,
+    "variant": "Rare"
+  },
+  {
+    "slug": "tatiana_pinto",
+    "name": "Tatiana Pinto",
+    "rating": 76,
+    "variant": "Common"
+  },
+  {
+    "slug": "narey",
+    "name": "Narey",
+    "rating": 74,
+    "variant": "Rare"
+  },
+  {
+    "slug": "narey",
+    "name": "Narey",
+    "rating": 74,
+    "variant": "Rare"
+  },
+  {
+    "slug": "oxlade_chamberlain",
+    "name": "Oxlade-Chamberlain",
+    "rating": 75,
+    "variant": "Common"
+  },
+  {
+    "slug": "kewin",
+    "name": "Kewin",
+    "rating": 73,
+    "variant": "Common"
+  },
+  {
+    "slug": "fran_vieites",
+    "name": "Fran Vieites",
+    "rating": 71,
+    "variant": "Rare"
+  },
+  {
+    "slug": "m_ller",
+    "name": "Møller",
+    "rating": 79,
+    "variant": "Common"
+  },
+  {
+    "slug": "aaronson",
+    "name": "Aaronson",
+    "rating": 75,
+    "variant": "Common"
+  },
+  {
+    "slug": "chacon",
+    "name": "Chacón",
+    "rating": 73,
+    "variant": "Rare"
+  },
+  {
+    "slug": "john_victor",
+    "name": "John Victor",
+    "rating": 71,
+    "variant": "Common"
+  },
+  {
+    "slug": "pacheco",
+    "name": "Pacheco",
+    "rating": 73,
+    "variant": "Common"
+  },
+  {
+    "slug": "ivan_jaime",
+    "name": "Iván Jaime",
+    "rating": 74,
+    "variant": "Rare"
+  },
+  {
+    "slug": "andrada",
+    "name": "Andrada",
+    "rating": 71,
+    "variant": "Common"
+  },
+  {
+    "slug": "boutobba",
+    "name": "Boutobba",
+    "rating": 71,
+    "variant": "Rare"
+  },
+  {
+    "slug": "fofana",
+    "name": "Fofana",
+    "rating": 72,
+    "variant": "Rare"
+  },
+  {
+    "slug": "fofana",
+    "name": "Fofana",
+    "rating": 72,
+    "variant": "Rare"
+  },
+  {
+    "slug": "sego",
+    "name": "Šego",
+    "rating": 69,
+    "variant": "Rare"
+  }
+]
