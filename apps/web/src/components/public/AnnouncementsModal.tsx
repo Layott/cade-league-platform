@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { renderMarkdownToSafeHtml } from "@/lib/markdown";
 import { formatWat } from "@/lib/time";
 
@@ -174,8 +175,12 @@ export function AnnouncementsModal({
   }, [rows]);
 
   if (!open) return null;
+  // Render to document.body via a portal so the modal escapes the
+  // sticky-header stacking context (z-40). Without this, the header
+  // overlaps the top of the dialog.
+  if (typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/60 p-4 py-16 backdrop-blur-sm"
       onClick={onBackdropClick}
@@ -256,7 +261,8 @@ export function AnnouncementsModal({
           </footer>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

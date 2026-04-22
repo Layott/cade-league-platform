@@ -101,13 +101,21 @@ export function ProfilePanel({ profile, editable, actorUserId }: Props) {
           </div>
 
           {profile.hasPlayerRow ? (
-            <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+            <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
               <div>
                 <dt className="text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
                   Gamer tag
                 </dt>
                 <dd className="font-mono text-[var(--chalk-1)]">
                   {profile.gamerTag ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
+                  PSN
+                </dt>
+                <dd className="font-mono text-[var(--chalk-1)]">
+                  {profile.psnId ?? "—"}
                 </dd>
               </div>
               <div>

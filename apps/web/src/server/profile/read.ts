@@ -28,6 +28,7 @@ export type ProfileView = {
   photoUrl: string | null;
   bio: string | null;
   gamerTag: string | null;
+  psnId: string | null;
   jerseyNumber: number | null;
   organizationId: string | null;
   roles: string[];
@@ -42,6 +43,7 @@ type UsersRow = {
 
 type PlayersRow = {
   gamer_tag: string | null;
+  psn_id: string | null;
   jersey_number: number | null;
   photo_url: string | null;
   bio: string | null;
@@ -92,7 +94,7 @@ export async function getProfileView(
   // 2. players row — optional. Plan 40 edits bio + photo_url here.
   const { data: playerRow, error: playerErr } = await sb
     .from("players")
-    .select("gamer_tag, jersey_number, photo_url, bio, organization_id")
+    .select("gamer_tag, psn_id, jersey_number, photo_url, bio, organization_id")
     .eq("user_id", userIdToRead)
     .is("deleted_at", null)
     .maybeSingle<PlayersRow>();
@@ -124,6 +126,7 @@ export async function getProfileView(
     photoUrl: playerRow?.photo_url ?? null,
     bio: playerRow?.bio ?? null,
     gamerTag: playerRow?.gamer_tag ?? null,
+    psnId: playerRow?.psn_id ?? null,
     jerseyNumber: playerRow?.jersey_number ?? null,
     organizationId: playerRow?.organization_id ?? null,
     roles,
