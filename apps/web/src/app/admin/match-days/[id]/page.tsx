@@ -21,6 +21,7 @@ import {
 import {
   PrimaryButton,
   SecondaryButton,
+  DangerButton,
 } from "@/components/admin/buttons";
 
 export const dynamic = "force-dynamic";
@@ -299,13 +300,12 @@ export default async function MatchDayDetailPage({
                     >
                       <input type="hidden" name="matchDayId" value={matchDay.id} />
                       <input type="hidden" name="matchId" value={m.id} />
-                      <button
+                      <DangerButton
                         type="submit"
-                        className="rounded-sm border border-[var(--flare)]/60 bg-transparent px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--flare)] hover:bg-[var(--flare)]/10"
                         data-testid={`remove-fixture-btn-${m.id}`}
                       >
                         Delete
-                      </button>
+                      </DangerButton>
                     </form>
                   </div>
 
