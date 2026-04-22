@@ -5,6 +5,8 @@ import { getPlayerById } from "@/server/players";
 import { getActiveSeason } from "@/server/seasons";
 import { listStandings } from "@/server/standings/read";
 import { PlayerAvatar } from "@/components/players/PlayerAvatar";
+import { CadePlayerCard } from "@/components/players/CadePlayerCard";
+import { getPlayerHeadshotUrl } from "@/lib/player-photos";
 import {
   getApprovedSubmissionForPlayer,
   weekStartThursday,
@@ -149,12 +151,50 @@ export default async function PlayerProfilePage({
           </Link>
 
           <header className="mt-6 flex flex-col items-start gap-8 md:flex-row md:items-end">
-            <PlayerAvatar
-              photoUrl={player.photo_url}
-              displayName={player.display_name}
-              size={152}
-              jerseyNumber={player.jersey_number}
-            />
+            {(() => {
+              // Plan 32 — render CadePlayerCard at top of profile when a
+              // transparent headshot is available; fall back to PlayerAvatar
+              // for players outside the seeded 13-roster.
+              const cardPhoto = getPlayerHeadshotUrl(
+                player.gamer_tag,
+                "transparent",
+                1,
+              );
+              if (cardPhoto) {
+                return (
+                  <div data-testid="profile-cade-card">
+                    <CadePlayerCard
+                      displayName={player.display_name}
+                      gamerTag={player.gamer_tag}
+                      jerseyNumber={player.jersey_number ?? undefined}
+                      rating={80}
+                      position="ST"
+                      photoUrl={cardPhoto}
+                      stats={{
+                        pac: 80,
+                        sho: 80,
+                        pas: 80,
+                        dri: 80,
+                        def: 80,
+                        phy: 80,
+                      }}
+                      rarity="cade-special"
+                      size="xl"
+                    />
+                  </div>
+                );
+              }
+              return (
+                <PlayerAvatar
+                  photoUrl={
+                    player.photo_url ?? getPlayerHeadshotUrl(player.gamer_tag)
+                  }
+                  displayName={player.display_name}
+                  size={152}
+                  jerseyNumber={player.jersey_number}
+                />
+              );
+            })()}
             <div className="flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--signal)]">
                 @{player.gamer_tag}

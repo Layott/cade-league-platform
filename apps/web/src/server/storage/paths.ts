@@ -1,17 +1,20 @@
 /**
- * Plan 13B — Storage path builders for the four private buckets.
+ * Plan 13B + Plan 31 — Storage path builders.
  *
  * Conventions (spec §3.1):
- *   org-cac-certs    → `orgs/{orgId}/cac-cert.{ext}`
+ *   org-cac-certs    → `orgs/{orgId}/cac-cert.{ext}`        (deprecated, Plan 31)
  *   org-contracts    → `orgs/{orgId}/contracts/{contractId}.{ext}`
  *   dispute-evidence → `disputes/{disputeId}/{fileId}.{ext}`
  *   appeal-evidence  → `appeals/{appealId}/{fileId}.{ext}`
+ *   org-logos (Plan 31, public) → `orgs/{orgId}/logo.{ext}`
  */
 
 export const ORG_CAC_BUCKET = "org-cac-certs" as const;
 export const ORG_CONTRACTS_BUCKET = "org-contracts" as const;
 export const DISPUTE_EVIDENCE_BUCKET = "dispute-evidence" as const;
 export const APPEAL_EVIDENCE_BUCKET = "appeal-evidence" as const;
+// Plan 31 — public bucket for org logos. Read via CDN, write via signed upload.
+export const ORG_LOGOS_BUCKET = "org-logos" as const;
 
 export type PrivateBucket =
   | typeof ORG_CAC_BUCKET
@@ -60,4 +63,13 @@ export function buildAppealEvidencePath(
   ext: string,
 ): string {
   return `appeals/${appealId}/${fileId}.${sanitizeExt(ext)}`;
+}
+
+/**
+ * Plan 31 — public org logo path. Mirrors the CAC-cert convention so
+ * we can later soft-archive the CAC bucket without disturbing logo
+ * lookups.
+ */
+export function buildOrgLogoPath(orgId: string, ext: string): string {
+  return `orgs/${orgId}/logo.${sanitizeExt(ext)}`;
 }

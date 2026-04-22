@@ -23,13 +23,14 @@ import {
 import { formatWat } from "@/lib/time";
 import { trySignedRead } from "@/server/storage/signed";
 import {
-  ORG_CAC_BUCKET,
   ORG_CONTRACTS_BUCKET,
 } from "@/server/storage/paths";
 import {
   softDeleteOrgAction,
   linkPlayerAction,
   unlinkPlayerAction,
+  linkCoachAction,
+  linkTeamManagerAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +75,10 @@ export default async function OrgDetailPage({
   const org = await getOrgById(sb, id);
   if (!org) return notFound();
 
-  const [players, contracts, ledger, unlinkedRoster, cacSignedUrl] =
+  // Plan 31 — load coach + team-manager candidates (any user) so the
+  // detail page can offer linking after a player has been added to the
+  // org. Pulled inline so we don't pay the cost on the public side.
+  const [players, contracts, ledger, unlinkedRoster, staffCandidates] =
     await Promise.all([
       listPlayersForOrg(sb, org.id),
       listContractsForOrg(sb, org.id),
@@ -85,8 +89,42 @@ export default async function OrgDetailPage({
         .is("organization_id", null)
         .is("deleted_at", null)
         .limit(100),
-      trySignedRead(sb, ORG_CAC_BUCKET, org.cac_cert_url, 300),
+      sb
+        .from("users")
+        .select("id, display_name, email")
+        .is("deleted_at", null)
+        .order("display_name", { ascending: true })
+        .limit(200),
     ]);
+
+  type StaffCandidate = { id: string; display_name: string | null; email: string };
+  const staffOptions = ((staffCandidates.data ?? []) as StaffCandidate[]).map(
+    (u) => ({ id: u.id, label: u.display_name ?? u.email }),
+  );
+
+  // Plan 31 — fetch the linked coach + team-manager IDs for each org
+  // player so the UI can show current assignment + offer "clear".
+  const playerIds = players.map((p) => p.id);
+  const { data: playerStaff } = playerIds.length
+    ? await sb
+        .from("players")
+        .select("id, coach_id, team_manager_id")
+        .in("id", playerIds)
+    : { data: [] as Array<{ id: string; coach_id: string | null; team_manager_id: string | null }> };
+  const staffByPlayer = new Map<
+    string,
+    { coachId: string | null; teamManagerId: string | null }
+  >();
+  for (const r of (playerStaff ?? []) as Array<{
+    id: string;
+    coach_id: string | null;
+    team_manager_id: string | null;
+  }>) {
+    staffByPlayer.set(r.id, {
+      coachId: r.coach_id,
+      teamManagerId: r.team_manager_id,
+    });
+  }
 
   type UnlinkedRow = {
     id: string;
@@ -133,6 +171,75 @@ export default async function OrgDetailPage({
       render: (p) => (
         <span className="text-[var(--chalk-1)]">{p.display_name}</span>
       ),
+    },
+    {
+      key: "coach",
+      label: "Coach (Plan 31)",
+      render: (p) => {
+        const cur = staffByPlayer.get(p.id)?.coachId ?? "";
+        return (
+          <form action={linkCoachAction} className="flex items-center gap-2">
+            <input type="hidden" name="orgId" value={org.id} />
+            <input type="hidden" name="playerId" value={p.id} />
+            <select
+              name="coachUserId"
+              defaultValue={cur}
+              className={selectClass}
+              data-testid={`coach-select-${p.id}`}
+            >
+              <option value="">— none —</option>
+              {staffOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--signal)] hover:underline"
+              data-testid={`coach-save-${p.id}`}
+            >
+              Save
+            </button>
+          </form>
+        );
+      },
+    },
+    {
+      key: "manager",
+      label: "Team manager (Plan 31)",
+      render: (p) => {
+        const cur = staffByPlayer.get(p.id)?.teamManagerId ?? "";
+        return (
+          <form
+            action={linkTeamManagerAction}
+            className="flex items-center gap-2"
+          >
+            <input type="hidden" name="orgId" value={org.id} />
+            <input type="hidden" name="playerId" value={p.id} />
+            <select
+              name="teamManagerUserId"
+              defaultValue={cur}
+              className={selectClass}
+              data-testid={`manager-select-${p.id}`}
+            >
+              <option value="">— none —</option>
+              {staffOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--signal)] hover:underline"
+              data-testid={`manager-save-${p.id}`}
+            >
+              Save
+            </button>
+          </form>
+        );
+      },
     },
     {
       key: "actions",
@@ -277,9 +384,6 @@ export default async function OrgDetailPage({
         description={
           <span className="flex items-center gap-2">
             <StatusPill status={org.status} />
-            <span className="font-mono text-xs text-[var(--chalk-3)]">
-              CAC: {org.cac_number ?? "—"}
-            </span>
           </span>
         }
         action={
@@ -300,66 +404,55 @@ export default async function OrgDetailPage({
         </div>
       ) : null}
 
-      {/* INFO */}
+      {/* INFO — Plan 31: CAC removed; logo is now the org's identity asset. */}
       <section id="info" className="space-y-3">
         <h2 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
           Info
         </h2>
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 text-sm">
-          <dl className="grid gap-4 md:grid-cols-2">
-            <div>
-              <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                Name
-              </dt>
-              <dd className="text-[var(--chalk-0)]">{org.name}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                CAC number
-              </dt>
-              <dd className="font-mono text-[var(--chalk-1)]">
-                {org.cac_number ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                Balance (coins)
-              </dt>
-              <dd className="font-mono tabular text-[var(--chalk-0)]">
-                {fmtCoins(org.caution_fee_balance_coins)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                Created
-              </dt>
-              <dd className="font-mono text-xs text-[var(--chalk-2)]">
-                {formatWat(org.created_at, "yyyy-MM-dd HH:mm")} WAT
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                CAC certificate
-              </dt>
-              <dd>
-                {cacSignedUrl ? (
-                  <a
-                    href={cacSignedUrl}
-                    target="_blank"
-                    rel="noopener"
-                    className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--signal)] hover:underline"
-                    data-testid="org-cac-download"
-                  >
-                    Download (5 min link)
-                  </a>
-                ) : (
-                  <span className="text-xs text-[var(--chalk-3)]">
-                    {org.cac_cert_url ? "Asset unavailable" : "Not uploaded"}
-                  </span>
-                )}
-              </dd>
-            </div>
-          </dl>
+          <div className="flex flex-col gap-5 md:flex-row md:items-start">
+            {org.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={org.logo_url}
+                alt={`${org.name} logo`}
+                className="h-24 w-24 flex-none rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] object-contain"
+                data-testid="org-logo-img"
+              />
+            ) : (
+              <div
+                className="flex h-24 w-24 flex-none items-center justify-center rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-1)] font-display text-2xl font-bold text-[var(--chalk-3)]"
+                data-testid="org-logo-empty"
+                aria-hidden
+              >
+                {org.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <dl className="flex-1 grid gap-4 md:grid-cols-2">
+              <div>
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                  Name
+                </dt>
+                <dd className="text-[var(--chalk-0)]">{org.name}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                  Balance (coins)
+                </dt>
+                <dd className="font-mono tabular text-[var(--chalk-0)]">
+                  {fmtCoins(org.caution_fee_balance_coins)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                  Created
+                </dt>
+                <dd className="font-mono text-xs text-[var(--chalk-2)]">
+                  {formatWat(org.created_at, "yyyy-MM-dd HH:mm")} WAT
+                </dd>
+              </div>
+            </dl>
+          </div>
         </div>
       </section>
 

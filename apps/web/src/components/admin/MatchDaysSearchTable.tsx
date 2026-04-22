@@ -21,6 +21,8 @@ export type MatchDayRow = {
   status: string;
   match_count: number;
   player_tags: string[];
+  // Plan 27 — null when not yet released to the public /fixtures page.
+  published_at: string | null;
 };
 
 export function MatchDaysSearchTable({
@@ -69,6 +71,16 @@ export function MatchDaysSearchTable({
       key: "status",
       label: "Status",
       render: (d) => <StatusPill status={d.status} />,
+    },
+    {
+      key: "published",
+      label: "Published",
+      render: (d) => (
+        <StatusPill
+          status={d.published_at ? "published" : "draft"}
+          data-testid={`md-publish-${d.id}`}
+        />
+      ),
     },
     {
       key: "actions",

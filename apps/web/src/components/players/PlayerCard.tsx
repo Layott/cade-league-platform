@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PlayerAvatar } from "./PlayerAvatar";
 import type { PlayerView } from "@/server/players/types";
+import { getPlayerAvatarUrl } from "@/lib/player-photos";
 
 export type PlayerCardStats = {
   matches_played: number;
@@ -33,7 +34,7 @@ export function PlayerCard({ player, stats }: Props) {
 
       <div className="relative flex items-start gap-4">
         <PlayerAvatar
-          photoUrl={player.photo_url}
+          photoUrl={player.photo_url ?? getPlayerAvatarUrl(player.gamer_tag)}
           displayName={player.display_name}
           size={64}
           jerseyNumber={player.jersey_number}

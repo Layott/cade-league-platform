@@ -4,6 +4,8 @@ import {
   buildOrgContractPath,
   buildDisputeEvidencePath,
   buildAppealEvidencePath,
+  buildOrgLogoPath,
+  ORG_LOGOS_BUCKET,
   PRIVATE_BUCKETS,
 } from "./paths";
 
@@ -41,5 +43,14 @@ describe("storage path builders (Plan 13B)", () => {
     expect(PRIVATE_BUCKETS).toContain("org-contracts");
     expect(PRIVATE_BUCKETS).toContain("dispute-evidence");
     expect(PRIVATE_BUCKETS).toContain("appeal-evidence");
+  });
+
+  it("Plan 31 — buildOrgLogoPath → orgs/<orgId>/logo.<ext>", () => {
+    expect(buildOrgLogoPath("ORG-1", "png")).toBe("orgs/ORG-1/logo.png");
+    expect(buildOrgLogoPath("ORG-2", "JPEG")).toBe("orgs/ORG-2/logo.jpeg");
+  });
+
+  it("Plan 31 — exposes ORG_LOGOS_BUCKET constant", () => {
+    expect(ORG_LOGOS_BUCKET).toBe("org-logos");
   });
 });

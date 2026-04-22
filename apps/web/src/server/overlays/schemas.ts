@@ -34,10 +34,13 @@ export const soundSlotSchema = z
 export type SoundSlot = z.infer<typeof soundSlotSchema>;
 
 // Player-ish shorthand — `displayName` + optional headshot URL.
+// Plan 32 — accept relative paths (`/players/<slug>/...`) as well as
+// absolute URLs so static-asset photos can be embedded in payloads.
+const photoUrlSchema = z.string().trim().min(1).max(500);
 const playerLiteSchema = z.object({
   displayName: z.string().trim().min(1).max(80),
   gamerTag: z.string().trim().min(1).max(80).optional(),
-  photoUrl: z.string().url().max(500).optional(),
+  photoUrl: photoUrlSchema.optional(),
 });
 
 const socialsSchema = z
@@ -66,6 +69,9 @@ export const lowerThirdSchema = z.object({
   displayName: z.string().trim().min(1).max(80),
   gamerTag: z.string().trim().min(1).max(80),
   jerseyNumber: z.coerce.number().int().min(0).max(999),
+  // Plan 32 — optional headshot URL. Public path (e.g. `/players/<slug>/...`)
+  // or absolute URL. Lower-third renderer falls back to initials.
+  photoUrl: z.string().trim().min(1).max(500).optional(),
   stats: z
     .object({
       gp: z.coerce.number().int().min(0).max(999),
@@ -99,7 +105,7 @@ export type StandingsWidgetPayload = z.infer<typeof standingsWidgetSchema>;
 export const playerCardSchema = z.object({
   playerId: z.string().uuid(),
   displayName: z.string().trim().min(1).max(80),
-  photoUrl: z.string().url().max(500).optional(),
+  photoUrl: photoUrlSchema.optional(),
   gamerTag: z.string().trim().min(1).max(80),
   seasonStats: z.object({
     gp: z.coerce.number().int().min(0).max(999),
@@ -166,14 +172,14 @@ export type StingerReplayPayload = z.infer<typeof stingerReplaySchema>;
 
 export const stingerGoalSchema = z.object({
   scorerDisplayName: z.string().trim().min(1).max(80).optional(),
-  scorerPhotoUrl: z.string().url().max(500).optional(),
+  scorerPhotoUrl: photoUrlSchema.optional(),
   soundSlot: soundSlotSchema,
 });
 export type StingerGoalPayload = z.infer<typeof stingerGoalSchema>;
 
 export const stingerWinnerSchema = z.object({
   winnerDisplayName: z.string().trim().min(1).max(80),
-  winnerPhotoUrl: z.string().url().max(500).optional(),
+  winnerPhotoUrl: photoUrlSchema.optional(),
   finalScore: z
     .object({
       home: z.coerce.number().int().min(0).max(99),
@@ -245,7 +251,7 @@ export type LayoutCastersChatPayload = z.infer<typeof layoutCastersChatSchema>;
 const h2hPlayerSchema = z.object({
   displayName: z.string().trim().min(1).max(80),
   gamerTag: z.string().trim().min(1).max(80).optional(),
-  photoUrl: z.string().url().max(500).optional(),
+  photoUrl: photoUrlSchema.optional(),
   h2hStats: z
     .object({
       w: z.coerce.number().int().min(0).max(999),
@@ -297,7 +303,7 @@ export const scoreBugSchema = z.object({
     .array(
       z.object({
         displayName: z.string().trim().min(1).max(80),
-        photoUrl: z.string().url().max(500).optional(),
+        photoUrl: photoUrlSchema.optional(),
         score: z.coerce.number().int().min(0).max(99),
       }),
     )
@@ -361,7 +367,7 @@ export const topScorersSchema = z.object({
       z.object({
         rank: z.coerce.number().int().min(1).max(999),
         displayName: z.string().trim().min(1).max(80),
-        photoUrl: z.string().url().max(500).optional(),
+        photoUrl: photoUrlSchema.optional(),
         goals: z.coerce.number().int().min(0).max(9999),
       }),
     )
@@ -393,7 +399,7 @@ export const playerPenaltiesSchema = z.object({
     .array(
       z.object({
         displayName: z.string().trim().min(1).max(80),
-        photoUrl: z.string().url().max(500).optional(),
+        photoUrl: photoUrlSchema.optional(),
         count: z.coerce.number().int().min(0).max(999),
         sanctionType: z.enum([
           "point_deduction",

@@ -11,6 +11,7 @@ import {
   type PlayerCardPayload,
   type LowerThirdPayload,
 } from "./schemas";
+import { getPlayerHeadshotUrl } from "@/lib/player-photos";
 
 /**
  * Plan 12 — "Auto-fill from live match" helpers.
@@ -199,11 +200,19 @@ export async function buildPlayerCardPayload(
       }
     | null;
 
+  // Plan 32 — prefer the static manifest headshot when the player is in
+  // the seeded 13-roster; fall back to the per-row photo_url, otherwise
+  // omit so the renderer shows initials.
+  const resolvedPhoto =
+    getPlayerHeadshotUrl(p.gamer_tag, "transparent", 1) ??
+    p.photo_url ??
+    undefined;
+
   return playerCardSchema.parse({
     playerId: p.id,
     displayName: p.users?.display_name ?? p.gamer_tag ?? "—",
     gamerTag: p.gamer_tag ?? "—",
-    photoUrl: p.photo_url ?? undefined,
+    photoUrl: resolvedPhoto,
     seasonStats: {
       gp: stats?.games_played ?? 0,
       w: stats?.wins ?? 0,
@@ -261,11 +270,16 @@ export async function buildLowerThirdPayload(
       }
     | null;
 
+  // Plan 32 — populate photoUrl from the static manifest when available.
+  const resolvedLowerThirdPhoto =
+    getPlayerHeadshotUrl(p.gamer_tag, "normal", 1) ?? undefined;
+
   return lowerThirdSchema.parse({
     playerId: p.id,
     displayName: p.users?.display_name ?? p.gamer_tag ?? "—",
     gamerTag: p.gamer_tag ?? "—",
     jerseyNumber: p.jersey_number ?? 0,
+    photoUrl: resolvedLowerThirdPhoto,
     stats: stats
       ? {
           gp: stats.games_played,

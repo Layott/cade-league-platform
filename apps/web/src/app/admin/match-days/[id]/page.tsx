@@ -1,15 +1,20 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getMatchDay } from "@/server/matches/match-days";
 import { listByMatchDay } from "@/server/matches/matches";
 import { formatWat } from "@/lib/time";
+import { getPlayerAvatarUrl } from "@/lib/player-photos";
 import {
   addFixtureAction,
   confirmResultAction,
   editResultAction,
   editMatchAction,
   enterResultAction,
+  publishMatchDayAction,
   removeMatchAction,
+  reorderMatchAction,
+  unpublishMatchDayAction,
 } from "./actions";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
@@ -98,12 +103,43 @@ export default async function MatchDayDetailPage({
               </span>
             </span>
             <StatusPill status={matchDay.status} className="ml-1" />
+            {/* Plan 27 — published / draft visibility on the public Fixtures page */}
+            <StatusPill
+              status={matchDay.published_at ? "published" : "draft"}
+              className="ml-1"
+              data-testid="md-publish-pill"
+            />
+            {matchDay.published_at ? (
+              <span className="text-[var(--chalk-3)] normal-case tracking-normal">
+                Released{" "}
+                <span className="text-[var(--chalk-1)] tabular">
+                  {formatWat(matchDay.published_at, "MMM d, HH:mm")}
+                </span>
+              </span>
+            ) : null}
           </span>
         }
         action={
-          <Link href={`/admin/match-days/${matchDay.id}/attendance`}>
-            <SecondaryButton type="button">Attendance roster</SecondaryButton>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {matchDay.published_at ? (
+              <form action={unpublishMatchDayAction}>
+                <input type="hidden" name="matchDayId" value={matchDay.id} />
+                <SecondaryButton type="submit" data-testid="unpublish-md-btn">
+                  Unpublish
+                </SecondaryButton>
+              </form>
+            ) : (
+              <form action={publishMatchDayAction}>
+                <input type="hidden" name="matchDayId" value={matchDay.id} />
+                <PrimaryButton type="submit" data-testid="publish-md-btn">
+                  Publish to players
+                </PrimaryButton>
+              </form>
+            )}
+            <Link href={`/admin/match-days/${matchDay.id}/attendance`}>
+              <SecondaryButton type="button">Attendance roster</SecondaryButton>
+            </Link>
+          </div>
         }
       />
 
@@ -178,7 +214,9 @@ export default async function MatchDayDetailPage({
           </div>
         ) : (
           <ul className="space-y-3">
-            {matches.map((m) => {
+            {matches.map((m, idx) => {
+              const isFirst = idx === 0;
+              const isLast = idx === matches.length - 1;
               const result = firstOrNull(
                 (m as unknown as { result: unknown }).result as
                   | {
@@ -227,11 +265,19 @@ export default async function MatchDayDetailPage({
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
-                      <PlayerChip label={playerLabel(homePlayer)} side="home" />
+                      <PlayerChip
+                        label={playerLabel(homePlayer)}
+                        gamerTag={homePlayer?.gamer_tag ?? null}
+                        side="home"
+                      />
                       <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
                         vs
                       </span>
-                      <PlayerChip label={playerLabel(awayPlayer)} side="away" />
+                      <PlayerChip
+                        label={playerLabel(awayPlayer)}
+                        gamerTag={awayPlayer?.gamer_tag ?? null}
+                        side="away"
+                      />
                     </div>
                     <div className="flex items-center gap-3">
                       {result ? (
@@ -243,6 +289,54 @@ export default async function MatchDayDetailPage({
                       ) : null}
                       <StatusPill status={statusLabel} />
                     </div>
+                  </div>
+
+                  {/* Plan 27 — reorder chevrons (a11y-friendly buttons; no drag-drop) */}
+                  <div
+                    className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[var(--chalk-3)]"
+                    data-testid={`reorder-row-${m.id}`}
+                  >
+                    <span className="font-mono tabular text-[var(--chalk-2)]">
+                      #{idx + 1}
+                    </span>
+                    <form action={reorderMatchAction}>
+                      <input type="hidden" name="matchDayId" value={matchDay.id} />
+                      <input type="hidden" name="matchId" value={m.id} />
+                      <input type="hidden" name="direction" value="up" />
+                      <button
+                        type="submit"
+                        disabled={isFirst}
+                        aria-label="Move fixture up"
+                        data-testid={`reorder-up-${m.id}`}
+                        className={
+                          "rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-0.5 text-[var(--chalk-1)] " +
+                          (isFirst
+                            ? "opacity-30"
+                            : "hover:border-[var(--primary)] hover:text-[var(--primary)]")
+                        }
+                      >
+                        ↑
+                      </button>
+                    </form>
+                    <form action={reorderMatchAction}>
+                      <input type="hidden" name="matchDayId" value={matchDay.id} />
+                      <input type="hidden" name="matchId" value={m.id} />
+                      <input type="hidden" name="direction" value="down" />
+                      <button
+                        type="submit"
+                        disabled={isLast}
+                        aria-label="Move fixture down"
+                        data-testid={`reorder-down-${m.id}`}
+                        className={
+                          "rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-0.5 text-[var(--chalk-1)] " +
+                          (isLast
+                            ? "opacity-30"
+                            : "hover:border-[var(--primary)] hover:text-[var(--primary)]")
+                        }
+                      >
+                        ↓
+                      </button>
+                    </form>
                   </div>
 
                   {/* Plan 26 — inline edit + soft-delete (admins only via matches.edit) */}
@@ -404,9 +498,11 @@ export default async function MatchDayDetailPage({
 
 function PlayerChip({
   label,
+  gamerTag,
   side,
 }: {
   label: string;
+  gamerTag: string | null;
   side: "home" | "away";
 }) {
   const initials = label
@@ -415,18 +511,40 @@ function PlayerChip({
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  // Plan 32 — try resolving a static headshot for the player; fall back to
+  // initials when the player isn't in the seeded 13-roster manifest.
+  const photoUrl = getPlayerAvatarUrl(gamerTag);
+  const ring =
+    side === "home"
+      ? "border-[var(--primary)]"
+      : "border-[var(--ink-5)]";
+  const fallbackInk =
+    side === "home"
+      ? "bg-[rgba(107,205,6,0.08)] text-[var(--primary)]"
+      : "bg-[var(--ink-3)] text-[var(--chalk-1)]";
   return (
     <div className="flex items-center gap-3">
       <div
         aria-hidden
         className={
-          "flex h-9 w-9 items-center justify-center rounded-full border-2 font-display text-xs font-bold tabular " +
-          (side === "home"
-            ? "border-[var(--primary)] bg-[rgba(107,205,6,0.08)] text-[var(--primary)]"
-            : "border-[var(--ink-5)] bg-[var(--ink-3)] text-[var(--chalk-1)]")
+          "relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 font-display text-xs font-bold tabular " +
+          ring +
+          " " +
+          (photoUrl ? "bg-[var(--ink-1)]" : fallbackInk)
         }
+        data-testid="match-day-player-chip"
       >
-        {initials || "—"}
+        {photoUrl ? (
+          <Image
+            src={photoUrl}
+            alt={label}
+            width={36}
+            height={36}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          (initials || "—")
+        )}
       </div>
       <span className="font-display text-base font-semibold text-[var(--chalk-0)]">
         {label}

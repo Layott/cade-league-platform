@@ -27,12 +27,12 @@ describe("PLAN26_SCHEDULE LOC fixture invariants", () => {
     expect(PLAN26_SCHEDULE.map((d) => d.date)).toEqual([
       "2026-04-26",
       "2026-05-02",
-      "2026-05-04",
+      "2026-05-03",
+      "2026-05-09",
       "2026-05-10",
-      "2026-05-11",
+      "2026-05-16",
       "2026-05-17",
-      "2026-05-18",
-      "2026-05-25",
+      "2026-05-30",
     ]);
   });
 
@@ -41,6 +41,24 @@ describe("PLAN26_SCHEDULE LOC fixture invariants", () => {
       10, 11, 9, 11, 10, 10, 9, 8,
     ]);
     expect(allPairs.length).toBe(78);
+  });
+
+  // Plan 27 — every match day must land on a Saturday or Sunday in the
+  // Africa/Lagos calendar. Hard-coded to UTC-derived getUTCDay() because
+  // YYYY-MM-DD date strings are calendar-day stable across timezones.
+  it("every match day is a Saturday or Sunday", () => {
+    for (const d of PLAN26_SCHEDULE) {
+      const dow = new Date(`${d.date}T00:00:00Z`).getUTCDay();
+      // 0 = Sun, 6 = Sat
+      expect([0, 6]).toContain(dow);
+    }
+  });
+
+  // Plan 27 — finale must be the last LOC-announced date (2026-05-30).
+  it("finale is 2026-05-30 (Sat) and is the last day", () => {
+    const last = PLAN26_SCHEDULE[PLAN26_SCHEDULE.length - 1];
+    expect(last.date).toBe("2026-05-30");
+    expect(new Date(`${last.date}T00:00:00Z`).getUTCDay()).toBe(6);
   });
 
   it("uses only the 13 known gamer_tags and references each", () => {

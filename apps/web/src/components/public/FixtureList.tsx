@@ -1,4 +1,6 @@
+import Image from "next/image";
 import { formatWat } from "@/lib/time";
+import { getPlayerAvatarUrl } from "@/lib/player-photos";
 
 export type FixtureRow = {
   id: string;
@@ -226,14 +228,16 @@ function TeamSide({
   const text = align === "right" ? "text-right" : "text-left";
   const ring = won ? "ring-2 ring-[var(--signal)]" : "ring-1 ring-[var(--ink-5)]";
   const initials = initialsFrom(name);
+  const photoUrl = getPlayerAvatarUrl(tag);
   return (
     <div className={"flex min-w-0 items-center gap-3 " + justify}>
       {align === "left" ? (
-        <JerseyTile
-          jersey={jersey}
+        <PlayerMini
+          photoUrl={photoUrl}
           initials={initials}
           ring={ring}
           won={won}
+          name={name}
         />
       ) : null}
       <div className={"min-w-0 " + text}>
@@ -250,47 +254,63 @@ function TeamSide({
         </div>
       </div>
       {align === "right" ? (
-        <JerseyTile
-          jersey={jersey}
+        <PlayerMini
+          photoUrl={photoUrl}
           initials={initials}
           ring={ring}
           won={won}
+          name={name}
         />
+      ) : null}
+      {/* Jersey tile retained as a small badge alongside the avatar. */}
+      {jersey != null ? (
+        <span
+          className="hidden items-center justify-center rounded-sm border border-[var(--ink-5)] bg-[var(--ink-1)] px-1.5 py-0.5 font-display text-[10px] font-bold tabular text-[var(--chalk-2)] sm:inline-flex"
+          aria-hidden
+        >
+          #{jersey}
+        </span>
       ) : null}
     </div>
   );
 }
 
-function JerseyTile({
-  jersey,
+function PlayerMini({
+  photoUrl,
   initials,
   ring,
   won,
+  name,
 }: {
-  jersey: number | null;
+  photoUrl: string | null;
   initials: string;
   ring: string;
   won: boolean;
+  name: string;
 }) {
   return (
     <div
       className={
-        "flex h-11 w-11 flex-none flex-col items-center justify-center rounded-sm bg-[var(--ink-1)] " +
+        "relative flex h-9 w-9 flex-none items-center justify-center overflow-hidden rounded-full bg-[var(--ink-1)] " +
         ring
       }
-      aria-hidden
+      data-testid="fixture-player-mini"
     >
-      {jersey != null ? (
+      {photoUrl ? (
+        <Image
+          src={photoUrl}
+          alt={name}
+          width={36}
+          height={36}
+          className="h-full w-full object-cover"
+        />
+      ) : (
         <span
           className={
-            "tabular font-display text-sm font-bold leading-none " +
-            (won ? "text-[var(--signal)]" : "text-[var(--chalk-0)]")
+            "font-display text-[11px] font-bold " +
+            (won ? "text-[var(--signal)]" : "text-[var(--chalk-2)]")
           }
         >
-          {jersey}
-        </span>
-      ) : (
-        <span className="font-display text-xs font-bold text-[var(--chalk-2)]">
           {initials}
         </span>
       )}

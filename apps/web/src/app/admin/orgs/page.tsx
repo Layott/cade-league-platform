@@ -86,13 +86,21 @@ export default async function AdminOrgsListPage() {
       ),
     },
     {
-      key: "cac",
-      label: "CAC#",
-      render: (r) => (
-        <span className="font-mono text-[12px] tabular text-[var(--chalk-1)]">
-          {r.cac_number ?? "—"}
-        </span>
-      ),
+      key: "logo",
+      label: "Logo",
+      render: (r) =>
+        r.logo_url ? (
+          // Plan 31 — show a thumbnail; org-logos bucket is public.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={r.logo_url}
+            alt={`${r.name} logo`}
+            className="h-8 w-8 rounded-sm border border-[var(--ink-4)] object-contain"
+            data-testid={`org-list-logo-${r.id}`}
+          />
+        ) : (
+          <span className="text-xs text-[var(--chalk-3)]">—</span>
+        ),
     },
     {
       key: "status",

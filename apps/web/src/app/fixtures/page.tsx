@@ -87,6 +87,8 @@ export default async function FixturesPage({
       )
       .eq("season_id", season.id)
       .is("deleted_at", null)
+      // Plan 27 — only days the LOC has explicitly published surface here.
+      .not("published_at", "is", null)
       .order("match_date", { ascending: true });
 
     for (const md of ((data ?? []) as unknown as MatchDayJoin[])) {
@@ -162,7 +164,7 @@ export default async function FixturesPage({
         {groups.length === 0 ? (
           <EmptyState
             title="Schedule drop pending"
-            hint="The league office publishes fixture releases ahead of each match day — check back here when the call goes out."
+            hint="Fixtures will appear here 24-48 hours before each match day. Check back soon."
           />
         ) : (
           <FixtureSearch groups={groups} initialQuery={q ?? ""} />

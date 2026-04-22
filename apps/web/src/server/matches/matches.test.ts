@@ -1,5 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMatch, editMatch, softDeleteMatch, voidMatch } from "./matches";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  createMatch,
+  editMatch,
+  reorderMatches,
+  softDeleteMatch,
+  voidMatch,
+} from "./matches";
+import { __test as cacheTest } from "@/server/roles/cache";
 
 function mkSb({
   matchDay,
@@ -131,5 +138,131 @@ describe("softDeleteMatch (Plan 26)", () => {
     });
     const payload = (sb._update.mock.calls[0] as [unknown])[0] as Record<string, unknown>;
     expect(payload.deleted_at).toEqual(expect.any(String));
+  });
+});
+
+/**
+ * Plan 27 — reorderMatches.
+ *
+ * Mock dual-purposes itself: handles `role_permissions` (perm check),
+ * `matches` SELECT (existing-id verify), and `matches` UPDATE (per-row
+ * match_order rewrite).
+ */
+function mkReorderSb(opts: {
+  rolePerms: Record<string, string[]>;
+  matchIds: string[];
+}) {
+  const updateCalls: Array<{ payload: Record<string, unknown>; id: string }> = [];
+  let nextEqId = "";
+  const from = vi.fn((table: string) => {
+    if (table === "role_permissions") {
+      const chain: Record<string, unknown> = {};
+      chain.select = vi.fn(() => chain);
+      chain.eq = vi.fn((_col: string, val: string) => {
+        const perms = (opts.rolePerms[val] ?? []).map((permission) => ({ permission }));
+        return Promise.resolve({ data: perms, error: null });
+      });
+      return chain;
+    }
+    if (table === "matches") {
+      // The verify-select chain: select().eq(match_day_id).is(deleted_at).order? returns an array of {id}.
+      const selectChain: Record<string, unknown> = {};
+      selectChain.select = vi.fn(() => selectChain);
+      selectChain.eq = vi.fn(() => selectChain);
+      selectChain.is = vi.fn(() =>
+        Promise.resolve({
+          data: opts.matchIds.map((id) => ({ id })),
+          error: null,
+        }),
+      );
+
+      const updateChain = {
+        update: vi.fn((payload: Record<string, unknown>) => {
+          const tail: Record<string, unknown> = {};
+          tail.eq = vi.fn((_col: string, val: string) => {
+            nextEqId = val;
+            return tail;
+          });
+          tail.is = vi.fn(() => {
+            updateCalls.push({ payload, id: nextEqId });
+            return Promise.resolve({ error: null });
+          });
+          return tail;
+        }),
+      };
+      return { ...selectChain, ...updateChain };
+    }
+    throw new Error(`unexpected table ${table}`);
+  });
+  return { from, _updates: updateCalls };
+}
+
+beforeEach(() => cacheTest.clearAll());
+afterEach(() => cacheTest.clearAll());
+
+describe("reorderMatches (Plan 27)", () => {
+  it("rejects when actor lacks matches.edit", async () => {
+    const sb = mkReorderSb({ rolePerms: { player: ["matches.read"] }, matchIds: ["a", "b"] });
+    await expect(
+      reorderMatches(sb as never, { userId: "u", roles: ["player"] }, "md-1", ["a", "b"]),
+    ).rejects.toThrow(/missing permission/);
+  });
+
+  it("rejects when an id is not in the match day", async () => {
+    const sb = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b"] });
+    await expect(
+      reorderMatches(sb as never, { userId: "u", roles: ["admin"] }, "md-1", ["a", "stranger"]),
+    ).rejects.toThrow(/not in match_day/);
+  });
+
+  it("rejects duplicate ids", async () => {
+    const sb = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b"] });
+    await expect(
+      reorderMatches(sb as never, { userId: "u", roles: ["admin"] }, "md-1", ["a", "a"]),
+    ).rejects.toThrow(/duplicate/);
+  });
+
+  it("writes match_order = i+1 for each id in order", async () => {
+    const sb = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b", "c"] });
+    await reorderMatches(
+      sb as never,
+      { userId: "u", roles: ["admin"] },
+      "md-1",
+      ["c", "a", "b"],
+    );
+    expect(sb._updates).toEqual([
+      { id: "c", payload: expect.objectContaining({ match_order: 1 }) },
+      { id: "a", payload: expect.objectContaining({ match_order: 2 }) },
+      { id: "b", payload: expect.objectContaining({ match_order: 3 }) },
+    ]);
+  });
+
+  it("idempotent — running the same order twice yields the same final state", async () => {
+    const sb1 = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b", "c"] });
+    await reorderMatches(sb1 as never, { userId: "u", roles: ["admin"] }, "md", ["a", "b", "c"]);
+    const sb2 = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b", "c"] });
+    await reorderMatches(sb2 as never, { userId: "u", roles: ["admin"] }, "md", ["a", "b", "c"]);
+    // Second run produces the same per-id match_order assignments.
+    expect(sb1._updates.map((c) => ({ id: c.id, n: c.payload.match_order }))).toEqual(
+      sb2._updates.map((c) => ({ id: c.id, n: c.payload.match_order })),
+    );
+  });
+
+  it("a single neighbor swap reverses cleanly when re-applied", async () => {
+    // Start: [a, b, c]. Swap b up → [b, a, c]. Swap b back down → [a, b, c].
+    const order1 = ["b", "a", "c"];
+    const order2 = ["a", "b", "c"];
+    const sb1 = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b", "c"] });
+    await reorderMatches(sb1 as never, { userId: "u", roles: ["admin"] }, "md", order1);
+    const sb2 = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a", "b", "c"] });
+    await reorderMatches(sb2 as never, { userId: "u", roles: ["admin"] }, "md", order2);
+    expect(sb1._updates.map((c) => c.id)).toEqual(order1);
+    expect(sb2._updates.map((c) => c.id)).toEqual(order2);
+  });
+
+  it("empty array no-ops without DB calls or perm errors", async () => {
+    const sb = mkReorderSb({ rolePerms: { admin: ["*"] }, matchIds: ["a"] });
+    await reorderMatches(sb as never, { userId: "u", roles: ["admin"] }, "md", []);
+    expect(sb._updates).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createOrgFormSchema } from "./schemas";
 
-describe("createOrgFormSchema (Plan 13B)", () => {
+describe("createOrgFormSchema (Plan 31 — CAC removed)", () => {
   it("rejects empty name", () => {
     const res = createOrgFormSchema.safeParse({ name: "" });
     expect(res.success).toBe(false);
@@ -10,25 +10,21 @@ describe("createOrgFormSchema (Plan 13B)", () => {
   it("accepts valid FormData shape with optional fields omitted", () => {
     const res = createOrgFormSchema.parse({
       name: "Lagos Crown Esports",
-      cacNumber: "",
-      cacCertPath: "",
+      logoPath: "",
       contactRepUserId: "",
     });
     expect(res.name).toBe("Lagos Crown Esports");
-    expect(res.cacNumber).toBeUndefined();
-    expect(res.cacCertPath).toBeUndefined();
+    expect(res.logoPath).toBeUndefined();
     expect(res.contactRepUserId).toBeUndefined();
   });
 
-  it("passes through populated optional fields", () => {
+  it("passes through populated logoPath + contactRepUserId", () => {
     const res = createOrgFormSchema.parse({
       name: "Abuja Eagles",
-      cacNumber: "RC-99",
-      cacCertPath: "orgs/x/cac-cert.pdf",
+      logoPath: "orgs/x/logo.png",
       contactRepUserId: "00000000-0000-4000-8000-000000000001",
     });
-    expect(res.cacNumber).toBe("RC-99");
-    expect(res.cacCertPath).toBe("orgs/x/cac-cert.pdf");
+    expect(res.logoPath).toBe("orgs/x/logo.png");
     expect(res.contactRepUserId).toBe(
       "00000000-0000-4000-8000-000000000001",
     );

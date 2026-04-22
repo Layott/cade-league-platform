@@ -33,6 +33,7 @@ export default async function MatchDaysPage({
     status: d.status,
     match_count: d.match_count,
     player_tags: d.player_tags,
+    published_at: d.published_at,
   }));
 
   return (

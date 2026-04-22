@@ -3,9 +3,13 @@ import {
   createOrgSchema,
   updateOrgSchema,
   linkPlayerSchema,
+  linkCoachSchema,
+  linkTeamManagerSchema,
   type CreateOrgInput,
   type UpdateOrgInput,
   type LinkPlayerInput,
+  type LinkCoachInput,
+  type LinkTeamManagerInput,
 } from "./schemas";
 
 export class OrgError extends Error {
@@ -18,8 +22,9 @@ export class OrgError extends Error {
 export type OrgRow = {
   id: string;
   name: string;
-  cac_number: string | null;
-  cac_cert_url: string | null;
+  // Plan 31 — CAC fields removed; logo_url replaces them as the org's
+  // public-facing identity asset.
+  logo_url: string | null;
   contact_rep_user_id: string | null;
   status: "active" | "suspended" | "dissolved";
   caution_fee_balance_coins: number;
@@ -37,8 +42,7 @@ export async function createOrg(
     .from("organizations")
     .insert({
       name: input.name,
-      cac_number: input.cacNumber ?? null,
-      cac_cert_url: input.cacCertUrl ?? null,
+      logo_url: input.logoUrl ?? null,
       contact_rep_user_id: input.contactRepUserId ?? null,
       status: input.status,
     })
@@ -55,8 +59,7 @@ export async function updateOrg(
   const input = updateOrgSchema.parse(raw);
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.name !== undefined) patch.name = input.name;
-  if (input.cacNumber !== undefined) patch.cac_number = input.cacNumber;
-  if (input.cacCertUrl !== undefined) patch.cac_cert_url = input.cacCertUrl;
+  if (input.logoUrl !== undefined) patch.logo_url = input.logoUrl;
   if (input.contactRepUserId !== undefined) patch.contact_rep_user_id = input.contactRepUserId;
   if (input.status !== undefined) patch.status = input.status;
 
@@ -133,6 +136,71 @@ export async function unlinkPlayer(
     })
     .eq("id", playerId);
   if (error) throw new OrgError(`unlinkPlayer: ${error.message}`);
+}
+
+/**
+ * Plan 31 — assign (or clear) a coach for a player.
+ * Verifies the player is currently linked to the given org so staff
+ * binding stays scoped. Pass `coachUserId: null` to clear.
+ */
+export async function linkCoach(
+  sb: SupabaseClient,
+  raw: LinkCoachInput,
+): Promise<void> {
+  const input = linkCoachSchema.parse(raw);
+  const { data: player, error: readErr } = await sb
+    .from("players")
+    .select("id, organization_id")
+    .eq("id", input.playerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (readErr) throw new OrgError(`linkCoach (read): ${readErr.message}`);
+  if (!player) throw new OrgError("linkCoach: player not found");
+  const p = player as { id: string; organization_id: string | null };
+  if (p.organization_id !== input.orgId) {
+    throw new OrgError("linkCoach: player not in given org");
+  }
+
+  const { error } = await sb
+    .from("players")
+    .update({
+      coach_id: input.coachUserId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.playerId);
+  if (error) throw new OrgError(`linkCoach: ${error.message}`);
+}
+
+/**
+ * Plan 31 — assign (or clear) a team manager for a player. Same scoping
+ * rule as linkCoach.
+ */
+export async function linkTeamManager(
+  sb: SupabaseClient,
+  raw: LinkTeamManagerInput,
+): Promise<void> {
+  const input = linkTeamManagerSchema.parse(raw);
+  const { data: player, error: readErr } = await sb
+    .from("players")
+    .select("id, organization_id")
+    .eq("id", input.playerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (readErr) throw new OrgError(`linkTeamManager (read): ${readErr.message}`);
+  if (!player) throw new OrgError("linkTeamManager: player not found");
+  const p = player as { id: string; organization_id: string | null };
+  if (p.organization_id !== input.orgId) {
+    throw new OrgError("linkTeamManager: player not in given org");
+  }
+
+  const { error } = await sb
+    .from("players")
+    .update({
+      team_manager_id: input.teamManagerUserId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.playerId);
+  if (error) throw new OrgError(`linkTeamManager: ${error.message}`);
 }
 
 export async function listPlayersForOrg(

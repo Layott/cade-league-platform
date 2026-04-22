@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { StandingsRow } from "@/server/standings/read";
+import { PlayerAvatar } from "@/components/players/PlayerAvatar";
+import { getPlayerAvatarUrl } from "@/lib/player-photos";
 
 const PODIUM_BADGE_STYLE = [
   // gold
@@ -72,20 +74,29 @@ export function StandingsTable({ rows }: { rows: StandingsRow[] }) {
                     </div>
                   </td>
                   <td className="px-3 py-3">
-                    <div className="font-display text-[15px] font-semibold leading-tight text-[var(--chalk-0)]">
-                      {r.player_name}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
-                      <span>@{r.gamer_tag}</span>
-                      {deduction > 0 ? (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-sm border border-[var(--flare)]/60 bg-[var(--flare)]/15 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[var(--flare)]"
-                          title={`Points deducted: ${deduction}`}
-                        >
-                          <span aria-hidden>!</span>
-                          <span>−{deduction} pen</span>
-                        </span>
-                      ) : null}
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar
+                        photoUrl={getPlayerAvatarUrl(r.gamer_tag)}
+                        displayName={r.player_name}
+                        size={32}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-display text-[15px] font-semibold leading-tight text-[var(--chalk-0)]">
+                          {r.player_name}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
+                          <span>@{r.gamer_tag}</span>
+                          {deduction > 0 ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-sm border border-[var(--flare)]/60 bg-[var(--flare)]/15 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[var(--flare)]"
+                              title={`Points deducted: ${deduction}`}
+                            >
+                              <span aria-hidden>!</span>
+                              <span>−{deduction} pen</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <NumCell value={r.matches_played} />

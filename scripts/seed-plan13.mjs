@@ -47,7 +47,10 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-async function getOrCreateOrg(name, cacNumber) {
+// Plan 31 — cacNumber arg ignored; columns dropped in migration
+// 20260507000300_orgs_simplify.sql. Kept in signature for call-site
+// compatibility until the next seed refresh.
+async function getOrCreateOrg(name, _cacNumber) {
   const { data: existing } = await sb
     .from("organizations")
     .select("*")
@@ -60,7 +63,7 @@ async function getOrCreateOrg(name, cacNumber) {
   }
   const { data, error } = await sb
     .from("organizations")
-    .insert({ name, cac_number: cacNumber, status: "active" })
+    .insert({ name, status: "active" })
     .select("*")
     .single();
   if (error) throw error;

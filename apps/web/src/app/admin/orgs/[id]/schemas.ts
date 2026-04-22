@@ -1,14 +1,16 @@
 import { z } from "zod";
 
 /**
- * Plan 13B — /admin/orgs/[id] form schemas. Split from `actions.ts` so
- * the "use server" module only exports async functions.
+ * Plan 13B + Plan 31 — /admin/orgs/[id] form schemas. Split from
+ * `actions.ts` so the "use server" module only exports async functions.
+ * CAC fields removed; `logoPath` added (storage path returned by the
+ * org-logos signed upload).
  */
 
 export const updateOrgFormSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(200).optional(),
-  cacNumber: z
+  logoPath: z
     .string()
     .trim()
     .optional()
@@ -27,7 +29,7 @@ export function parseUpdateOrgForm(fd: FormData): UpdateOrgForm {
   return updateOrgFormSchema.parse({
     id: fd.get("id"),
     name: fd.get("name") || undefined,
-    cacNumber: fd.get("cacNumber"),
+    logoPath: fd.get("logoPath"),
     contactRepUserId: fd.get("contactRepUserId"),
     status: (fd.get("status") as string) || undefined,
   });
@@ -41,5 +43,47 @@ export function parseLinkPlayerForm(fd: FormData) {
   return linkPlayerFormSchema.parse({
     orgId: fd.get("orgId"),
     playerId: fd.get("playerId"),
+  });
+}
+
+export const linkCoachFormSchema = z.object({
+  orgId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  coachUserId: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null))
+    .refine(
+      (v) => v === null || /^[0-9a-f-]{36}$/i.test(v),
+      "coachUserId must be uuid or empty",
+    ),
+});
+export function parseLinkCoachForm(fd: FormData) {
+  return linkCoachFormSchema.parse({
+    orgId: fd.get("orgId"),
+    playerId: fd.get("playerId"),
+    coachUserId: fd.get("coachUserId"),
+  });
+}
+
+export const linkTeamManagerFormSchema = z.object({
+  orgId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  teamManagerUserId: z
+    .string()
+    .trim()
+    .nullish()
+    .transform((v) => (v && v.length > 0 ? v : null))
+    .refine(
+      (v) => v === null || /^[0-9a-f-]{36}$/i.test(v),
+      "teamManagerUserId must be uuid or empty",
+    ),
+});
+export function parseLinkTeamManagerForm(fd: FormData) {
+  return linkTeamManagerFormSchema.parse({
+    orgId: fd.get("orgId"),
+    playerId: fd.get("playerId"),
+    teamManagerUserId: fd.get("teamManagerUserId"),
   });
 }

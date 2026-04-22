@@ -87,12 +87,12 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
 
   await login(page);
 
-  // 1. Navigate to orgs/new.
+  // 1. Navigate to orgs/new. Plan 31 — CAC input is gone; only name +
+  // optional logo upload remain. Skip the file upload here so the test
+  // remains hermetic.
   await page.goto("/admin/orgs/new");
   await expect(page.getByTestId("org-create-form")).toBeVisible();
   await page.getByTestId("org-name-input").fill(ORG_NAME);
-  const cacNumber = `RC-${runId}`.slice(0, 15);
-  await page.getByTestId("org-cac-input").fill(cacNumber);
   await page.getByTestId("org-create-submit").click();
 
   // 2. Landed on detail page. Cold compile of the detail route in dev can

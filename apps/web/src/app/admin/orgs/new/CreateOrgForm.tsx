@@ -9,10 +9,16 @@ import {
 } from "@/components/admin/FormField";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import { SignedFileInput } from "@/components/shared/SignedFileInput";
-import { createOrgAction, requestCacUploadAction } from "./actions";
+import { createOrgAction, requestOrgLogoUploadAction } from "./actions";
 
 type UserOption = { id: string; display_name: string | null; email: string };
 
+/**
+ * Plan 31 — orgs simplified. CAC inputs are gone; the logo upload is the
+ * only file field. Coach + team-manager linking happens on the org
+ * detail page after the org exists (so the player → org relation exists
+ * first).
+ */
 export function CreateOrgForm({ users }: { users: UserOption[] }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -45,16 +51,6 @@ export function CreateOrgForm({ users }: { users: UserOption[] }) {
         />
       </FormField>
 
-      <FormField label="CAC number" hint="Optional but unique across all orgs">
-        <input
-          name="cacNumber"
-          maxLength={64}
-          className={inputClass}
-          data-testid="org-cac-input"
-          placeholder="RC-1234567"
-        />
-      </FormField>
-
       <FormField
         label="Contact rep (user)"
         hint="Who represents this org in-league"
@@ -75,11 +71,11 @@ export function CreateOrgForm({ users }: { users: UserOption[] }) {
       </FormField>
 
       <SignedFileInput
-        fieldName="cacCertPath"
-        accept=".pdf,.png,.jpg,.jpeg"
-        requestUpload={requestCacUploadAction}
-        label="CAC certificate (optional)"
-        data-testid="org-cac-upload"
+        fieldName="logoPath"
+        accept=".png,.jpg,.jpeg,.svg,.webp"
+        requestUpload={requestOrgLogoUploadAction}
+        label="Logo (optional)"
+        data-testid="org-logo-upload"
       />
 
       {error ? (

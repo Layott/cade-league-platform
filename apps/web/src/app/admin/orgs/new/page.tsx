@@ -52,7 +52,7 @@ export default async function NewOrgPage() {
       <SectionHeader
         eyebrow="Organizations"
         title="Register a new organization"
-        description="CAC number is unique across all orgs. The CAC certificate is stored privately — only admins can download it via short-lived signed URLs."
+        description="Plan 31 — orgs simplified. Logo is the only file field; coach + team-manager assignments happen on the org detail page after players are linked."
       />
       <CreateOrgForm users={options} />
     </div>

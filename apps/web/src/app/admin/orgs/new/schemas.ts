@@ -1,19 +1,16 @@
 import { z } from "zod";
 
 /**
- * Plan 13B — /admin/orgs/new form schema. Split from `actions.ts` so the
- * "use server" module only exports async functions.
+ * Plan 31 — /admin/orgs/new form schema (CAC removed).
+ * Split from `actions.ts` so the "use server" module only exports async
+ * functions. `logoPath` is the storage path returned by the signed-upload
+ * action (`requestOrgLogoUploadAction`); it's resolved into the public
+ * URL by the action before persisting.
  */
 
 export const createOrgFormSchema = z.object({
   name: z.string().trim().min(1, "name required").max(200),
-  cacNumber: z
-    .string()
-    .trim()
-    .max(64)
-    .nullish()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
-  cacCertPath: z
+  logoPath: z
     .string()
     .trim()
     .max(500)
@@ -43,8 +40,7 @@ function str(fd: FormData, key: string): string | undefined {
 export function parseCreateOrgForm(fd: FormData): CreateOrgForm {
   return createOrgFormSchema.parse({
     name: str(fd, "name"),
-    cacNumber: str(fd, "cacNumber"),
-    cacCertPath: str(fd, "cacCertPath"),
+    logoPath: str(fd, "logoPath"),
     contactRepUserId: str(fd, "contactRepUserId"),
   });
 }

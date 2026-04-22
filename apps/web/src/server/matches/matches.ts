@@ -7,6 +7,8 @@ import {
   type EditMatchInput,
   type RemoveMatchInput,
 } from "./schemas";
+import { requirePermAsync } from "@/lib/perms-db";
+import type { Actor } from "@/perms";
 
 export async function createMatch(
   sb: SupabaseClient,
@@ -91,4 +93,62 @@ export async function listByMatchDay(sb: SupabaseClient, matchDayId: string) {
 export async function voidMatch(sb: SupabaseClient, matchId: string): Promise<void> {
   const { error } = await sb.from("matches").update({ status: "voided" }).eq("id", matchId);
   if (error) throw new Error(`voidMatch failed: ${error.message}`);
+}
+
+/**
+ * Plan 27 — atomically rewrite the `match_order` column for every fixture
+ * inside a match day. Caller passes the full ordered list of match ids;
+ * each entry receives `match_order = (index + 1)`. Idempotent — re-running
+ * the same array yields the same DB state.
+ *
+ * Gated by `matches.edit` (same permission as add/edit/delete fixture).
+ *
+ * The update happens via N parallel updates rather than a single SQL CASE
+ * because the Supabase JS client doesn't expose CASE expressions directly
+ * and Plan 27's match-day cardinality is bounded (≤ 11 fixtures per day).
+ * If perf becomes an issue, push this into a Postgres function later.
+ */
+export async function reorderMatches(
+  sb: SupabaseClient,
+  actor: Actor,
+  matchDayId: string,
+  orderedIds: readonly string[],
+): Promise<void> {
+  await requirePermAsync(sb, actor, "matches.edit");
+  if (orderedIds.length === 0) return;
+  // Reject duplicates so a programmer error surfaces instead of silently
+  // re-ordering only the last reference.
+  const seen = new Set<string>();
+  for (const id of orderedIds) {
+    if (seen.has(id)) {
+      throw new Error(`reorderMatches: duplicate id ${id}`);
+    }
+    seen.add(id);
+  }
+  // Verify every id belongs to the same match day. Cheap select first.
+  const { data: existing, error: selErr } = await sb
+    .from("matches")
+    .select("id")
+    .eq("match_day_id", matchDayId)
+    .is("deleted_at", null);
+  if (selErr) throw new Error(`reorderMatches verify failed: ${selErr.message}`);
+  const dayIds = new Set((existing ?? []).map((r: { id: string }) => r.id));
+  for (const id of orderedIds) {
+    if (!dayIds.has(id)) {
+      throw new Error(`reorderMatches: ${id} is not in match_day ${matchDayId}`);
+    }
+  }
+  // Apply updates. Run sequentially so the audit trigger emits one row
+  // per change in the order the admin saw the swap.
+  for (let i = 0; i < orderedIds.length; i++) {
+    const id = orderedIds[i];
+    const { error } = await sb
+      .from("matches")
+      .update({ match_order: i + 1, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .is("deleted_at", null);
+    if (error) {
+      throw new Error(`reorderMatches: update ${id} failed: ${error.message}`);
+    }
+  }
 }

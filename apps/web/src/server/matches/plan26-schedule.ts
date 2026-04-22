@@ -49,7 +49,7 @@ export const PLAN26_SCHEDULE: readonly Plan26Day[] = [
     ],
   },
   {
-    date: "2026-05-04",
+    date: "2026-05-03",
     pairs: [
       ["ANIFE", "KILLER_FREAK"],
       ["BAJI_JNR", "WOLEVATION"],
@@ -63,7 +63,7 @@ export const PLAN26_SCHEDULE: readonly Plan26Day[] = [
     ],
   },
   {
-    date: "2026-05-10",
+    date: "2026-05-09",
     pairs: [
       ["ADEFOLA", "DADABOI"],
       ["ANIFE", "MR_OGA"],
@@ -79,7 +79,7 @@ export const PLAN26_SCHEDULE: readonly Plan26Day[] = [
     ],
   },
   {
-    date: "2026-05-11",
+    date: "2026-05-10",
     pairs: [
       ["FARUK", "MR_OGA"],
       ["DADABOI", "KILLER_FREAK"],
@@ -94,7 +94,7 @@ export const PLAN26_SCHEDULE: readonly Plan26Day[] = [
     ],
   },
   {
-    date: "2026-05-17",
+    date: "2026-05-16",
     pairs: [
       ["DADABOI", "MITCH"],
       ["FARUK", "GURU"],
@@ -109,7 +109,7 @@ export const PLAN26_SCHEDULE: readonly Plan26Day[] = [
     ],
   },
   {
-    date: "2026-05-18",
+    date: "2026-05-17",
     pairs: [
       ["KINGNONEX", "TACTICAL"],
       ["ADEFOLA", "KILLER_FREAK"],
@@ -123,7 +123,7 @@ export const PLAN26_SCHEDULE: readonly Plan26Day[] = [
     ],
   },
   {
-    date: "2026-05-25",
+    date: "2026-05-30",
     pairs: [
       ["DADABOI", "KINGNONEX"],
       ["MITCH", "TACTICAL"],

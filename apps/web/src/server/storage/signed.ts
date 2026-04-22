@@ -1,5 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PrivateBucket } from "./paths";
+import { ORG_LOGOS_BUCKET } from "./paths";
+
+/**
+ * Plan 31 — `org-logos` is a public bucket but we still need a signed
+ * upload URL for the in-browser PUT (avoids shipping the service-role
+ * key to the client). Treat it as an additional valid bucket here.
+ */
+type UploadBucket = PrivateBucket | typeof ORG_LOGOS_BUCKET;
 
 /**
  * Plan 13B — signed URL helpers for the four private plan-13B buckets.
@@ -24,7 +32,7 @@ export type SignedUploadResult = {
 
 export async function createSignedUpload(
   sb: SupabaseClient,
-  bucket: PrivateBucket,
+  bucket: UploadBucket,
   path: string,
 ): Promise<SignedUploadResult> {
   const { data, error } = await sb.storage

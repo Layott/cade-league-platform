@@ -6,6 +6,16 @@
 **Parent spec:** `docs/superpowers/specs/2026-04-21-plan-13-orgs-disputes-content.md`
 **Status:** Draft. Plan 13A (tasks 1–16 of parent) SHIPPED — server modules + migrations live in cloud. This plan covers parent tasks 17–28: every admin page, every player page, the four private storage buckets, the three required E2E specs. No gateway integration. Manual ledger only.
 
+## Plan 31 SUPERSEDES (2026-04-21): orgs simplified — CAC removed, logo + staff added
+
+User direction: "for orgs; there is no need to have their cac document or cac number on the platform, most important information is their logo, players under them, coaches or managers under them also."
+
+The `cac_number` and `cac_cert_url` columns are HARD-DROPPED in migration `20260507000300_orgs_simplify.sql`. A `logo_url text null` column replaces them. A new public `org-logos` storage bucket (migration `20260507000301_org_logos_bucket.sql`) is added alongside the existing four private buckets. Coach + team-manager assignment was already half-implemented (Plan 13A added `players.coach_id` + `players.team_manager_id`); Plan 31 ships the UI on `/admin/orgs/[id]` and the matching `linkCoach` / `linkTeamManager` server functions + actions.
+
+Treat every reference below to `cac_number`, `cac_cert_url`, `cacNumber`, `cacCertPath`, `cacCertUrl`, `requestCacUploadAction`, `org-cac-certs` bucket, and the "CAC" form input / info panel as ~~historical only~~. The `org-cac-certs` storage bucket itself is not removed — orphan objects from prior placeholder seeds will be cleaned by a follow-up storage sweep.
+
+Tests in `index.test.ts` now ASSERT that `createOrgSchema` + `updateOrgSchema` REJECT payloads carrying `cacNumber` / `cacCertUrl` (the schemas are `.strict()`).
+
 ## Plan 33 dropped (2026-04-22): content obligations + preseason shoots
 
 User direction: drop both Plan 13 features wholesale. Sections C and D below — admin/content, admin/preseason, player/content routes, the three E2E content/preseason specs, every "content" or "preseason" tab in subnavs, and `content.* | preseason.manage` perms — are **superseded.** Code, perms, tests, and subnav entries removed in change-wave Plan 33; cloud tables soft-archived (not dropped) by migration `20260507000020_drop_content_preseason_features.sql`. Sections A (orgs/contracts/ledger) and B (disputes/appeals) remain in scope; the four storage buckets in `20260505000002_plan13b_storage_buckets.sql` remain — `dispute-evidence` and `appeal-evidence` are still live, `org-cac-certs` and `org-contracts` likewise. The two unused buckets (none from this spec — content/preseason did not own a bucket) require no follow-up.
@@ -24,7 +34,7 @@ Ship the UI + E2E layer so the four Plan 13 acceptance scenarios are demoable en
 
 | # | Scenario | UI demo path |
 |---|----------|----|
-| A | Admin creates `Lagos Crown Esports` + CAC cert + 2 linked players + 50,000-coin deposit + 5,000-coin fine → balance=45,000, ledger append-only, no Edit/Delete UI | `/admin/orgs/new` → `/admin/orgs/[id]` → `/admin/orgs/[id]/ledger/new` (×2) |
+| A | Admin creates `Lagos Crown Esports` ~~+ CAC cert~~ (Plan 31) + 2 linked players + 50,000-coin deposit + 5,000-coin fine → balance=45,000, ledger append-only, no Edit/Delete UI | `/admin/orgs/new` → `/admin/orgs/[id]` → `/admin/orgs/[id]/ledger/new` (×2) |
 | B | Player submits appeal against case issued Fri 2026-05-01 → admin sees deadline Fri 2026-05-08 23:59 WAT with red badge within 24 h, amber within 72 h → admin assigns panel → rules → status flips to `ruled` | `/player/appeals/new?caseId=…` → `/admin/appeals` → `/admin/appeals/[id]` |
 | C | Player submits 2 IG posts + 1 Twitter post for week 2026-05-04. Obligation card on `/player/content` flips `Met` once moderator verifies 2 platforms; flips `Unmet` after 1 rejection | `/player/content` → `/admin/content` |
 | D | Admin schedules 2026-04-28 preseason shoot, marks 11/13 attended → 2 absent rows auto-warn via Rule 2.5 | `/admin/preseason/new` → `/admin/preseason/[id]` (attendance grid) |
@@ -243,13 +253,13 @@ Every page follows the same skeleton: `SectionHeader` at top, body content in `D
 
 Gate: `orgs.read`.
 Data: `listOrgs(sb)` → enrich each row with linked-player count via one batched query (`select organization_id, count(*) from players where organization_id in (…) group by organization_id`).
-Columns: Name (link to detail) · CAC# (mono) · Status (`StatusPill`) · Balance (`tabular` + `fmtCoins(balance)`) · Linked players (count) · Updated (WAT).
+Columns: Name (link to detail) · ~~CAC# (mono)~~ → Logo thumbnail (Plan 31) · Status (`StatusPill`) · Balance (`tabular` + `fmtCoins(balance)`) · Linked players (count) · Updated (WAT).
 Action: header `PrimaryButton` → `/admin/orgs/new`.
 
 #### `/admin/orgs/new` — create
 
 Gate: `orgs.edit`.
-Fields: Name (text, required) · CAC number (text, optional, unique) · Contact rep (select of users) · CAC cert upload (file: pdf/png/jpg). Upload happens client-side to signed URL BEFORE form submit (mirror `/player/squad/SubmitForm.tsx`). Server action receives the already-uploaded `cacCertPath`.
+Fields (Plan 31): Name (text, required) · ~~CAC number~~ (removed) · Contact rep (select of users) · ~~CAC cert upload~~ → Logo upload (file: png/jpg/svg/webp, public `org-logos` bucket). Upload happens client-side to signed URL BEFORE form submit (mirror `/player/squad/SubmitForm.tsx`). Server action receives the already-uploaded `logoPath`.
 Server action: `createOrgAction(formData)`:
 
 ```ts

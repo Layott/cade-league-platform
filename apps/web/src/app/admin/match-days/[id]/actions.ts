@@ -7,8 +7,13 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import {
   createMatch,
   editMatch,
+  reorderMatches,
   softDeleteMatch,
 } from "@/server/matches/matches";
+import {
+  publishMatchDay,
+  unpublishMatchDay,
+} from "@/server/matches/match-days";
 import { enterResult, editResult, confirmResult } from "@/server/matches/results";
 import { requirePermAsync } from "@/lib/perms-db";
 
@@ -26,6 +31,10 @@ async function currentPublicUserId(): Promise<string> {
 }
 
 async function requireMatchEditPerm(): Promise<{ userId: string }> {
+  return requirePermInline("matches.edit");
+}
+
+async function requirePermInline(perm: string): Promise<{ userId: string; roles: string[] }> {
   const sb = await getServerSupabase();
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) throw new Error("not authenticated");
@@ -42,8 +51,8 @@ async function requireMatchEditPerm(): Promise<{ userId: string }> {
     .is("deleted_at", null);
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
   const svc = getServiceRoleSupabase();
-  await requirePermAsync(svc, { userId: pub.id, roles }, "matches.edit");
-  return { userId: pub.id };
+  await requirePermAsync(svc, { userId: pub.id, roles }, perm);
+  return { userId: pub.id, roles };
 }
 
 export async function addFixtureAction(formData: FormData) {
@@ -158,6 +167,69 @@ export async function confirmResultAction(formData: FormData) {
   await confirmResult(sb, { matchId }, actor);
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
+  revalidatePath("/fixtures");
+}
+
+// Plan 27 — publish a match day to the public /fixtures page.
+export async function publishMatchDayAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  const { userId, roles } = await requirePermInline("match_days.publish");
+  const sb = getServiceRoleSupabase();
+  await publishMatchDay(sb, { userId, roles }, matchDayId);
+  revalidatePath(`/admin/match-days/${matchDayId}`);
+  revalidatePath("/admin/match-days");
+  revalidatePath("/fixtures");
+}
+
+// Plan 27 — withdraw a published match day from the public /fixtures page.
+export async function unpublishMatchDayAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  const { userId, roles } = await requirePermInline("match_days.publish");
+  const sb = getServiceRoleSupabase();
+  await unpublishMatchDay(sb, { userId, roles }, matchDayId);
+  revalidatePath(`/admin/match-days/${matchDayId}`);
+  revalidatePath("/admin/match-days");
+  revalidatePath("/fixtures");
+}
+
+/**
+ * Plan 27 — single-step reorder (swap with neighbor) driven from the
+ * per-fixture up/down chevrons on the match-day detail page. Form posts
+ * `matchId` + `direction` ("up" | "down"); we look up the current order,
+ * find the neighbor, and persist a new full ordering via reorderMatches.
+ */
+export async function reorderMatchAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  const matchId = String(formData.get("matchId") ?? "");
+  const direction = String(formData.get("direction") ?? "");
+  if (direction !== "up" && direction !== "down") {
+    throw new Error("reorderMatchAction: direction must be 'up' or 'down'");
+  }
+  const { userId, roles } = await requirePermInline("matches.edit");
+  const sb = getServiceRoleSupabase();
+  const { data: rows, error } = await sb
+    .from("matches")
+    .select("id, match_order")
+    .eq("match_day_id", matchDayId)
+    .is("deleted_at", null)
+    .order("match_order", { ascending: true });
+  if (error) throw new Error(`reorderMatchAction load failed: ${error.message}`);
+  const ids = (rows ?? []).map((r: { id: string }) => r.id);
+  const idx = ids.indexOf(matchId);
+  if (idx === -1) {
+    throw new Error(`reorderMatchAction: match ${matchId} not in day ${matchDayId}`);
+  }
+  const swapWith = direction === "up" ? idx - 1 : idx + 1;
+  if (swapWith < 0 || swapWith >= ids.length) {
+    // Already at the boundary — no-op (fail soft so accidental double-clicks
+    // don't error the action).
+    revalidatePath(`/admin/match-days/${matchDayId}`);
+    return;
+  }
+  const next = ids.slice();
+  [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+  await reorderMatches(sb, { userId, roles }, matchDayId, next);
+  revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
 }
 
