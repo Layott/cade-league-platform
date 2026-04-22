@@ -29,7 +29,30 @@ Local DB of FC 26 FUT items (from periodic Kaggle dumps) so the ref review UI (P
 - [ ] `docs/ops/fc26-data-refresh.md`.
 
 ### F. Gates
-- [ ] `npm run lint` clean.
-- [ ] `npm run test` — ≥10 new tests green.
-- [ ] `npm run build` clean.
-- [ ] Commit per logical slice; push.
+- [x] `npm run lint` — 0 errors (5 pre-existing warnings in tracked files; 0 new from fcdb).
+- [x] `npm run test` — 533 pass across 86 files. Pre-existing broken untracked file `CadePlayerCard.test.tsx` is unrelated to Plan 21.
+- [x] fcdb module tests: 30 green (slug 10 + lookup 12 + validate 8).
+- [ ] `npm run build` — fails on pre-existing uncommitted `(overlay)/overlay/layout-animated-bg/page` work; does not reference any Plan 21 file.
+- [x] Migrations applied via `supabase db push`; table + audit trigger + RPC verified via `supabase db query`.
+- [x] Commit per logical slice: migration+spec, importer, server module+RPC, runbook.
+
+## Review
+
+Delivered table `public.fc26_players` + fuzzy RPC + Python Kaggle importer +
+TS server module (`@/server/fcdb`) with ranked lookup and per-squad validation.
+Importer is deliberately no-op on missing CSV. Slug normalization is shared
+contract between Python + TS (tested both sides).
+
+**Out of scope per spec:** live coin prices (Plan 24), auto-refresh cron
+(Plan 21B), ref-review UI (Plan 23).
+
+**Unresolved externals (not caused by Plan 21):**
+1. `npm run build` fails on pre-existing untracked overlay-preview/player-card
+   work in flight. My code type-checks clean under `tsc --noEmit`.
+2. `CadePlayerCard.test.tsx` has a rolldown parse error — untracked file,
+   predates Plan 21.
+
+**Blocker for end-to-end:** user must drop the Kaggle CSV at
+`KNOWLEDGE/extracted/fc26_players_kaggle.csv` (see runbook §3). Until then,
+lookup against the empty table returns `unknown` for every row, which is the
+correct degraded behaviour.
