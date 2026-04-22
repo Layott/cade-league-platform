@@ -41,6 +41,11 @@
   --secondary-dim: rgba(254, 3, 109, 0.35);
   --secondary-glow: rgba(254, 3, 109, 0.18);
 
+  /* Plan 37 — broadcast panel surfaces (derived from --ink-1 + alpha) */
+  --panel: rgba(10, 17, 10, 0.92);
+  --panel-strong: rgba(5, 8, 5, 0.96);
+  --bone: #e8f0dc;
+
   /* Warning / priority pips */
   --flare: #ff5b3b;       /* urgent / red card */
   --amber: #ffb020;       /* warnings, late */

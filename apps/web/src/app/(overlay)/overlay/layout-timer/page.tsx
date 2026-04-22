@@ -54,7 +54,7 @@ function TimerInner() {
               right: "60px",
               minWidth: "280px",
               padding: "16px 28px",
-              background: "rgba(5, 8, 5, 0.96)",
+              background: "var(--panel-strong)",
               border: "2px solid var(--primary)",
               clipPath:
                 "polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)",

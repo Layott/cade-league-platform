@@ -55,7 +55,7 @@ function UpNextInner() {
               right: "60px",
               top: "60px",
               minWidth: "780px",
-              background: "rgba(5, 8, 5, 0.96)",
+              background: "var(--panel-strong)",
               border: "2px solid var(--primary)",
               clipPath:
                 "polygon(20px 0, calc(100% - 20px) 0, 100% 100%, 0 100%)",

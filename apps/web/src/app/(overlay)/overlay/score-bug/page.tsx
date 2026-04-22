@@ -56,7 +56,7 @@ function ScoreBugInner() {
               right: "60px",
               bottom: "60px",
               minWidth: "520px",
-              background: "rgba(5, 8, 5, 0.96)",
+              background: "var(--panel-strong)",
               border: "2px solid var(--primary)",
               clipPath:
                 "polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%)",

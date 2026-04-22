@@ -166,7 +166,7 @@ function LowerThirdCard({
         style={{
           minWidth: "520px",
           padding: "22px 36px 22px 28px",
-          background: "rgba(5, 8, 5, 0.96)",
+          background: "var(--panel-strong)",
           borderTop: "2px solid var(--primary)",
           borderBottom: "2px solid var(--primary)",
           display: "flex",
