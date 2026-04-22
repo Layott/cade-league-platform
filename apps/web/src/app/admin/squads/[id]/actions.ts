@@ -3,7 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { approveSubmission, rejectSubmission } from "@/server/squads";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import {
+  approveSubmission,
+  rejectSubmission,
+  acceptFcdbCandidate,
+} from "@/server/squads";
 import type { Actor } from "@/perms";
 
 async function loadActor(sb: Awaited<ReturnType<typeof getServerSupabase>>): Promise<Actor> {
@@ -47,4 +52,32 @@ export async function rejectAction(formData: FormData): Promise<void> {
   revalidatePath(`/admin/squads/${submissionId}`);
   revalidatePath("/admin/squads");
   redirect(`/admin/squads/${submissionId}`);
+}
+
+/**
+ * Plan 23 — server action invoked from <FcdbBadge> when the ref locks in
+ * one of the ambiguous-candidates from the dropdown. Updates the squad
+ * item's `resolved_fc_player_id`; audit fires via the existing trigger.
+ *
+ * Uses service-role for the UPDATE because squad_player_items has no
+ * write-side RLS and the user-scoped client may not have the perm to
+ * write directly. We still gate via `requirePermAsync(squads.validate)`
+ * inside `acceptFcdbCandidate`. We pass the user-scoped client to the
+ * perm check so the role lookup uses the same auth context as the
+ * other ref actions on this page.
+ */
+export async function acceptFcdbCandidateAction(
+  formData: FormData,
+): Promise<void> {
+  const itemId = String(formData.get("itemId") ?? "");
+  const fcPlayerId = String(formData.get("fcPlayerId") ?? "");
+  const submissionId = String(formData.get("submissionId") ?? "");
+  if (!itemId || !fcPlayerId) {
+    throw new Error("missing itemId or fcPlayerId");
+  }
+  const sb = await getServerSupabase();
+  const actor = await loadActor(sb);
+  const svc = getServiceRoleSupabase();
+  await acceptFcdbCandidate(svc, actor, itemId, fcPlayerId);
+  if (submissionId) revalidatePath(`/admin/squads/${submissionId}`);
 }

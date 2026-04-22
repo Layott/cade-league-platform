@@ -7,7 +7,9 @@ import {
   getRuleForSeason,
   evaluateRules,
   createSignedRead,
+  reviewSquadAgainstFCDB,
   type ItemForValidation,
+  type SquadItemReview,
 } from "@/server/squads";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
@@ -19,7 +21,15 @@ import {
 } from "@/components/admin/buttons";
 import { FormField, textareaClass } from "@/components/admin/FormField";
 import { ViolationList } from "@/components/squads/ViolationChip";
-import { approveAction, rejectAction } from "./actions";
+import {
+  FcdbBadge,
+  FcdbSummaryChip,
+} from "@/components/squads/FcdbBadge";
+import {
+  approveAction,
+  rejectAction,
+  acceptFcdbCandidateAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +64,29 @@ export default async function AdminSquadDetailPage({
   }));
   const { ok, violations } = evaluateRules(itemsForEval, ruleForEval);
 
+  // Plan 23 — FCDB enrichment. Tolerates empty FCDB (every item flagged
+  // unknown with a runbook reason; banner rendered above the table).
+  // Failures here MUST NOT break the page — refs still need to approve
+  // / reject. Catch + degrade to "no FCDB data" rendering.
+  let fcdb: Awaited<ReturnType<typeof reviewSquadAgainstFCDB>> = {
+    items: [],
+    summary: {
+      total: items.length,
+      resolved: 0,
+      fuzzy: 0,
+      ambiguous: 0,
+      unknown: items.length,
+      fcdbEmpty: true,
+    },
+  };
+  try {
+    fcdb = await reviewSquadAgainstFCDB(sb, id);
+  } catch {
+    // Swallow — UI shows the empty banner. Operator notices via dev log.
+  }
+  const reviewByItem = new Map<string, SquadItemReview>();
+  for (const r of fcdb.items) reviewByItem.set(r.itemId, r);
+
   // Signed URL for screenshot (5 min). Use service-role in case the admin's
   // session can't read the bucket directly — safe since this is a server
   // component authenticated behind /admin middleware.
@@ -75,6 +108,7 @@ export default async function AdminSquadDetailPage({
         description={`Submitted ${formatWat(submission.submitted_at, "yyyy-MM-dd HH:mm")} WAT`}
         action={
           <div className="flex items-center gap-3">
+            <FcdbSummaryChip summary={fcdb.summary} />
             <StatusPill status={submission.validation_status} />
             <Link href="/admin/squads">
               <SecondaryButton>Back</SecondaryButton>
@@ -82,6 +116,27 @@ export default async function AdminSquadDetailPage({
           </div>
         }
       />
+
+      {fcdb.summary.fcdbEmpty ? (
+        <div
+          data-testid="fcdb-empty-banner"
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3 text-xs text-[var(--chalk-2)]"
+        >
+          <span className="font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)]">
+            FCDB empty —
+          </span>{" "}
+          drop the Kaggle CSV at{" "}
+          <code className="rounded-sm bg-[var(--ink-3)] px-1 py-0.5 font-mono text-[11px]">
+            KNOWLEDGE/extracted/fc26_players_kaggle.csv
+          </code>{" "}
+          and run{" "}
+          <code className="rounded-sm bg-[var(--ink-3)] px-1 py-0.5 font-mono text-[11px]">
+            npm run fcdb:import
+          </code>{" "}
+          to enable per-item validation. Submission can still be reviewed
+          manually below.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4">
@@ -112,7 +167,7 @@ export default async function AdminSquadDetailPage({
           <h3 className="mt-6 mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
             Items ({items.length})
           </h3>
-          <div className="overflow-auto">
+          <div className="overflow-visible">
             <table
               className="w-full text-xs text-[var(--chalk-1)]"
               data-testid="squad-items-table"
@@ -126,24 +181,42 @@ export default async function AdminSquadDetailPage({
                   <th className="px-2 py-1 text-left">Type</th>
                   <th className="px-2 py-1 text-right">Value</th>
                   <th className="px-2 py-1 text-left">Flag</th>
+                  <th className="px-2 py-1 text-left">FCDB</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => (
-                  <tr key={it.id} className="border-b border-[var(--ink-4)]/50">
-                    <td className="px-2 py-1 font-mono text-[var(--chalk-3)]">
-                      {it.slot_index}
-                    </td>
-                    <td className="px-2 py-1">{it.name}</td>
-                    <td className="px-2 py-1 text-right tabular">{it.rating}</td>
-                    <td className="px-2 py-1">{it.position}</td>
-                    <td className="px-2 py-1">{it.item_type}</td>
-                    <td className="px-2 py-1 text-right tabular">
-                      {it.value.toLocaleString()}
-                    </td>
-                    <td className="px-2 py-1">{it.nationality_flag ?? "—"}</td>
-                  </tr>
-                ))}
+                {items.map((it) => {
+                  const review = reviewByItem.get(it.id);
+                  return (
+                    <tr key={it.id} className="border-b border-[var(--ink-4)]/50">
+                      <td className="px-2 py-1 font-mono text-[var(--chalk-3)]">
+                        {it.slot_index}
+                      </td>
+                      <td className="px-2 py-1">{it.name}</td>
+                      <td className="px-2 py-1 text-right tabular">{it.rating}</td>
+                      <td className="px-2 py-1">{it.position}</td>
+                      <td className="px-2 py-1">{it.item_type}</td>
+                      <td className="px-2 py-1 text-right tabular">
+                        {it.value.toLocaleString()}
+                      </td>
+                      <td className="px-2 py-1">{it.nationality_flag ?? "—"}</td>
+                      <td className="px-2 py-1">
+                        {review ? (
+                          <FcdbBadge
+                            review={review}
+                            onPickAction={async (formData) => {
+                              "use server";
+                              formData.append("submissionId", submission.id);
+                              await acceptFcdbCandidateAction(formData);
+                            }}
+                          />
+                        ) : (
+                          <span className="text-[var(--chalk-3)]">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
