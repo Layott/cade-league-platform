@@ -66,6 +66,10 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
     scorerDisplayName: "SCORER",
     soundSlot: "stinger-goal",
   },
+  stinger_miss: {
+    scorerDisplayName: "SHOOTER",
+    soundSlot: "stinger-miss",
+  },
   stinger_winner: {
     winnerDisplayName: "CHAMPION",
     finalScore: { home: 3, away: 1 },
