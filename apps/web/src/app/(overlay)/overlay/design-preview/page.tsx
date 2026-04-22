@@ -58,7 +58,9 @@ export default async function DesignPreviewPage() {
                   ? "E · Full-screen"
                   : g.group === "stats"
                     ? "F · Stats"
-                    : "Z · Legacy",
+                    : g.group === "comments"
+                      ? "G · Comments"
+                      : "Z · Legacy",
       templates: g.templates.map((t) => ({
         key: t.key,
         route: t.entry.route,

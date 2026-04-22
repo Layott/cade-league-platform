@@ -41,6 +41,8 @@ import {
   orgsRosterSchema,
   coachIntrosSchema,
   playerPenaltiesSchema,
+  // Plan 44 — comments
+  featuredCommentSchema,
 } from "./schemas";
 
 /**
@@ -94,6 +96,8 @@ export const TEMPLATE_KEYS = [
   "orgs_roster",
   "coach_intros",
   "player_penalties",
+  // Plan 44 comments (1)
+  "featured_comment",
 ] as const;
 
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
@@ -105,7 +109,8 @@ export type TemplateGroup =
   | "matchups"
   | "data"
   | "fullscreen"
-  | "stats";
+  | "stats"
+  | "comments";
 
 type TemplateEntry = {
   schema: ZodType;
@@ -363,6 +368,14 @@ export const TEMPLATE_REGISTRY: Record<TemplateKey, TemplateEntry> = {
     label: "Player Penalties",
     defaultSoundSlot: null,
   },
+  // Plan 44 — comments (YouTube live-chat featuring)
+  featured_comment: {
+    schema: featuredCommentSchema,
+    route: "/overlay/featured-comment",
+    group: "comments",
+    label: "Featured Comment",
+    defaultSoundSlot: null,
+  },
 };
 
 export function isTemplateKey(x: string): x is TemplateKey {
@@ -385,6 +398,7 @@ export function listTemplatesByGroup(): Array<{
     data: [],
     fullscreen: [],
     stats: [],
+    comments: [],
   };
   for (const key of TEMPLATE_KEYS) {
     const entry = TEMPLATE_REGISTRY[key];
@@ -397,6 +411,7 @@ export function listTemplatesByGroup(): Array<{
     "data",
     "fullscreen",
     "stats",
+    "comments",
     "legacy",
   ];
   return ordered.map((group) => ({ group, templates: groups[group] }));

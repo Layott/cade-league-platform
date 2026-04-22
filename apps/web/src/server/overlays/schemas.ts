@@ -454,3 +454,26 @@ export const playerPenaltiesSchema = z.object({
   slot: matchSlotSchema,
 });
 export type PlayerPenaltiesPayload = z.infer<typeof playerPenaltiesSchema>;
+
+// -- Plan 44 — Featured Comment ---------------------------------------
+
+/**
+ * Featured-comment overlay payload. Fired by the admin's YouTubeChatPanel
+ * when they click "Feature on stream" on a chat row. The overlay page
+ * (`/overlay/featured-comment`) renders the card, auto-clears after
+ * `displaySeconds` (default 10 s).
+ *
+ * `postedAt` is an ISO string from the YouTube API's `snippet.publishedAt`.
+ * `slot` lets two concurrent matches each feature their own comment (same
+ * dual-slot model as score_bug / lower_third).
+ */
+export const featuredCommentSchema = z.object({
+  authorName: z.string().trim().min(1).max(80),
+  authorPhotoUrl: photoUrlSchema.optional(),
+  message: z.string().trim().min(1).max(500),
+  postedAt: z.string().datetime(),
+  displaySeconds: z.coerce.number().int().min(3).max(30).default(10),
+  soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
+});
+export type FeaturedCommentPayload = z.infer<typeof featuredCommentSchema>;

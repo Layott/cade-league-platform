@@ -884,3 +884,27 @@ Spec: `docs/superpowers/specs/2026-04-21-plan-15-session-monitoring.md`. Goal: c
 ### Plan 15 review
 
 _(To be filled once tasks 1-20 are complete.)_
+
+---
+
+## Plan 44 — YouTube live-chat picker + Feature-on-stream overlay (active 2026-04-22)
+
+Spec: `docs/superpowers/specs/2026-04-22-plan-44-youtube-chat-overlay.md`.
+
+- [ ] 1. Migration `20260510000100_plan44_youtube_bind.sql` — add 3 session columns + extend CHECK + seed featured_comment template. `db:push`.
+- [ ] 2. `server/youtube/channel.ts` + test — resolveChannelId w/ module cache.
+- [ ] 3. `server/youtube/live.ts` + test — listLiveVideos.
+- [ ] 4. `server/youtube/chat.ts` + test — fetchChatMessages w/ pageToken.
+- [ ] 5. `server/youtube/bind.ts` + test — bind / unbind w/ perm gate.
+- [ ] 6. Schema: append `featuredCommentSchema` in `overlays/schemas.ts`. Registry: add `featured_comment` entry + TEMPLATE_KEYS.
+- [ ] 7. Starter payload for `featured_comment`.
+- [ ] 8. API routes: `/api/youtube/live|bind|unbind|chat|` + `/api/broadcast/feature-comment`.
+- [ ] 9. Overlay page `/overlay/featured-comment` w/ framer-motion slide-in → linger → fade-out + PreviewStub.
+- [ ] 10. Admin `YouTubeChatPanel` mounted in MatchControlPanel.
+- [ ] 11. `.env.example` add YOUTUBE_API_KEY + `docs/ops/youtube-api-key.md` runbook.
+- [ ] 12. Verify: vitest targeted + full, lint, db:push, overlay curl.
+- [ ] 13. Commit `feat(youtube): live-chat picker + Feature-on-stream overlay (Plan 44)` + push.
+
+### Plan 44 review
+
+_(To be filled once tasks 1-13 are complete.)_

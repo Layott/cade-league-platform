@@ -203,4 +203,14 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
     ],
     slot: "primary",
   },
+  // Plan 44 — featured YouTube chat comment. The YouTubeChatPanel posts a
+  // real payload from the picked message; this starter exists so the
+  // legacy textarea form + starter-payloads.test.ts both cover the key.
+  featured_comment: {
+    authorName: "Viewer",
+    message: "Great goal!",
+    postedAt: "2026-04-22T00:00:00.000Z",
+    displaySeconds: 10,
+    slot: "primary",
+  },
 };

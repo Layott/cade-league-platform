@@ -189,6 +189,14 @@ const SAMPLE_PAYLOAD: Record<string, unknown> = {
   },
   intro: { matchDayLabel: "MD 1", seasonLabel: "Elite 25/26" },
   outro: { matchDayLabel: "MD 1" },
+  // Plan 44 — featured YouTube chat comment
+  featured_comment: {
+    authorName: "Sample Viewer",
+    message: "What a goal! Keep it up CADE!!!",
+    postedAt: "2026-04-22T00:00:00.000Z",
+    displaySeconds: 10,
+    slot: "primary",
+  },
 };
 
 export function DesignPreviewClient({ groups }: { groups: Group[] }) {

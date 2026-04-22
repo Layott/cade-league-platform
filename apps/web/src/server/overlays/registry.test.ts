@@ -13,6 +13,7 @@ import {
 //   - 20260503000003_overlay_templates_seed.sql  (Plan 12, 7 keys)
 //   - 20260505000003_plan16_overlay_template_types.sql (Plan 16, +20)
 //   - 20260508000010_plan16_stinger_miss.sql (Plan 16 amended, +1)
+//   - 20260510000100_plan44_youtube_bind.sql (Plan 44, +1 featured_comment)
 const DB_TEMPLATE_TYPES = [
   // Plan 12
   "lower_third",
@@ -50,6 +51,8 @@ const DB_TEMPLATE_TYPES = [
   "orgs_roster",
   "coach_intros",
   "player_penalties",
+  // Plan 44
+  "featured_comment",
 ] as const;
 
 describe("overlay registry", () => {
@@ -98,12 +101,12 @@ describe("overlay registry", () => {
     expect(REALTIME.eventSessionEnded).toBe("session.ended");
   });
 
-  it("listTemplatesByGroup returns 34 templates across 7 groups (27 existing + Plan-16-amended stinger_miss; 7 legacy)", () => {
+  it("listTemplatesByGroup returns 35 templates across 8 groups (28 existing + Plan-44 featured_comment; 7 legacy)", () => {
     const groups = listTemplatesByGroup();
-    expect(groups).toHaveLength(7);
+    expect(groups).toHaveLength(8);
     const total = groups.reduce((acc, g) => acc + g.templates.length, 0);
     expect(total).toBe(TEMPLATE_KEYS.length);
-    expect(TEMPLATE_KEYS.length).toBe(34);
+    expect(TEMPLATE_KEYS.length).toBe(35);
   });
 
   it("every stinger template defaults to its dedicated sound slot", () => {

@@ -38,6 +38,7 @@ import {
   MatchControlPanel,
   type CurrentMatchDigest,
 } from "./MatchControlPanel";
+import { YouTubeChatPanel } from "./YouTubeChatPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,10 @@ type SessionRow = {
   primary_match_started_at: string | null;
   secondary_match_id: string | null;
   secondary_match_started_at: string | null;
+  // Plan 44 — YouTube live-chat binding (nullable — unbound by default).
+  youtube_video_id: string | null;
+  youtube_live_chat_id: string | null;
+  youtube_bound_at: string | null;
 };
 
 /** Editable templates upgraded to the rich panel in Plan 37. The slot
@@ -128,7 +133,7 @@ export default async function BroadcastSessionPage({
   const { data: sessionRaw } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at, primary_match_id, primary_match_started_at, secondary_match_id, secondary_match_started_at",
+      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at, primary_match_id, primary_match_started_at, secondary_match_id, secondary_match_started_at, youtube_video_id, youtube_live_chat_id, youtube_bound_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -296,6 +301,15 @@ export default async function BroadcastSessionPage({
         primaryCurrent={primaryDigest}
         secondaryCurrent={secondaryDigest}
         isLive={isLive}
+      />
+
+      {/* Plan 44 — YouTube chat picker + Feature-on-stream. Session-scoped
+          (shared across both match slots); the panel itself lets the admin
+          pick primary/secondary per featured comment. */}
+      <YouTubeChatPanel
+        sessionId={session.id}
+        initialVideoId={session.youtube_video_id}
+        initialLiveChatId={session.youtube_live_chat_id}
       />
 
       {/* Match clock — Plan 37. Shared across both match slots. */}
