@@ -47,3 +47,8 @@ backups/
 
 # Brand asset zip archives — extracted contents live alongside
 KNOWLEDGE/brand-assets/fonts/*.zip
+
+# Futbin live-price scraper — state + cookies + unmatched dump (regenerated per run)
+KNOWLEDGE/extracted/_scrape_tmp/
+KNOWLEDGE/extracted/futbin_scrape_state.json
+KNOWLEDGE/extracted/futbin_unmatched.json
