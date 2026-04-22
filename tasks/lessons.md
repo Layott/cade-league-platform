@@ -102,6 +102,14 @@ Append patterns after any correction from the user. Keep each entry short: what 
 
 ---
 
+**Date:** 2026-04-22
+**Context:** User hit a runtime stack-trace crash creating a match day on a date that already had one. Asked "why didn't your tests catch this bug?"
+**Mistake:** Server-action unit tests mock Supabase entirely → real DB constraints (unique, FK, NOT NULL, RLS) never fire in test. E2E only covered the happy path with a fresh date — never the conflict. So the unhappy server-action path (DB throws → action doesn't catch → Next.js shows raw stack trace) was completely uncovered.
+**Correction:** Added `apps/web/src/app/admin/match-days/new/actions.test.ts` covering 4 paths: success, duplicate-date Postgres unique violation, no-active-season, generic create-failed. Each asserts action calls `redirect()` with the expected error querystring.
+**Rule for future:** Every server action that touches the DB must have a unit test for at least: (a) success path, (b) DB-error path with mocked rejection mimicking the real Postgres error message (`unique constraint "..."`, `foreign key constraint "..."`, `not-null`, `permission denied`), (c) any input-validation rejection path. Mocked Supabase = mocked happy path; only EXPLICIT mocked rejections cover the unhappy paths users actually hit.
+
+---
+
 **Date:** 2026-04-21
 **Context:** Plan 12 overlay pages failed `next build` with "useSearchParams() should be wrapped in a suspense boundary".
 **Mistake:** Client components that call `useSearchParams()` force a CSR bailout during prerender even with `export const dynamic = "force-dynamic"`. Next.js 15 still attempts to resolve the page shell at build time.
