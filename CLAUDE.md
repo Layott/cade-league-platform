@@ -42,11 +42,11 @@ Read these before proposing changes:
 
 ## Scope Discipline
 
-**Dropped entirely (do NOT build at any phase):** GPS geofence, QR check-in, prize disbursement automation, under-18 parental consent, auto promotion/relegation, mobile app, anonymous whistleblower flow, **Paystack + any payment gateway** (dropped 2026-04-21 — manual ledger only, caution-fee balances tracked by admin hand-entry).
+**Dropped entirely (do NOT build at any phase):** GPS geofence, QR check-in, prize disbursement automation, under-18 parental consent, auto promotion/relegation, mobile app, anonymous whistleblower flow, **Paystack + any payment gateway** (dropped 2026-04-21 — manual ledger only, caution-fee balances tracked by admin hand-entry), **content obligations** (dropped 2026-04-22 — no platform-side collection of social-media post links; tables soft-archived per migration `20260507000020`), **preseason shoots** (dropped 2026-04-22 — no platform-side scheduling/attendance for pre-season photo/video sessions; tables soft-archived; `incident_type='preseason_miss'` enum value retained for historical disciplinary rows only).
 
 **Deferred (not yet built):** multi-season abstraction, Futbin scraper (Phase 3 attempt), social/weekly auto-generated graphics, IG/TikTok API auto-verification, MFA + advanced device fingerprinting, full holiday-aware business-day math.
 
-**Now shipped (was "deferred" in Phase 1A):** vMix/OBS/Streamlabs overlay bridge (Plan 12), 12-role matrix + DB perms (Plan 9), squad submission + Friday change window (Plan 10), void-match propagation (Plan 11), orgs + disputes + appeals + content + preseason server modules (Plan 13A).
+**Now shipped (was "deferred" in Phase 1A):** vMix/OBS/Streamlabs overlay bridge (Plan 12), 12-role matrix + DB perms (Plan 9), squad submission + Friday change window (Plan 10), void-match propagation (Plan 11), orgs + disputes + appeals server modules (Plan 13A — content + preseason subsystems dropped 2026-04-22 per Plan 33).
 
 When in doubt, check `PRODUCT_STRUCTURE.md` §2.5 + `tasks/todo.md` review sections.
 
@@ -57,7 +57,7 @@ Locked across all phases — do not deviate without user approval:
 1. **Monolith.** Single Next.js repo. Route groups `(public)`, admin at `/admin/*` (flat naming), `(auth)`, `(player)`, `(overlay)`.
 2. **DB-backed permissions** (post-Plan 9). `role_permissions` table seeded from `src/perms.ts`. Runtime reads via `hasPermAsync` / `requirePermAsync` in `apps/web/src/lib/perms-db.ts` with 30s process-local cache. `src/perms.ts` is now the SEED doc, not runtime source.
 3. **Audit via Postgres trigger.** Generic `audit_row_change()` + `public.attach_audit('<table>')` on every mutable table. Reads `current_setting('app.current_user_id')` set by API middleware. No hand-coded audit calls.
-4. **RLS on PII + financial tables only.** Covered tables: `users`, `players` (bank/ID columns), `organization_contracts`, `caution_ledger_entries`, `disputes`, `appeals`, `content_posts`. Business permissions enforced in API layer via `hasPermAsync()`.
+4. **RLS on PII + financial tables only.** Covered tables: `users`, `players` (bank/ID columns), `organization_contracts`, `caution_ledger_entries`, `disputes`, `appeals`. (`content_posts` previously listed; soft-archived 2026-04-22 per Plan 33 — RLS policies remain attached to the dormant table.) Business permissions enforced in API layer via `hasPermAsync()`.
 5. **Append-only tables.** `audit_events` + `caution_ledger_entries` + `ocr_usage_log` block UPDATE + DELETE via dedicated triggers. Never mutate after insert.
 6. **Idempotent recompute.** Any change to `match_results` or `disciplinary_actions` triggers a full recompute of affected season's standings from scratch. Void rows (`result_type='void'`) excluded. Never patch incrementally.
 7. **Soft delete + Restore.** Every mutable table has `deleted_at`. Reads filter `WHERE deleted_at IS NULL`. Admin `/trash` UI restores. No hard-delete UI.

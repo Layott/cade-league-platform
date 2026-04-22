@@ -27,6 +27,23 @@ export const createMatchSchema = z
   });
 export type CreateMatchInput = z.infer<typeof createMatchSchema>;
 
+export const editMatchSchema = z
+  .object({
+    matchId: z.string().uuid(),
+    homePlayerId: z.string().uuid(),
+    awayPlayerId: z.string().uuid(),
+  })
+  .refine((v) => v.homePlayerId !== v.awayPlayerId, {
+    message: "home and away cannot be the same player",
+    path: ["awayPlayerId"],
+  });
+export type EditMatchInput = z.infer<typeof editMatchSchema>;
+
+export const removeMatchSchema = z.object({
+  matchId: z.string().uuid(),
+});
+export type RemoveMatchInput = z.infer<typeof removeMatchSchema>;
+
 const scoreField = z.coerce.number().int().nonnegative().max(99);
 const possessionField = z.coerce.number().int().min(0).max(100).optional();
 

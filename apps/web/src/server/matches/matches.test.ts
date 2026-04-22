@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMatch, voidMatch } from "./matches";
+import { createMatch, editMatch, softDeleteMatch, voidMatch } from "./matches";
 
 function mkSb({
   matchDay,
@@ -74,5 +74,62 @@ describe("voidMatch", () => {
     const sb = mkSb({ matchDay: { season_id: "s-1" } });
     await voidMatch(sb as never, "m-77");
     expect(sb._update).toHaveBeenCalled();
+  });
+});
+
+function mkUpdateSb() {
+  // The new editMatch / softDeleteMatch helpers chain
+  // .update(...).eq(...).is(...) so the eq() leaf must return a promise.
+  const isFn = vi.fn().mockResolvedValue({ error: null });
+  const eqFn = vi.fn(() => ({ is: isFn }));
+  const updateFn = vi.fn(() => ({ eq: eqFn }));
+  return {
+    from: vi.fn(() => ({ update: updateFn })),
+    _update: updateFn,
+    _eq: eqFn,
+    _is: isFn,
+  };
+}
+
+describe("editMatch (Plan 26)", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("rejects same home/away player", async () => {
+    const sb = mkUpdateSb();
+    await expect(
+      editMatch(sb as never, {
+        matchId: "11111111-1111-4111-8111-111111111111",
+        homePlayerId: "22222222-2222-4222-8222-222222222222",
+        awayPlayerId: "22222222-2222-4222-8222-222222222222",
+      })
+    ).rejects.toThrow(/same player/i);
+  });
+
+  it("updates the matches row with snake_case columns", async () => {
+    const sb = mkUpdateSb();
+    await editMatch(sb as never, {
+      matchId: "11111111-1111-4111-8111-111111111111",
+      homePlayerId: "22222222-2222-4222-8222-222222222222",
+      awayPlayerId: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(sb.from).toHaveBeenCalledWith("matches");
+    const payload = (sb._update.mock.calls[0] as [unknown])[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      home_player_id: "22222222-2222-4222-8222-222222222222",
+      away_player_id: "33333333-3333-4333-8333-333333333333",
+    });
+  });
+});
+
+describe("softDeleteMatch (Plan 26)", () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it("sets deleted_at on the matches row", async () => {
+    const sb = mkUpdateSb();
+    await softDeleteMatch(sb as never, {
+      matchId: "11111111-1111-4111-8111-111111111111",
+    });
+    const payload = (sb._update.mock.calls[0] as [unknown])[0] as Record<string, unknown>;
+    expect(payload.deleted_at).toEqual(expect.any(String));
   });
 });

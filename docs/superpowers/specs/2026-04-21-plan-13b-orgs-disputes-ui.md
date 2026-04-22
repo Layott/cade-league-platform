@@ -1,10 +1,16 @@
-# Plan 13B — Phase 2: UI + E2E for orgs + contracts + disputes + appeals + content + preseason
+# Plan 13B — Phase 2: UI + E2E for orgs + contracts + disputes + appeals + ~~content~~ + ~~preseason~~
 
 **Owner:** Spektakula
 **Version:** 1.0
 **Date:** 2026-04-21
 **Parent spec:** `docs/superpowers/specs/2026-04-21-plan-13-orgs-disputes-content.md`
 **Status:** Draft. Plan 13A (tasks 1–16 of parent) SHIPPED — server modules + migrations live in cloud. This plan covers parent tasks 17–28: every admin page, every player page, the four private storage buckets, the three required E2E specs. No gateway integration. Manual ledger only.
+
+## Plan 33 dropped (2026-04-22): content obligations + preseason shoots
+
+User direction: drop both Plan 13 features wholesale. Sections C and D below — admin/content, admin/preseason, player/content routes, the three E2E content/preseason specs, every "content" or "preseason" tab in subnavs, and `content.* | preseason.manage` perms — are **superseded.** Code, perms, tests, and subnav entries removed in change-wave Plan 33; cloud tables soft-archived (not dropped) by migration `20260507000020_drop_content_preseason_features.sql`. Sections A (orgs/contracts/ledger) and B (disputes/appeals) remain in scope; the four storage buckets in `20260505000002_plan13b_storage_buckets.sql` remain — `dispute-evidence` and `appeal-evidence` are still live, `org-cac-certs` and `org-contracts` likewise. The two unused buckets (none from this spec — content/preseason did not own a bucket) require no follow-up.
+
+Treat references in this spec to `/admin/content`, `/admin/preseason`, `/player/content`, `content-obligation-week.spec.ts`, `content.*` and `preseason.manage` as historical only — do NOT implement.
 
 > **Rule of engagement.** Everything here consumes the shipped server modules in `apps/web/src/server/{orgs,disputes,appeals,content,preseason}/`. UI never touches the DB directly; server actions delegate to those modules. `requirePermAsync` double-gates every page + every action. Admin primitives (`AdminShell`, `AdminSubnav`, `SectionHeader`, `DataTable`, `StatusPill`, `FormField`, `inputClass`, `selectClass`, `textareaClass`, `PrimaryButton`, `SecondaryButton`, `DangerButton`) are the ONLY way we render admin surface.
 

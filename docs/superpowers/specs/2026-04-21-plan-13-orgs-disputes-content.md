@@ -1,10 +1,21 @@
-# Plan 13 — Phase 2 Prep: Organizations + Contracts + Disputes + Content Obligations + Pre-season Shoots
+# Plan 13 — Phase 2 Prep: Organizations + Contracts + Disputes + ~~Content Obligations~~ + ~~Pre-season Shoots~~
 
 **Owner:** Spektakula
 **Version:** 1.0
 **Date:** 2026-04-21
 **Supersedes:** Phase 2 bullets in `ESOCCER LEAGUE/PRODUCT_STRUCTURE.md` §3 for org/content/disputes/shoots entities only
 **Status:** Prep (entities + workflow scaffolding). No Paystack. No payment automation. Money flows = manual ledger only.
+
+## Plan 33 dropped (2026-04-22): content obligations + preseason shoots
+
+User direction: "We don't need to collect content links on the platform" + "We don't need the preseason shoot feature." Both subsystems were removed from the codebase in change-wave Plan 33 (2026-04-22):
+
+- **Content obligations (subsystem C in this spec):** server module `apps/web/src/server/content/`, admin routes `app/admin/content/**`, player route `app/player/content/`, perms `content.submit | content.verify | content.read.own`, E2E `content-obligation-week.spec.ts`, subnav entries — all deleted. Tables `content_posts`, `content_sessions`, view `content_obligation_status` SOFT-archived (`deleted_at = now()`); rows preserved, schema kept. See migration `20260507000020_drop_content_preseason_features.sql` for the rollback / future-hard-drop template.
+- **Pre-season shoots (subsystem D in this spec):** server module `apps/web/src/server/preseason/`, admin routes `app/admin/preseason/**`, perm `preseason.manage`, subnav entry — all deleted. Tables `preseason_shoots`, `preseason_shoot_attendance` SOFT-archived. The `incident_type='preseason_miss'` enum value on `disciplinary_cases` / `disciplinary_precedents` is INTENTIONALLY KEPT so historical warning rows stay valid; new code no longer issues this incident type.
+
+Acceptance scenarios C and D in §1 below are **superseded — do NOT implement.** Sections describing content_posts / content_sessions / preseason_shoots / preseason_shoot_attendance schemas, server modules, and UI surfaces are retained for historical context only — they describe the soft-archived state of the cloud DB, not active feature surface.
+
+Plans 31/32 and the orgs/disputes/appeals subsystems (A + B) are unaffected.
 
 ---
 

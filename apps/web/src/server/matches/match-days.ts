@@ -65,6 +65,76 @@ export async function listMatchDays(
   );
 }
 
+/**
+ * Plan 26 — variant of listMatchDays that also pulls every gamer_tag
+ * appearing in any of that day's fixtures, so the admin /admin/match-days
+ * search bar can client-filter by participant tag without a second roundtrip.
+ */
+export type MatchDaySummaryWithTags = MatchDaySummary & {
+  player_tags: string[];
+};
+
+export async function listMatchDaysWithTags(
+  sb: SupabaseClient,
+  seasonId: string
+): Promise<MatchDaySummaryWithTags[]> {
+  const { data, error } = await sb
+    .from("match_days")
+    .select(
+      `
+      id, season_id, match_date, venue_name, status,
+      matches:matches (
+        id,
+        home_player:home_player_id ( id, gamer_tag ),
+        away_player:away_player_id ( id, gamer_tag )
+      )
+      `,
+    )
+    .eq("season_id", seasonId)
+    .is("deleted_at", null)
+    .order("match_date", { ascending: false });
+  if (error) throw new Error(`listMatchDaysWithTags failed: ${error.message}`);
+
+  type MatchRow = {
+    id: string;
+    home_player: { id: string; gamer_tag: string }[] | { id: string; gamer_tag: string } | null;
+    away_player: { id: string; gamer_tag: string }[] | { id: string; gamer_tag: string } | null;
+  };
+  type Row = {
+    id: string;
+    season_id: string;
+    match_date: string;
+    venue_name: string;
+    status: string;
+    matches: MatchRow[] | null;
+  };
+
+  const firstOrNull = <T>(v: T | T[] | null | undefined): T | null => {
+    if (!v) return null;
+    if (Array.isArray(v)) return v[0] ?? null;
+    return v;
+  };
+
+  return ((data ?? []) as unknown as Row[]).map((r) => {
+    const tagSet = new Set<string>();
+    for (const m of r.matches ?? []) {
+      const h = firstOrNull(m.home_player);
+      const a = firstOrNull(m.away_player);
+      if (h?.gamer_tag) tagSet.add(h.gamer_tag);
+      if (a?.gamer_tag) tagSet.add(a.gamer_tag);
+    }
+    return {
+      id: r.id,
+      season_id: r.season_id,
+      match_date: r.match_date,
+      venue_name: r.venue_name,
+      status: r.status,
+      match_count: r.matches?.length ?? 0,
+      player_tags: [...tagSet].sort(),
+    };
+  });
+}
+
 export async function getMatchDay(sb: SupabaseClient, id: string) {
   const { data, error } = await sb
     .from("match_days")

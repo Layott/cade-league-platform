@@ -7,7 +7,9 @@ import {
   addFixtureAction,
   confirmResultAction,
   editResultAction,
+  editMatchAction,
   enterResultAction,
+  removeMatchAction,
 } from "./actions";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
@@ -214,6 +216,8 @@ export default async function MatchDayDetailPage({
                 : result
                   ? "draft"
                   : m.status;
+              const homePlayerId = (homePlayer as { id?: string } | null)?.id ?? "";
+              const awayPlayerId = (awayPlayer as { id?: string } | null)?.id ?? "";
               return (
                 <li
                   key={m.id}
@@ -238,6 +242,71 @@ export default async function MatchDayDetailPage({
                       ) : null}
                       <StatusPill status={statusLabel} />
                     </div>
+                  </div>
+
+                  {/* Plan 26 — inline edit + soft-delete (admins only via matches.edit) */}
+                  <div className="mt-4 grid grid-cols-1 gap-3 rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-1)] p-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+                    <form
+                      action={editMatchAction}
+                      className="contents"
+                      data-testid={`edit-fixture-form-${m.id}`}
+                    >
+                      <input type="hidden" name="matchDayId" value={matchDay.id} />
+                      <input type="hidden" name="matchId" value={m.id} />
+                      <FormField label="Home (edit)">
+                        <select
+                          name="homePlayerId"
+                          required
+                          defaultValue={homePlayerId}
+                          className={selectClass}
+                          data-testid={`edit-home-select-${m.id}`}
+                        >
+                          {playerOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                      <FormField label="Away (edit)">
+                        <select
+                          name="awayPlayerId"
+                          required
+                          defaultValue={awayPlayerId}
+                          className={selectClass}
+                          data-testid={`edit-away-select-${m.id}`}
+                        >
+                          {playerOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                      <div>
+                        <SecondaryButton
+                          type="submit"
+                          data-testid={`edit-fixture-btn-${m.id}`}
+                        >
+                          Save
+                        </SecondaryButton>
+                      </div>
+                    </form>
+                    <form
+                      action={removeMatchAction}
+                      className="md:justify-self-end"
+                      data-testid={`remove-fixture-form-${m.id}`}
+                    >
+                      <input type="hidden" name="matchDayId" value={matchDay.id} />
+                      <input type="hidden" name="matchId" value={m.id} />
+                      <button
+                        type="submit"
+                        className="rounded-sm border border-[var(--flare)]/60 bg-transparent px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--flare)] hover:bg-[var(--flare)]/10"
+                        data-testid={`remove-fixture-btn-${m.id}`}
+                      >
+                        Delete
+                      </button>
+                    </form>
                   </div>
 
                   <form

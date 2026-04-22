@@ -3,10 +3,10 @@ import { getActiveSeason } from "@/server/seasons";
 import { PageHeader } from "@/components/public/PageHeader";
 import { EmptyState } from "@/components/public/EmptyState";
 import {
-  FixtureList,
   type FixtureGroup,
   type FixtureRow,
 } from "@/components/public/FixtureList";
+import { FixtureSearch } from "@/components/public/FixtureSearch";
 
 export const revalidate = 60;
 
@@ -30,6 +30,7 @@ type MatchJoin = {
   id: string;
   status: string;
   scheduled_time: string | null;
+  match_order: number | null;
   home_player: PlayerJoin | PlayerJoin[] | null;
   away_player: PlayerJoin | PlayerJoin[] | null;
   result: ResultJoin | ResultJoin[] | null;
@@ -60,9 +61,14 @@ function playerTag(p: PlayerJoin | null): string {
   return p?.gamer_tag ?? "";
 }
 
-export default async function FixturesPage() {
+export default async function FixturesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const sb = await getServerSupabase();
   const season = await getActiveSeason(sb);
+  const { q } = await searchParams;
 
   const groups: FixtureGroup[] = [];
   if (season) {
@@ -72,7 +78,7 @@ export default async function FixturesPage() {
         `
         id, match_date, venue_name, match_start_time, arrival_cutoff_time, status,
         matches:matches (
-          id, status, scheduled_time,
+          id, status, scheduled_time, match_order,
           home_player:home_player_id ( id, gamer_tag, jersey_number, users:users!players_user_id_fkey ( id, display_name ) ),
           away_player:away_player_id ( id, gamer_tag, jersey_number, users:users!players_user_id_fkey ( id, display_name ) ),
           result:match_results ( home_score, away_score, confirmed_at, result_type )
@@ -108,6 +114,11 @@ export default async function FixturesPage() {
           } satisfies FixtureRow;
         })
         .sort((a, b) => {
+          // Plan 26 — match_order is the LOC's announced order; fall back to
+          // scheduled_time only if both rows lack an explicit order.
+          const am = (md.matches?.find((mm) => mm.id === a.id)?.match_order ?? 0);
+          const bm = (md.matches?.find((mm) => mm.id === b.id)?.match_order ?? 0);
+          if (am !== bm) return am - bm;
           const at = a.scheduled_time ?? "";
           const bt = b.scheduled_time ?? "";
           return at.localeCompare(bt);
@@ -154,7 +165,7 @@ export default async function FixturesPage() {
             hint="The league office publishes fixture releases ahead of each match day — check back here when the call goes out."
           />
         ) : (
-          <FixtureList groups={groups} />
+          <FixtureSearch groups={groups} initialQuery={q ?? ""} />
         )}
       </div>
     </div>
