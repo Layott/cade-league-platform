@@ -70,7 +70,10 @@ export default async function RolesPage() {
   // actions without requiring a code change to surface them.
   const enforcedPerms = [
     "roles.edit",
+    "users.read",
+    "users.create",
     "users.edit",
+    "users.delete",
   ];
   for (const p of enforcedPerms) allPerms.add(p);
 

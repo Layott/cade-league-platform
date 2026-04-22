@@ -6,7 +6,7 @@ import { requirePermAsync } from "@/lib/perms-db";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { StatusPill, roleTone } from "@/components/admin/StatusPill";
-import { SecondaryButton } from "@/components/admin/buttons";
+import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import { formatWat } from "@/lib/time";
 import { listUsersWithRoles, type UserWithRoles } from "@/server/roles";
 
@@ -113,6 +113,13 @@ export default async function UsersListPage() {
         eyebrow="People & access"
         title="Users & roles"
         description="Everyone registered on the platform. Click through to add or remove roles per user."
+        action={
+          <Link href="/admin/users/new">
+            <PrimaryButton type="button" data-testid="add-user-button">
+              + Add user
+            </PrimaryButton>
+          </Link>
+        }
       />
       <DataTable
         columns={columns}

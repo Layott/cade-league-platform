@@ -10,10 +10,16 @@ import {
   SecondaryButton,
   DangerButton,
 } from "@/components/admin/buttons";
-import { FormField, selectClass } from "@/components/admin/FormField";
+import { FormField, inputClass, selectClass } from "@/components/admin/FormField";
 import { formatWat } from "@/lib/time";
 import { ROLE_NAMES } from "@/perms";
-import { assignRoleAction, removeRoleAction } from "../actions";
+import {
+  assignRoleAction,
+  removeRoleAction,
+  updateUserAction,
+  resetPasswordAction,
+  softDeleteUserAction,
+} from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +59,13 @@ export default async function UserDetailPage({
     .is("deleted_at", null)
     .maybeSingle();
   if (!user) notFound();
+
+  const { data: player } = await sb
+    .from("players")
+    .select("id, gamer_tag, jersey_number")
+    .eq("user_id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
 
   const { data: rolesRows } = await sb
     .from("user_roles")
@@ -160,6 +173,143 @@ export default async function UserDetailPage({
             Every defined role is already assigned to this user.
           </p>
         )}
+      </section>
+
+      <section
+        aria-labelledby="profile-heading"
+        className="space-y-4 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+      >
+        <h2
+          id="profile-heading"
+          className="font-display text-lg font-bold text-[var(--chalk-0)]"
+        >
+          Edit profile
+        </h2>
+        <form
+          action={updateUserAction}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+          data-testid="edit-profile-form"
+        >
+          <input type="hidden" name="id" value={id} />
+          <FormField label="Display name" htmlFor="edit-display-name">
+            <input
+              id="edit-display-name"
+              name="display_name"
+              type="text"
+              defaultValue={user.display_name ?? ""}
+              className={inputClass}
+              data-testid="edit-display-name"
+            />
+          </FormField>
+          <FormField label="Gamer tag" htmlFor="edit-gamer-tag">
+            <input
+              id="edit-gamer-tag"
+              name="gamer_tag"
+              type="text"
+              defaultValue={(player as { gamer_tag?: string } | null)?.gamer_tag ?? ""}
+              className={inputClass}
+              data-testid="edit-gamer-tag"
+            />
+          </FormField>
+          <FormField label="Jersey #" htmlFor="edit-jersey">
+            <input
+              id="edit-jersey"
+              name="jersey_number"
+              type="number"
+              min={1}
+              max={99}
+              defaultValue={
+                (player as { jersey_number?: number | null } | null)
+                  ?.jersey_number ?? ""
+              }
+              className={inputClass}
+              data-testid="edit-jersey"
+            />
+          </FormField>
+          <div className="sm:col-span-3">
+            <PrimaryButton type="submit" data-testid="edit-profile-submit">
+              Save profile
+            </PrimaryButton>
+          </div>
+        </form>
+      </section>
+
+      <section
+        aria-labelledby="password-heading"
+        className="space-y-4 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+      >
+        <h2
+          id="password-heading"
+          className="font-display text-lg font-bold text-[var(--chalk-0)]"
+        >
+          Reset password
+        </h2>
+        <p className="text-xs text-[var(--chalk-3)]">
+          Sets a temporary password. The user keeps signing in with it until
+          they reset it themselves.
+        </p>
+        <form
+          action={resetPasswordAction}
+          className="flex flex-wrap items-end gap-3"
+          data-testid="reset-password-form"
+        >
+          <input type="hidden" name="id" value={id} />
+          <FormField label="New password" htmlFor="reset-password-input">
+            <input
+              id="reset-password-input"
+              name="new_password"
+              type="text"
+              minLength={8}
+              required
+              className={inputClass + " font-mono"}
+              data-testid="reset-password-input"
+            />
+          </FormField>
+          <SecondaryButton type="submit" data-testid="reset-password-submit">
+            Set new password
+          </SecondaryButton>
+        </form>
+      </section>
+
+      <section
+        aria-labelledby="danger-heading"
+        className="space-y-4 rounded-sm border border-[rgba(255,91,59,0.35)] bg-[rgba(255,91,59,0.04)] p-5"
+      >
+        <h2
+          id="danger-heading"
+          className="font-display text-lg font-bold text-[var(--flare)]"
+        >
+          Danger zone
+        </h2>
+        <p className="text-xs text-[var(--chalk-2)]">
+          Soft-deletes the user. The auth account stays in place so the audit
+          history remains intact, and an admin can restore from{" "}
+          <Link
+            href="/admin/trash/users"
+            className="text-[var(--signal)] underline-offset-4 hover:underline"
+          >
+            /admin/trash/users
+          </Link>
+          .
+        </p>
+        <details className="group rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-3">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-[var(--flare)]">
+            Delete this user
+          </summary>
+          <form
+            action={softDeleteUserAction}
+            className="mt-3 flex flex-wrap items-center gap-3"
+            data-testid="delete-user-form"
+          >
+            <input type="hidden" name="id" value={id} />
+            <DangerButton type="submit" data-testid="delete-user-confirm">
+              Confirm delete
+            </DangerButton>
+            <span className="text-[11px] text-[var(--chalk-3)]">
+              This action is reversible from the trash.
+            </span>
+          </form>
+        </details>
       </section>
 
       <section
