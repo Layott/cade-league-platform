@@ -104,6 +104,7 @@ describe("getProfileView", () => {
       },
       player: {
         gamer_tag: "SELFY",
+        psn_id: "SelfyPSN",
         jersey_number: 7,
         photo_url: "https://example.com/self.jpg",
         bio: "Striker.",
@@ -121,6 +122,7 @@ describe("getProfileView", () => {
       photoUrl: "https://example.com/self.jpg",
       bio: "Striker.",
       gamerTag: "SELFY",
+      psnId: "SelfyPSN",
       jerseyNumber: 7,
       organizationId: "org-1",
       // Roles returned sorted alphabetically so the UI chips render stable.
