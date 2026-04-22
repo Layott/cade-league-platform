@@ -190,6 +190,87 @@ export async function markRead(
   if (error) throw new Error(`markRead failed: ${error.message}`);
 }
 
+/**
+ * Plan 40 §3.3 — fetch every visible announcement for the signed-in
+ * user, ready to render in the bell-modal. Joins notifications →
+ * announcements (deleted_at filtered on both sides) and projects the
+ * body_md inline so the detail pane doesn't need a second fetch.
+ *
+ * Returned shape matches the spec exactly: one row per notification, with
+ * `is_read` derived from `read_at IS NOT NULL`.
+ */
+export async function listAnnouncementsForUser(
+  sb: SupabaseClient,
+  userId: string,
+  opts: { limit?: number } = {}
+): Promise<
+  Array<{
+    id: string;
+    title: string;
+    body_md: string;
+    priority: string;
+    published_at: string | null;
+    is_read: boolean;
+  }>
+> {
+  const limit = opts.limit ?? 50;
+  const { data, error } = await sb
+    .from("notifications")
+    .select(
+      "id, read_at, announcement:announcements!inner(title, body_md, priority, published_at, deleted_at)"
+    )
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`listAnnouncementsForUser failed: ${error.message}`);
+
+  type Row = {
+    id: string;
+    read_at: string | null;
+    announcement: {
+      title: string;
+      body_md: string;
+      priority: string;
+      published_at: string | null;
+      deleted_at: string | null;
+    } | null;
+  };
+
+  return ((data ?? []) as unknown as Row[])
+    // Filter soft-deleted announcements client-side. The `!inner` join
+    // plus the deleted_at column in the select lets us see which rows to
+    // drop — postgREST can't apply the `.is("deleted_at", null)` filter
+    // through the join without a dedicated RLS policy, so we gate here.
+    .filter((n) => n.announcement && n.announcement.deleted_at === null)
+    .map((n) => ({
+      id: n.id,
+      title: n.announcement!.title,
+      body_md: n.announcement!.body_md,
+      priority: n.announcement!.priority ?? "info",
+      published_at: n.announcement!.published_at ?? null,
+      is_read: n.read_at !== null,
+    }));
+}
+
+/**
+ * Plan 40 §5 — mark every unread notification owned by this user as
+ * read. Idempotent: a second call is a no-op because `.is("read_at",
+ * null)` matches zero rows.
+ */
+export async function markAllRead(
+  sb: SupabaseClient,
+  userId: string
+): Promise<void> {
+  const { error } = await sb
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .is("read_at", null);
+  if (error) throw new Error(`markAllRead failed: ${error.message}`);
+}
+
 // --- local helpers ---
 
 function wrapEmailHtml(title: string, innerHtml: string): string {
