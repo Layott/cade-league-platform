@@ -362,7 +362,7 @@ describe("resetUserPassword", () => {
     await expect(
       resetUserPassword(sb, adminActor, {
         id: "11111111-1111-4111-8111-111111111111",
-        newPassword: "abcd1234",
+        newPassword: "abcd1234-xyz9",
       }),
     ).rejects.toThrow(/missing permission/);
   });
@@ -376,10 +376,10 @@ describe("resetUserPassword", () => {
     });
     await resetUserPassword(sb, adminActor, {
       id: "11111111-1111-4111-8111-111111111111",
-      newPassword: "abcd1234",
+      newPassword: "abcd1234-xyz9",
     });
     expect(auth.admin.updateUserById).toHaveBeenCalledWith("auth-uid-9", {
-      password: "abcd1234",
+      password: "abcd1234-xyz9",
     });
   });
 });
