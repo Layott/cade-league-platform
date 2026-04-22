@@ -148,8 +148,70 @@ inspection.
 
 ---
 
-## 6. Out of scope
+## 6. Nightly auto-refresh (Plan 24, shipped 2026-04-22)
 
-- Live coin prices — Plan 24 (deferred).
-- Auto-refresh cron / GitHub Action — Plan 21B.
+A Vercel cron hits `/api/cron/fcdb-refresh` nightly at **03:00 WAT**
+(`0 2 * * *` UTC). The route tries three sources in order and stops at the
+first that returns rows:
+
+1. **Kaggle CLI** — dev-only. Needs `kaggle` CLI on PATH plus
+   `KAGGLE_API_TOKEN` (or `KAGGLE_KEY` + `KAGGLE_USERNAME`). Skipped fast
+   on Vercel serverless (no CLI installable).
+2. **futdb.co API** — needs `FUTDB_API_KEY` (free tier, 100 req/day).
+   Fetches 3 pages of 100 cards nightly = 300 cards refreshed per run.
+   Rate-limited to 1 req/sec.
+3. **sofifa.com HTML scrape** — last resort. No key; rate-limited 1 req/s.
+   Fragile to markup drift; monitor `fc26_refresh_log` for `source='sofifa'`
+   rows with `rows_upserted = 0` and update the regex in
+   `apps/web/src/server/fcdb/sources/sofifa.ts` when that happens.
+
+### 6.1 Required env vars
+
+Add to Vercel Project Settings -> Environment Variables (Production):
+
+| Var                | Required? | Notes                                                   |
+| ------------------ | --------- | ------------------------------------------------------- |
+| `CRON_SECRET`      | yes       | Shared with other crons. Any 32+ byte random string.    |
+| `FUTDB_API_KEY`    | yes       | Free tier at https://futdb.co/settings/tokens.          |
+| `KAGGLE_API_TOKEN` | no        | Dev / self-hosted runners only; ignored on Vercel.      |
+| `KAGGLE_KEY`       | no        | Alternative Kaggle env; same semantics as above.        |
+| `KAGGLE_USERNAME`  | no        | Required alongside `KAGGLE_KEY` per Kaggle CLI rules.   |
+
+### 6.2 Manual trigger
+
+```bash
+curl -s -X POST \
+  -H "X-Cron-Secret: $(grep '^CRON_SECRET=' apps/web/.env.local | cut -d= -f2-)" \
+  http://localhost:3030/api/cron/fcdb-refresh
+```
+
+Expected JSON on success:
+```json
+{ "ok": true, "source": "futdb", "upserted": 300, "failed": 0, "duration_ms": 3500 }
+```
+
+When every source is skipped / failing (typical on a fresh clone with no
+env vars set), the response is still 200 with:
+```json
+{ "ok": true, "source": "none", "upserted": 0, "failed": 0,
+  "error": "kaggle: ...; futdb: FUTDB_API_KEY not set; sofifa: ..." }
+```
+
+### 6.3 Observability
+
+Every run writes one row to `public.fc26_refresh_log` (append-only). To
+inspect recent runs:
+
+```bash
+npx supabase db query --linked \
+  "select ran_at, source, rows_upserted, rows_failed, duration_ms, error
+   from public.fc26_refresh_log
+   order by ran_at desc limit 10;"
+```
+
+---
+
+## 7. Out of scope
+
+- Real-time price updates (would need websocket infra).
 - Non-player items (managers, stadiums) — not needed for ref review.
