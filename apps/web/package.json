@@ -22,7 +22,6 @@
     "isomorphic-dompurify": "^2.36.0",
     "marked": "^14.1.4",
     "next": "15.5.15",
-    "node-tesseract-ocr": "^2.2.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "resend": "^6.12.2",

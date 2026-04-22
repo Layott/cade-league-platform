@@ -99,7 +99,7 @@ describe("parse dispatcher — Claude path", () => {
   });
 });
 
-describe("parse dispatcher — Tesseract fallback", () => {
+describe("parse dispatcher — no engine configured (post Plan 39 C5)", () => {
   const saved = { ...process.env };
   beforeEach(() => {
     delete process.env.OCR_DISABLED;
@@ -109,26 +109,22 @@ describe("parse dispatcher — Tesseract fallback", () => {
     process.env = { ...saved };
   });
 
-  it("falls through to Tesseract when no Anthropic key, logs zero cost", async () => {
-    const tessRecognize = vi
-      .fn()
-      .mockResolvedValue("A 1 - 0 B\nPossession 60% 40%\nShots 5 3");
+  it("returns { status: 'failed', reason: 'no OCR engine configured' } + logs manual", async () => {
     const sb = mkSb();
     const out = await parse(sb as never, {
       screenshotId: "s-1",
       matchId: "m-1",
       imageBuffer: FAKE_IMAGE,
       mimeType: "image/png",
-      tesseractClient: { recognize: tessRecognize },
     });
-    expect(out.status).toBe("parsed");
-    if (out.status === "parsed") {
-      expect(out.engine).toBe("tesseract");
+    expect(out.status).toBe("failed");
+    if (out.status === "failed") {
+      expect(out.reason).toBe("no OCR engine configured");
     }
-    expect(tessRecognize).toHaveBeenCalledTimes(1);
     const logged = sb.__insertMock.mock.calls[0][0];
-    expect(logged.engine).toBe("tesseract");
+    expect(logged.engine).toBe("manual");
     expect(logged.cost_usd_cents).toBe(0);
+    expect(logged.success_bool).toBe(false);
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   parseIntOrNull,
   parsePercentOrNull,
@@ -6,7 +6,7 @@ import {
   STAT_REGIONS,
 } from "./parse.tesseract";
 
-describe("parseIntOrNull heuristic", () => {
+describe("parseIntOrNull / parsePercentOrNull helpers", () => {
   it("parses clean ints", () => {
     expect(parseIntOrNull("11")).toBe(11);
     expect(parseIntOrNull("  412  ")).toBe(412);
@@ -43,43 +43,20 @@ describe("STAT_REGIONS", () => {
   it("exposes possession coords for both home and away", () => {
     expect(STAT_REGIONS.possessionHome).toBeDefined();
     expect(STAT_REGIONS.possessionAway).toBeDefined();
-    // Home + away possession strips live at the same y.
     expect(STAT_REGIONS.possessionHome.y).toBe(STAT_REGIONS.possessionAway.y);
   });
 });
 
-describe("parseWithTesseract happy path", () => {
-  it("extracts score + possession + shots from an eFootball-like OCR dump", async () => {
-    const tess = {
-      recognize: vi.fn().mockResolvedValue(
-        [
-          "NUNUSWAGGER    3 - 1    LAYO_KING",
-          "Possession 54% 46%",
-          "Shots 11 4",
-        ].join("\n")
-      ),
-    };
-    const out = await parseWithTesseract(tess as never, Buffer.from([]));
+describe("parseWithTesseract (post Plan 39 C5 — no-op stub)", () => {
+  it("returns status='unavailable' with empty parsed block, never calls recognize", async () => {
+    const out = await parseWithTesseract(
+      { recognize: async () => "SHOULD NOT RUN" },
+      Buffer.from([]),
+    );
     expect(out.engine).toBe("tesseract");
-    expect(out.parsed.homeScore).toBe(3);
-    expect(out.parsed.awayScore).toBe(1);
-    expect(out.parsed.homeStats.possessionPct).toBe(54);
-    expect(out.parsed.awayStats.possessionPct).toBe(46);
-    expect(out.parsed.homeStats.shots).toBe(11);
-    expect(out.parsed.awayStats.shots).toBe(4);
-    // Unreadable rest stays null — never 0.
-    expect(out.parsed.homeStats.tackles).toBeNull();
-    expect(out.parsed.homeStats.passAccuracyPct).toBeNull();
-  });
-
-  it("returns all-null parsed block when OCR text is garbage", async () => {
-    const tess = {
-      recognize: vi.fn().mockResolvedValue("lorem ipsum dolor sit amet"),
-    };
-    const out = await parseWithTesseract(tess as never, Buffer.from([]));
+    expect(out.status).toBe("unavailable");
     expect(out.parsed.homeScore).toBeNull();
     expect(out.parsed.awayScore).toBeNull();
     expect(out.parsed.homeStats.possessionPct).toBeNull();
-    expect(out.parsed.homeStats.shots).toBeNull();
   });
 });

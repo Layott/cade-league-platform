@@ -1,25 +1,30 @@
 import {
-  parsedMatchStatsSchema,
   emptyParsedMatchStats,
   type ParsedMatchStats,
   type ParsedStatsBlock,
 } from "./schemas";
 
 /**
- * Plan 14 — Tesseract dev fallback.
+ * Plan 39 C5 — Tesseract path REMOVED.
  *
- * Tesseract runs only when ANTHROPIC_API_KEY is missing AND OCR_DISABLED is
- * not set. Prod never exercises this path (Vercel has no Tesseract binary
- * installed). It's a best-effort crop-based heuristic whose main value is
- * letting local dev test the review flow without burning Anthropic credits.
+ * `node-tesseract-ocr@2.2.1` carried CVSS-9.8 GHSA-8j44-735h-w4w2 (OS
+ * command injection through `recognize()` parameter handling and the
+ * un-sanitized `binary` env var). The library has no upstream patch and
+ * was only ever used as a dev convenience — production has always run on
+ * the Anthropic-Claude path. Removing the dep is the cleanest fix.
  *
- * Calibration for eFootball end-screens is in STAT_REGIONS; numbers are
- * normalized 0..1 coords so the same config works across 1080p / 1440p.
- * Fields Tesseract cannot parse confidently emit null (never 0 or a guess).
+ * The exported surface is preserved so existing call sites + the
+ * `stats_ocr/index.ts` re-export continue to type-check, but every
+ * function is now a no-op that returns `{ status: 'unavailable' }`.
+ *
+ * If a future operator wants OCR locally and Anthropic is unset, the path
+ * is hand-paste via the admin review UI (`parsed_by_engine='manual'`).
  */
 
+// Coordinate constants kept (still used by tests + by anyone scripting a
+// future replacement OCR engine). Numbers are normalized 0..1 against the
+// screenshot.
 export const STAT_REGIONS = {
-  // x, y, w, h normalized 0..1 against the screenshot.
   homeDisplayName: { x: 0.05, y: 0.08, w: 0.3, h: 0.06 },
   awayDisplayName: { x: 0.65, y: 0.08, w: 0.3, h: 0.06 },
   score: { x: 0.4, y: 0.05, w: 0.2, h: 0.12 },
@@ -33,10 +38,6 @@ export const STAT_REGIONS = {
 
 export type StatRegionKey = keyof typeof STAT_REGIONS;
 
-/**
- * Parse a single string into an int, or null if unparseable. Never returns
- * 0 for unparseable input — that would masquerade as a legitimate reading.
- */
 export function parseIntOrNull(raw: string | null | undefined): number | null {
   if (raw == null) return null;
   const cleaned = raw.trim().replace(/[^\d.]/g, "");
@@ -45,9 +46,6 @@ export function parseIntOrNull(raw: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * "54%" → 54. "—" or "N/A" → null.
- */
 export function parsePercentOrNull(
   raw: string | null | undefined,
 ): number | null {
@@ -60,8 +58,14 @@ export function parsePercentOrNull(
 export interface TesseractParseResult {
   engine: "tesseract";
   parsed: ParsedMatchStats;
+  /** Always 'unavailable' since Plan 39. */
+  status: "unavailable";
 }
 
+/**
+ * Kept as a type for back-compat with existing imports. The dispatcher no
+ * longer accepts a tesseractClient option (see parse.ts).
+ */
 export interface TesseractLike {
   recognize: (
     image: Buffer | string,
@@ -69,65 +73,22 @@ export interface TesseractLike {
   ) => Promise<string>;
 }
 
-function bin(): string | undefined {
-  return process.env.TESSERACT_BIN ?? "C:\\Program Files\\Tesseract-OCR\\tesseract.exe";
-}
-
 /**
- * Minimal heuristic — passes the full image through a single tesseract OCR
- * call (no sharp crops in the fallback). Then sprays regex against the text
- * for the stats we care about. Any field not matched stays null.
- *
- * This is deliberately dumb — it exists to unblock local dev review flow.
- * Prod uses Claude.
+ * Returns the documented unavailable result. The dispatcher in `parse.ts`
+ * never invokes this anymore — kept exported for any external script that
+ * may have imported it directly.
  */
 export async function parseWithTesseract(
-  tesseract: TesseractLike,
-  imageBuffer: Buffer,
+  _tesseract: TesseractLike,
+  _imageBuffer: Buffer,
 ): Promise<TesseractParseResult> {
-  const rawText = await tesseract.recognize(imageBuffer, {
-    lang: "eng",
-    oem: 1,
-    psm: 6,
-    binary: bin(),
-  });
-
-  const parsed = emptyParsedMatchStats();
-
-  // Possession: look for two percentages close together.
-  const possMatch = rawText.match(/(\d{1,3})\s*%[^\d]{1,30}(\d{1,3})\s*%/);
-  if (possMatch) {
-    parsed.homeStats.possessionPct = parsePercentOrNull(possMatch[1]);
-    parsed.awayStats.possessionPct = parsePercentOrNull(possMatch[2]);
-  }
-
-  // Shots: "Shots 11 4" or similar
-  const shotsMatch = rawText.match(/shots[^\d]{0,30}(\d{1,3})[^\d]{1,30}(\d{1,3})/i);
-  if (shotsMatch) {
-    parsed.homeStats.shots = parseIntOrNull(shotsMatch[1]);
-    parsed.awayStats.shots = parseIntOrNull(shotsMatch[2]);
-  }
-
-  // Score: "3 - 1" or "3 : 1"
-  const scoreMatch = rawText.match(/(\d{1,2})\s*[-:]\s*(\d{1,2})/);
-  if (scoreMatch) {
-    parsed.homeScore = parseIntOrNull(scoreMatch[1]);
-    parsed.awayScore = parseIntOrNull(scoreMatch[2]);
-  }
-
-  parsed.sourceNotes = "tesseract dev fallback";
-
-  // Final safety: Zod-validate. If somehow a field slips out of range it
-  // becomes null via the catch — we never hand a malformed result back.
-  const result = parsedMatchStatsSchema.safeParse(parsed);
-  const safe = result.success ? result.data : emptyParsedMatchStats();
-  return { engine: "tesseract", parsed: safe };
+  return {
+    engine: "tesseract",
+    parsed: emptyParsedMatchStats(),
+    status: "unavailable",
+  };
 }
 
-/**
- * Exported so tests can assert stats-block identity without importing Zod
- * schemas into the test file.
- */
 export function cloneBlock(b: ParsedStatsBlock): ParsedStatsBlock {
   return { ...b };
 }

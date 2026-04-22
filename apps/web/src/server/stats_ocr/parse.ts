@@ -6,27 +6,25 @@ import {
   type AnthropicLike,
   getAnthropicClient,
 } from "./parse.claude";
-import {
-  parseWithTesseract,
-  type TesseractLike,
-} from "./parse.tesseract";
 import { type ParsedMatchStats } from "./schemas";
 
 /**
  * Plan 14 — OCR dispatcher.
  *
- * Order of checks (short-circuit on first win):
- *  1. OCR_DISABLED=1 → { status: 'disabled' }, no log, no cost. Admin
- *     hand-enters via the review page (`parsed_by_engine='manual'`).
+ * Order of checks:
+ *  1. OCR_DISABLED=1 → { status: 'disabled' }. Admin hand-enters via the
+ *     review page (`parsed_by_engine='manual'`).
  *  2. ANTHROPIC_API_KEY set → budget cap check → Claude vision path.
- *  3. Tesseract fallback (dev only).
- *  4. Nothing viable → 'failed'.
+ *  3. Nothing viable → 'failed' (admin falls back to manual entry).
+ *
+ * Plan 39 C5: the Tesseract dev fallback was removed. `node-tesseract-ocr`
+ * carried CVSS-9.8 GHSA-8j44-735h-w4w2 with no upstream fix.
  */
 
 export type ParseOutcome =
   | {
       status: "parsed";
-      engine: "claude-opus-4-7" | "tesseract";
+      engine: "claude-opus-4-7";
       parsed: ParsedMatchStats;
     }
   | { status: "disabled" }
@@ -51,7 +49,6 @@ export interface ParseOptions {
   mimeType: "image/png" | "image/jpeg" | "image/webp";
   // Injected in tests — prod uses defaults.
   anthropicClient?: AnthropicLike;
-  tesseractClient?: TesseractLike;
 }
 
 export function getDailyCapCents(): number {
@@ -132,40 +129,7 @@ export async function parse(
     }
   }
 
-  // 3. Tesseract fallback (dev).
-  if (opts.tesseractClient) {
-    try {
-      const result = await parseWithTesseract(
-        opts.tesseractClient,
-        opts.imageBuffer,
-      );
-      await logUsage(sb, {
-        engine: "tesseract",
-        costUsdCents: 0,
-        successBool: true,
-        matchIdRef: opts.matchId,
-        screenshotIdRef: opts.screenshotId,
-      });
-      return {
-        status: "parsed",
-        engine: "tesseract",
-        parsed: result.parsed,
-      };
-    } catch (err) {
-      const msg = (err as Error).message;
-      await logUsage(sb, {
-        engine: "tesseract",
-        costUsdCents: 0,
-        successBool: false,
-        matchIdRef: opts.matchId,
-        screenshotIdRef: opts.screenshotId,
-        errorMessage: msg,
-      });
-      return { status: "failed", reason: msg };
-    }
-  }
-
-  // 4. Nothing configured.
+  // 3. Nothing configured.
   await logUsage(sb, {
     engine: "manual",
     costUsdCents: 0,
