@@ -10,19 +10,26 @@ import {
   SecondaryButton,
   DangerButton,
 } from "@/components/admin/buttons";
+import { textareaClass } from "@/components/admin/FormField";
 import { formatWat } from "@/lib/time";
 import {
   TEMPLATE_KEYS,
   TEMPLATE_REGISTRY,
   getTemplateRoute,
+  type TemplateKey,
 } from "@/server/overlays/registry";
 import { listActiveOverlays } from "@/server/broadcast/events";
+import { listPresets } from "@/server/overlays/presets";
+import { listActiveInstances } from "@/server/overlays/instances";
+import { getClock } from "@/server/overlays/match_clock";
 import {
   triggerOverlayAction,
   clearOverlayAction,
   endSessionAction,
 } from "../actions";
 import { STARTER_PAYLOADS } from "./starter-payloads";
+import { EditableTemplatePanel } from "./EditableTemplatePanel";
+import { MatchClockPanel } from "./MatchClockPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +41,17 @@ type SessionRow = {
   ended_at: string | null;
   notes: string | null;
 };
+
+/** Editable templates upgraded to the rich panel in Plan 37. The slot
+ *  picker only appears when the template is also multi-instance. */
+const EDITABLE_TEMPLATES: ReadonlyArray<TemplateKey> = [
+  "lower_third",
+  "score_bug",
+  "up_next_bug",
+];
+const MULTI_INSTANCE_TEMPLATES: ReadonlySet<TemplateKey> = new Set([
+  "lower_third",
+]);
 
 async function resolveAdmin() {
   const userClient = await getServerSupabase();
@@ -97,7 +115,24 @@ export default async function BroadcastSessionPage({
     );
   }
 
-  const active = await listActiveOverlays(sb, session.id);
+  // Parallel fetch: active overlays + per-template presets + multi-instance
+  // active rows + match_clock state.
+  const [active, presetsAll, lowerThirdInstances, clock] = await Promise.all([
+    listActiveOverlays(sb, session.id),
+    listPresets(sb),
+    listActiveInstances(sb, session.id, "lower_third"),
+    getClock(sb, session.id),
+  ]);
+
+  const presetsByTemplate = new Map<string, typeof presetsAll>();
+  for (const p of presetsAll) {
+    const arr = presetsByTemplate.get(p.templateKey) ?? [];
+    arr.push(p);
+    presetsByTemplate.set(p.templateKey, arr);
+  }
+
+  const activeByTemplate = new Map<string, typeof active[number]>();
+  for (const a of active) activeByTemplate.set(a.template_key, a);
 
   const { data: matchDayRaw } = await sb
     .from("match_days")
@@ -109,6 +144,9 @@ export default async function BroadcastSessionPage({
     | null;
 
   const isLive = session.ended_at === null;
+  const legacyTemplates = TEMPLATE_KEYS.filter(
+    (k) => !EDITABLE_TEMPLATES.includes(k),
+  );
 
   return (
     <div className="space-y-8">
@@ -155,14 +193,51 @@ export default async function BroadcastSessionPage({
         }
       />
 
+      {/* Match clock — Plan 37 */}
+      <MatchClockPanel sessionId={session.id} clock={clock} isLive={isLive} />
+
+      {/* Editable rich panels */}
+      <div className="space-y-4">
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+          Editable templates
+        </h2>
+        <div className="space-y-4">
+          {EDITABLE_TEMPLATES.map((key) => (
+            <EditableTemplatePanel
+              key={key}
+              sessionId={session.id}
+              templateKey={key}
+              isLive={isLive}
+              presets={presetsByTemplate.get(key) ?? []}
+              activeInstances={
+                key === "lower_third" ? lowerThirdInstances : undefined
+              }
+              activeSingle={
+                key === "lower_third"
+                  ? null
+                  : activeByTemplate.get(key)
+                    ? {
+                        id: activeByTemplate.get(key)!.id,
+                        payload: activeByTemplate.get(key)!.payload,
+                        triggered_at:
+                          activeByTemplate.get(key)!.triggered_at,
+                      }
+                    : null
+              }
+              multiInstance={MULTI_INSTANCE_TEMPLATES.has(key)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Legacy textarea grid for non-editable 23 templates */}
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Left: template trigger grid (spans 2 cols) */}
         <div className="space-y-4 lg:col-span-2">
           <h2 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
-            Trigger overlays
+            Other overlays
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {TEMPLATE_KEYS.map((key) => {
+            {legacyTemplates.map((key) => {
               const tpl = TEMPLATE_REGISTRY[key];
               const starter = STARTER_PAYLOADS[key] ?? {};
               return (
@@ -208,7 +283,7 @@ export default async function BroadcastSessionPage({
                       rows={5}
                       defaultValue={JSON.stringify(starter, null, 2)}
                       data-testid={`trigger-payload-${key}`}
-                      className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-2 font-mono text-[12px] text-[var(--chalk-1)] focus:border-[var(--signal)] focus:outline-none"
+                      className={textareaClass}
                     />
                     <div className="flex justify-end">
                       <PrimaryButton
@@ -227,7 +302,7 @@ export default async function BroadcastSessionPage({
           </div>
         </div>
 
-        {/* Right: active overlays + controls */}
+        {/* Right: active overlays summary */}
         <aside className="space-y-4">
           <div>
             <h2 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
@@ -267,7 +342,7 @@ export default async function BroadcastSessionPage({
                           <button
                             type="submit"
                             data-testid={`clear-${o.template_key}`}
-                            className="rounded-sm border border-[rgba(255,91,59,0.45)] bg-transparent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--flare)] hover:bg-[rgba(255,91,59,0.12)]"
+                            className="rounded-sm border border-[var(--flare)]/45 bg-transparent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--flare)] hover:bg-[var(--flare)]/12"
                           >
                             Clear
                           </button>

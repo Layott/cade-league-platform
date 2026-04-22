@@ -10,6 +10,25 @@ import {
   triggerOverlay,
   clearOverlay,
 } from "@/server/broadcast/events";
+import {
+  createPreset,
+  updatePreset,
+  deletePreset,
+  loadPresetIntoEvent,
+} from "@/server/overlays/presets";
+import {
+  triggerInstance,
+  clearInstance,
+  updateInstancePayload,
+} from "@/server/overlays/instances";
+import {
+  setClock,
+  startClock,
+  pauseClock,
+  resumeClock,
+  adjustClock,
+  resetClock,
+} from "@/server/overlays/match_clock";
 
 /**
  * Admin server actions for the broadcast control panel. All actions
@@ -109,4 +128,183 @@ export async function clearOverlayAction(formData: FormData) {
   const { sb, publicUserId } = await gate("broadcast.trigger");
   await clearOverlay(sb, eventId, publicUserId);
   if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+// -- Plan 37: presets --------------------------------------------------
+
+function parsePayload(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error("payload must be valid JSON");
+  }
+}
+
+export async function createPresetAction(formData: FormData) {
+  const templateKey = String(formData.get("templateKey") ?? "");
+  const label = String(formData.get("label") ?? "").trim();
+  const payloadRaw = String(formData.get("payload") ?? "{}");
+  const isDefault = formData.get("isDefault") === "on";
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!templateKey) throw new Error("templateKey required");
+  if (!label) throw new Error("label required");
+
+  const { sb, publicUserId } = await gate("overlay_presets.manage");
+  await createPreset(sb, {
+    templateKey,
+    label,
+    payload: parsePayload(payloadRaw),
+    userId: publicUserId,
+    isDefault,
+  });
+  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function updatePresetAction(formData: FormData) {
+  const presetId = String(formData.get("presetId") ?? "");
+  const label = String(formData.get("label") ?? "").trim();
+  const payloadRaw = String(formData.get("payload") ?? "");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!presetId) throw new Error("presetId required");
+
+  const { sb, publicUserId } = await gate("overlay_presets.manage");
+  await updatePreset(sb, presetId, {
+    label: label || undefined,
+    payload: payloadRaw ? parsePayload(payloadRaw) : undefined,
+    userId: publicUserId,
+  });
+  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function deletePresetAction(formData: FormData) {
+  const presetId = String(formData.get("presetId") ?? "");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!presetId) throw new Error("presetId required");
+  const { sb, publicUserId } = await gate("overlay_presets.manage");
+  await deletePreset(sb, presetId, publicUserId);
+  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function loadPresetAction(formData: FormData) {
+  const presetId = String(formData.get("presetId") ?? "");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const slotRaw = String(formData.get("instanceSlot") ?? "");
+  const instanceSlot = slotRaw ? Number(slotRaw) : undefined;
+  if (!presetId || !sessionId) throw new Error("presetId + sessionId required");
+
+  const { sb, publicUserId } = await gate("broadcast.trigger");
+  await loadPresetIntoEvent(sb, {
+    presetId,
+    sessionId,
+    userId: publicUserId,
+    instanceSlot,
+  });
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+// -- Plan 37: instances ------------------------------------------------
+
+export async function triggerInstanceAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const templateKey = String(formData.get("templateKey") ?? "");
+  const slotRaw = String(formData.get("instanceSlot") ?? "1");
+  const payloadRaw = String(formData.get("payload") ?? "{}");
+  if (!sessionId || !templateKey) throw new Error("session + templateKey required");
+
+  const { sb, publicUserId } = await gate("broadcast.trigger");
+  await triggerInstance(sb, {
+    sessionId,
+    templateKey,
+    instanceSlot: Number(slotRaw),
+    payload: parsePayload(payloadRaw),
+    userId: publicUserId,
+  });
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function clearInstanceAction(formData: FormData) {
+  const instanceId = String(formData.get("instanceId") ?? "");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!instanceId) throw new Error("instanceId required");
+  const { sb, publicUserId } = await gate("broadcast.trigger");
+  await clearInstance(sb, instanceId, publicUserId);
+  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function updateInstancePayloadAction(formData: FormData) {
+  const instanceId = String(formData.get("instanceId") ?? "");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const payloadRaw = String(formData.get("payload") ?? "{}");
+  if (!instanceId) throw new Error("instanceId required");
+  const { sb, publicUserId } = await gate("broadcast.trigger");
+  await updateInstancePayload(
+    sb,
+    instanceId,
+    parsePayload(payloadRaw),
+    publicUserId,
+  );
+  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+// -- Plan 37: match_clock ---------------------------------------------
+
+export async function setClockAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const mode = String(formData.get("mode") ?? "countdown");
+  const secondsRaw = String(formData.get("secondsRemaining") ?? "0");
+  const label = String(formData.get("label") ?? "").trim() || null;
+  if (!sessionId) throw new Error("sessionId required");
+  if (!["countdown", "countup", "paused", "stopped"].includes(mode)) {
+    throw new Error(`bad mode: ${mode}`);
+  }
+
+  const { sb, publicUserId } = await gate("match_clock.manage");
+  await setClock(sb, sessionId, {
+    mode: mode as "countdown" | "countup" | "paused" | "stopped",
+    secondsRemaining: Number(secondsRaw),
+    label,
+    userId: publicUserId,
+  });
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function startClockAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  const { sb, publicUserId } = await gate("match_clock.manage");
+  await startClock(sb, sessionId, publicUserId);
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function pauseClockAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  const { sb, publicUserId } = await gate("match_clock.manage");
+  await pauseClock(sb, sessionId, publicUserId);
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function resumeClockAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  const { sb, publicUserId } = await gate("match_clock.manage");
+  await resumeClock(sb, sessionId, publicUserId);
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function adjustClockAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const deltaRaw = String(formData.get("deltaSeconds") ?? "0");
+  if (!sessionId) throw new Error("sessionId required");
+  const { sb, publicUserId } = await gate("match_clock.manage");
+  await adjustClock(sb, sessionId, Number(deltaRaw), publicUserId);
+  revalidatePath(`/admin/broadcast/${sessionId}`);
+}
+
+export async function resetClockAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  const { sb, publicUserId } = await gate("match_clock.manage");
+  await resetClock(sb, sessionId, publicUserId);
+  revalidatePath(`/admin/broadcast/${sessionId}`);
 }
