@@ -28,28 +28,38 @@ export async function UserBadge() {
   try {
     const sb = await getServerSupabase();
 
-    // Resolve the Supabase auth user and reject fast if there is none.
-    // We call `getActorFromSession` without `opts.userId` first so it
-    // performs the cheap auth.getUser() check on our behalf and returns
-    // null for signed-out visitors.
-    const preAuth = await getActorFromSession(sb);
-    if (!preAuth) return <SignInLink />;
-
-    // Fetch the public `users.id` via supabase_auth_id — the join target
-    // for roles + player photo lookups. Using maybeSingle so an invited
-    // auth user without a public row still renders the sign-in fallback
-    // rather than crashing.
+    // Auth probe — one call, no sidecar wrappers. A signed-in user always
+    // has `data.user`; anything else is anon (or a token that Supabase
+    // rejects).
     const { data: authData } = await sb.auth.getUser();
     if (!authData.user) return <SignInLink />;
 
+    // Public users row — PII read. Plan 39 C2 column-level grants let
+    // authenticated read (id, display_name, created_at, updated_at,
+    // deleted_at); email requires service-role. We therefore read only
+    // columns anon+authenticated hold, plus pull the fallback display
+    // name from the auth user's email metadata if the public row has
+    // no display_name (non-player role seed rows can lack one).
     const { data: pub } = await sb
       .from("users")
-      .select("id, display_name, email")
+      .select("id, display_name")
       .eq("supabase_auth_id", authData.user.id)
       .is("deleted_at", null)
       .maybeSingle();
 
-    if (!pub) return <SignInLink />;
+    // If the users row is missing (shouldn't happen post-Plan 2 mirror
+    // trigger, but be resilient) render a minimal signed-in badge rather
+    // than a fake Sign-in link. Email → initials fallback.
+    const authEmail = authData.user.email ?? null;
+    if (!pub) {
+      return (
+        <UserBadgeShell
+          displayName={authEmail ? authEmail.split("@")[0]! : "You"}
+          photoUrl={null}
+          roles={[]}
+        />
+      );
+    }
 
     // One select joining user_roles + players(photo_url). Keep the
     // explicit FK name for `players.user_id` consistent with the post
@@ -71,7 +81,7 @@ export async function UserBadge() {
     const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
     const displayName =
       (pub.display_name && pub.display_name.trim()) ||
-      (pub.email ? pub.email.split("@")[0]! : "Player");
+      (authEmail ? authEmail.split("@")[0]! : "You");
     const photoUrl = playerRow?.photo_url ?? null;
 
     return (
@@ -81,10 +91,12 @@ export async function UserBadge() {
         roles={roles}
       />
     );
-  } catch {
-    // Any server-side failure → render the unauthenticated fallback
-    // rather than taking the whole header (and therefore every page)
-    // down. Plan 40 spec §9.
+  } catch (err) {
+    // Surface the error in dev-server logs so a signed-in user seeing
+    // the Sign-in fallback gets diagnosed fast. Plan 40 spec §9: never
+    // crash the header, but do NOT swallow the reason silently.
+    // eslint-disable-next-line no-console
+    console.error("[UserBadge] falling back to SignInLink:", err);
     return <SignInLink />;
   }
 }

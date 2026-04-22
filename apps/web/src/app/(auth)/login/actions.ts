@@ -60,10 +60,20 @@ async function recordFailure(
   });
 }
 
+// Role-based default landing when the login form has no explicit `next`.
+// Staff roles go to /admin; players to /player; anyone else (viewer /
+// design / technical / team_manager / coach / no-role) to /profile.
+function defaultLandingForRoles(roles: readonly string[]): string {
+  const STAFF = new Set(["admin", "loc", "idc", "referee", "production", "moderator"]);
+  if (roles.some((r) => STAFF.has(r))) return "/admin";
+  if (roles.includes("player")) return "/player";
+  return "/profile";
+}
+
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/admin");
+  const nextParam = String(formData.get("next") ?? "");
 
   const sb = await getServerSupabase();
 
@@ -102,5 +112,14 @@ export async function login(formData: FormData) {
     acceptLanguage: h.get("accept-language") ?? "",
   });
 
-  redirect(next);
+  if (nextParam) {
+    redirect(nextParam);
+  }
+  const { data: roleRows } = await svc
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", pub.id)
+    .is("deleted_at", null);
+  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+  redirect(defaultLandingForRoles(roles));
 }

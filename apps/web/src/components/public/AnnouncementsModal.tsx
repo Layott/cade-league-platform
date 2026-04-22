@@ -177,7 +177,7 @@ export function AnnouncementsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/60 p-4 py-16 backdrop-blur-sm"
       onClick={onBackdropClick}
       data-testid="announcements-modal-backdrop"
     >
