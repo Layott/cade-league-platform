@@ -157,19 +157,14 @@ async function upsertRows(sb, rows, stats, inserted) {
       await sb.from("fc26_players").update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
       stats.updated++;
     } else {
-      const { data: base } = await sb.from("fc26_players").select("id").eq("slug", slug).eq("rating", r.rating).is("deleted_at", null).limit(1);
-      if (base && base.length > 0) {
-        await sb.from("fc26_players").update({ value_coins_estimate: coins, attributes: attrs }).eq("id", base[0].id);
-        stats.updated++;
-      } else {
-        await sb.from("fc26_players").insert({
-          source_dataset: "futbin.com", source_row_id: sourceRowId,
-          name: r.name, slug, rating: r.rating, position: r.position || "ST",
-          item_type: itemType, value_coins_estimate: coins, attributes: attrs,
-        });
-        inserted.push({ name: r.name, rating: r.rating, variant: r.variant });
-        stats.inserted++;
-      }
+      // Always insert as its own futbin.com row. No Kaggle merge.
+      await sb.from("fc26_players").insert({
+        source_dataset: "futbin.com", source_row_id: sourceRowId,
+        name: r.name, slug, rating: r.rating, position: r.position || "ST",
+        item_type: itemType, value_coins_estimate: coins, attributes: attrs,
+      });
+      inserted.push({ name: r.name, rating: r.rating, variant: r.variant });
+      stats.inserted++;
     }
   }
 }
@@ -231,7 +226,8 @@ async function main() {
   const stats = { bands: 0, updated: 0, inserted: 0, noPrice: 0, bandRows: {} };
   const inserted = [];
   const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: true,
+    headless: false,
+    slowMo: 50,
     args: ["--disable-blink-features=AutomationControlled"],
     viewport: { width: 1440, height: 900 },
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
@@ -239,9 +235,24 @@ async function main() {
   });
   await ctx.addInitScript(() => { Object.defineProperty(navigator, "webdriver", { get: () => undefined }); });
   const page = await ctx.newPage();
-  // Warm
+  // Warm via home, then probe first unfinished band so user can clear CF.
   await page.goto("https://www.futbin.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForTimeout(5000);
+  await page.waitForTimeout(6000);
+  const firstBand = BANDS.find((b) => !state.done.includes(b.key));
+  if (firstBand) {
+    await page.goto(LIST_URL(firstBand, 1), { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForTimeout(8000);
+    const { rows: probeRows } = await extract(page);
+    if (probeRows.length === 0) {
+      const readline = require("readline");
+      console.log("\n=== Cloudflare challenge? Look at the browser window ===");
+      console.log("If CF is blocking, solve it in the window then press ENTER.");
+      await new Promise((r) => {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        rl.question("ready: ", () => { rl.close(); r(); });
+      });
+    }
+  }
   for (const band of BANDS) {
     await scrapeBand(page, sb, band, state, stats, inserted);
     stats.bands++;

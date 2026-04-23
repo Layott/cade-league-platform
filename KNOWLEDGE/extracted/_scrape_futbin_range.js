@@ -108,18 +108,13 @@ async function upsert(sb, rows, stats) {
       await sb.from("fc26_players").update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
       stats.updated++;
     } else {
-      const { data: base } = await sb.from("fc26_players").select("id").eq("slug", slug).eq("rating", r.rating).is("deleted_at", null).limit(1);
-      if (base && base.length > 0) {
-        await sb.from("fc26_players").update({ value_coins_estimate: coins, attributes: attrs }).eq("id", base[0].id);
-        stats.updated++;
-      } else {
-        await sb.from("fc26_players").insert({
-          source_dataset: "futbin.com", source_row_id: sourceRowId,
-          name: r.name, slug, rating: r.rating, position: r.position || "ST",
-          item_type: itemType, value_coins_estimate: coins, attributes: attrs,
-        });
-        stats.inserted++;
-      }
+      // Always insert as its own futbin.com row. No Kaggle merge.
+      await sb.from("fc26_players").insert({
+        source_dataset: "futbin.com", source_row_id: sourceRowId,
+        name: r.name, slug, rating: r.rating, position: r.position || "ST",
+        item_type: itemType, value_coins_estimate: coins, attributes: attrs,
+      });
+      stats.inserted++;
     }
   }
 }

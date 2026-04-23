@@ -210,35 +210,21 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
         .eq("id", exist.id);
       stats.updated++;
     } else {
-      // Try to match an existing base card by (slug, rating) before inserting.
-      const { data: base } = await sb
-        .from("fc26_players")
-        .select("id, attributes")
-        .eq("slug", normalizedSlug)
-        .eq("rating", r.rating)
-        .is("deleted_at", null)
-        .limit(1);
-      if (base && base.length > 0) {
-        const existingAttrs = base[0].attributes && typeof base[0].attributes === "object" ? { ...base[0].attributes, ...attrs } : attrs;
-        await sb.from("fc26_players")
-          .update({ value_coins_estimate: coins, attributes: existingAttrs, updated_at: new Date().toISOString() })
-          .eq("id", base[0].id);
-        stats.updated++;
-      } else {
-        await sb.from("fc26_players").insert({
-          source_dataset: "futbin.com",
-          source_row_id: sourceRowId,
-          name: r.name,
-          slug: normalizedSlug,
-          rating: r.rating,
-          position: r.position || "ST",
-          item_type: itemType,
-          value_coins_estimate: coins,
-          attributes: attrs,
-        });
-        inserted.push({ name: r.name, rating: r.rating, variant: r.variant });
-        stats.inserted++;
-      }
+      // Always insert as its own futbin.com row. No slug+rating merge —
+      // Futbin is the source of truth; Kaggle/fut.gg rows stay untouched.
+      await sb.from("fc26_players").insert({
+        source_dataset: "futbin.com",
+        source_row_id: sourceRowId,
+        name: r.name,
+        slug: normalizedSlug,
+        rating: r.rating,
+        position: r.position || "ST",
+        item_type: itemType,
+        value_coins_estimate: coins,
+        attributes: attrs,
+      });
+      inserted.push({ name: r.name, rating: r.rating, variant: r.variant });
+      stats.inserted++;
     }
   }
 }
