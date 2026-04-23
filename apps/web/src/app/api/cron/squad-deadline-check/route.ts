@@ -6,19 +6,19 @@ import {
   weekStartThursday,
   thursdayDeadline,
 } from "@/server/squads";
+import { checkCronSecret } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Plan 10 — hourly cron. Polled by Vercel Cron / GitHub Actions / manual
- * curl. Protected by X-Cron-Secret header matching env CRON_SECRET.
- * Idempotent at the case level (issueAutoWarningForMissed checks marker).
+ * Plan 10 — hourly cron. Polled by Vercel Cron
+ * (`Authorization: Bearer $CRON_SECRET`) / GitHub Actions / manual curl
+ * (`X-Cron-Secret: …`). Idempotent at the case level
+ * (issueAutoWarningForMissed checks marker).
  */
 export async function GET(req: NextRequest) {
-  const headerSecret = req.headers.get("x-cron-secret");
-  const expected = process.env.CRON_SECRET;
-  if (!expected || headerSecret !== expected) {
+  if (!checkCronSecret(req)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

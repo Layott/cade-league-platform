@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { hasPermAsync } from "@/lib/perms-db";
 import {
   listSubmissionsForWeek,
   weekStartThursday,
+  getSquadWindowOverride,
   type SubmissionRow,
 } from "@/server/squads";
 import { formatWat } from "@/lib/time";
@@ -10,6 +13,13 @@ import { SectionHeader } from "@/components/admin/SectionHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SecondaryButton } from "@/components/admin/buttons";
+import { SquadWindowControls } from "@/components/admin/SquadWindowControls";
+import {
+  forceOpenSquadWindowAction,
+  forceCloseSquadWindowAction,
+  clearSquadWindowOverrideAction,
+} from "./window-actions";
+import type { Actor } from "@/perms";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +48,30 @@ export default async function AdminSquadsListPage({
         status: status === "all" ? undefined : status,
       })
     : [];
+
+  // Resolve viewer + perm check for the window-override controls.
+  const { data: auth } = await sb.auth.getUser();
+  let actor: Actor = { userId: null, roles: [] };
+  if (auth.user) {
+    const { data: pub } = await sb
+      .from("users")
+      .select("id")
+      .eq("supabase_auth_id", auth.user.id)
+      .maybeSingle();
+    if (pub) {
+      const { data: roleRows } = await sb
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", pub.id)
+        .is("deleted_at", null);
+      actor = { userId: pub.id, roles: (roleRows ?? []).map((r: { role: string }) => r.role) };
+    }
+  }
+  const svc = getServiceRoleSupabase();
+  const canManageWindow = await hasPermAsync(svc, actor, "squads.window.manage");
+  const squadWindowOverride = canManageWindow
+    ? await getSquadWindowOverride(svc, weekStart)
+    : null;
 
   const columns: DataTableColumn<SubmissionRow>[] = [
     {
@@ -93,6 +127,16 @@ export default async function AdminSquadsListPage({
           </Link>
         }
       />
+
+      {canManageWindow ? (
+        <SquadWindowControls
+          weekStart={weekStart}
+          override={squadWindowOverride}
+          forceOpen={forceOpenSquadWindowAction}
+          forceClose={forceCloseSquadWindowAction}
+          clearOverride={clearSquadWindowOverrideAction}
+        />
+      ) : null}
 
       <form method="GET" className="flex items-center gap-3">
         <label className="text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">

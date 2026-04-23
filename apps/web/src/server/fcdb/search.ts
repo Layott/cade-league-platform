@@ -115,6 +115,7 @@ export async function searchCards(
       .from("fc26_players")
       .select(SELECT_COLUMNS)
       .eq("slug", slug)
+      .eq("source_dataset", "futbin.com")
       .is("deleted_at", null)
       .limit(v.limit);
     if (exactErr) {

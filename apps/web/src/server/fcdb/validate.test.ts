@@ -12,7 +12,7 @@ const mockedFindPlayer = vi.mocked(findPlayer);
 function mkCand(over: Partial<FCPlayerCandidate> = {}): FCPlayerCandidate {
   return {
     id: "id-" + Math.random().toString(36).slice(2, 8),
-    source_dataset: "kaggle",
+    source_dataset: "futbin.com",
     source_row_id: "1",
     name: "Lionel Messi",
     short_name: "L. Messi",

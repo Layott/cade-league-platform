@@ -84,11 +84,14 @@ export async function findPlayer(
   const slug = slugify(query.name);
   if (!slug) return [];
 
-  // 1. Exact slug match.
+  // 1. Exact slug match. CLAUDE.md §Dormant datasets mandates filtering
+  //    to source_dataset='futbin.com' — Kaggle/fut.gg rows are frozen
+  //    provenance and carry no prices/images/stats.
   const { data: exact, error: exactErr } = await sb
     .from("fc26_players")
     .select(FCDB_COLUMNS)
     .eq("slug", slug)
+    .eq("source_dataset", "futbin.com")
     .is("deleted_at", null);
   if (exactErr) {
     throw new Error(`findPlayer (exact) failed: ${exactErr.message}`);

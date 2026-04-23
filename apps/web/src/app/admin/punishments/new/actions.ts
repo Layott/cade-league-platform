@@ -31,7 +31,6 @@ export async function createPunishment(formData: FormData) {
       | "betting"
       | "match_fixing"
       | "dress_code"
-      | "preseason_miss"
       | "other",
     sanctionType: formData.get("sanctionType") as
       | "warning"

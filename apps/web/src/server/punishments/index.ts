@@ -15,7 +15,6 @@ export const issueSchema = z
       "betting",
       "match_fixing",
       "dress_code",
-      "preseason_miss",
       "other",
     ]),
     sanctionType: z.enum(["warning", "point_deduction", "gd_deduction", "forfeit", "ban"]),

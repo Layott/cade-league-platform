@@ -106,6 +106,7 @@ export async function submitPickerSquad(
     .from("fc26_players")
     .select("id, name, rating, position, value_coins_estimate, item_type, nation_iso")
     .in("id", cardIds)
+    .eq("source_dataset", "futbin.com")
     .is("deleted_at", null);
   if (cardsErr) {
     throw new Error(`failed to hydrate picked cards: ${cardsErr.message}`);

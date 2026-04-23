@@ -14,7 +14,7 @@ import type { FCPlayer } from "./types";
 function mkPlayer(over: Partial<FCPlayer> = {}): FCPlayer {
   return {
     id: "id-" + Math.random().toString(36).slice(2, 8),
-    source_dataset: "kaggle",
+    source_dataset: "futbin.com",
     source_row_id: "1",
     name: "Lionel Messi",
     short_name: "L. Messi",
@@ -58,10 +58,13 @@ function mkSb(opts: { exact?: ExactResult; rpc?: RpcResult }) {
   const sb = {
     from: () => ({
       select: () => ({
+        // .eq('slug').eq('source_dataset').is('deleted_at')
         eq: () => ({
-          is: vi.fn().mockImplementation(async () => {
-            exactSpy();
-            return opts.exact ?? { data: [], error: null };
+          eq: () => ({
+            is: vi.fn().mockImplementation(async () => {
+              exactSpy();
+              return opts.exact ?? { data: [], error: null };
+            }),
           }),
         }),
       }),

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { publishNow } from "@/server/announcements";
+import { checkCronSecret } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Polled by Vercel Cron / GitHub Actions / manual curl every ~5 minutes.
-// Protected by X-Cron-Secret header matching env CRON_SECRET.
+// Polled by Vercel Cron (`Authorization: Bearer $CRON_SECRET`) / GitHub
+// Actions / manual curl (`X-Cron-Secret: …`) every ~5 minutes.
 export async function GET(req: NextRequest) {
-  const headerSecret = req.headers.get("x-cron-secret");
-  const expected = process.env.CRON_SECRET;
-  if (!expected || headerSecret !== expected) {
+  if (!checkCronSecret(req)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

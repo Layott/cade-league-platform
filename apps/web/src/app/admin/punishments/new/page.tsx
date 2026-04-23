@@ -57,7 +57,6 @@ export default async function NewPunishmentPage() {
               <option value="betting">Betting</option>
               <option value="match_fixing">Match fixing</option>
               <option value="dress_code">Dress code</option>
-              <option value="preseason_miss">Preseason miss</option>
               <option value="other">Other</option>
             </select>
           </FormField>
