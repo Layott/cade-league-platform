@@ -69,17 +69,22 @@ async function extract(page) {
         def: intText("td.table-defending .table-key-stats, td.table-defending"),
         phy: intText("td.table-physicality .table-key-stats, td.table-physicality"),
       };
-      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
+      // Player portrait — specials use .playercard-26-special-img, normals
+      // use .playercard-26 img[alt]; fallback to any <img> whose src points
+      // at the /players/ path.
+      const cardImgEl =
+        row.querySelector(".playercard-26 img[alt]:not([alt=''])") ||
+        row.querySelector(".playercard-26-special-img") ||
+        row.querySelector("img[src*='/img/players/']");
 
-      // Card frame — try multiple selector + style paths because Futbin
-      // sometimes wraps it in a background-image on a div instead of
-      // img[src]. We also dump the raw source string so the host log
-      // can show exactly what the page returned.
+      // Card frame — broadest-fall path first targets the CDN URL directly
+      // so we catch silver/bronze rows where Futbin doesn't use the
+      // -bg classname.
       const bgCandidates = [
         row.querySelector("img.playercard-s-26-bg"),
         row.querySelector(".playercard-s-26-bg img"),
-        row.querySelector(".playercard-26 img.playercard-s-26-bg"),
-        row.querySelector(".playercard-26 [class*='card-bg'] img"),
+        row.querySelector("img[src*='/img/cards/tiny/']"),
+        row.querySelector("img[src*='/img/cards/']"),
       ].filter(Boolean);
       let cardBgSrc = "";
       for (const el of bgCandidates) {

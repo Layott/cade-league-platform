@@ -72,9 +72,28 @@ async function extract(page) {
         def: intText("td.table-defending .table-key-stats, td.table-defending"),
         phy: intText("td.table-physicality .table-key-stats, td.table-physicality"),
       };
-      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
-      const cardBgSrc = row.querySelector("img.playercard-s-26-bg")?.getAttribute("src") || "";
-      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+      // Player portrait — specials use .playercard-26-special-img, normals
+      // use .playercard-26 img[alt]; fallback to any <img> whose src points
+      // at the /players/ path.
+      const cardImgEl =
+        row.querySelector(".playercard-26 img[alt]:not([alt=''])") ||
+        row.querySelector(".playercard-26-special-img") ||
+        row.querySelector("img[src*='/img/players/']");
+      // Card frame — try class-based selectors first, then fall back to
+      // ANY img whose src hits the /cards/tiny/ Futbin CDN path. This
+      // catches silver/bronze rows that Futbin renders with a different
+      // class than gold+special.
+      const bgCandidates = [
+        row.querySelector("img.playercard-s-26-bg"),
+        row.querySelector("img[src*='/img/cards/tiny/']"),
+        row.querySelector("img[src*='/img/cards/']"),
+      ].filter(Boolean);
+      let cardBgSrc = "";
+      for (const el of bgCandidates) {
+        const s = el.getAttribute("src") || el.getAttribute("data-src") || "";
+        if (s) { cardBgSrc = s; break; }
+      }
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
       out.push({
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
         position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
