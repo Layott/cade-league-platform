@@ -152,8 +152,10 @@ export function NavDrawer({
     return () => panel.removeEventListener("keydown", trap);
   }, [open]);
 
-  if (!open) return null;
-
+  // Always mount the drawer + backdrop so CSS transforms can animate the
+  // slide-in / slide-out. The `open` flag flips the translate-x + opacity
+  // classes; pointer-events are muted when closed so clicks fall through
+  // to the underlying page.
   return (
     <div role="presentation" data-testid="nav-drawer-shell">
       {/* Backdrop */}
@@ -161,15 +163,24 @@ export function NavDrawer({
         type="button"
         aria-label="Close menu"
         onClick={onClose}
-        className="fixed inset-0 z-[119] bg-black/60 backdrop-blur-sm"
+        aria-hidden={!open}
+        tabIndex={open ? 0 : -1}
+        className={
+          "fixed inset-0 z-[119] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-out " +
+          (open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")
+        }
         data-testid="nav-drawer-backdrop"
       />
       <aside
         ref={panelRef}
         role="dialog"
         aria-modal="true"
+        aria-hidden={!open}
         aria-labelledby={titleId}
-        className="fixed inset-y-0 left-0 z-[120] flex w-[min(320px,85vw)] flex-col overflow-y-auto border-r border-[var(--ink-4)] bg-[var(--ink-0)] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.9)]"
+        className={
+          "fixed inset-y-0 left-0 z-[120] flex w-[min(320px,85vw)] flex-col overflow-y-auto border-r border-[var(--ink-4)] bg-[var(--ink-0)] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.9)] transform transition-transform duration-300 ease-out " +
+          (open ? "translate-x-0" : "-translate-x-full pointer-events-none")
+        }
         data-testid="nav-drawer"
       >
         <div className="flex items-center justify-between border-b border-[var(--ink-4)] px-5 py-4">
