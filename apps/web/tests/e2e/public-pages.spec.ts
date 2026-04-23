@@ -10,7 +10,9 @@ test.describe("public pages", () => {
   test("homepage renders hero + all four landing sections", async ({
     page,
   }) => {
-    await page.goto("/");
+    // Anonymous `/` now redirects to `/welcome`; pass ?nolanding=1 to
+    // render the public homepage directly for the asserting tests.
+    await page.goto("/?nolanding=1");
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       /LEAGUE/,
     );
@@ -101,7 +103,7 @@ test.describe("public pages", () => {
   });
 
   test("primary nav links reach every public page", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?nolanding=1");
     for (const [label, pathFragment] of [
       ["Fixtures", "/fixtures"],
       ["Standings", "/standings"],
@@ -109,7 +111,7 @@ test.describe("public pages", () => {
       ["News", "/announcements"],
       ["Discipline", "/punishments"],
     ] as const) {
-      await page.goto("/");
+      await page.goto("/?nolanding=1");
       // Use the desktop nav — first match. Mobile copy matches too but
       // desktop locator is first in DOM.
       await page.getByRole("link", { name: label }).first().click();

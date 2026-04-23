@@ -32,7 +32,9 @@ export async function middleware(req: NextRequest) {
   const isAdmin = pathname.startsWith("/admin");
   const isPlayerArea = pathname.startsWith("/player");
   const isRefereeArea = pathname.startsWith("/referee");
-  if (!isAdmin && !isPlayerArea && !isRefereeArea) return NextResponse.next();
+  const isRoot = pathname === "/";
+  if (!isAdmin && !isPlayerArea && !isRefereeArea && !isRoot)
+    return NextResponse.next();
 
   const res = NextResponse.next();
   const supabase = createServerClient(
@@ -55,6 +57,20 @@ export async function middleware(req: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Root route: unauthenticated visitors land on /welcome unless they
+  // explicitly opted out with ?nolanding=1 (used by the "Public site" link
+  // on /welcome so signed-out readers can still browse fixtures).
+  if (isRoot) {
+    if (user) return NextResponse.next();
+    const nolanding = req.nextUrl.searchParams.get("nolanding");
+    if (nolanding === "1") return NextResponse.next();
+    const url = req.nextUrl.clone();
+    url.pathname = "/welcome";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   if (!user) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
@@ -103,5 +119,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/player/:path*", "/referee/:path*"],
+  matcher: ["/", "/admin/:path*", "/player/:path*", "/referee/:path*"],
 };

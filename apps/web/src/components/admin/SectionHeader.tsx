@@ -20,7 +20,7 @@ export function SectionHeader({
   return (
     <header className="flex flex-col gap-4 border-b border-[var(--ink-4)] pb-6 md:flex-row md:items-end md:justify-between">
       <div className="space-y-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--signal)]">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[var(--secondary)]">
           {eyebrow}
         </div>
         <h1 className="font-display text-[28px] font-bold leading-[1.05] tracking-tight text-[var(--chalk-0)] md:text-[34px]">

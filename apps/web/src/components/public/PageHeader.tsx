@@ -22,10 +22,10 @@ export function PageHeader({ eyebrow, title, description, right }: Props) {
       <div className="relative mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-5 md:flex-row md:items-end">
         <div className="max-w-2xl">
           {eyebrow ? (
-            <div className="mb-3 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--signal)]">
+            <div className="mb-3 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--secondary)]">
               <span
                 aria-hidden
-                className="h-[1px] w-8 bg-[var(--signal)]"
+                className="h-[1px] w-8 bg-[var(--secondary)]"
               />
               {eyebrow}
             </div>

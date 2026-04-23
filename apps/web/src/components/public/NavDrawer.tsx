@@ -247,7 +247,7 @@ export function NavDrawer({
                         data-testid={`nav-drawer-link-${link.href}`}
                         aria-current={active ? "page" : undefined}
                         className={
-                          "block rounded-sm px-3 py-2 text-sm font-medium transition-colors " +
+                          "nav-drawer-link block rounded-sm px-3 py-2 text-sm font-medium transition-colors " +
                           (active
                             ? "bg-[var(--signal)] text-[var(--signal-ink)]"
                             : "text-[var(--chalk-1)] hover:bg-[var(--ink-3)] hover:text-[var(--chalk-0)]")

@@ -475,15 +475,16 @@ export function PitchLayout({ formation, slots, onSlotClick }: PitchLayoutProps)
       data-formation={formation}
       className="relative mx-auto aspect-[3/4] w-full max-w-[560px] overflow-hidden rounded-sm border border-[var(--ink-4)] bg-gradient-to-b from-[#0d2417] via-[#0a1c12] to-[#081a10]"
     >
-      {/* field markings (pure CSS) */}
+      {/* field markings (pure CSS) — CADE pink edge stroke replaces the
+           neutral white/15 rules so the pitch reads as brand canvas. */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         {/* halfway line */}
-        <div className="absolute left-[5%] right-[5%] top-[50%] border-t border-white/15" />
+        <div className="absolute left-[5%] right-[5%] top-[50%] border-t border-[rgba(254,3,109,0.45)]" />
         {/* center circle */}
-        <div className="absolute left-1/2 top-1/2 h-[18%] w-[18%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15" />
+        <div className="absolute left-1/2 top-1/2 h-[18%] w-[18%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[rgba(254,3,109,0.45)]" />
         {/* penalty boxes */}
-        <div className="absolute left-[22%] right-[22%] top-[2%] h-[14%] border-b border-l border-r border-white/15" />
-        <div className="absolute left-[22%] right-[22%] bottom-[2%] h-[14%] border-l border-r border-t border-white/15" />
+        <div className="absolute left-[22%] right-[22%] top-[2%] h-[14%] border-b border-l border-r border-[rgba(254,3,109,0.45)]" />
+        <div className="absolute left-[22%] right-[22%] bottom-[2%] h-[14%] border-l border-r border-t border-[rgba(254,3,109,0.45)]" />
       </div>
 
       {defs.map((s) => {

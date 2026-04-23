@@ -20,7 +20,7 @@ export function SectionHeading({
     <div className="mb-4 flex items-end justify-between gap-4">
       <div>
         {eyebrow ? (
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--signal)]">
+          <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--secondary)]">
             {eyebrow}
           </div>
         ) : null}

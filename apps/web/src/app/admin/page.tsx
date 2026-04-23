@@ -384,7 +384,13 @@ function HeroStrip({ hero }: { hero: HeroStats }) {
       <HeroCard
         label="Open cases"
         value={`${hero.openDisputes} dispute${hero.openDisputes === 1 ? "" : "s"} · ${hero.draftAnnouncements} draft${hero.draftAnnouncements === 1 ? "" : "s"}`}
-        tone={hero.openDisputes + hero.draftAnnouncements > 0 ? "amber" : "neutral"}
+        tone={
+          hero.openDisputes > 0
+            ? "secondary"
+            : hero.draftAnnouncements > 0
+              ? "amber"
+              : "neutral"
+        }
       />
     </section>
   );
@@ -399,14 +405,16 @@ function HeroCard({
   label: string;
   value: string;
   hint?: React.ReactNode;
-  tone: "signal" | "amber" | "neutral";
+  tone: "signal" | "amber" | "neutral" | "secondary";
 }) {
   const accent =
     tone === "signal"
       ? "border-[rgba(107,205,6,0.35)]"
       : tone === "amber"
         ? "border-[rgba(255,176,32,0.35)]"
-        : "border-[var(--ink-4)]";
+        : tone === "secondary"
+          ? "border-[rgba(254,3,109,0.45)]"
+          : "border-[var(--ink-4)]";
   return (
     <div
       className={`group relative overflow-hidden rounded-sm border bg-[var(--ink-2)] p-4 ${accent}`}
@@ -427,7 +435,9 @@ function HeroCard({
             ? "bg-[var(--signal)]"
             : tone === "amber"
               ? "bg-[var(--amber)]"
-              : "bg-[var(--ink-4)]"
+              : tone === "secondary"
+                ? "bg-[var(--secondary)]"
+                : "bg-[var(--ink-4)]"
         }`}
       />
     </div>

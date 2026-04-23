@@ -18,8 +18,9 @@ import { HamburgerNav } from "./NavDrawer";
 
 // Overlay routes (browser sources for OBS/vMix/Streamlabs/etc.) render
 // transparent with no chrome so they composite cleanly into video output.
-// See (overlay)/layout.tsx.
-const HIDDEN_PREFIXES = ["/login", "/logout", "/overlay"];
+// See (overlay)/layout.tsx. /welcome is the dedicated sign-in landing for
+// unauthenticated visitors and owns its own full-bleed chrome.
+const HIDDEN_PREFIXES = ["/login", "/logout", "/overlay", "/welcome"];
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -133,10 +134,16 @@ function SiteHeader({
               >
                 {link.label}
                 {active ? (
-                  <span
-                    aria-hidden
-                    className="absolute inset-x-3 -bottom-[1px] h-[2px] bg-[var(--signal)]"
-                  />
+                  <>
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-3 -bottom-[1px] h-[2px] bg-[var(--signal)]"
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-3 -bottom-[3px] h-[1px] bg-[var(--secondary)]"
+                    />
+                  </>
                 ) : null}
               </Link>
             );

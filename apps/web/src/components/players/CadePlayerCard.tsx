@@ -264,6 +264,10 @@ export function CadePlayerCard(props: CadePlayerCardProps) {
   } = props;
 
   const palette = PALETTES[rarity];
+  // Elite-tier rating (90+) promotes the rating chip to CADE pink —
+  // a brand-forward flourish on top of the rarity palette. Cards below 90
+  // keep the rarity's own accent (gold / silver / bronze / …).
+  const ratingColor = rating >= 90 ? "var(--secondary)" : palette.accent;
   const widthPx = SIZE_PX[size];
   const gradId = useId();
   const sheenId = useId();
@@ -407,7 +411,7 @@ export function CadePlayerCard(props: CadePlayerCardProps) {
               : undefined
           }
           style={{
-            color: palette.accent,
+            color: ratingColor,
             fontSize: ratingFontSize,
             fontWeight: 900,
             lineHeight: 1,
