@@ -285,14 +285,12 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
               <AssetUploader
                 kind="image"
                 label="image"
-                onUploaded={() => {}}
                 showCopy
                 data-testid={`asset-upload-image-${templateKey}`}
               />
               <AssetUploader
                 kind="video"
                 label="video"
-                onUploaded={() => {}}
                 showCopy
                 data-testid={`asset-upload-video-${templateKey}`}
               />

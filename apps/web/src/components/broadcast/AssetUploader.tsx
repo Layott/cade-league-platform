@@ -21,7 +21,12 @@ import { useRef, useState } from "react";
 export type AssetUploaderProps = {
   kind: "image" | "video";
   label?: string;
-  onUploaded: (publicUrl: string) => void;
+  /** Optional callback. When omitted the uploader still renders + stores
+   * the URL locally; it only fires a post-upload callback when a parent
+   * client component wires one. Leaving this optional lets Server
+   * Components mount AssetUploader (client) without passing a function
+   * across the RSC boundary, which is illegal. */
+  onUploaded?: (publicUrl: string) => void;
   /** Accepts a testid prefix; appended to child elements. */
   "data-testid"?: string;
   /** When true, renders a tiny "Copy URL" button after upload so admins
@@ -88,7 +93,7 @@ export function AssetUploader({
       }
       setPublicUrl(meta.publicUrl);
       setStatus("done");
-      onUploaded(meta.publicUrl);
+      onUploaded?.(meta.publicUrl);
     } catch (err) {
       setStatus("error");
       setError((err as Error).message || "upload failed");
