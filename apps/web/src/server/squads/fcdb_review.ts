@@ -29,7 +29,7 @@ import type { Actor } from "@/perms";
  */
 
 const EMPTY_FCDB_REASON =
-  "FCDB not yet populated — drop Kaggle CSV at KNOWLEDGE/extracted/fc26_players_kaggle.csv and run npm run fcdb:import";
+  "FCDB not yet populated — run ./scrape-futbin-full.bat (Windows) to seed from Futbin.";
 
 const MIN_RESOLVE_NAME_LEN = 4;
 

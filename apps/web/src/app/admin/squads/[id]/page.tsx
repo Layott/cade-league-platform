@@ -127,16 +127,12 @@ export default async function AdminSquadDetailPage({
           <span className="font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)]">
             FCDB empty —
           </span>{" "}
-          drop the Kaggle CSV at{" "}
+          run{" "}
           <code className="rounded-sm bg-[var(--ink-3)] px-1 py-0.5 font-mono text-[11px]">
-            KNOWLEDGE/extracted/fc26_players_kaggle.csv
+            ./scrape-futbin-full.bat
           </code>{" "}
-          and run{" "}
-          <code className="rounded-sm bg-[var(--ink-3)] px-1 py-0.5 font-mono text-[11px]">
-            npm run fcdb:import
-          </code>{" "}
-          to enable per-item validation. Submission can still be reviewed
-          manually below.
+          (Windows) to seed from Futbin and enable per-item validation.
+          Submission can still be reviewed manually below.
         </div>
       ) : null}
 

@@ -49,14 +49,6 @@ export {
 export type { ClaudeParseResult, AnthropicLike } from "./parse.claude";
 
 export {
-  parseWithTesseract,
-  STAT_REGIONS,
-  parseIntOrNull,
-  parsePercentOrNull,
-} from "./parse.tesseract";
-export type { TesseractParseResult, TesseractLike } from "./parse.tesseract";
-
-export {
   applyReview,
   rejectReview,
   ConflictError,

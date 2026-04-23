@@ -34,13 +34,13 @@ etc. Workflow:
    day from the dropdown, optionally add a session tag, click
    **Start stream session**. You'll land on `/admin/broadcast/<sessionId>`.
 3. **Point your browser sources** at each overlay URL you need:
-   - Scorebar — `https://<host>/overlay/scorebar?session=<sessionId>`
-   - Lower Third — `https://<host>/overlay/lower-third?session=<sessionId>`
-   - Standings Widget — `https://<host>/overlay/standings-widget?session=<sessionId>`
-   - Player Card — `https://<host>/overlay/player-card?session=<sessionId>`
-   - Punishment Ticker — `https://<host>/overlay/punishment-ticker?session=<sessionId>`
-   - Intro — `https://<host>/overlay/intro?session=<sessionId>`
-   - Outro — `https://<host>/overlay/outro?session=<sessionId>`
+   - Scorebar — `https://<host>/overlay/scorebar?session=<sessionId>&t=<viewToken>`
+   - Lower Third — `https://<host>/overlay/lower-third?session=<sessionId>&t=<viewToken>`
+   - Standings Widget — `https://<host>/overlay/standings-widget?session=<sessionId>&t=<viewToken>`
+   - Player Card — `https://<host>/overlay/player-card?session=<sessionId>&t=<viewToken>`
+   - Punishment Ticker — `https://<host>/overlay/punishment-ticker?session=<sessionId>&t=<viewToken>`
+   - Intro — `https://<host>/overlay/intro?session=<sessionId>&t=<viewToken>`
+   - Outro — `https://<host>/overlay/outro?session=<sessionId>&t=<viewToken>`
    Append `&debug=1` (with `NEXT_PUBLIC_OVERLAY_DEBUG=1` set) for a
    connection HUD during setup.
 4. **Trigger overlays** from the admin page's Trigger grid. Each card
@@ -54,7 +54,7 @@ etc. Workflow:
 Notes:
 
 - Overlay URLs are the shared secret for Phase 2 prep — do not share
-  publicly. A short-lived HMAC token is planned for Phase 2 proper.
+  publicly.
 - Overlay pages set `.overlay-mode` on `<html>` + `<body>` to force a
   transparent background; the broadcast tool composites directly onto
   video output.

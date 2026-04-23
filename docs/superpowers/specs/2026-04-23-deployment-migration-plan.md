@@ -24,9 +24,9 @@ This document is a draft for the user to review and execute from. No code change
 
 1. Zero-config for Next.js 15 + Server Actions + `serverExternalPackages` already declared in `apps/web/next.config.ts`.
 2. Edge/CDN + image optimization baked in (the repo uses `sharp@^0.34.5` which Vercel packages natively).
-3. The existing `vercel.json` + `export const maxDuration = 300` pattern in `apps/web/src/app/api/cron/fcdb-refresh/route.ts` assumes Vercel-style deployment already.
+3. The existing `vercel.json` cron wiring assumes Vercel-style deployment already. No route requires `maxDuration > 60` now that the Plan 24 `fcdb-refresh` cron has been removed (2026-04-23, commit `89440bb`).
 4. Preview deployments on every PR — parallel to CI lint+test+build.
-5. Pay-as-you-go — Hobby tier likely sufficient for Elite Division (13 players + staff + one broadcast at a time). Pro tier ($20/mo) if the cron durations get close to the 60s Hobby cap or traffic requires.
+5. Pay-as-you-go — Hobby tier suffices for Elite Division (13 players + staff + one broadcast at a time). With only 2 crons (`publish-announcements` + `squad-deadline-check`) the Hobby 2-cron cap is not exceeded, and every route now fits under the 60s Hobby function cap.
 
 **Alternatives considered (and why not):**
 
@@ -134,7 +134,7 @@ Source: `apps/web/.env.example`, `apps/web/.env.local`, `docs/ops/*.md`, plus `g
 
 | Var | Classification | Consumed by | Required for prod? |
 |---|---|---|---|
-| `CRON_SECRET` | Secret | `api/cron/{fcdb-refresh,publish-announcements,squad-deadline-check}/route.ts` | **Yes.** 32+ byte random string. Shared between Vercel Cron + any external pokers. |
+| `CRON_SECRET` | Secret | `api/cron/{publish-announcements,squad-deadline-check}/route.ts` | **Yes.** 32+ byte random string. Shared between Vercel Cron + any external pokers. |
 | `ANTHROPIC_API_KEY` | Secret | `server/stats_ocr/parse.ts`, `parse.claude.ts` | Only if flipping OCR on (`OCR_DISABLED=0`). |
 | `OCR_DISABLED` | Config | `server/stats_ocr/parse.ts:65`, `app/admin/match-days/[id]/stats-upload/page.tsx:104` | Set to `0` when enabling OCR. `1` = kill switch (default). |
 | `OCR_DAILY_CAP_USD_CENTS` | Config | `server/stats_ocr/parse.ts:55` | Default `100` ($1/day). Bump for broadcast days. |
@@ -143,8 +143,6 @@ Source: `apps/web/.env.example`, `apps/web/.env.local`, `docs/ops/*.md`, plus `g
 | `RESEND_FROM` | Config | `lib/email/resend.ts:17` | Default `CADE League <noreply@cadeesports.com>`. Domain must be DKIM/SPF/DMARC verified in Resend. |
 | `APP_TIMEZONE` | Config | Several (advisory — most code hard-codes `Africa/Lagos`) | `Africa/Lagos`. |
 | `NEXT_PUBLIC_OVERLAY_DEBUG` | Public | `(overlay)/OverlayFrame.tsx:140`, `lib/overlay-preview.ts` | Set `1` only on staging/preview; leaks debug HUD when `&debug=1` added to URL. |
-| `FUTDB_API_KEY` | Secret | `server/fcdb/sources/futdb.ts:233` | For the `/api/cron/fcdb-refresh` futdb source. Free tier at https://futdb.co/settings/tokens (100 req/day). |
-| `KAGGLE_API_TOKEN` / `KAGGLE_KEY` / `KAGGLE_USERNAME` | Secret | `server/fcdb/sources/kaggle.ts` | **Dev/self-hosted only.** Ignored on Vercel (no CLI available). |
 
 ### 3.3 Not needed in production
 
@@ -172,22 +170,24 @@ On first production deploy, rotate these **once**: `SUPABASE_SERVICE_ROLE_KEY`, 
 
 ## 4. Hosting Choice — Detailed Trade-off
 
-### 4.1 Vercel Pro ($20/mo) — recommended
+### 4.1 Vercel Hobby (free) — recommended for Phase 1
 
 **Pros:**
 - Next.js 15 + React 19 first-class; Vercel ships feature parity within days.
 - Server Actions, streaming, dynamic routing, `serverExternalPackages`, image optimization all zero-config.
-- Vercel Cron already referenced in `vercel.json` + `apps/web/src/app/api/cron/fcdb-refresh/route.ts:9` (with `maxDuration = 300`).
+- Vercel Cron already wired in `vercel.json` with two cron routes (`publish-announcements` + `squad-deadline-check`). Post-2026-04-23 removal of `fcdb-refresh`, no route requires `maxDuration > 60` — every handler fits comfortably under the Hobby 60s cap.
+- Hobby allows up to 2 cron jobs; we have exactly 2. Within cap.
 - Branch-preview deployments give you free staging; every PR gets a URL.
 - SSL + HTTP/2 + HTTP/3 automatic on custom domains.
 - Built-in log drain + analytics; easy Sentry integration.
 - Fluid Compute ("active CPU" pricing) means bursty broadcast days don't murder the bill.
 
 **Cons:**
-- Serverless function 60s hard cap on Hobby (300s on Pro). `fcdb-refresh` already asks for 300s — you effectively need Pro.
-- No persistent disk. Any scraper needing Chromium cookies + profile state is a non-starter on Vercel. (See §9 for Futbin plan.)
+- Hobby has a 60s function hard cap. If a future route ever needs >60s (e.g., a large migration-triggered recompute), upgrade to Pro ($20/mo, 300s cap).
+- No persistent disk. Any scraper needing Chromium cookies + profile state is a non-starter on Vercel. (See §9 for Futbin plan — scraper intentionally stays on the admin's PC.)
 - `export const runtime = "nodejs"` is used on every API route we audited — no Edge Runtime bundling savings to harvest.
 - Vendor lock (limited, but the crons + cookie/session behavior are Vercel-shaped).
+- Hobby lacks advanced team features (deployment protection, custom build environments, longer log retention). Upgrade to Pro when any of these become blockers.
 
 **Config specifics:**
 - Framework preset: "Next.js" (autodetected).
