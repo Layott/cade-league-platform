@@ -52,3 +52,9 @@ KNOWLEDGE/brand-assets/fonts/*.zip
 KNOWLEDGE/extracted/_scrape_tmp/
 KNOWLEDGE/extracted/futbin_scrape_state.json
 KNOWLEDGE/extracted/futbin_unmatched.json
+
+# Futbin cookie-injected scraper — cf_clearance secrets + per-run artefacts
+KNOWLEDGE/extracted/.futbin_cookies.json
+KNOWLEDGE/extracted/futbin_cookies_state.json
+KNOWLEDGE/extracted/futbin_cookies_unmatched.json
+KNOWLEDGE/extracted/futbin_cookies_inserted.json
