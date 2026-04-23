@@ -17,6 +17,7 @@ import { AnnouncementBell } from "./AnnouncementBell";
 export async function SiteChrome({ children }: { children: ReactNode }) {
   let isStaff = false;
   let authenticated = false;
+  let roles: string[] = [];
 
   try {
     const sb = await getServerSupabase();
@@ -38,7 +39,7 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
           .select("role")
           .eq("user_id", pub.id)
           .is("deleted_at", null);
-        const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
+        roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
         isStaff = roles.some(
           (r) =>
             r === "admin" ||
@@ -63,6 +64,7 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
     <SiteChromeClient
       authenticated={authenticated}
       isStaff={isStaff}
+      roles={roles}
       userBadge={<UserBadge />}
       announcementBell={authenticated ? <AnnouncementBell /> : null}
     >

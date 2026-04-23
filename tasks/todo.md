@@ -1,6 +1,44 @@
 # Tasks — Active Work
 
-Active plan: **Plan 23 — FCDB squad validation in the ref-review surface**. Spec: `docs/superpowers/specs/2026-04-22-plan-23-fcdb-squad-validation.md`. Earlier plans archived below.
+Active plan: **Plan 46 — Global hamburger nav drawer + /referee/attendance surface**. User brief 2026-04-22.
+
+## Plan 46 tasks (active 2026-04-22)
+
+- [x] 1. Roles flow: extended `SiteChrome.tsx` to compute + pass `roles: string[]` through to `SiteChromeClient.tsx` → `NavDrawer`.
+- [x] 2. `apps/web/src/components/public/NavDrawer.tsx` — client component with `NavDrawer`, `HamburgerButton`, and `HamburgerNav` wrapper. Groups: Public / Player / Staff / Referee. ESC-to-close, focus trap, focus restore via `wasOpenRef`.
+- [x] 3. `SiteChromeClient.tsx` — hamburger visible on both mobile (top-left, `order-1`) and desktop (right of brand mark, `md:order-2`).
+- [x] 4. `apps/web/src/components/public/NavDrawer.test.tsx` — 12 RTL tests, all passing.
+- [x] 5. `apps/web/src/middleware.ts` — matcher extended with `/referee/:path*`, new `REFEREE_AREA_ROLES` set {admin, moderator, referee}.
+- [x] 6. `apps/web/src/app/referee/layout.tsx` — shipped.
+- [x] 7. `apps/web/src/app/referee/attendance/page.tsx` — today-first list with highlighted "Today" badge.
+- [x] 8. `apps/web/src/app/referee/attendance/[matchDayId]/page.tsx` — grid reuses `markAction` / `editAction` from admin; summary strip at top; PRESENT/LATE buttons are 44px min-height; photos via `getPlayerAvatarUrl`.
+- [x] 9. Migration `20260510000200_plan46_referee_attendance_perms_seed.sql` pushed via `npm run db:push`. Also added the same perms to the seed doc `src/perms.ts` + perms.seed.test asserts referee has attendance.mark/edit.
+- [x] 10. E2E `apps/web/tests/e2e/referee-attendance.spec.ts` — admin login → hamburger → Referee → Attendance → mark 2 players.
+- [x] 11. Verification: `npx vitest run` → **991 tests pass across 115 files** (12 new NavDrawer tests + 1 new perms-seed test + pre-existing). `npm run lint` → 0 errors. Curl `/referee/attendance` unauth → **307**.
+- [ ] 12. Commit `feat(ui+ref): global hamburger nav drawer + /referee/attendance surface (Plan 46)` and push.
+
+## Plan 46 review (2026-04-22)
+
+**Delta:**
+
+- 12 new unit tests (NavDrawer behaviours) + 1 new seed-contract test (referee attendance perms) = **+13 tests**. Suite went 978 → 991.
+- 8 new files: `NavDrawer.tsx`, `NavDrawer.test.tsx`, `referee/layout.tsx`, `referee/attendance/page.tsx`, `referee/attendance/[matchDayId]/page.tsx`, `20260510000200_plan46_referee_attendance_perms_seed.sql`, `referee-attendance.spec.ts`, and this todo update.
+- 4 touched: `SiteChrome.tsx`, `SiteChromeClient.tsx`, `middleware.ts`, `perms.ts`, `perms.seed.test.ts`.
+
+**Key decisions:**
+
+- Reused existing admin `markAction` / `editAction` rather than duplicating the write path. Admin actions already call `requirePermAsync(attendance.mark|edit)`, so refs were blocked at the server-action layer until the new perms seed.
+- On the grid, when a mark already exists the button submits `editAction` with a canned `reason: "ref grid: change to present|late"`. This satisfies the `override_reason required` check in `editAction` without adding UI friction for refs on mobile.
+- Dropped ABSENT from the big buttons (kept in admin view only) so refs can't accidentally fire a −3 point penalty from a phone tap.
+- Hamburger placement: on mobile it sits before the brand (order-1); on desktop it sits right of the brand mark (md:order-2) to match the brief.
+
+**Verification:** see task 11 line above.
+
+---
+
+## Plan 23 (archived mid-flight; earlier active plan)
+
+Spec: `docs/superpowers/specs/2026-04-22-plan-23-fcdb-squad-validation.md`. Earlier plans archived below.
 
 ## Plan 23 tasks (active 2026-04-22)
 

@@ -21,12 +21,18 @@ const PLAYER_AREA_ROLES = new Set([
   "loc",
   "referee",
 ]);
+// Plan 46 — /referee/* is the simplified attendance surface for refs.
+// Admins + moderators keep access for oversight / QA; everyone else is
+// bounced. Per-action perm re-checks (attendance.mark / attendance.edit)
+// still gate the server-action writes.
+const REFEREE_AREA_ROLES = new Set(["admin", "moderator", "referee"]);
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isAdmin = pathname.startsWith("/admin");
   const isPlayerArea = pathname.startsWith("/player");
-  if (!isAdmin && !isPlayerArea) return NextResponse.next();
+  const isRefereeArea = pathname.startsWith("/referee");
+  if (!isAdmin && !isPlayerArea && !isRefereeArea) return NextResponse.next();
 
   const res = NextResponse.next();
   const supabase = createServerClient(
@@ -78,6 +84,14 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
+  if (isRefereeArea) {
+    const allowed = roles.some((r) => REFEREE_AREA_ROLES.has(r));
+    if (!allowed) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+    return res;
+  }
+
   // /player/** — any authenticated user whose roles include player (or an
   // admin/moderator/ref impersonation path). Admins + refs still need to see
   // this area for impersonation QA; the server action layer re-checks perms.
@@ -89,5 +103,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/player/:path*"],
+  matcher: ["/admin/:path*", "/player/:path*", "/referee/:path*"],
 };

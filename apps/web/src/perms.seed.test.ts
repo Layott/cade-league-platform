@@ -100,6 +100,17 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(PERMS.referee).toContain("squads.change_authorize");
   });
 
+  it("referee holds attendance.mark + attendance.edit (Plan 46)", () => {
+    expect(PERMS.referee).toContain("attendance.mark");
+    expect(PERMS.referee).toContain("attendance.edit");
+    expect(
+      hasPerm({ userId: null, roles: ["referee"] }, "attendance.mark"),
+    ).toBe(true);
+    expect(
+      hasPerm({ userId: null, roles: ["referee"] }, "attendance.edit"),
+    ).toBe(true);
+  });
+
   it("player seed holds squads.submit.own (Plan 10)", () => {
     expect(PERMS.player).toContain("squads.submit.own");
   });

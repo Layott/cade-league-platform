@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
+import { HamburgerNav } from "./NavDrawer";
 
 /**
  * SiteChromeClient — the visual public nav + footer. Receives session
@@ -37,12 +38,14 @@ function isActive(pathname: string, href: string): boolean {
 export function SiteChromeClient({
   authenticated,
   isStaff,
+  roles = [],
   userBadge,
   announcementBell,
   children,
 }: {
   authenticated: boolean;
   isStaff: boolean;
+  roles?: readonly string[];
   userBadge: ReactNode;
   announcementBell: ReactNode;
   children: ReactNode;
@@ -60,6 +63,7 @@ export function SiteChromeClient({
         pathname={pathname}
         authenticated={authenticated}
         isStaff={isStaff}
+        roles={roles}
         userBadge={userBadge}
         announcementBell={announcementBell}
       />
@@ -73,34 +77,46 @@ function SiteHeader({
   pathname,
   authenticated,
   isStaff,
+  roles,
   userBadge,
   announcementBell,
 }: {
   pathname: string;
   authenticated: boolean;
   isStaff: boolean;
+  roles: readonly string[];
   userBadge: ReactNode;
   announcementBell: ReactNode;
 }) {
   const adminActive = pathname.startsWith("/admin");
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--ink-4)] bg-[rgba(7,8,11,0.82)] backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-3">
-        <Link
-          href="/"
-          className="group flex items-center gap-3"
-          aria-label="CADE League home"
-        >
-          <CadeMark />
-          <div className="flex flex-col leading-none">
-            <span className="font-display text-base font-bold tracking-tight text-[var(--chalk-0)]">
-              CADE&nbsp;League
-            </span>
-            <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-              Division&nbsp;1&nbsp;Elite
-            </span>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
+        <div className="flex items-center gap-3">
+          {/* Hamburger: visible always. Order-wise, on mobile it sits BEFORE the brand (top-left); on desktop it sits AFTER the brand (right of brand mark). */}
+          <div className="order-1 md:order-2">
+            <HamburgerNav
+              roles={roles}
+              isStaff={isStaff}
+              authenticated={authenticated}
+            />
           </div>
-        </Link>
+          <Link
+            href="/"
+            className="group order-2 flex items-center gap-3 md:order-1"
+            aria-label="CADE League home"
+          >
+            <CadeMark />
+            <div className="flex flex-col leading-none">
+              <span className="font-display text-base font-bold tracking-tight text-[var(--chalk-0)]">
+                CADE&nbsp;League
+              </span>
+              <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+                Division&nbsp;1&nbsp;Elite
+              </span>
+            </div>
+          </Link>
+        </div>
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
           {NAV_LINKS.map((link) => {
             const active = isActive(pathname, link.href);

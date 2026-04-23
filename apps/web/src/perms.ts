@@ -34,7 +34,14 @@ export const PERMS: Record<RoleName, readonly string[]> = {
   admin: ["*", "squads.reopen", "broadcast.match_control"],
   loc: ["squads.validate", "squads.change_authorize"],
   idc: [],
-  referee: ["squads.validate", "squads.change_authorize"],
+  // Plan 46 — refs mark attendance from /referee/attendance (migration
+  // 20260510000200). attendance.edit lets them correct a prior mark.
+  referee: [
+    "squads.validate",
+    "squads.change_authorize",
+    "attendance.mark",
+    "attendance.edit",
+  ],
   technical: [],
   production: [
     "broadcast.trigger",
