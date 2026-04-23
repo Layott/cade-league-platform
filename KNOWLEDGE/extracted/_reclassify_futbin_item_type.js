@@ -24,14 +24,15 @@ async function main() {
     { auth: { persistSession: false } }
   );
 
-  // Page all rows.
+  // Page all rows with Futbin data (any source_dataset — includes Kaggle
+  // rows enriched in-place by slug+rating fallback).
   const all = [];
   const PAGE = 1000;
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from("fc26_players")
       .select("id, item_type, attributes")
-      .eq("source_dataset", "futbin.com")
+      .not("attributes->>futbin_resource_id", "is", null)
       .is("deleted_at", null)
       .order("id", { ascending: true })
       .range(offset, offset + PAGE - 1);

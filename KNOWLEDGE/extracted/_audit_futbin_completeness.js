@@ -22,14 +22,17 @@ async function main() {
     { auth: { persistSession: false } }
   );
 
-  // Paginate — Supabase default caps 1000 rows per request.
+  // Count EVERY row with futbin data — not just source_dataset='futbin.com'.
+  // The scraper enriches existing Kaggle rows in-place when slug+rating matches,
+  // so Futbin data lives across multiple source_dataset values. The authoritative
+  // marker is `attributes.futbin_resource_id`.
   const all = [];
   const PAGE = 1000;
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from("fc26_players")
-      .select("id, name, rating, value_coins_estimate, item_type, attributes")
-      .eq("source_dataset", "futbin.com")
+      .select("id, name, rating, value_coins_estimate, item_type, source_dataset, attributes")
+      .not("attributes->>futbin_resource_id", "is", null)
       .is("deleted_at", null)
       .order("id", { ascending: true })
       .range(offset, offset + PAGE - 1);
@@ -73,7 +76,7 @@ async function main() {
 
   const pct = (n) => total ? ((n / total) * 100).toFixed(1) + "%" : "0%";
 
-  console.log("=== fc26_players (futbin.com) completeness ===");
+  console.log("=== fc26_players — Futbin-enriched cards (any source_dataset, futbin_resource_id present) ===");
   console.log(`total rows:       ${total}`);
   console.log("");
   console.log("coverage:");
