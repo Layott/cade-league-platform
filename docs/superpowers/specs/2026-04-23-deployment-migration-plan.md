@@ -8,6 +8,22 @@ This document is a draft for the user to review and execute from. No code change
 
 ---
 
+## Addendum 2026-04-23
+
+Changes since draft:
+
+- **fcdb-refresh cron removed** (commit `89440bb`). All FC DB catalog refresh is now manual via the Futbin scraper on the admin's PC (`KNOWLEDGE/extracted/_scrape_futbin_auto.js`, Wed/Thu/Fri at 20:00 WAT). The `server/fcdb/sources/{kaggle,futdb,sofifa}.ts` orchestrator code is gone; `FUTDB_API_KEY`, `KAGGLE_API_TOKEN`, `KAGGLE_KEY`, `KAGGLE_USERNAME` env vars are no longer read anywhere.
+- **Cron auth header mismatch fixed** (commit `f955ad8`). Dual-path helper at `apps/web/src/lib/cron-auth.ts` accepts both `X-Cron-Secret` and `Authorization: Bearer`, so Vercel-native cron invocations pass alongside external pokers using the legacy header.
+
+Downstream impacts in this doc:
+- Hosting recommendation flipped from Vercel Pro to Vercel Hobby (baseline). Two crons fit the Hobby 2-cron cap; every route now fits under the Hobby 60s function cap.
+- Baseline monthly cost drops from ~$47/mo to ~$27/mo.
+- §16.1 (Vercel Cron signature mismatch) marked resolved.
+- §17 risk #1 marked resolved.
+- §14 execution steps 3 + 5 marked done.
+
+---
+
 ## 1. Executive Summary
 
 **Recommended stack:**
@@ -423,37 +439,35 @@ Not a concern — every request is stateless (cookies + service-role DB access).
 
 ### 9.1 Inventory
 
-Three cron routes in the codebase — all guarded by `CRON_SECRET`:
+Two cron routes in the codebase — both guarded by `CRON_SECRET`:
 
 | Route | Cadence (recommended) | Purpose |
 |---|---|---|
-| `/api/cron/fcdb-refresh` | `0 2 * * *` (02:00 UTC = 03:00 WAT) — **already set in `vercel.json`** | Nightly FC 26 catalogue refresh (Kaggle → futdb → sofifa fallback). 300s maxDuration. |
 | `/api/cron/publish-announcements` | `*/5 * * * *` (every 5 min) | Publishes scheduled announcement rows past `scheduled_publish_at`. |
-| `/api/cron/squad-deadline-check` | `0 */1 * * *` (hourly) | Issues auto-warnings for players who missed Thursday 23:59 WAT deadline. |
+| `/api/cron/squad-deadline-check` | `0 * * * *` (hourly) | Issues auto-warnings for players who missed Thursday 23:59 WAT deadline. |
 
-Plus the Windows-Task-Scheduler-driven **Futbin scraper** (`KNOWLEDGE/extracted/_scrape_futbin_auto.js`) which runs Wed/Thu/Fri at 20:00 WAT.
+The Plan 24 `/api/cron/fcdb-refresh` route (Kaggle → futdb → sofifa orchestrator) was **removed 2026-04-23 (commit `89440bb`)** — FC DB refresh is now handled by the manual Futbin scraper run from the admin's PC.
+
+Plus the Windows-Task-Scheduler-driven **Futbin scraper** (`KNOWLEDGE/extracted/_scrape_futbin_auto.js`) which runs Wed/Thu/Fri at 20:00 WAT. This is now the sole FC DB refresh mechanism.
 
 ### 9.2 Production cron strategy
 
-Amend `vercel.json` to:
+The shipped `vercel.json` lists exactly the two active crons:
 
 ```json
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/fcdb-refresh",        "schedule": "0 2 * * *" },
-    { "path": "/api/cron/publish-announcements","schedule": "*/5 * * * *" },
-    { "path": "/api/cron/squad-deadline-check", "schedule": "0 * * * *" }
+    { "path": "/api/cron/publish-announcements", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/squad-deadline-check",  "schedule": "0 * * * *" }
   ]
 }
 ```
 
 **Notes:**
-- Vercel Cron sends `GET` requests. All three routes support GET. ✅
-- Vercel Cron does NOT send custom headers — each of our routes checks `x-cron-secret`. **This is broken on Vercel as-is.** Two remediation options:
-  - **(Recommended)** Amend the cron routes to ALSO accept Vercel's `Authorization: Bearer $CRON_SECRET` convention. Vercel Cron injects this automatically when `CRON_SECRET` is set as an env var — see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs. **This is a small code change needed before launch.**
-  - Or fall back to GitHub Actions cron (free) that sends the `X-Cron-Secret` header explicitly.
-- Hobby plan allows up to 2 cron jobs. **Pro is required** to run all three. Pro is likely needed anyway for the 300s `fcdb-refresh` maxDuration.
+- Vercel Cron sends `GET` requests. Both routes support GET. ✅
+- Vercel Cron injects `Authorization: Bearer $CRON_SECRET` when `CRON_SECRET` is set as an env var (see https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs). The dual-path helper at `apps/web/src/lib/cron-auth.ts` accepts BOTH `X-Cron-Secret` and `Authorization: Bearer` (shipped commit `f955ad8`), so both Vercel-native cron invocations and external pokers using the legacy header work.
+- Hobby plan allows up to 2 cron jobs — we're exactly at cap. If a third cron is added in the future, upgrade to Pro ($20/mo).
 - Each Vercel Cron run counts against monthly function invocations.
 
 ### 9.3 Futbin scraper — HARD PROBLEM
@@ -590,7 +604,7 @@ Tick each item before flipping DNS:
 - [ ] Production build clean locally: `npm run build` — fix any `isomorphic-dompurify` / `jsdom` surprises.
 - [ ] All E2E green against cloud Supabase: `npm --workspace apps/web run e2e`.
 - [ ] `apps/web/next.config.ts` retains `serverExternalPackages: ["isomorphic-dompurify", "jsdom"]`.
-- [ ] Amend cron routes to accept `Authorization: Bearer $CRON_SECRET` (for Vercel Cron) OR decide on GitHub Actions cron — see §9.2.
+- [x] ~~Amend cron routes to accept `Authorization: Bearer $CRON_SECRET` (for Vercel Cron) OR decide on GitHub Actions cron — see §9.2.~~ Shipped 2026-04-23 (commit `f955ad8`, `apps/web/src/lib/cron-auth.ts`).
 - [ ] Remove any `localhost:3030` / `127.0.0.1:3030` references outside of `playwright.config.ts` and `apps/web/README.md:17`. `grep` confirms those are the only two.
 
 ### B. Vercel
@@ -601,7 +615,7 @@ Tick each item before flipping DNS:
 - [ ] All env vars from §3 added (Production + Preview).
 - [ ] `NEXT_PUBLIC_OVERLAY_DEBUG` set ONLY on Preview, not Production.
 - [ ] `.vercelignore` created with `KNOWLEDGE/`, `scripts/`, `supabase/`, `docs/`, `tasks/`, `backups/`, `test-results/`, `playwright-report/`, `.github/`.
-- [ ] Cron schedule updated in `vercel.json` per §9.2.
+- [x] ~~Cron schedule updated in `vercel.json` per §9.2.~~ Shipped — both active crons (`publish-announcements` + `squad-deadline-check`) are listed; Plan 24's `fcdb-refresh` row is intentionally omitted (route removed 2026-04-23).
 - [ ] Deployment Protection → "Only deploy when CI passes" enabled.
 
 ### C. Supabase
@@ -654,9 +668,9 @@ Run top-to-bottom. Rough estimates in parens.
 
 1. **(15 min) Purchase domain `cadeesports.com`.** Registrar of choice.
 2. **(30 min) Create Resend account + add sending domain.** Get DKIM + SPF values. Don't add DNS yet.
-3. **(1 hour) Add cron secret auth compatibility.** Amend `apps/web/src/app/api/cron/*/route.ts` to accept `Authorization: Bearer <CRON_SECRET>` in addition to `X-Cron-Secret`. Add unit tests. Ship via PR.
+3. ~~**(1 hour) Add cron secret auth compatibility.**~~ **DONE 2026-04-23** (commit `f955ad8`). Dual-path helper at `apps/web/src/lib/cron-auth.ts` accepts both `X-Cron-Secret` and `Authorization: Bearer`.
 4. **(30 min) Create `.vercelignore`** at repo root excluding `KNOWLEDGE/`, `scripts/`, `supabase/`, `docs/`, `tasks/`, `backups/`, `test-results/`, `playwright-report/`, `.github/`, `.claude/`. Commit.
-5. **(30 min) Update `vercel.json`** with three crons per §9.2. Commit.
+5. ~~**(30 min) Update `vercel.json`** with three crons per §9.2.~~ **DONE** — `vercel.json` ships with the two remaining crons (`publish-announcements` + `squad-deadline-check`). The third cron (`fcdb-refresh`) was removed 2026-04-23 in commit `89440bb`.
 6. **(1 hour) Create Vercel project.** Connect repo. Configure build command, Node 20. Do NOT add domain yet.
 7. **(1 hour) Populate Vercel env vars** (Production scope). Rotate every secret at creation time. Copy non-secrets from `.env.local`; generate fresh values for `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (rotate), etc.
 8. **(15 min) Trigger first Production deploy** (auto-triggered by git push if project is new; else `vercel --prod`). Watch build log.
@@ -680,7 +694,7 @@ Total: ~9 hours of active work, plus DNS + Resend propagation idle time.
 
 | Item | Tier | Cost/mo | Notes |
 |---|---|---|---|
-| Vercel Pro | Pro | $20 | Required for 300s `fcdb-refresh` maxDuration + 3 cron jobs. |
+| Vercel Hobby | Hobby | $0 | Sufficient post-`fcdb-refresh` removal: 2 crons fit the 2-cron Hobby cap, every route fits under the 60s function cap. Upgrade to Pro ($20/mo) only when a team feature or third cron is needed. |
 | Supabase | Pro | $25 | Required for PITR + 100 GB egress; current is likely Free tier but prod needs Pro. |
 | Resend | Free | $0 | 100 emails/day free; Pro $20/mo for 50k emails. Start free. |
 | Sentry | Hobby | $0 | 5k errors/mo, 1 user. |
@@ -691,20 +705,20 @@ Total: ~9 hours of active work, plus DNS + Resend propagation idle time.
 | YouTube Data API | Free | $0 | 10,000 units/day — may need quota increase. |
 | Anthropic (OCR, when enabled) | PAYG | ~$5-20/mo | Gated by `OCR_DAILY_CAP_USD_CENTS` ($1/day by default = max $30/mo). |
 | Optional: Fly.io Futbin worker | Shared-1x | ~$3-5/mo | Only if moving scraper off user's PC. |
-| **Baseline total** | | **~$47/mo** | Vercel Pro + Supabase Pro + domain + backup. |
-| **With OCR + worker** | | **~$75/mo** | |
+| **Baseline total** | | **~$27/mo** | Supabase Pro + domain + backup. Vercel Hobby = $0. |
+| **With OCR + worker** | | **~$55/mo** | |
 
 ---
 
 ## 16. Known Risks & Unknowns
 
-### 16.1 Vercel Cron signature mismatch
+### 16.1 Vercel Cron signature mismatch — RESOLVED 2026-04-23
 
-All three cron routes currently require `X-Cron-Secret` header. Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. **Without a code change, all crons fail 403 on Vercel.** This is the #1 blocker.
+Previously both cron routes required only the `X-Cron-Secret` header while Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. Fixed in commit `f955ad8` by extracting `apps/web/src/lib/cron-auth.ts` which accepts both paths. Both remaining cron routes (`publish-announcements` + `squad-deadline-check`) now pass auth on Vercel-native cron invocations and external pokers using the legacy header.
 
 ### 16.2 Futbin scraper = operator-on-call forever
 
-The CF-warmed Chromium profile is fragile. If CF rotates trust, the scraper silently returns 0 rows and the admin sees stale catalogue data. Supabase alert on `fc26_refresh_log` rows with `source='none'` for >48h is recommended.
+The CF-warmed Chromium profile is fragile. If CF rotates trust, the scraper silently returns 0 rows and the admin sees stale catalogue data. Monitor via spot-checks against `public.fc26_players` (count of rows with `source_dataset='futbin.com'` AND `imported_at` within the last 48h). Alert if the scraper hasn't landed fresh rows in >72h.
 
 ### 16.3 Git-LFS bandwidth
 
@@ -744,8 +758,8 @@ Producers will fat-finger session IDs. `/admin/broadcast/<id>` should (confirm) 
 
 Copied for the executive summary:
 
-1. **Vercel Cron auth mismatch** — all three cron endpoints reject Vercel's native `Authorization: Bearer` header. Must ship a code change before the first cron fires. Blocks Plan 10 squad-deadline auto-warnings + Plan 6 announcements + Plan 24 FC DB refresh.
-2. **Futbin scraper has no serverless-friendly deployment path.** Persistent Chromium + CF cookies + UK VPN = user's PC stays the operator. Acceptable for Phase 1 but creates single-point-of-failure.
+1. ~~**Vercel Cron auth mismatch**~~ — resolved 2026-04-23 (commit `f955ad8`, dual-path helper at `lib/cron-auth.ts`). Was originally the #1 blocker because every cron endpoint rejected Vercel's native `Authorization: Bearer` header.
+2. **Futbin scraper has no serverless-friendly deployment path.** Persistent Chromium + CF cookies + UK VPN = user's PC stays the operator. Acceptable for Phase 1 but creates single-point-of-failure. (Plan 24's `fcdb-refresh` cron, which used to hedge this with Kaggle/futdb/sofifa fallback, was removed 2026-04-23 in commit `89440bb` — the scraper is now the sole refresh mechanism.)
 3. **Git-LFS bandwidth + 2.4 GB `KNOWLEDGE/` folder** will bloat Vercel build context + LFS quota. A single missing `.vercelignore` here doubles or triples function cold-start times and can exhaust the free LFS bandwidth, at which point builds fail.
 
 ---
