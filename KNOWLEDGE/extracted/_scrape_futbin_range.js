@@ -138,7 +138,8 @@ async function main() {
   if (!fs.existsSync(PROFILE_DIR)) { console.error("run headful scraper first to warm profile"); process.exit(1); }
 
   const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: true,
+    headless: false,
+    slowMo: 50,
     args: ["--disable-blink-features=AutomationControlled"],
     viewport: { width: 1440, height: 900 },
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
@@ -147,14 +148,35 @@ async function main() {
   await ctx.addInitScript(() => { Object.defineProperty(navigator, "webdriver", { get: () => undefined }); });
   const page = await ctx.newPage();
 
-  // Warm via home.
+  // Warm via home, then probe the first target page so user can clear CF.
   await page.goto("https://www.futbin.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(6000);
+  await page.goto(LIST_URL(from), { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.waitForTimeout(10000);
+
+  // Verify list is up before the batch. If 0 rows, prompt the user to
+  // manually click through the Cloudflare challenge.
+  let probeRows = await extract(page);
+  if (probeRows.length === 0) {
+    const readline = require("readline");
+    console.log("\n=== Cloudflare challenge? Look at the browser window ===");
+    console.log("If CF is blocking, solve it in the window then press ENTER.");
+    await new Promise((r) => {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      rl.question("ready: ", () => { rl.close(); r(); });
+    });
+    probeRows = await extract(page);
+  }
 
   const stats = { pages: 0, rows: 0, updated: 0, inserted: 0, noPrice: 0 };
   console.log(`[range] scraping p${from}..p${to}`);
 
-  for (let p = from; p <= to; p++) {
+  // Use the probe from warmup for the first page.
+  await upsert(sb, probeRows, stats);
+  stats.pages = 1; stats.rows = probeRows.length;
+  console.log(`[range] p${from}: ${probeRows.length} rows`);
+
+  for (let p = from + 1; p <= to; p++) {
     await sleep(jitter());
     let attempt = 0;
     let pageRows = null;
