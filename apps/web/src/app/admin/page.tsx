@@ -6,6 +6,14 @@ import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { formatWat } from "@/lib/time";
 import type { Actor } from "@/perms";
+import { SquadWindowControls } from "@/components/admin/SquadWindowControls";
+import { getSquadWindowOverride } from "@/server/squads/window_override";
+import { weekStartThursday } from "@/server/squads/week";
+import {
+  forceOpenSquadWindowAction,
+  forceCloseSquadWindowAction,
+  clearSquadWindowOverrideAction,
+} from "@/app/admin/squads/window-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +189,11 @@ async function resolveViewer(): Promise<{
 export default async function AdminHome() {
   const { actor, sb } = await resolveViewer();
   const hero = await loadHero(sb);
+  const canManageWindow = await hasPermAsync(sb, actor, "squads.window.manage");
+  const weekStart = weekStartThursday(new Date());
+  const squadWindowOverride = canManageWindow
+    ? await getSquadWindowOverride(sb, weekStart)
+    : null;
 
   const allTiles: TileDef[] = [
     {
@@ -334,6 +347,16 @@ export default async function AdminHome() {
       />
 
       <HeroStrip hero={hero} />
+
+      {canManageWindow ? (
+        <SquadWindowControls
+          weekStart={weekStart}
+          override={squadWindowOverride}
+          forceOpen={forceOpenSquadWindowAction}
+          forceClose={forceCloseSquadWindowAction}
+          clearOverride={clearSquadWindowOverrideAction}
+        />
+      ) : null}
 
       <section
         aria-label="Manager tiles"

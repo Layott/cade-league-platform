@@ -26,6 +26,13 @@ function mkSb(opts: {
     created_at: string;
     after_json: Record<string, unknown>;
   } | null;
+  windowOverride?: {
+    week_start_date: string;
+    state: "force_open" | "force_close";
+    note: string | null;
+    set_by: string;
+    set_at: string;
+  } | null;
 }) {
   return {
     from: vi.fn((table: string) => {
@@ -72,6 +79,20 @@ function mkSb(opts: {
                     })),
                   })),
                 })),
+              })),
+            })),
+          })),
+        };
+      }
+      if (table === "squad_window_overrides") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              is: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: opts.windowOverride ?? null,
+                  error: null,
+                }),
               })),
             })),
           })),

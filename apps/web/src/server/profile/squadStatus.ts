@@ -5,6 +5,7 @@ import {
   fridayWindowBounds,
   isWithinFridayWindow,
 } from "@/lib/time";
+import { getSquadWindowOverride } from "@/server/squads/window_override";
 
 /**
  * Plan 41 — P41-F — squad-status helper for the /player dashboard card + banner.
@@ -123,10 +124,17 @@ export async function getCurrentSquadStatus(
   const deadline = thursdayDeadline(weekStart);
   const { closeAt: fridayClose } = fridayWindowBounds(weekStart);
 
+  // Admin override takes precedence over the time-based window.
+  const override = await getSquadWindowOverride(sb, weekStart);
+
   const submission = await fetchCurrentSubmission(sb, playerId, weekStart);
 
   // 1. Nothing submitted yet.
   if (!submission) {
+    if (override?.state === "force_close") return { kind: "window_closed" };
+    if (override?.state === "force_open") {
+      return { kind: "pre_deadline", hoursUntil: 0, deadline };
+    }
     if (now < deadline) {
       const hoursUntil = Math.max(
         0,

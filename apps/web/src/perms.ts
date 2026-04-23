@@ -31,14 +31,15 @@ export const ROLE_NAMES = [
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMS: Record<RoleName, readonly string[]> = {
-  admin: ["*", "squads.reopen", "broadcast.match_control", "branding.manage"],
-  loc: ["squads.validate", "squads.change_authorize"],
+  admin: ["*", "squads.reopen", "broadcast.match_control", "branding.manage", "squads.window.manage"],
+  loc: ["squads.validate", "squads.change_authorize", "squads.window.manage"],
   idc: [],
   // Plan 46 — refs mark attendance from /referee/attendance (migration
   // 20260510000200). attendance.edit lets them correct a prior mark.
   referee: [
     "squads.validate",
     "squads.change_authorize",
+    "squads.window.manage",
     "attendance.mark",
     "attendance.edit",
   ],

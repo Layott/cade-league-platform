@@ -11,6 +11,12 @@ export { replaceItemsForSubmission } from "./items";
 export { approveSubmission, rejectSubmission } from "./review";
 export { reopenSubmission } from "./reopen";
 export type { ReopenResult } from "./reopen";
+export {
+  getSquadWindowOverride,
+  setSquadWindowOverride,
+  clearSquadWindowOverride,
+} from "./window_override";
+export type { SquadWindowOverride, SquadWindowState } from "./window_override";
 export { requestChange } from "./change";
 export { getRuleForSeason, upsertRule } from "./rules";
 export type { SquadRuleRow } from "./rules";
