@@ -39,13 +39,27 @@ export type CardSearchResult = {
   itemType: string;
   priceCoins: number | null;
   cardImageUrl: string | null;
+  variant: string | null;
 };
 
 const FUZZY_THRESHOLD = 0.2;
 const SELECT_COLUMNS =
   "id, name, rating, position, alt_positions, club, league, nation, nation_iso, item_type, value_coins_estimate";
 
+// fut.gg scraper stashes card visuals + the full variant label in
+// `attributes.card_image_url` + `attributes.futgg_variant`. The column is
+// jsonb so we read defensively — legacy rows without the keys fall back to
+// `null` (UI renders the solid-color tile) / `item_type` (which maps to our
+// coarse taxonomy: "icon", "hero", "special", …).
+function readAttrString(attrs: FCPlayer["attributes"], key: string): string | null {
+  if (!attrs || typeof attrs !== "object") return null;
+  const v = (attrs as Record<string, unknown>)[key];
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
 function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
+  const cardImageUrl = readAttrString(row.attributes, "card_image_url");
+  const futggVariant = readAttrString(row.attributes, "futgg_variant");
   return {
     id: row.id,
     name: row.name,
@@ -61,8 +75,11 @@ function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
     // later Plan 24 "price refresh" job may introduce a denormalised
     // `price_coins` column. Until then we mirror the estimate.
     priceCoins: row.value_coins_estimate,
-    // No card_image_url in the schema yet — picker falls back to an avatar.
-    cardImageUrl: null,
+    cardImageUrl,
+    // Prefer the exact fut.gg variant string ("Trophy Titans Hero", "Icon",
+    // "TOTY", "Fantasy UT"). Fall back to the coarse item_type when absent
+    // so pre-scrape rows still show something meaningful.
+    variant: futggVariant ?? (row.item_type && row.item_type !== "normal" ? row.item_type : null),
   };
 }
 
@@ -156,6 +173,7 @@ export async function searchCards(
       itemType: row.itemType,
       priceCoins: row.priceCoins,
       cardImageUrl: row.cardImageUrl,
+      variant: row.variant,
     };
     return rest;
   });

@@ -17,6 +17,7 @@ function mkCard(over: Partial<CardSearchResult> = {}): CardSearchResult {
     itemType: "gold",
     priceCoins: 50_000,
     cardImageUrl: null,
+    variant: null,
     ...over,
   };
 }

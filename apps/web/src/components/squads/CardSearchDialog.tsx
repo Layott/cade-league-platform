@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FutCard } from "./FutCard";
 import type { CardSearchResult } from "@/server/fcdb/search";
 
 /**
@@ -188,45 +187,75 @@ export function CardSearchDialog({
             </div>
           ) : (
             <ul className="divide-y divide-[var(--ink-4)]">
-              {results.map((r, idx) => (
-                <li
-                  key={r.id}
-                  data-testid={`card-search-result-${idx}`}
-                  data-active={idx === cursor ? "true" : undefined}
-                  className={
-                    "flex items-center gap-3 p-2 transition-colors " +
-                    (idx === cursor
-                      ? "bg-[var(--ink-4)]"
-                      : "hover:bg-[var(--ink-3)]")
-                  }
-                >
-                  <FutCard card={r} size="sm" onClick={() => pick(r)} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-display text-sm font-bold text-[var(--chalk-0)]">
-                      {r.name}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-[var(--chalk-3)]">
-                      {r.rating} {r.position} · {r.club ?? "—"} · {r.nation ?? "—"}
-                    </div>
-                    {r.priceCoins != null ? (
-                      <div className="mt-0.5 font-mono text-[10px] text-[var(--chalk-2)]">
-                        {r.priceCoins.toLocaleString()} coins
-                      </div>
+              {results.map((r, idx) => {
+                const variantLabel = r.variant ?? "Normal";
+                const rowTitle = `${r.name} — ${r.rating} — ${variantLabel}`;
+                return (
+                  <li
+                    key={r.id}
+                    data-testid={`card-search-result-${idx}`}
+                    data-active={idx === cursor ? "true" : undefined}
+                    title={rowTitle}
+                    className={
+                      "flex items-center gap-3 p-2 transition-colors " +
+                      (idx === cursor
+                        ? "bg-[var(--ink-4)]"
+                        : "hover:bg-[var(--ink-3)]")
+                    }
+                  >
+                    {r.cardImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={r.cardImageUrl}
+                        alt={rowTitle}
+                        width={40}
+                        height={56}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-[56px] w-[40px] flex-shrink-0 rounded-sm bg-[var(--ink-2)] object-contain"
+                        data-testid={`card-search-thumb-${idx}`}
+                      />
                     ) : (
-                      <div className="mt-0.5 font-mono text-[10px] text-[var(--chalk-3)]">
-                        price: —
+                      <div
+                        data-testid={`card-search-thumb-fallback-${idx}`}
+                        className="flex h-[56px] w-[40px] flex-shrink-0 items-center justify-center rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] font-display text-[11px] font-black text-[var(--chalk-2)]"
+                      >
+                        {r.rating}
                       </div>
                     )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => pick(r)}
-                    className="rounded-sm bg-[var(--signal)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-black hover:brightness-110"
-                  >
-                    Pick
-                  </button>
-                </li>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-display text-sm font-bold text-[var(--chalk-0)]">
+                        {r.name}
+                      </div>
+                      <div
+                        className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--signal)]"
+                        data-testid={`card-search-variant-${idx}`}
+                      >
+                        {variantLabel}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-[var(--chalk-3)]">
+                        {r.rating} {r.position} · {r.club ?? "—"} · {r.nation ?? "—"}
+                      </div>
+                      {r.priceCoins != null ? (
+                        <div className="mt-0.5 font-mono text-[10px] text-[var(--chalk-2)]">
+                          {r.priceCoins.toLocaleString()} coins
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 font-mono text-[10px] text-[var(--chalk-3)]">
+                          price: —
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => pick(r)}
+                      className="rounded-sm bg-[var(--signal)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-black hover:brightness-110"
+                    >
+                      Pick
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

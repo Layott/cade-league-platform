@@ -126,4 +126,33 @@ describe("searchCards", () => {
       searchCards(sb as never, { q: "a", limit: 10 }),
     ).rejects.toThrow();
   });
+
+  it("surfaces card_image_url + futgg_variant from attributes", async () => {
+    const row = mkPlayer({
+      attributes: {
+        card_image_url: "https://game-assets.fut.gg/cdn-cgi/image/quality=85,format=auto,width=300/2026/futgg-player-item-card/26-42.abc.webp",
+        futgg_variant: "Trophy Titans Hero",
+      },
+      item_type: "hero",
+    });
+    const { sb } = mkSb({ exact: { data: [row], error: null } });
+    const [hit] = await searchCards(sb as never, { q: "Lionel Messi", limit: 10 });
+    expect(hit.cardImageUrl).toContain("26-42.abc.webp");
+    expect(hit.variant).toBe("Trophy Titans Hero");
+  });
+
+  it("falls back variant to item_type when futgg_variant is absent", async () => {
+    const row = mkPlayer({ attributes: {}, item_type: "icon" });
+    const { sb } = mkSb({ exact: { data: [row], error: null } });
+    const [hit] = await searchCards(sb as never, { q: "Lionel Messi", limit: 10 });
+    expect(hit.cardImageUrl).toBeNull();
+    expect(hit.variant).toBe("icon");
+  });
+
+  it("returns null variant for base (normal) cards without fut.gg data", async () => {
+    const row = mkPlayer({ attributes: {}, item_type: "normal" });
+    const { sb } = mkSb({ exact: { data: [row], error: null } });
+    const [hit] = await searchCards(sb as never, { q: "Lionel Messi", limit: 10 });
+    expect(hit.variant).toBeNull();
+  });
 });

@@ -5,10 +5,12 @@ import type { CardSearchResult } from "@/server/fcdb/search";
 /**
  * Plan 30 — FC-style card tile.
  *
- * Compact rectangle showing rating + position badge + name + nation. Rating
- * controls the colour band: 75+ gold, 65-74 silver, <65 bronze, `icon`/
- * `hero` get special tints that win over the rating band. `special` in the
- * source item_type also gets an override.
+ * Compact rectangle showing rating + position badge + name + nation. When
+ * `card.cardImageUrl` is present (populated by the fut.gg image scraper,
+ * `_scrape_futgg_images.js`), the full FUT card art is rendered at the
+ * primary visual slot; otherwise we fall back to the solid-colour band
+ * (75+ gold, 65-74 silver, <65 bronze; icon / hero / special get tints
+ * that override the rating band).
  *
  * Size `sm` (used in the picker slot) is ~64×80. Size `md` (used in the
  * typeahead result row) is ~120×150.
@@ -98,6 +100,8 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
       : "h-[80px] w-[64px] p-1";
   const ratingSize = size === "md" ? "text-2xl" : "text-lg";
   const nameSize = size === "md" ? "text-[11px]" : "text-[9px]";
+  const variantSize = size === "md" ? "text-[9px]" : "text-[7px]";
+  const hasImage = Boolean(card.cardImageUrl);
 
   return (
     <button
@@ -105,30 +109,80 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
       onClick={onClick}
       data-testid={dataTestId}
       data-card-id={card.id}
+      title={`${card.name} — ${card.rating} — ${card.variant ?? "Normal"}`}
       className={
-        `relative flex flex-col items-center justify-between rounded-sm ${band.bg} ${band.ring} ${band.text} ${dims} transition-transform hover:scale-[1.03]`
+        `relative flex flex-col items-center justify-between overflow-hidden rounded-sm ${
+          hasImage ? "bg-[#0a0a0a]" : band.bg
+        } ${band.ring} ${band.text} ${dims} transition-transform hover:scale-[1.03]`
       }
     >
-      <div className="flex w-full items-start justify-between">
-        <div className={`font-display font-black leading-none ${ratingSize}`}>
+      {hasImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={card.cardImageUrl ?? ""}
+          alt={`${card.name} ${card.rating} ${card.variant ?? ""}`.trim()}
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : null}
+
+      {/* Text overlays sit above the image (if any). Keep rating + position
+          legible by gating them behind a faint gradient when imagery is
+          present — matches the FUT card layout where the number + position
+          chip sit on top of the card art. */}
+      {hasImage ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70"
+        />
+      ) : null}
+
+      <div className="relative flex w-full items-start justify-between">
+        <div
+          className={`font-display font-black leading-none ${ratingSize} ${
+            hasImage ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : ""
+          }`}
+        >
           {card.rating}
         </div>
         <div className="flex flex-col items-end">
-          <div className="text-[9px] font-semibold uppercase tracking-[0.14em]">
+          <div
+            className={`text-[9px] font-semibold uppercase tracking-[0.14em] ${
+              hasImage ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" : ""
+            }`}
+          >
             {card.position}
           </div>
           {card.nationIso ? (
-            <div className="mt-0.5 text-[8px] font-mono opacity-80">
+            <div
+              className={`mt-0.5 text-[8px] font-mono opacity-80 ${
+                hasImage ? "text-white" : ""
+              }`}
+            >
               {card.nationIso}
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="w-full truncate text-center">
-        <div className={`truncate font-display font-bold uppercase tracking-[0.08em] ${nameSize}`}>
+      <div className="relative w-full truncate text-center">
+        <div
+          className={`truncate font-display font-bold uppercase tracking-[0.08em] ${nameSize} ${
+            hasImage ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]" : ""
+          }`}
+        >
           {shortName(card.name)}
         </div>
+        {card.variant ? (
+          <div
+            className={`truncate uppercase tracking-[0.14em] ${variantSize} ${
+              hasImage ? "text-[#6bcd06] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]" : "text-[var(--chalk-3)]"
+            }`}
+          >
+            {card.variant}
+          </div>
+        ) : null}
       </div>
     </button>
   );
