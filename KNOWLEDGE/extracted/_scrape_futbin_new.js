@@ -70,8 +70,33 @@ async function extract(page) {
         phy: intText("td.table-physicality .table-key-stats, td.table-physicality"),
       };
       const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
-      const cardBgSrc = row.querySelector("img.playercard-s-26-bg")?.getAttribute("src") || "";
-      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+
+      // Card frame — try multiple selector + style paths because Futbin
+      // sometimes wraps it in a background-image on a div instead of
+      // img[src]. We also dump the raw source string so the host log
+      // can show exactly what the page returned.
+      const bgCandidates = [
+        row.querySelector("img.playercard-s-26-bg"),
+        row.querySelector(".playercard-s-26-bg img"),
+        row.querySelector(".playercard-26 img.playercard-s-26-bg"),
+        row.querySelector(".playercard-26 [class*='card-bg'] img"),
+      ].filter(Boolean);
+      let cardBgSrc = "";
+      for (const el of bgCandidates) {
+        const s = el.getAttribute("src") || el.getAttribute("data-src") || "";
+        if (s) { cardBgSrc = s; break; }
+      }
+      // Fallback: scan computed background-image on common wrappers.
+      if (!cardBgSrc) {
+        const wrap = row.querySelector(".playercard-26, .playercard-s-26, .playercard-s-26-bg");
+        if (wrap) {
+          const bg = getComputedStyle(wrap).backgroundImage;
+          const m = bg && bg !== "none" ? bg.match(/url\(["']?([^"')]+)["']?\)/) : null;
+          if (m) cardBgSrc = m[1];
+        }
+      }
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
+
       out.push({
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
         position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
@@ -82,6 +107,8 @@ async function extract(page) {
         metaTag: row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null,
         cardImageUrl: cardImgEl?.getAttribute("src") || null,
         cardBgUrl: cardBgSrc || null,
+        // Kept for debug — show raw string even when the /cards/ regex misses.
+        cardBgRaw: cardBgSrc || null,
       });
     }
     return out;
@@ -162,6 +189,18 @@ async function main() {
 
   async function processPage(pageRows, pageNum) {
     recordIds(pageRows);
+    // Verbose debug on page 1 — show what the scraper actually saw for
+    // the card-frame capture. Helps diagnose why FutCard renders a
+    // black background when card_bg_url is still missing.
+    if (pageNum === 1 && pageRows.length > 0) {
+      console.log("\n[debug] first 5 rows of p1 — raw captures:");
+      for (const r of pageRows.slice(0, 5)) {
+        console.log(`  ${r.name.padEnd(35)} r${r.rating}  variant=${r.variant ?? "-"}`);
+        console.log(`    portrait: ${r.cardImageUrl ?? "-"}`);
+        console.log(`    bg raw:   ${r.cardBgRaw ?? "-"}`);
+      }
+      console.log();
+    }
     let pUnchanged = 0, pUpdated = 0, pInserted = 0;
     for (const r of pageRows) {
       const coinsPs = parseCoins(r.pricePs);
@@ -216,6 +255,20 @@ async function main() {
   }
 
   if (stopReason) console.log(`\n[new] stopped: ${stopReason}`);
+
+  // Post-run DB audit — count futbin rows that now carry card_bg_url.
+  // Helps confirm the hardened capture actually produced writeable URLs.
+  try {
+    const { count } = await sb
+      .from("fc26_players")
+      .select("*", { count: "exact", head: true })
+      .eq("source_dataset", "futbin.com")
+      .not("attributes->>card_bg_url", "is", null)
+      .is("deleted_at", null);
+    console.log(`[new] DB now has ${count} futbin rows with card_bg_url populated.`);
+  } catch (e) {
+    console.error(`[new] post-run audit failed: ${e.message}`);
+  }
 
   // Persist the full seen-set so the NEXT run can compare against it.
   saveState({
