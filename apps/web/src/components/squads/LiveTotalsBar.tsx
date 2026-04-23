@@ -61,11 +61,15 @@ export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarPro
   const [chemBreakdownOpen, setChemBreakdownOpen] = useState(false);
 
   const totals = useMemo(() => {
-    const starters = Object.values(slots).filter(
-      (c): c is CardSearchResult => !!c,
-    );
+    // Slot 0 = goalkeeper. GK is excluded from both the budget and the
+    // Nigerian-minimum counts per league rules (mirrors the server-side
+    // logic in server/squads/validate.ts).
+    const starterEntries = Object.entries(slots)
+      .map(([k, c]) => ({ slot: Number(k), card: c }))
+      .filter((e): e is { slot: number; card: CardSearchResult } => !!e.card);
+    const nonGkStarters = starterEntries.filter((e) => e.slot !== 0);
+    const gkStarter = starterEntries.find((e) => e.slot === 0)?.card ?? null;
     const benched = subs.filter((c): c is CardSearchResult => !!c);
-    const allCards = [...starters, ...benched];
 
     let coins = 0;
     let priceMissing = 0;
@@ -74,11 +78,34 @@ export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarPro
       (rule?.bannedItemTypes ?? []).map((t) => t.toLowerCase()),
     );
     let bannedCount = 0;
-    for (const c of allCards) {
+
+    // Coins + Nigerian: sum over non-GK starters + subs.
+    for (const { card: c } of nonGkStarters) {
       if (c.priceCoins == null) priceMissing += 1;
       else coins += c.priceCoins;
       if ((c.nationIso ?? "").toUpperCase() === "NG") nigerianCount += 1;
+    }
+    for (const c of benched) {
+      if (c.priceCoins == null) priceMissing += 1;
+      else coins += c.priceCoins;
+      if ((c.nationIso ?? "").toUpperCase() === "NG") nigerianCount += 1;
+    }
+
+    // Banned-type check DOES include GK — a banned keeper is still banned.
+    const allCards = [
+      ...starterEntries.map((e) => e.card),
+      ...benched,
+    ];
+    for (const c of allCards) {
       if (bannedSet.has((c.itemType ?? "").toLowerCase())) bannedCount += 1;
+    }
+    // Avoid shadow-reporting the GK as price-missing when it's actually present
+    // (price_missing counter only matters for budget cards — i.e. non-GK).
+    if (gkStarter && gkStarter.priceCoins == null) {
+      // GK is price-missing but doesn't count toward coins; still flag for
+      // transparency so the player knows their GK price is unknown — mirror
+      // behaviour matches what players expect.
+      priceMissing += 1;
     }
 
     // Full FC26 chemistry requires the formation (for per-slot position

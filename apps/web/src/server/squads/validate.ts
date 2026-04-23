@@ -78,9 +78,13 @@ export function evaluateRules(
     });
   }
 
-  // 2. Minimum Nigerian items in starting XI (slot 0..10).
+  // 2. Minimum Nigerian items in starting XI (slot 1..10). The goalkeeper
+  //    (slot 0) is explicitly excluded from the Nigerian-minimum rule —
+  //    same carve-out used for the budget check above.
   const startingXi = items.filter((i) => i.slotIndex >= 0 && i.slotIndex <= 10);
-  const nigerianCount = startingXi.filter((i) => isNigerian(i.nationalityFlag)).length;
+  const nigerianCount = startingXi
+    .filter((i) => i.slotIndex !== 0 && isNigerian(i.nationalityFlag))
+    .length;
   if (nigerianCount < rule.minNigerianItems) {
     violations.push({
       code: "missing_nigerian_items",
