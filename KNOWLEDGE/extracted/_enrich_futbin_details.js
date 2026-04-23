@@ -30,6 +30,12 @@ const { createClient } = require("@supabase/supabase-js");
 const PROFILE_DIR = path.resolve(__dirname, ".futbin_chromium_profile");
 const STATE_PATH = path.resolve(__dirname, "futbin_enrich_state.json");
 const FAILURES_PATH = path.resolve(__dirname, "futbin_enrich_failures.json");
+const CHANGES_PATH = path.resolve(__dirname, "futbin_enrich_changes.json");
+
+// Re-enrichment TTL: a card is eligible for re-scan when its last
+// enrich_at is older than this many hours. Defaults to 7 days; override
+// with --ttl-hours N. --force skips the check entirely.
+const DEFAULT_TTL_HOURS = 24 * 7;
 
 function loadEnv() {
   const p = path.resolve(__dirname, "..", "..", "apps", "web", ".env.local");
@@ -143,12 +149,34 @@ async function extractDetail(page) {
   });
 }
 
+// Compare two attribute snapshots + return a flat list of changed fields.
+// Narrow to the interesting keys (stats, prices, playstyles, flags) so
+// we don't log noise like enrich_at timestamps.
+function diffAttrs(before, after) {
+  const keys = ["mains", "subs", "platform_prices", "meta", "playstyles", "chem_styles", "flags"];
+  const changes = [];
+  for (const k of keys) {
+    const b = JSON.stringify(before?.[k] ?? null);
+    const a = JSON.stringify(after?.[k] ?? null);
+    if (b !== a) changes.push({ field: k, before: before?.[k] ?? null, after: after?.[k] ?? null });
+  }
+  // Card-art swap (EA sometimes re-skins a card mid-cycle)
+  if ((before?.card_image_url || null) !== (after?.card_image_url || null)) {
+    changes.push({ field: "card_image_url", before: before?.card_image_url ?? null, after: after?.card_image_url ?? null });
+  }
+  return changes;
+}
+
 async function main() {
   loadEnv();
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const state = process.argv.includes("--reset") ? { done: [] } : loadState();
   const ratingMinArg = process.argv.indexOf("--rating-min");
   const ratingMin = ratingMinArg >= 0 ? parseInt(process.argv[ratingMinArg + 1], 10) : 0;
+  const ttlArg = process.argv.indexOf("--ttl-hours");
+  const ttlHours = ttlArg >= 0 ? parseInt(process.argv[ttlArg + 1], 10) : DEFAULT_TTL_HOURS;
+  const force = process.argv.includes("--force");
+  const ttlMs = ttlHours * 3600 * 1000;
 
   if (!fs.existsSync(PROFILE_DIR)) {
     console.error("[enrich] Missing Chromium profile. Run the headful scraper first:");
@@ -166,8 +194,18 @@ async function main() {
     .order("rating", { ascending: false });
   if (error) { console.error("[enrich] DB read failed:", error.message); process.exit(1); }
 
-  const todo = (rows || []).filter((r) => !state.done.includes(r.id));
-  console.log(`[enrich] ${rows?.length ?? 0} futbin-sourced rows; ${todo.length} remaining to enrich.`);
+  // A card is eligible when: force mode, OR never enriched, OR last
+  // enrich_at is older than the TTL. `state.done` only applies to
+  // first-pass completions; after that the timestamp gate takes over.
+  const now = Date.now();
+  const todo = (rows || []).filter((r) => {
+    if (force) return true;
+    const lastIso = r.attributes && typeof r.attributes === "object" ? r.attributes.enrich_at : null;
+    if (!lastIso) return true;
+    const lastMs = new Date(lastIso).getTime();
+    return Number.isFinite(lastMs) && now - lastMs > ttlMs;
+  });
+  console.log(`[enrich] ${rows?.length ?? 0} futbin-sourced rows; ${todo.length} due for enrichment (ttl=${ttlHours}h, force=${force}).`);
 
   const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
     headless: true,
@@ -190,6 +228,7 @@ async function main() {
   }
 
   const failures = [];
+  const changes = [];
   let i = 0;
   const t0 = Date.now();
   for (const row of todo) {
@@ -226,8 +265,22 @@ async function main() {
       const patch = { attributes: newAttrs, updated_at: new Date().toISOString() };
       if (coins) patch.value_coins_estimate = coins;
 
+      // Diff the meaningful fields vs the prior attributes and log the
+      // delta so we can see which cards EA quietly updated.
+      const delta = diffAttrs(attrs, newAttrs);
+      if (delta.length > 0) {
+        changes.push({
+          id: row.id,
+          name: row.name,
+          rating: row.rating,
+          resourceId: rid,
+          at: new Date().toISOString(),
+          fields: delta,
+        });
+      }
+
       await sb.from("fc26_players").update(patch).eq("id", row.id);
-      state.done.push(row.id);
+      if (!state.done.includes(row.id)) state.done.push(row.id);
       if (i % 25 === 0) saveState(state);
       if (i % 10 === 0 || i < 3) {
         const rate = (i / ((Date.now() - t0) / 1000)).toFixed(2);
@@ -242,7 +295,18 @@ async function main() {
 
   saveState(state);
   fs.writeFileSync(FAILURES_PATH, JSON.stringify(failures, null, 2));
-  console.log(`[enrich] done. enriched=${state.done.length} failures=${failures.length}`);
+  // Append new changes to a rolling log (keep last 2000 entries).
+  let runningChanges = [];
+  try { runningChanges = JSON.parse(fs.readFileSync(CHANGES_PATH, "utf8")); } catch {}
+  runningChanges = runningChanges.concat(changes).slice(-2000);
+  fs.writeFileSync(CHANGES_PATH, JSON.stringify(runningChanges, null, 2));
+  console.log(`[enrich] done. processed=${todo.length} enriched=${state.done.length} changed=${changes.length} failures=${failures.length}`);
+  if (changes.length > 0) {
+    console.log(`[enrich] change summary (first 5):`);
+    for (const c of changes.slice(0, 5)) {
+      console.log(`   ${c.name} r${c.rating}: ${c.fields.map((f) => f.field).join(", ")}`);
+    }
+  }
   await ctx.close();
 }
 
