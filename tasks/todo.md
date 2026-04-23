@@ -37,6 +37,50 @@ Active plan: **Plan 47 — Site Manager (Wix/Hostinger-style admin backend)**. U
 
 ---
 
+## 2026-04-23 — Futbin data cleanup (ad-hoc, no plan spec)
+
+User-driven cleanup pass on `fc26_players` to correct classification + source attribution of the Futbin scrape. Not tied to a numbered plan (Plan 21 Kaggle ingest was the original fcdb onramp; Plan 23 and Plan 30 downstream consumers remain unchanged).
+
+### Problems identified
+
+1. **Audit misreport.** Initial row-count audit filtered on `source_dataset='futbin.com'` only, reported ~5k Futbin rows. Actual count was 20,373 — rows had been enriched in-place on `kaggle`/`fut.gg` `source_dataset` labels via an upsert fallback in the scraper. Briefly panicked thinking 15k rows were lost.
+2. **`item_type` classification bug.** Classifier regex `/^(gold|silver|bronze|...)$/` was exact-match only. Numeric-prefixed upstream variants like `0-silver` / `3-gold` fell through to `item_type='special'`, inflating the special count. Icon/toty/tots/hero/rttf also needed word-boundary checks.
+3. **Scraper upsert fallback.** All 5 scrapers (headful, reverse, range, filters, auto) had a slug+rating merge fallback that wrote Futbin data onto existing Kaggle/fut.gg rows rather than inserting new `source_dataset='futbin.com'` rows. Pollution had been silent.
+4. **Filter scraper headless.** Was bypassing CF gate; patched to headful with manual CF-gate (same pattern as range scraper).
+
+### Fixes applied
+
+- Commit `518be6b` — `item_type` regex now `/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/` with word-boundary checks for icon/toty/tots/hero/rttf. Shared classifier lives at `KNOWLEDGE/extracted/_classify_variant.js` — all scrapers + ingest scripts import from there.
+- Commit `983cb2a` — audit script scope fix (semantic-presence filter on `attributes->>'futbin_resource_id'` rather than `source_dataset`).
+- Removed slug+rating upsert fallback across all 5 scrapers. Scrapers now always upsert to `source_dataset='futbin.com'` with `source_row_id='futbin_{resource_id}'`.
+- Migrated 15,634 enriched rows back to `source_dataset='futbin.com'` + rewrote their `source_row_id`. Soft-deleted 1 genuine cross-source duplicate. Zero migration errors.
+- Filter scraper patched from headless to headful with manual CF-gate.
+
+### Final state (2026-04-23)
+
+`fc26_players`:
+- `source_dataset='futbin.com'`: **20,372 rows** (100% priced, 100% images, 100% 6-main-stats + weak foot + skill moves + variant; 99.7% PS price, 95.9% PC price, 89.7% Futbin meta rating)
+- `source_dataset='kaggle'`: 2,745 rows (dormant — no Futbin data, kept for provenance)
+- `source_dataset='fut.gg'`: 1,405 rows (dormant — same)
+- 1 row soft-deleted (cross-source duplicate)
+- **Grand total: 24,522**
+
+Item_type distribution (futbin.com slice only): normal 18,729 · special 969 · icon 306 · hero 216 · tots 66 · rttf 47 · toty 40.
+
+### Downstream impact
+
+- Plan 21 (Kaggle ingest) — source_dataset='kaggle' rows now dormant; ingest script should still write kaggle rows but runtime lookups skip them.
+- Plan 23 (fcdb squad validation badges) — must filter `source_dataset='futbin.com' AND deleted_at IS NULL` in lookup queries.
+- Plan 30 (squad picker, not yet started) — same filter rule; picker selects exclusively from the Futbin slice.
+
+### Not covered / follow-ups
+
+- Migration + scraper-patch commit coming in one final push after this doc update.
+- No schema change required — `source_dataset` already an unconstrained text field.
+- Dormant rows NOT hard-deleted (user choice: keep provenance).
+
+---
+
 ## Plan 46 (archived)
 
 Active plan: **Plan 46 — Global hamburger nav drawer + /referee/attendance surface**. User brief 2026-04-22.

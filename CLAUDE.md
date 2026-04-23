@@ -2,9 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository State (updated 2026-04-21)
+## Repository State (updated 2026-04-23)
 
 **Stage:** Phase 1A SHIPPED + Phase 1B SHIPPED + Phase 2 prep SHIPPED. 14+ plans landed on `main`. Next.js 15 + Supabase monolith live, 432+ unit tests, 30+ E2E specs, 30+ migrations applied to cloud.
+
+**FCDB (`fc26_players`) state as of 2026-04-23:** 24,522 total rows. 20,372 rows on `source_dataset='futbin.com'` are 100% priced (99.7% PS / 95.9% PC), 100% card images, 100% 6-main-stats + weak foot + skill moves + variant, 89.7% Futbin meta rating. Dormant: 2,745 Kaggle rows + 1,405 fut.gg rows (no Futbin enrichment — kept for provenance, not deleted). Item_type distribution (futbin.com only): normal 18,729 · special 969 · icon 306 · hero 216 · tots 66 · rttf 47 · toty 40. Fcdb lookups should filter `source_dataset='futbin.com' AND deleted_at IS NULL` for real data. See Futbin cleanup review in `tasks/todo.md` (commits `518be6b` item_type regex fix + `983cb2a` audit scope fix).
 
 Stack: **Next.js 15 (App Router) + Supabase (Postgres/Auth/Storage/Realtime) + Vercel + Resend + Anthropic SDK (@anthropic-ai/sdk) + framer-motion + rembg/OpenCV Python pipeline for asset processing**.
 
@@ -44,9 +46,11 @@ Read these before proposing changes:
 
 **Dropped entirely (do NOT build at any phase):** GPS geofence, QR check-in, prize disbursement automation, under-18 parental consent, auto promotion/relegation, mobile app, anonymous whistleblower flow, **Paystack + any payment gateway** (dropped 2026-04-21 — manual ledger only, caution-fee balances tracked by admin hand-entry), **content obligations** (dropped 2026-04-22 — no platform-side collection of social-media post links; tables soft-archived per migration `20260507000020`), **preseason shoots** (dropped 2026-04-22 — no platform-side scheduling/attendance for pre-season photo/video sessions; tables soft-archived; `incident_type='preseason_miss'` enum value retained for historical disciplinary rows only).
 
-**Deferred (not yet built):** multi-season abstraction, Futbin scraper (Phase 3 attempt), social/weekly auto-generated graphics, IG/TikTok API auto-verification, MFA + advanced device fingerprinting, full holiday-aware business-day math.
+**Deferred (not yet built):** multi-season abstraction, social/weekly auto-generated graphics, IG/TikTok API auto-verification, MFA + advanced device fingerprinting, full holiday-aware business-day math.
 
-**Now shipped (was "deferred" in Phase 1A):** vMix/OBS/Streamlabs overlay bridge (Plan 12), 12-role matrix + DB perms (Plan 9), squad submission + Friday change window (Plan 10), void-match propagation (Plan 11), orgs + disputes + appeals server modules (Plan 13A — content + preseason subsystems dropped 2026-04-22 per Plan 33).
+**Dormant datasets (kept, not mutated):** `fc26_players` rows with `source_dataset IN ('kaggle','fut.gg')` — 2,745 Kaggle + 1,405 fut.gg rows carry no Futbin pricing/images/stats. Left in place for provenance; all fcdb runtime lookups MUST filter `source_dataset='futbin.com' AND deleted_at IS NULL`.
+
+**Now shipped (was "deferred" in Phase 1A):** vMix/OBS/Streamlabs overlay bridge (Plan 12), 12-role matrix + DB perms (Plan 9), squad submission + Friday change window (Plan 10), void-match propagation (Plan 11), orgs + disputes + appeals server modules (Plan 13A — content + preseason subsystems dropped 2026-04-22 per Plan 33), **Futbin scraper + FCDB enrichment** (Phase 3 attempt: 20,372 rows live as of 2026-04-23; shared classifier at `KNOWLEDGE/extracted/_classify_variant.js`).
 
 When in doubt, check `PRODUCT_STRUCTURE.md` §2.5 + `tasks/todo.md` review sections.
 
