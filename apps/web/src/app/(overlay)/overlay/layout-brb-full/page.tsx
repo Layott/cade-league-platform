@@ -754,7 +754,7 @@ function BrbFullInner({
             style={{ height: 42, maxWidth: 120, objectFit: "contain", opacity: 0.95 }}
           />
           <img
-            src="/brand/logos/partners/esf-nigeria.png"
+            src="/brand/logos/partners/trace-tv.png"
             alt=""
             aria-hidden
             style={{ height: 42, maxWidth: 120, objectFit: "contain", opacity: 0.95 }}

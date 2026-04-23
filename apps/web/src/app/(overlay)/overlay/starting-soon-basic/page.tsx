@@ -110,7 +110,7 @@ export default function StartingSoonBasicPage() {
               <span className="ss-partner-divider" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/logos/partners/esf-nigeria.png"
+                src="/brand/logos/partners/trace-tv.png"
                 alt=""
                 className="ss-partner-img"
               />

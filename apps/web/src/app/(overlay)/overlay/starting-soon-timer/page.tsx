@@ -553,7 +553,7 @@ function MarqueeStrap() {
     "◆",
     "GAMEPRIDE",
     "◆",
-    "ESF NIGERIA",
+    "TRACE TV",
     "◆",
     "NATIONAL E-SOCCER PRO LEAGUE",
     "◆",

@@ -717,8 +717,8 @@ function BrbBasic({ message }: { message?: string }) {
           <span className="partner-divider" />
           <div className="pitem">
             <Image
-              src="/brand/logos/partners/esf-nigeria.png"
-              alt="ESF Nigeria"
+              src="/brand/logos/partners/trace-tv.png"
+              alt="Trace TV"
               width={180}
               height={56}
             />

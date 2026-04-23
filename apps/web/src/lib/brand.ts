@@ -18,7 +18,7 @@ export const PARTNER_LOGOS = {
   esportsAfricaNewsBlack: "/brand/logos/partners/esports-africa-news-black.png",
   esportsAfricaNewsWhite: "/brand/logos/partners/esports-africa-news-white.png",
   gamepride: "/brand/logos/partners/gamepride.png",
-  esfNigeria: "/brand/logos/partners/esf-nigeria.png",
+  traceTv: "/brand/logos/partners/trace-tv.png",
 } as const;
 
 export const BRAND_TOKENS = {
