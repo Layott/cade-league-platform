@@ -57,34 +57,41 @@ function parseCoins(raw) {
 
 async function extract(page) {
   return page.evaluate(() => {
-    let rows = Array.from(document.querySelectorAll("tr.player_tr_1, tr.player_tr_2"));
-    if (rows.length === 0) rows = Array.from(document.querySelectorAll("table.players_table tbody tr, table#repTb tbody tr"));
-    if (rows.length === 0) rows = Array.from(document.querySelectorAll("a[href*='/26/player/']"));
+    const rows = Array.from(document.querySelectorAll("tr.player-row"));
     const out = [];
     for (const row of rows) {
-      const anchor = row.tagName === "A" ? row : row.querySelector("a[href*='/26/player/']");
-      const href = anchor ? anchor.getAttribute("href") || "" : "";
+      const cardAnchor = row.querySelector("a.player-row-playercard, a[href*='/26/player/']");
+      const href = cardAnchor?.getAttribute("href") || "";
       const hrefM = href.match(/\/26\/player\/(\d+)\/([^/?#]+)/);
       if (!hrefM) continue;
-      const nameEl = row.querySelector(".player_name_players_table") || row.querySelector(".table-player-name") || row.querySelector("[class*='player-name']") || anchor;
-      const name = nameEl ? (nameEl.getAttribute("data-original-title") || nameEl.textContent.trim()) : null;
-      const ratingEl = row.querySelector(".pcdisplay-rat") || row.querySelector(".rating") || row.querySelector("[class*='rating']");
-      const rating = ratingEl ? parseInt(ratingEl.textContent.trim(), 10) : null;
-      const posEl = row.querySelector(".pcdisplay-pos") || row.querySelector(".position") || row.querySelector("[class*='pos']");
-      const revEl = row.querySelector(".pcdisplay-rev") || row.querySelector(".revision") || row.querySelector("[class*='version']");
-      const pricePsEl = row.querySelector(".platform-ps-only") || row.querySelector("[data-price-ps]") || row.querySelector("[class*='ps-price']");
-      const pricePs = pricePsEl ? (pricePsEl.getAttribute("data-price-ps") || pricePsEl.getAttribute("data-price-num") || pricePsEl.textContent.trim()) : null;
-      const imgEl = row.querySelector("img.playercard, img[src*='players_html'], img[src*='/card/']");
+      const nameAnchor = row.querySelector("a.table-player-name");
+      const name = nameAnchor?.textContent?.trim() || row.querySelector("[title]")?.getAttribute("title")?.trim() || null;
+      const ratingText = row.querySelector("td.table-rating .rating-square, td.table-rating")?.textContent?.trim();
+      const rating = ratingText ? parseInt(ratingText, 10) : null;
       if (!name || !rating) continue;
+      const pricePs = row.querySelector("td.table-price.platform-ps-only .price")?.textContent?.trim() || null;
+      const pricePc = row.querySelector("td.table-price.platform-pc-only .price")?.textContent?.trim() || null;
+      const intText = (sel) => { const t = row.querySelector(sel)?.textContent?.trim(); const n = t ? parseInt(t, 10) : NaN; return Number.isFinite(n) ? n : null; };
+      const stats = {
+        pac: intText("td.table-pace .table-key-stats, td.table-pace"),
+        sho: intText("td.table-shooting .table-key-stats, td.table-shooting"),
+        pas: intText("td.table-passing .table-key-stats, td.table-passing"),
+        dri: intText("td.table-dribbling .table-key-stats, td.table-dribbling"),
+        def: intText("td.table-defending .table-key-stats, td.table-defending"),
+        phy: intText("td.table-physicality .table-key-stats, td.table-physicality"),
+      };
+      const weakFoot = intText("td.table-weak-foot");
+      const skillMoves = intText("td.table-skills");
+      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
+      const cardImageUrl = cardImgEl?.getAttribute("src") || null;
+      const cardBgSrc = row.querySelector("img.playercard-s-26-bg")?.getAttribute("src") || "";
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+      const variant = variantM ? variantM[1].replace(/_/g, "-") : null;
+      const metaTag = row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null;
       out.push({
-        resourceId: hrefM[1],
-        slug: hrefM[2],
-        name,
-        rating,
-        position: posEl ? posEl.textContent.trim() : null,
-        variant: revEl ? revEl.textContent.trim() : null,
-        pricePs,
-        cardImageUrl: imgEl ? imgEl.getAttribute("src") : null,
+        resourceId: hrefM[1], slug: hrefM[2], name, rating,
+        position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
+        variant, pricePs, pricePc, stats, weakFoot, skillMoves, metaTag, cardImageUrl,
       });
     }
     const pagers = Array.from(document.querySelectorAll("a[href*='?page=']"))
@@ -95,7 +102,9 @@ async function extract(page) {
 
 async function upsertRows(sb, rows, stats, newCards) {
   for (const r of rows) {
-    const coins = parseCoins(r.pricePs);
+    const coinsPs = parseCoins(r.pricePs);
+    const coinsPc = parseCoins(r.pricePc);
+    const coins = coinsPs || coinsPc;
     if (!coins) { stats.noPrice++; continue; }
     const slug = slugify(r.name);
     const sourceRowId = `futbin_${r.resourceId}`;
@@ -110,9 +119,23 @@ async function upsertRows(sb, rows, stats, newCards) {
     attrs.price_snapshot_at = new Date().toISOString();
     attrs.futbin_resource_id = r.resourceId;
     attrs.futbin_variant = r.variant || "normal";
+    attrs.platform_prices = { ps: coinsPs, pc: coinsPc };
+    if (r.stats) attrs.mains = r.stats;
+    if (r.weakFoot != null) attrs.weak_foot = r.weakFoot;
+    if (r.skillMoves != null) attrs.skill_moves = r.skillMoves;
+    if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
+    const vLower = (r.variant || "").toLowerCase();
+    let itemType = "normal";
+    if (/icon/.test(vLower)) itemType = "icon";
+    else if (/hero/.test(vLower)) itemType = "hero";
+    else if (/toty/.test(vLower)) itemType = "toty";
+    else if (/tots/.test(vLower)) itemType = "tots";
+    else if (/totw/.test(vLower)) itemType = "totw";
+    else if (/rttf|road-to-final|road-to-the-final/.test(vLower)) itemType = "rttf";
+    else if (r.variant && !/^(gold|silver|bronze|common|rare|5_gold|4_silver|3_bronze|if|normal)$/.test(vLower)) itemType = "special";
     if (exist) {
-      await sb.from("fc26_players").update({ value_coins_estimate: coins, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
+      await sb.from("fc26_players").update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
       stats.updated++;
     } else {
       const { data: base } = await sb.from("fc26_players")
@@ -124,7 +147,7 @@ async function upsertRows(sb, rows, stats, newCards) {
         await sb.from("fc26_players").insert({
           source_dataset: "futbin.com", source_row_id: sourceRowId,
           name: r.name, slug, rating: r.rating, position: r.position || "ST",
-          item_type: r.variant ? "special" : "normal",
+          item_type: itemType,
           value_coins_estimate: coins, attributes: attrs,
         });
         newCards.push({ name: r.name, rating: r.rating, variant: r.variant, resourceId: r.resourceId });

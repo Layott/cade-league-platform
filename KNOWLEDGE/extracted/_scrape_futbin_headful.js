@@ -61,91 +61,99 @@ function waitForEnter(prompt) {
   });
 }
 
-// Selector-tolerant extraction — tries several paths Futbin has used
-// across the EAFC 26 redesign to future-proof.
+// Extractor calibrated to live Futbin EAFC 26 DOM (Apr 2026).
+// Each row is a <tr class="player-row"> containing the card anchor
+// plus a dozen <td> columns: rating / skills / weak-foot / PAC / SHO /
+// PAS / DRI / DEF / PHY / price-ps / price-pc / popularity / etc.
 async function extractListPage(page) {
   return page.evaluate(() => {
-    // Approach 1 — classic <tr class="player_tr_1|2"> layout
-    let rows = Array.from(document.querySelectorAll("tr.player_tr_1, tr.player_tr_2"));
-    // Approach 2 — generic tbody tr inside players_table / #repTb
-    if (rows.length === 0) {
-      rows = Array.from(document.querySelectorAll("table.players_table tbody tr, table#repTb tbody tr"));
-    }
-    // Approach 3 — modern card-grid (data-card-info / player-anchor based)
-    if (rows.length === 0) {
-      rows = Array.from(document.querySelectorAll("a[href*='/26/player/']"));
-    }
-
+    const rows = Array.from(document.querySelectorAll("tr.player-row"));
     const out = [];
     for (const row of rows) {
-      // href
-      const anchor = row.tagName === "A" ? row : row.querySelector("a[href*='/26/player/']");
-      const href = anchor ? anchor.getAttribute("href") || "" : "";
+      // Card anchor carries href + card art. May be nested <a class="player-row-playercard">.
+      const cardAnchor = row.querySelector("a.player-row-playercard, a[href*='/26/player/']");
+      const href = cardAnchor?.getAttribute("href") || "";
       const hrefM = href.match(/\/26\/player\/(\d+)\/([^/?#]+)/);
-      const resourceId = hrefM ? hrefM[1] : null;
-      const slug = hrefM ? hrefM[2] : null;
+      if (!hrefM) continue;
+      const resourceId = hrefM[1];
+      const slug = hrefM[2];
 
-      // name
-      const nameEl =
-        row.querySelector(".player_name_players_table") ||
-        row.querySelector(".table-player-name") ||
-        row.querySelector("[class*='player-name']") ||
-        anchor;
-      const name = nameEl ? (nameEl.getAttribute("data-original-title") || nameEl.textContent.trim()) : null;
+      // Name — the table-name column holds a separate anchor.
+      const nameAnchor = row.querySelector("a.table-player-name");
+      const titleAttrHolder = row.querySelector("[title]");
+      const name = nameAnchor?.textContent?.trim()
+        || titleAttrHolder?.getAttribute("title")?.trim()
+        || null;
 
-      // rating
-      const ratingEl =
-        row.querySelector(".pcdisplay-rat") ||
-        row.querySelector(".rating") ||
-        row.querySelector("[class*='rating']");
-      const rating = ratingEl ? parseInt(ratingEl.textContent.trim(), 10) : null;
+      // Rating
+      const ratingText = row.querySelector("td.table-rating .rating-square, td.table-rating")?.textContent?.trim();
+      const rating = ratingText ? parseInt(ratingText, 10) : null;
 
-      // position
-      const posEl =
-        row.querySelector(".pcdisplay-pos") ||
-        row.querySelector(".position") ||
-        row.querySelector("[class*='pos']");
-      const position = posEl ? posEl.textContent.trim() : null;
+      // Prices: PS + PC (XboX often mirrors PS on Futbin's list).
+      const pricePs = row.querySelector("td.table-price.platform-ps-only .price")?.textContent?.trim() || null;
+      const pricePc = row.querySelector("td.table-price.platform-pc-only .price")?.textContent?.trim() || null;
 
-      // revision / variant
-      const revEl =
-        row.querySelector(".pcdisplay-rev") ||
-        row.querySelector(".revision") ||
-        row.querySelector("[class*='version']");
-      const variant = revEl ? revEl.textContent.trim() : null;
+      // Main attrs
+      const intText = (sel) => {
+        const t = row.querySelector(sel)?.textContent?.trim();
+        const n = t ? parseInt(t, 10) : NaN;
+        return Number.isFinite(n) ? n : null;
+      };
+      const stats = {
+        pac: intText("td.table-pace .table-key-stats, td.table-pace"),
+        sho: intText("td.table-shooting .table-key-stats, td.table-shooting"),
+        pas: intText("td.table-passing .table-key-stats, td.table-passing"),
+        dri: intText("td.table-dribbling .table-key-stats, td.table-dribbling"),
+        def: intText("td.table-defending .table-key-stats, td.table-defending"),
+        phy: intText("td.table-physicality .table-key-stats, td.table-physicality"),
+      };
+      const weakFoot = intText("td.table-weak-foot");
+      const skillMoves = intText("td.table-skills");
+      const popularityText = row.querySelector("td.table-popularity")?.textContent?.trim();
+      const popularity = popularityText ? parseInt(popularityText.replace(/[^\d]/g, ""), 10) : null;
 
-      // price PS
-      const pricePsEl =
-        row.querySelector(".platform-ps-only") ||
-        row.querySelector("[data-price-ps]") ||
-        row.querySelector("[class*='ps-price']");
-      let pricePs = null;
-      if (pricePsEl) {
-        pricePs = pricePsEl.getAttribute("data-price-ps") || pricePsEl.getAttribute("data-price-num") || pricePsEl.textContent.trim();
-      }
+      // Futbin meta-rating ("95.1" tier tag)
+      const metaTag = row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null;
 
-      // card image
-      const imgEl = row.querySelector("img.playercard, img[src*='players_html'], img[src*='/card/']");
-      const cardImageUrl = imgEl ? imgEl.getAttribute("src") : null;
+      // Card art — the big inline <img alt="Name"> inside the card anchor.
+      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
+      const cardImageUrl = cardImgEl?.getAttribute("src") || null;
 
-      // nation, club
-      const nationEl = row.querySelector("[class*='nation']");
-      const clubEl = row.querySelector("[class*='club']");
+      // Variant — derived from the card background <img alt="" src="...<type>.png">.
+      // Futbin naming pattern: /cards/tiny/5_toty.png → variant "toty".
+      const cardBgEl = row.querySelector("img.playercard-s-26-bg");
+      const cardBgSrc = cardBgEl?.getAttribute("src") || "";
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+      const variant = variantM ? variantM[1].replace(/_/g, "-") : null;
 
-      if (resourceId && name && rating) {
-        out.push({
-          resourceId,
-          slug,
-          name,
-          rating,
-          position,
-          variant,
-          pricePs,
-          cardImageUrl,
-          nation: nationEl ? nationEl.textContent.trim() || nationEl.getAttribute("title") : null,
-          club: clubEl ? clubEl.textContent.trim() || clubEl.getAttribute("title") : null,
-        });
-      }
+      // Position — Futbin list page sometimes lacks a dedicated position column.
+      // When present it's under td.table-position or inside the card's alt-pos row.
+      const positionText = row.querySelector("td.table-position, .table-position-pos, .playercard-s-26-pos")?.textContent?.trim() || null;
+
+      // Nation + club from icon <img alt>
+      const nationImg = row.querySelector("img[alt='Nation']");
+      const clubImg = row.querySelector("img[alt='Club'], img[alt*='Club']");
+      // Futbin stores nation/club names on the card anchor title attribute in some views — fall back blank.
+
+      if (!name || !rating) continue;
+      out.push({
+        resourceId,
+        slug,
+        name,
+        rating,
+        position: positionText,
+        variant,
+        pricePs,
+        pricePc,
+        stats,
+        weakFoot,
+        skillMoves,
+        popularity,
+        metaTag,
+        cardImageUrl,
+        nationImg: nationImg?.getAttribute("src") || null,
+        clubImg: clubImg?.getAttribute("src") || null,
+      });
     }
 
     // Discover total pages
@@ -157,7 +165,9 @@ async function extractListPage(page) {
 
 async function upsertRows(sb, rows, stats, inserted, unmatched) {
   for (const r of rows) {
-    const coins = parseCoins(r.pricePs);
+    const coinsPs = parseCoins(r.pricePs);
+    const coinsPc = parseCoins(r.pricePc);
+    const coins = coinsPs || coinsPc;
     if (!coins) { stats.noPrice++; continue; }
     const normalizedSlug = slugify(r.name);
     const sourceRowId = `futbin_${r.resourceId}`;
@@ -175,11 +185,28 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     attrs.price_snapshot_at = new Date().toISOString();
     attrs.futbin_resource_id = r.resourceId;
     attrs.futbin_variant = r.variant || "normal";
+    attrs.platform_prices = { ps: coinsPs, pc: coinsPc };
+    if (r.stats) attrs.mains = r.stats;
+    if (r.weakFoot != null) attrs.weak_foot = r.weakFoot;
+    if (r.skillMoves != null) attrs.skill_moves = r.skillMoves;
+    if (r.popularity != null) attrs.popularity = r.popularity;
+    if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
+
+    // item_type bucket from variant string.
+    const vLower = (r.variant || "").toLowerCase();
+    let itemType = "normal";
+    if (/icon/.test(vLower)) itemType = "icon";
+    else if (/hero/.test(vLower)) itemType = "hero";
+    else if (/toty/.test(vLower)) itemType = "toty";
+    else if (/tots/.test(vLower)) itemType = "tots";
+    else if (/totw/.test(vLower)) itemType = "totw";
+    else if (/rttf|road-to-final|road-to-the-final/.test(vLower)) itemType = "rttf";
+    else if (r.variant && !/^(gold|silver|bronze|common|rare|5_gold|4_silver|3_bronze|if|normal)$/.test(vLower)) itemType = "special";
 
     if (exist) {
       await sb.from("fc26_players")
-        .update({ value_coins_estimate: coins, attributes: attrs, updated_at: new Date().toISOString() })
+        .update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() })
         .eq("id", exist.id);
       stats.updated++;
     } else {
@@ -205,7 +232,7 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
           slug: normalizedSlug,
           rating: r.rating,
           position: r.position || "ST",
-          item_type: r.variant ? "special" : "normal",
+          item_type: itemType,
           value_coins_estimate: coins,
           attributes: attrs,
         });
