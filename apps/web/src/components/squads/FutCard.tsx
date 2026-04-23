@@ -102,7 +102,16 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
   const nameSize = size === "md" ? "text-[11px]" : "text-[9px]";
   const variantSize = size === "md" ? "text-[9px]" : "text-[7px]";
   const hasPortrait = Boolean(card.cardImageUrl);
-  const hasFrame = Boolean(card.cardBgUrl);
+  // Fallback: if the row hasn't been re-scraped since the cardBgUrl
+  // capture patch, synthesise the frame URL from the known variant label.
+  // Futbin hosts frames at /cards/s26/{variant}.webp (pattern observed
+  // from the scraper). `onError` hides the img if the guess 404s.
+  const fallbackFrameUrl =
+    !card.cardBgUrl && card.variant
+      ? `https://cdn.futbin.com/cards/s26/${card.variant.toLowerCase()}.webp`
+      : null;
+  const frameUrl = card.cardBgUrl ?? fallbackFrameUrl;
+  const hasFrame = Boolean(frameUrl);
   const hasImage = hasPortrait || hasFrame;
 
   return (
@@ -120,15 +129,21 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
     >
       {/* Card frame (gold/icon/hero/promo shell). Rendered FIRST so the
           portrait sits above it and the text overlays sit on top of both. */}
-      {hasFrame ? (
+      {frameUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={card.cardBgUrl ?? ""}
+          src={frameUrl}
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 h-full w-full object-contain"
           loading="lazy"
           decoding="async"
+          onError={(e) => {
+            // Frame URL was a guess (synthesised from variant) and the
+            // CDN path didn't match. Hide so the portrait + band tile
+            // can render cleanly instead.
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
         />
       ) : null}
       {hasPortrait ? (

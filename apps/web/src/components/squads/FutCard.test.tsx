@@ -17,6 +17,7 @@ function mkCard(over: Partial<CardSearchResult> = {}): CardSearchResult {
     itemType: "icon",
     priceCoins: 125_000,
     cardImageUrl: null,
+    cardBgUrl: null,
     variant: null,
     ...over,
   };
@@ -28,28 +29,39 @@ describe("FutCard", () => {
     expect(screen.getByText(/Add/i)).toBeTruthy();
   });
 
-  it("renders the solid-band fallback when cardImageUrl is absent", () => {
-    render(<FutCard card={mkCard({ cardImageUrl: null, variant: "Icon" })} />);
-    // No <img> element because imageUrl is absent
+  it("renders the solid-band fallback when no image + no variant", () => {
+    render(<FutCard card={mkCard({ cardImageUrl: null, cardBgUrl: null, variant: null })} />);
+    // No <img> elements because neither portrait nor frame URL available
     expect(document.querySelector("img")).toBeNull();
-    // Variant label is shown
-    expect(screen.getByText("Icon")).toBeTruthy();
   });
 
-  it("renders the FUT card art when cardImageUrl is present", () => {
-    const url =
-      "https://game-assets.fut.gg/cdn-cgi/image/quality=85,format=auto,width=300/2026/futgg-player-item-card/26-42.abc.webp";
+  it("synthesises a frame URL from the variant when cardBgUrl is absent", () => {
+    render(<FutCard card={mkCard({ variant: "5-toty" })} />);
+    const imgs = document.querySelectorAll("img");
+    // Exactly one image — the synthesised frame.
+    expect(imgs.length).toBe(1);
+    expect(imgs[0].getAttribute("src")).toMatch(/\/cards\/s26\/5-toty\.webp$/);
+  });
+
+  it("renders portrait + frame when both cardImageUrl and cardBgUrl are present", () => {
+    const portrait = "https://cdn3.futbin.com/content/fifa26/img/players/p231747.png";
+    const frame = "https://cdn.futbin.com/cards/s26/5-toty.webp";
     render(
       <FutCard
-        card={mkCard({ cardImageUrl: url, variant: "Trophy Titans Hero" })}
+        card={mkCard({
+          cardImageUrl: portrait,
+          cardBgUrl: frame,
+          variant: "5-toty",
+        })}
         size="md"
       />,
     );
-    const img = document.querySelector("img");
-    expect(img).toBeTruthy();
-    expect(img?.getAttribute("src")).toBe(url);
-    // Variant label is rendered
-    expect(screen.getByText("Trophy Titans Hero")).toBeTruthy();
+    const imgs = document.querySelectorAll("img");
+    expect(imgs.length).toBe(2);
+    // Frame is rendered first so it sits behind the portrait.
+    expect(imgs[0].getAttribute("src")).toBe(frame);
+    expect(imgs[1].getAttribute("src")).toBe(portrait);
+    expect(screen.getByText("5-toty")).toBeTruthy();
   });
 
   it("sets a title attribute combining name, rating + variant", () => {
