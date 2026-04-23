@@ -3,10 +3,11 @@
 // it. Uses a best-guess URL pattern built from the existing
 // `attributes.futbin_variant` label so we don't need to rescrape Futbin.
 //
-// Futbin's observed card-frame URL shape:
-//   https://cdn.futbin.com/cards/s26/{variant}.webp
-// where {variant} is the exact hyphenated label ("3-gold", "5-toty",
-// "72-heroes", etc).
+// Futbin's observed card-frame URL shape (captured from real HTML
+// 2026-04-23):
+//   https://cdn3.futbin.com/content/fifa26/img/cards/tiny/{variant_underscored}.png
+// Variants are stored hyphenated ("5-toty", "111-fantasy-fc"); the CDN
+// path uses underscores + a .png extension.
 //
 // Safe: only writes rows that currently have card_bg_url null. Idempotent.
 // Does NOT hit Futbin — purely DB updates.
@@ -27,11 +28,12 @@ function loadEnv() {
   }
 }
 
-const BASE = "https://cdn.futbin.com/cards/s26/";
+const BASE = "https://cdn3.futbin.com/content/fifa26/img/cards/tiny/";
 
 function buildBgUrl(variant) {
   if (!variant) return null;
-  return `${BASE}${variant}.webp`;
+  const underscored = String(variant).toLowerCase().replace(/-/g, "_");
+  return `${BASE}${underscored}.png`;
 }
 
 (async () => {

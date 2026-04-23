@@ -167,7 +167,14 @@ export function NavDrawer({
   // `position: fixed`. Without the portal the drawer would only span the
   // header band — user saw that bug on the first ship and asked for the
   // full-height slide from the right side.
-  if (typeof document === "undefined") return null;
+  //
+  // Hydration: createPortal renders outside the React tree so the server-
+  // rendered HTML never contains the portal subtree. Gate the portal on
+  // a post-mount flag so client-side hydration matches the server's
+  // "nothing here" output first, THEN inserts the portal on the next tick.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
     <div role="presentation" data-testid="nav-drawer-shell">

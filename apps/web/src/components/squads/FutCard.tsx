@@ -104,11 +104,14 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
   const hasPortrait = Boolean(card.cardImageUrl);
   // Fallback: if the row hasn't been re-scraped since the cardBgUrl
   // capture patch, synthesise the frame URL from the known variant label.
-  // Futbin hosts frames at /cards/s26/{variant}.webp (pattern observed
-  // from the scraper). `onError` hides the img if the guess 404s.
+  // Real Futbin pattern (observed in scraped HTML, 2026-04-23):
+  //   https://cdn3.futbin.com/content/fifa26/img/cards/tiny/{variant_underscored}.png
+  // Variants are canonically stored hyphenated ("5-toty", "72-heroes",
+  // "111-fantasy-fc"); Futbin's CDN uses underscores for the filename,
+  // so convert on the way out.
   const fallbackFrameUrl =
     !card.cardBgUrl && card.variant
-      ? `https://cdn.futbin.com/cards/s26/${card.variant.toLowerCase()}.webp`
+      ? `https://cdn3.futbin.com/content/fifa26/img/cards/tiny/${card.variant.toLowerCase().replace(/-/g, "_")}.png`
       : null;
   const frameUrl = card.cardBgUrl ?? fallbackFrameUrl;
   const hasFrame = Boolean(frameUrl);
