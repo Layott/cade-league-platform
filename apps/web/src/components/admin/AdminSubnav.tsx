@@ -17,6 +17,8 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "Dashboard", exact: true },
+  { href: "/admin/branding", label: "Branding" },
+  { href: "/admin/players", label: "Players" },
   { href: "/admin/match-days", label: "Match days" },
   { href: "/admin/punishments", label: "Punishments" },
   { href: "/admin/squads", label: "Squads" },
@@ -25,6 +27,7 @@ const TABS = [
   { href: "/admin/appeals", label: "Appeals" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/broadcast", label: "Broadcast" },
+  { href: "/admin/youtube-channels", label: "YouTube" },
   { href: "/admin/roles", label: "Roles" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/trash", label: "Trash" },

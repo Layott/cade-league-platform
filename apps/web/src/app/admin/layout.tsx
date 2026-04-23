@@ -21,6 +21,8 @@ import { hasPermAsync } from "@/lib/perms-db";
 // List of every tab href registered in AdminSubnav.tsx.
 const TAB_PERMS: Array<{ href: string; perm: string }> = [
   { href: "/admin", perm: "audit.read" },
+  { href: "/admin/branding", perm: "branding.manage" },
+  { href: "/admin/players", perm: "users.edit" },
   { href: "/admin/match-days", perm: "matches.read" },
   { href: "/admin/punishments", perm: "punishments.read" },
   { href: "/admin/squads", perm: "squads.validate" },
@@ -29,6 +31,7 @@ const TAB_PERMS: Array<{ href: string; perm: string }> = [
   { href: "/admin/appeals", perm: "appeals.read" },
   { href: "/admin/announcements", perm: "announcements.read" },
   { href: "/admin/broadcast", perm: "broadcast.manage" },
+  { href: "/admin/youtube-channels", perm: "branding.manage" },
   { href: "/admin/roles", perm: "roles.manage" },
   { href: "/admin/users", perm: "users.manage" },
   { href: "/admin/trash", perm: "trash.restore" },

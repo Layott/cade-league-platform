@@ -37,10 +37,14 @@ const PLAYER_LINKS: LinkRow[] = [
 ];
 
 const STAFF_LINKS: LinkRow[] = [
-  { href: "/admin", label: "Admin Console" },
-  { href: "/admin/broadcast", label: "Broadcast" },
+  { href: "/admin", label: "Site Manager" },
+  { href: "/admin/branding", label: "Branding" },
+  { href: "/admin/players", label: "Players" },
   { href: "/admin/match-days", label: "Match Days" },
   { href: "/admin/squads", label: "Squads" },
+  { href: "/admin/broadcast", label: "Broadcast" },
+  { href: "/admin/broadcast/stingers", label: "Stingers" },
+  { href: "/admin/youtube-channels", label: "YouTube Channels" },
   { href: "/admin/punishments", label: "Punishments" },
   { href: "/admin/stats-review", label: "Stats Review" },
   { href: "/admin/appeals", label: "Appeals" },

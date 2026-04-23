@@ -1,5 +1,44 @@
 # Tasks — Active Work
 
+Active plan: **Plan 47 — Site Manager (Wix/Hostinger-style admin backend)**. User brief 2026-04-22.
+
+## Plan 47 tasks
+
+- [x] 1. Migration `20260511000100_plan47_brand_settings.sql` — brand_settings + brand_assets tables + brand-logos storage bucket + perm seed `branding.manage` on admin role.
+- [x] 2. Migration `20260511000200_plan47_youtube_channels.sql` — youtube_channels table + seed `@CadeEsports` default row.
+- [x] 3. `server/branding/read.ts` + `write.ts` + tests — getBrandConfig, upsertBrandSettings, upsertBrandAsset, listAllBrandAssets.
+- [x] 4. `server/youtube/channels.ts` + tests — listChannels, createChannel, deleteChannel, promoteToDefault.
+- [x] 5. lib/brand.ts kept static for back-compat; server/branding/read.ts exposes getBrandConfig() that overlays DB rows on top.
+- [x] 6. Refactor `app/api/youtube/live/route.ts` to iterate DB-registered channels (not hard-coded @CadeEsports).
+- [x] 7. New `/admin/branding/page.tsx` — tabs: Logos + Colors & Fonts + preview pane.
+- [x] 8. New `/admin/youtube-channels/page.tsx` — list + add + promote + remove.
+- [x] 9. New `/admin/broadcast/stingers/page.tsx` — consolidated 6-stinger trigger panel.
+- [x] 10. New `/admin/players/page.tsx` + `/admin/players/[id]/edit/page.tsx` — roster table + comprehensive editor.
+- [x] 11. Redesign `/admin/page.tsx` — Site Manager hub: hero strip + 18-tile grid with inline SVG icons.
+- [x] 12. Update `NavDrawer.tsx` STAFF_LINKS — rename "Admin Console" → "Site Manager"; add Branding, YouTube Channels, Stingers, Players.
+- [x] 13. Update `AdminSubnav.tsx` TABS + `admin/layout.tsx` TAB_PERMS with new routes.
+- [x] 14. Update `perms.ts` seed doc with `branding.manage` on admin + `perms.seed.test.ts` coverage.
+- [x] 15. Push migrations → cloud via `npm run db:push` (applied both).
+- [x] 16. Run unit tests: branding + youtube channels + perms seed all green (53 new tests). Full suite pending.
+- [ ] 17. Commit + push via URL-embedded PAT.
+
+## Plan 47 review
+
+**Delta:**
+
+- 6 server modules: branding/read.ts (+test), branding/write.ts (+test), youtube/channels.ts (+test) — +16 unit tests covering fallback colors, asset overlay, hex validation, upsert behaviour, handle format validation, default-channel promotion.
+- 2 migrations applied cloud: brand_settings + brand_assets + brand-logos bucket + branding.manage perm + youtube_channels + @CadeEsports seed (is_default=true).
+- 5 new admin routes: /admin/branding (two tabs), /admin/youtube-channels, /admin/broadcast/stingers (6-stinger trigger grid), /admin/players (roster), /admin/players/[id]/edit.
+- 1 redesigned page: /admin/page.tsx — hero strip (active season / broadcast / next match day / open cases) + 18 permission-filtered tiles with inline SVG icons.
+- 1 refactor: /api/youtube/live iterates DB-registered channels.
+- 3 tests added for seed contract (admin wildcard + branding.manage + non-admin denial).
+
+**Not touched (per spec):** /profile, /player public surfaces, overlay motion code, squad picker UI (Plan 30), referee attendance (Plan 46), fcdb scraper scripts.
+
+---
+
+## Plan 46 (archived)
+
 Active plan: **Plan 46 — Global hamburger nav drawer + /referee/attendance surface**. User brief 2026-04-22.
 
 ## Plan 46 tasks (active 2026-04-22)

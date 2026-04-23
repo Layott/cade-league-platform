@@ -138,14 +138,29 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(hasPerm({ userId: null, roles: ["player"] }, "broadcast.manage")).toBe(false);
   });
 
-  it("admin seed is wildcard + explicit squads.reopen + broadcast.match_control (Plans 41, 42)", () => {
+  it("admin seed is wildcard + explicit squads.reopen + broadcast.match_control + branding.manage (Plans 41, 42, 47)", () => {
     // Admin still wins everything via '*'; we seed explicit entries so the
     // role_permissions table stays self-documenting for future role editors.
     // See supabase/migrations/20260509000001_plan41_squads_reopen_perm_seed.sql
     // and supabase/migrations/20260509000101_plan42_broadcast_perms_seed.sql.
+    // Plan 47 adds branding.manage to the explicit seed.
     expect(PERMS.admin).toContain("*");
     expect(PERMS.admin).toContain("squads.reopen");
     expect(PERMS.admin).toContain("broadcast.match_control");
+    expect(PERMS.admin).toContain("branding.manage");
+  });
+
+  it("admin matches branding.manage via wildcard (Plan 47)", () => {
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "branding.manage")).toBe(
+      true,
+    );
+  });
+
+  it("non-admin roles do not have branding.manage (Plan 47)", () => {
+    for (const r of ROLE_NAMES) {
+      if (r === "admin") continue;
+      expect(PERMS[r]).not.toContain("branding.manage");
+    }
   });
 
   it("admin + production hold broadcast.match_control; others do not (Plan 42)", () => {

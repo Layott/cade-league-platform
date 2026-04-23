@@ -31,7 +31,7 @@ export const ROLE_NAMES = [
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMS: Record<RoleName, readonly string[]> = {
-  admin: ["*", "squads.reopen", "broadcast.match_control"],
+  admin: ["*", "squads.reopen", "broadcast.match_control", "branding.manage"],
   loc: ["squads.validate", "squads.change_authorize"],
   idc: [],
   // Plan 46 — refs mark attendance from /referee/attendance (migration
