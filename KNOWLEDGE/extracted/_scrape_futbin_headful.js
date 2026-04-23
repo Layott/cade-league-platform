@@ -298,23 +298,41 @@ async function main() {
   saveState(state);
 
   const totalPages = maxPage || 600;
+  // Retry-on-failure: every page keeps retrying until it returns ≥1 row OR
+  // we've concluded "catalogue end" (≥3 consecutive zero-row pages).
+  let consecutiveZero = 0;
   for (let p = state.lastPage + 1; p <= totalPages; p++) {
     await sleep(jitter());
-    try {
-      await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.waitForTimeout(3500);
-      const { rows } = await extractListPage(page);
-      if (rows.length === 0) { console.log(`[headful] p${p}: 0 rows — likely end.`); break; }
-      stats.pages++; stats.rows += rows.length;
-      await upsertRows(sb, rows, stats, inserted, unmatched);
-      state.lastPage = p;
-      if (p % 10 === 0) saveState(state);
-      if (p % 5 === 0 || p < 5) {
-        console.log(`[headful] p${p}/${totalPages}: +${rows.length} | upd=${stats.updated} ins=${stats.inserted} np=${stats.noPrice}`);
+    let attempt = 0;
+    let succeeded = false;
+    let pageRows = [];
+    while (!succeeded) {
+      attempt++;
+      try {
+        await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.waitForTimeout(3500);
+        const { rows } = await extractListPage(page);
+        pageRows = rows;
+        succeeded = true;
+      } catch (e) {
+        const backoff = Math.min(300000, 10000 * attempt); // 10s, 20s, 30s, ... cap 5min
+        console.error(`[err] p${p} attempt ${attempt}: ${e.message} — retrying in ${backoff / 1000}s`);
+        await sleep(backoff);
       }
-    } catch (e) {
-      console.error(`[err] p${p}: ${e.message}`);
-      await sleep(10000);
+    }
+    if (pageRows.length === 0) {
+      consecutiveZero++;
+      console.log(`[headful] p${p}: 0 rows (${consecutiveZero}/3)`);
+      if (consecutiveZero >= 3) { console.log(`[headful] catalogue end at p${p}`); break; }
+      continue;
+    }
+    consecutiveZero = 0;
+    stats.pages++; stats.rows += pageRows.length;
+    await upsertRows(sb, pageRows, stats, inserted, unmatched);
+    state.lastPage = p;
+    if (p % 10 === 0) saveState(state);
+    if (p % 5 === 0 || p < 5) {
+      console.log(`[headful] p${p}/${totalPages}: +${pageRows.length} | upd=${stats.updated} ins=${stats.inserted} np=${stats.noPrice}`);
     }
   }
 

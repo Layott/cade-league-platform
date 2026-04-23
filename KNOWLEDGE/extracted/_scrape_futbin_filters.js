@@ -181,24 +181,40 @@ async function scrapeBand(page, sb, band, state, stats, inserted) {
   }
   let p = 1;
   let totalPages = null;
+  let consecutiveZero = 0;
   while (true) {
     await sleep(jitter());
-    try {
-      await page.goto(LIST_URL(band, p), { waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.waitForTimeout(3000);
-      const { rows, maxPage } = await extract(page);
-      if (p === 1) totalPages = maxPage || 1;
-      if (rows.length === 0) { console.log(`[${band.key}] p${p}: 0 rows — band end`); break; }
-      stats.bandRows[band.key] = (stats.bandRows[band.key] || 0) + rows.length;
-      await upsertRows(sb, rows, stats, inserted);
-      if (p === 1 || p % 10 === 0) console.log(`[${band.key}] p${p}/${totalPages}: +${rows.length} | total upd=${stats.updated} ins=${stats.inserted}`);
-      p++;
-      if (totalPages && p > totalPages) break;
-      if (p > 300) break; // safety
-    } catch (e) {
-      console.error(`[err] ${band.key} p${p}: ${e.message}`);
-      await sleep(10000);
+    let attempt = 0;
+    let pageRows = null;
+    let maxPageSeen = null;
+    while (pageRows === null) {
+      attempt++;
+      try {
+        await page.goto(LIST_URL(band, p), { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.waitForTimeout(3000);
+        const { rows, maxPage } = await extract(page);
+        pageRows = rows;
+        maxPageSeen = maxPage;
+      } catch (e) {
+        const backoff = Math.min(300000, 10000 * attempt);
+        console.error(`[err] ${band.key} p${p} attempt ${attempt}: ${e.message} — retry in ${backoff / 1000}s`);
+        await sleep(backoff);
+      }
     }
+    if (p === 1 && maxPageSeen) totalPages = maxPageSeen;
+    if (pageRows.length === 0) {
+      consecutiveZero++;
+      if (consecutiveZero >= 3) { console.log(`[${band.key}] p${p}: 0 rows — band end`); break; }
+      p++;
+      continue;
+    }
+    consecutiveZero = 0;
+    stats.bandRows[band.key] = (stats.bandRows[band.key] || 0) + pageRows.length;
+    await upsertRows(sb, pageRows, stats, inserted);
+    if (p === 1 || p % 10 === 0) console.log(`[${band.key}] p${p}/${totalPages}: +${pageRows.length} | total upd=${stats.updated} ins=${stats.inserted}`);
+    p++;
+    if (totalPages && p > totalPages) break;
+    if (p > 300) break;
   }
   state.done.push(band.key);
   saveState(state);

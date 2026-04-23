@@ -199,22 +199,35 @@ async function main() {
   stats.pages = 1; stats.rows = probe.rows.length;
   state.lastPage = 1; saveState(state);
 
+  let consecutiveZero = 0;
   for (let p = state.lastPage + 1; p <= totalPages; p++) {
     await sleep(jitter());
-    try {
-      await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.waitForTimeout(3500);
-      const { rows } = await extract(page);
-      if (rows.length === 0) { console.log(`[auto] p${p}: 0 rows — stopping.`); break; }
-      stats.pages++; stats.rows += rows.length;
-      await upsertRows(sb, rows, stats, newCards);
-      state.lastPage = p;
-      if (p % 10 === 0) saveState(state);
-      if (p % 20 === 0 || p < 3) console.log(`[auto] p${p}/${totalPages}: upd=${stats.updated} ins=${stats.inserted} np=${stats.noPrice}`);
-    } catch (e) {
-      console.error(`[err] p${p}: ${e.message}`);
-      await sleep(10000);
+    let attempt = 0;
+    let pageRows = null;
+    while (pageRows === null) {
+      attempt++;
+      try {
+        await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.waitForTimeout(3500);
+        const { rows } = await extract(page);
+        pageRows = rows;
+      } catch (e) {
+        const backoff = Math.min(300000, 10000 * attempt);
+        console.error(`[err] p${p} attempt ${attempt}: ${e.message} — retry in ${backoff / 1000}s`);
+        await sleep(backoff);
+      }
     }
+    if (pageRows.length === 0) {
+      consecutiveZero++;
+      if (consecutiveZero >= 3) { console.log(`[auto] catalogue end at p${p}`); break; }
+      continue;
+    }
+    consecutiveZero = 0;
+    stats.pages++; stats.rows += pageRows.length;
+    await upsertRows(sb, pageRows, stats, newCards);
+    state.lastPage = p;
+    if (p % 10 === 0) saveState(state);
+    if (p % 20 === 0 || p < 3) console.log(`[auto] p${p}/${totalPages}: upd=${stats.updated} ins=${stats.inserted} np=${stats.noPrice}`);
   }
 
   state.lastPage = 0; saveState(state); // reset for next nightly run
