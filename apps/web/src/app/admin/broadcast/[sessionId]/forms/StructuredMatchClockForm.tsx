@@ -20,10 +20,12 @@ export function StructuredMatchClockForm({
   sessionId,
   isLive,
   clock,
+  instanceKey = "primary",
 }: {
   sessionId: string;
   isLive: boolean;
   clock: ClockState | null;
+  instanceKey?: string;
 }) {
   const currentSeconds = clock?.secondsRemaining ?? 0;
   const [mins, setMins] = useState<number>(Math.floor(currentSeconds / 60));
@@ -65,6 +67,7 @@ export function StructuredMatchClockForm({
         data-testid="structured-clock-form"
       >
         <input type="hidden" name="sessionId" value={sessionId} />
+        <input type="hidden" name="instanceKey" value={instanceKey} />
         <input type="hidden" name="mode" value="countdown" />
         <input
           type="hidden"
@@ -126,6 +129,7 @@ export function StructuredMatchClockForm({
 
       <form action={resetClockAction} className="flex justify-end">
         <input type="hidden" name="sessionId" value={sessionId} />
+        <input type="hidden" name="instanceKey" value={instanceKey} />
         <DangerButton
           type="submit"
           size="sm"

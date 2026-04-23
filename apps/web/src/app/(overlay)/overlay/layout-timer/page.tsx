@@ -87,7 +87,10 @@ function TimerInner() {
   const sp = useSearchParams();
   const sessionId = sp?.get("session") ?? null;
   const pos = parsePos(sp?.get("pos") ?? null);
-  const clock = useMatchClock(sessionId);
+  // Plan 48.1 — /overlay/layout-timer?slot=primary|secondary addresses
+  // the right per-instance clock. Default primary for legacy URLs.
+  const slot = (sp?.get("slot") ?? "primary").trim() || "primary";
+  const clock = useMatchClock(sessionId, slot);
 
   return (
     <OverlayFrame>

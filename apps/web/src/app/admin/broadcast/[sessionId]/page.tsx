@@ -169,7 +169,8 @@ export default async function BroadcastSessionPage({
     active,
     presetsAll,
     lowerThirdInstances,
-    clock,
+    primaryClock,
+    secondaryClock,
     selectableMatches,
     primaryScoreBug,
     secondaryScoreBug,
@@ -178,7 +179,8 @@ export default async function BroadcastSessionPage({
     listActiveOverlays(sb, session.id),
     listPresets(sb),
     listActiveInstances(sb, session.id, "lower_third"),
-    getClock(sb, session.id),
+    getClock(sb, session.id, "primary"),
+    getClock(sb, session.id, "secondary"),
     listSelectableMatches(sb, session.id, { scope: "today" }),
     getActiveForTemplate(sb, session.id, "score_bug", "primary"),
     getActiveForTemplate(sb, session.id, "score_bug", "secondary"),
@@ -319,12 +321,24 @@ export default async function BroadcastSessionPage({
         initialLiveChatId={session.youtube_live_chat_id}
       />
 
-      {/* Match clock — Plan 37. Shared across both match slots. */}
-      <div className="space-y-1">
-        <MatchClockPanel sessionId={session.id} clock={clock} isLive={isLive} />
-        <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-          Match clock — shared across both slots
-        </div>
+      {/* Match clocks — Plan 37 + Plan 48.1 per-instance.
+          Primary clock drives /overlay/layout-timer?slot=primary.
+          Secondary drives /overlay/layout-timer?slot=secondary. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <MatchClockPanel
+          sessionId={session.id}
+          clock={primaryClock}
+          isLive={isLive}
+          instanceKey="primary"
+          title="Primary match clock"
+        />
+        <MatchClockPanel
+          sessionId={session.id}
+          clock={secondaryClock}
+          isLive={isLive}
+          instanceKey="secondary"
+          title="Secondary match clock"
+        />
       </div>
 
       {/* Editable rich panels */}

@@ -27,7 +27,11 @@ export async function GET(
   const gate = await checkViewToken(sb, req, id);
   if (!gate.ok) return gate.response;
 
-  const state = await getClock(sb, id);
+  // Plan 48.1 — per-instance clocks. `?instance=<key>` or `?slot=<key>`
+  // addresses a specific per-slot clock. Defaults to primary.
+  const url = new URL(req.url);
+  const instanceKey = (url.searchParams.get("instance") ?? url.searchParams.get("slot") ?? "primary").trim() || "primary";
+  const state = await getClock(sb, id, instanceKey);
   if (!state) {
     return NextResponse.json(null, {
       headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },

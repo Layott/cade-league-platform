@@ -270,6 +270,11 @@ export async function updateInstancePayloadAction(formData: FormData) {
 
 // -- Plan 37: match_clock ---------------------------------------------
 
+function readInstanceKey(formData: FormData): string {
+  const raw = String(formData.get("instanceKey") ?? "primary").trim();
+  return raw || "primary";
+}
+
 export async function setClockAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   const mode = String(formData.get("mode") ?? "countdown");
@@ -279,13 +284,14 @@ export async function setClockAction(formData: FormData) {
   if (!["countdown", "countup", "paused", "stopped"].includes(mode)) {
     throw new Error(`bad mode: ${mode}`);
   }
-
+  const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
   await setClock(sb, sessionId, {
     mode: mode as "countdown" | "countup" | "paused" | "stopped",
     secondsRemaining: Number(secondsRaw),
     label,
     userId: publicUserId,
+    instanceKey,
   });
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
@@ -293,24 +299,27 @@ export async function setClockAction(formData: FormData) {
 export async function startClockAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   if (!sessionId) throw new Error("sessionId required");
+  const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
-  await startClock(sb, sessionId, publicUserId);
+  await startClock(sb, sessionId, publicUserId, instanceKey);
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 
 export async function pauseClockAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   if (!sessionId) throw new Error("sessionId required");
+  const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
-  await pauseClock(sb, sessionId, publicUserId);
+  await pauseClock(sb, sessionId, publicUserId, instanceKey);
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 
 export async function resumeClockAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   if (!sessionId) throw new Error("sessionId required");
+  const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
-  await resumeClock(sb, sessionId, publicUserId);
+  await resumeClock(sb, sessionId, publicUserId, instanceKey);
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 
@@ -318,16 +327,18 @@ export async function adjustClockAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   const deltaRaw = String(formData.get("deltaSeconds") ?? "0");
   if (!sessionId) throw new Error("sessionId required");
+  const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
-  await adjustClock(sb, sessionId, Number(deltaRaw), publicUserId);
+  await adjustClock(sb, sessionId, Number(deltaRaw), publicUserId, instanceKey);
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 
 export async function resetClockAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   if (!sessionId) throw new Error("sessionId required");
+  const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
-  await resetClock(sb, sessionId, publicUserId);
+  await resetClock(sb, sessionId, publicUserId, instanceKey);
   revalidatePath(`/admin/broadcast/${sessionId}`);
 }
 

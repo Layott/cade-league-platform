@@ -50,7 +50,10 @@ function computeDisplay(snap: ClockSnapshot, nowMs: number): number {
   return snap.secondsRemaining;
 }
 
-export function useMatchClock(sessionId: string | null): MatchClockState {
+export function useMatchClock(
+  sessionId: string | null,
+  instanceKey: string = "primary",
+): MatchClockState {
   const [snap, setSnap] = useState<ClockSnapshot | null>(null);
   const [, setTick] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -60,10 +63,8 @@ export function useMatchClock(sessionId: string | null): MatchClockState {
     if (!sessionId) return;
     let cancelled = false;
 
-    fetch(
-      `/api/broadcast/sessions/${encodeURIComponent(sessionId)}/clock`,
-      { cache: "no-store" },
-    )
+    const url = `/api/broadcast/sessions/${encodeURIComponent(sessionId)}/clock?instance=${encodeURIComponent(instanceKey)}`;
+    fetch(url, { cache: "no-store" })
       .then((r) => r.json() as Promise<ApiResponse>)
       .then((row) => {
         if (cancelled || !row) return;
@@ -89,6 +90,7 @@ export function useMatchClock(sessionId: string | null): MatchClockState {
         { event: REALTIME.eventClockChanged },
         (msg: {
           payload: {
+            instanceKey?: string;
             mode: ClockMode;
             secondsRemaining: number;
             setAt: string;
@@ -97,6 +99,9 @@ export function useMatchClock(sessionId: string | null): MatchClockState {
         }) => {
           const p = msg.payload;
           if (!p) return;
+          // Filter to this hook's instance — primary realtime channel is shared.
+          const payloadKey = p.instanceKey ?? "primary";
+          if (payloadKey !== instanceKey) return;
           setSnap({
             mode: p.mode,
             secondsRemaining: p.secondsRemaining,
@@ -111,7 +116,7 @@ export function useMatchClock(sessionId: string | null): MatchClockState {
       cancelled = true;
       sb.removeChannel(channel);
     };
-  }, [sessionId]);
+  }, [sessionId, instanceKey]);
 
   // 250 ms rAF-throttled tick to refresh derived display.
   useEffect(() => {

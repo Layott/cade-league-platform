@@ -23,10 +23,16 @@ function clockTable(opts: { row?: Record<string, unknown> | null }) {
     .fn()
     .mockResolvedValue({ data: opts.row ?? null, error: null });
 
+  // Real chain (Plan 48.1): select().eq().eq().is().maybeSingle().
+  // Double .eq() for stream_session_id + instance_key.
+  const innerEq = () => ({
+    is: vi.fn(() => ({ maybeSingle })),
+  });
   return {
     upsert: vi.fn(() => ({ select: vi.fn(() => ({ single: upsertSingle })) })),
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
+        eq: vi.fn(() => innerEq()),
         is: vi.fn(() => ({ maybeSingle })),
       })),
     })),
