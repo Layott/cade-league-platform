@@ -43,8 +43,11 @@ export type CardSearchResult = {
 };
 
 const FUZZY_THRESHOLD = 0.2;
+// `attributes` is jsonb carrying `card_image_url` + `futbin_variant` from
+// the Futbin scraper — must be selected so the picker renders the real
+// FUT card art instead of the solid-colour fallback tile.
 const SELECT_COLUMNS =
-  "id, name, rating, position, alt_positions, club, league, nation, nation_iso, item_type, value_coins_estimate";
+  "id, name, rating, position, alt_positions, club, league, nation, nation_iso, item_type, value_coins_estimate, attributes";
 
 // fut.gg scraper stashes card visuals + the full variant label in
 // `attributes.card_image_url` + `attributes.futgg_variant`. The column is

@@ -17,6 +17,13 @@ export {
   clearSquadWindowOverride,
 } from "./window_override";
 export type { SquadWindowOverride, SquadWindowState } from "./window_override";
+export {
+  getPlayerSquadOverride,
+  setPlayerSquadOverride,
+  clearPlayerSquadOverride,
+  listPlayerSquadOverridesForWeek,
+} from "./player_override";
+export type { PlayerSquadOverride, PlayerOverrideState } from "./player_override";
 export { requestChange } from "./change";
 export { getRuleForSeason, upsertRule } from "./rules";
 export type { SquadRuleRow } from "./rules";
