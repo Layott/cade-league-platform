@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { PrimaryButton } from "@/components/admin/buttons";
 import { inputClass } from "@/components/admin/FormField";
+import { AssetUploader } from "@/components/broadcast/AssetUploader";
+import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
 import { triggerOverlayAction } from "../../actions";
 
 /**
@@ -81,6 +83,12 @@ export function StructuredBrbForm({
       </label>
       <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
         Ad video URL (optional)
+        <AssetUploader
+          kind="video"
+          label="ad video"
+          onUploaded={(url) => setAdVideoUrl(url)}
+          data-testid="brb-ad-upload"
+        />
         <input
           type="url"
           value={adVideoUrl}
@@ -117,19 +125,27 @@ export function StructuredBrbForm({
       <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
         Resumes in {totalSeconds}s
       </div>
-      <form action={triggerOverlayAction} className="flex justify-end">
-        <input type="hidden" name="sessionId" value={sessionId} />
-        <input type="hidden" name="templateKey" value="layout_brb_full" />
-        <input type="hidden" name="payload" value={JSON.stringify(payload)} />
-        <PrimaryButton
-          type="submit"
-          size="sm"
+      <div className="flex items-center justify-end gap-2">
+        <OffTriggerButton
+          templateKey="layout_brb_full"
+          sessionId={sessionId}
           disabled={!isLive}
-          data-testid="brb-trigger"
-        >
-          Trigger
-        </PrimaryButton>
-      </form>
+          data-testid="brb-off"
+        />
+        <form action={triggerOverlayAction}>
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <input type="hidden" name="templateKey" value="layout_brb_full" />
+          <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+          <PrimaryButton
+            type="submit"
+            size="sm"
+            disabled={!isLive}
+            data-testid="brb-trigger"
+          >
+            Trigger
+          </PrimaryButton>
+        </form>
+      </div>
     </div>
   );
 }

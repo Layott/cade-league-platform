@@ -1,11 +1,13 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { motion } from "framer-motion";
 import { PreviewStub } from "../PreviewStub";
 import {
   streamEndedSchema,
   type StreamEndedPayload,
 } from "@/server/overlays/schemas";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +41,14 @@ export const dynamic = "force-dynamic";
  */
 export default function StreamEndedPage() {
   return (
-    <PreviewStub
-      templateKey="stream_ended"
-      schema={streamEndedSchema}
-      position="fullscreen"
-      render={(p, { cycle }) => <StreamEndedScene payload={p} cycle={cycle} />}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="stream_ended"
+        schema={streamEndedSchema}
+        position="fullscreen"
+        render={(p, { cycle }) => <StreamEndedScene payload={p} cycle={cycle} />}
+      />
+    </OverlayFrame>
   );
 }
 

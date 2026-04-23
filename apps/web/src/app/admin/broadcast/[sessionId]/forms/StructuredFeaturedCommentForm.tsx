@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PrimaryButton } from "@/components/admin/buttons";
 import { inputClass, textareaClass } from "@/components/admin/FormField";
+import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
 import { triggerOverlayAction } from "../../actions";
 
 /**
@@ -123,20 +124,29 @@ export function StructuredFeaturedCommentForm({
         />
       </label>
 
-      <form action={triggerOverlayAction} className="flex justify-end">
-        <input type="hidden" name="sessionId" value={sessionId} />
-        <input type="hidden" name="templateKey" value="featured_comment" />
-        <input type="hidden" name="slot" value={slot} />
-        <input type="hidden" name="payload" value={JSON.stringify(payload)} />
-        <PrimaryButton
-          type="submit"
-          size="sm"
+      <div className="flex items-center justify-end gap-2">
+        <OffTriggerButton
+          templateKey="featured_comment"
+          sessionId={sessionId}
+          slot={slot}
           disabled={!isLive}
-          data-testid="fc-trigger"
-        >
-          Trigger
-        </PrimaryButton>
-      </form>
+          data-testid="fc-off"
+        />
+        <form action={triggerOverlayAction}>
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <input type="hidden" name="templateKey" value="featured_comment" />
+          <input type="hidden" name="slot" value={slot} />
+          <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+          <PrimaryButton
+            type="submit"
+            size="sm"
+            disabled={!isLive}
+            data-testid="fc-trigger"
+          >
+            Trigger
+          </PrimaryButton>
+        </form>
+      </div>
     </div>
   );
 }

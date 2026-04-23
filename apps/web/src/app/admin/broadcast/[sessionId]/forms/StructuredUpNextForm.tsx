@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { PrimaryButton } from "@/components/admin/buttons";
 import { inputClass } from "@/components/admin/FormField";
+import { AssetUploader } from "@/components/broadcast/AssetUploader";
+import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
 import type { UnplayedMatch } from "@/server/matches/unplayed";
 import { triggerOverlayAction } from "../../actions";
 
@@ -28,6 +30,8 @@ export function StructuredUpNextForm({
   const [homeName, setHomeName] = useState<string>("");
   const [awayName, setAwayName] = useState<string>("");
   const [kickoffAt, setKickoffAt] = useState<string>("");
+  const [homePhotoUrl, setHomePhotoUrl] = useState<string>("");
+  const [awayPhotoUrl, setAwayPhotoUrl] = useState<string>("");
 
   const picked = useMemo(
     () => unplayed.find((m) => m.id === matchId) ?? null,
@@ -45,8 +49,14 @@ export function StructuredUpNextForm({
     : kickoffAt.trim() || new Date().toISOString();
 
   const payload = {
-    home: { displayName: effectiveHome },
-    away: { displayName: effectiveAway },
+    home: {
+      displayName: effectiveHome,
+      ...(homePhotoUrl.trim() ? { photoUrl: homePhotoUrl.trim() } : {}),
+    },
+    away: {
+      displayName: effectiveAway,
+      ...(awayPhotoUrl.trim() ? { photoUrl: awayPhotoUrl.trim() } : {}),
+    },
     kickoffAt: effectiveKickoff,
     slot,
   };
@@ -152,20 +162,68 @@ export function StructuredUpNextForm({
         </label>
       </div>
 
-      <form action={triggerOverlayAction} className="flex justify-end">
-        <input type="hidden" name="sessionId" value={sessionId} />
-        <input type="hidden" name="templateKey" value="up_next_bug" />
-        <input type="hidden" name="slot" value={slot} />
-        <input type="hidden" name="payload" value={JSON.stringify(payload)} />
-        <PrimaryButton
-          type="submit"
-          size="sm"
+      {/* Plan 48 — per-side photo uploaders. Home + away photoUrl are
+          optional on the schema; when set, the overlay card replaces the
+          shield silhouette with the uploaded image. */}
+      <div className="grid gap-2 md:grid-cols-2">
+        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+          Home photo (optional)
+          <AssetUploader
+            kind="image"
+            label="home photo"
+            onUploaded={(url) => setHomePhotoUrl(url)}
+            data-testid="up-next-home-photo-upload"
+          />
+          <input
+            type="url"
+            value={homePhotoUrl}
+            onChange={(e) => setHomePhotoUrl(e.target.value)}
+            placeholder="https://…/home.png"
+            className={inputClass}
+            data-testid="up-next-home-photo"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+          Away photo (optional)
+          <AssetUploader
+            kind="image"
+            label="away photo"
+            onUploaded={(url) => setAwayPhotoUrl(url)}
+            data-testid="up-next-away-photo-upload"
+          />
+          <input
+            type="url"
+            value={awayPhotoUrl}
+            onChange={(e) => setAwayPhotoUrl(e.target.value)}
+            placeholder="https://…/away.png"
+            className={inputClass}
+            data-testid="up-next-away-photo"
+          />
+        </label>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <OffTriggerButton
+          templateKey="up_next_bug"
+          sessionId={sessionId}
           disabled={!isLive}
-          data-testid="up-next-trigger"
-        >
-          Trigger
-        </PrimaryButton>
-      </form>
+          data-testid="up-next-off"
+        />
+        <form action={triggerOverlayAction}>
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <input type="hidden" name="templateKey" value="up_next_bug" />
+          <input type="hidden" name="slot" value={slot} />
+          <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+          <PrimaryButton
+            type="submit"
+            size="sm"
+            disabled={!isLive}
+            data-testid="up-next-trigger"
+          >
+            Trigger
+          </PrimaryButton>
+        </form>
+      </div>
     </div>
   );
 }

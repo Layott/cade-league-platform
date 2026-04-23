@@ -22,6 +22,11 @@ vi.mock("../../actions", () => ({
   scoreBugDeltaAction: vi.fn(),
   resetScoreBugAction: vi.fn(),
   clearScoreBugAction: vi.fn(),
+  // Plan 48 — OffTriggerButton mounted inside the structured forms also
+  // imports these clear-* actions; stubbed here so JSDOM render doesn't
+  // blow up resolving the module.
+  clearOverlayAction: vi.fn(),
+  clearInstanceAction: vi.fn(),
 }));
 
 import { StructuredMatchClockForm } from "./StructuredMatchClockForm";

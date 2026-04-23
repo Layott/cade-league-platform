@@ -1,9 +1,11 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import Image from "next/image";
 import { PreviewStub } from "../PreviewStub";
 import { stingerIntroSchema } from "@/server/overlays/schemas";
 import { useOverlaySound } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +31,14 @@ export const dynamic = "force-dynamic";
  */
 export default function StingerIntroPage() {
   return (
-    <PreviewStub
-      templateKey="stinger_intro"
-      schema={stingerIntroSchema}
-      position="fullscreen"
-      render={(p, { cycle }) => <StingerIntroStage payload={p} cycle={cycle} />}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="stinger_intro"
+        schema={stingerIntroSchema}
+        position="fullscreen"
+        render={(p, { cycle }) => <StingerIntroStage payload={p} cycle={cycle} />}
+      />
+    </OverlayFrame>
   );
 }
 

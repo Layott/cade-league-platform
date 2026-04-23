@@ -6,18 +6,25 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useOverlayInstances } from "../../useOverlayInstances";
 import { lowerThirdSchema } from "@/server/overlays/schemas";
 import { ENTER } from "@/lib/motion";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
- * Plan 37 — multi-instance lower-third overlay.
+ * Plan 37 + Plan 48 — multi-instance lower-third overlay.
  *
- * Subscribes to `overlay:<sessionId>` and renders up to three stacked
- * cards keyed by instanceSlot. React key uses `instanceId` (stable across
- * payload edits) so re-publishing a payload to the same slot does NOT
- * re-mount and re-play enter motion.
+ * Plan 48 parity pass against
+ * `KNOWLEDGE/brand-assets/elements/17_lower_third.html`:
+ *   - 1920×1080 OverlayFrame root; positioning switched to absolute so
+ *     `?preview=1` scales the card along with the frame.
+ *   - 8 px pink accent bar → kept, with box-shadow glow on primary green.
+ *   - 180×180 photo slot with gradient backdrop (green→ink) matches ref.
+ *   - body panel min-width 520 px, padding 22/36/22/28 px, slope clip
+ *     (24 px) matches ref.
+ *   - title 62 px AghartiWide, tag 12 px Quedora — ref identical.
+ *   - Subtext line: separator (pink •) + gamer tag in primary + optional
+ *     stats.pts tail.
  *
- * Chrome lifted from `KNOWLEDGE/brand-assets/elements/17_lower_third.html`:
- * 8 px pink accent bar, 180 px green-bordered photo slot, body panel with
- * scanlight sweep + slope clip-path. Brand tokens only.
+ * React key stays `instanceId` so re-publishing to the same slot does NOT
+ * re-mount the card / re-play enter motion.
  */
 
 export const dynamic = "force-dynamic";
@@ -47,15 +54,7 @@ function LowerThirdInner() {
   const state = useOverlayInstances(sessionId, "lower_third", slot);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        background: "transparent",
-      }}
-      data-testid="overlay-root"
-    >
+    <OverlayFrame>
       <AnimatePresence>
         {[1, 2, 3].map((slot) => {
           const inst = state.bySlot[slot];
@@ -71,7 +70,7 @@ function LowerThirdInner() {
               exit={{ opacity: 0, x: -60 }}
               transition={{ ...ENTER, duration: 0.7 }}
               style={{
-                position: "fixed",
+                position: "absolute",
                 left: "120px",
                 bottom: placement.bottom,
                 display: "flex",
@@ -86,7 +85,7 @@ function LowerThirdInner() {
           );
         })}
       </AnimatePresence>
-    </div>
+    </OverlayFrame>
   );
 }
 
@@ -97,16 +96,16 @@ function LowerThirdCard({
 }) {
   return (
     <>
-      {/* pink accent bar */}
+      {/* pink accent bar — 8 px wide w/ pink glow */}
       <div
         style={{
           width: "8px",
           background: "var(--secondary)",
           transformOrigin: "bottom",
-          boxShadow: "0 0 18px var(--secondary-glow)",
+          boxShadow: "0 0 18px rgba(254, 3, 109, 0.5)",
         }}
       />
-      {/* photo slot */}
+      {/* photo slot — 180×180 with green→ink vertical gradient */}
       <div
         style={{
           position: "relative",
@@ -114,7 +113,7 @@ function LowerThirdCard({
           height: "180px",
           overflow: "hidden",
           background:
-            "linear-gradient(180deg, var(--primary-glow), var(--ink-1))",
+            "linear-gradient(180deg, rgba(107, 205, 6, 0.15), rgba(5, 8, 5, 0.9))",
         }}
       >
         {data.photoUrl ? (
@@ -163,7 +162,7 @@ function LowerThirdCard({
           }}
         />
       </div>
-      {/* body */}
+      {/* body panel — 520 px min, green borders, slope clip (24 px), scan sheen */}
       <div
         style={{
           minWidth: "520px",
@@ -175,10 +174,10 @@ function LowerThirdCard({
           flexDirection: "column",
           justifyContent: "center",
           gap: "6px",
-          clipPath:
-            "polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%)",
+          clipPath: "polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%)",
           position: "relative",
           overflow: "hidden",
+          boxShadow: "0 0 0 1px rgba(107, 205, 6, 0.2), 0 10px 40px rgba(0, 0, 0, 0.6)",
         }}
       >
         <div
@@ -206,7 +205,7 @@ function LowerThirdCard({
             color: "var(--chalk-0)",
             letterSpacing: "1px",
             textTransform: "uppercase",
-            textShadow: "2px 2px 0 var(--secondary-dim)",
+            textShadow: "2px 2px 0 rgba(254, 3, 109, 0.35)",
           }}
         >
           {data.displayName}
@@ -224,7 +223,7 @@ function LowerThirdCard({
             textTransform: "uppercase",
           }}
         >
-          <span style={{ color: "var(--secondary)" }}>·</span>
+          <span style={{ color: "var(--secondary)" }}>•</span>
           <span style={{ color: "var(--primary)" }}>@{data.gamerTag}</span>
           {data.stats ? (
             <span className="tabular" style={{ color: "var(--chalk-2)" }}>

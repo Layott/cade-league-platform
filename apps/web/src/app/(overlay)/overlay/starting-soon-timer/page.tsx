@@ -1,5 +1,6 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { motion } from "framer-motion";
 import { useEffect, useState, type CSSProperties } from "react";
 import Image from "next/image";
@@ -7,6 +8,7 @@ import { PreviewStub } from "../PreviewStub";
 import { startingSoonTimerSchema } from "@/server/overlays/schemas";
 import type { StartingSoonTimerPayload } from "@/server/overlays/schemas";
 import { useOverlaySound, type OverlaySoundSlot } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +47,14 @@ function fmt(totalSeconds: number): string {
 
 export default function StartingSoonTimerPage() {
   return (
-    <PreviewStub
-      templateKey="starting_soon_timer"
-      schema={startingSoonTimerSchema}
-      position="fullscreen"
-      render={(p, { cycle }) => <Inner key={cycle} payload={p} cycle={cycle} />}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="starting_soon_timer"
+        schema={startingSoonTimerSchema}
+        position="fullscreen"
+        render={(p, { cycle }) => <Inner key={cycle} payload={p} cycle={cycle} />}
+      />
+    </OverlayFrame>
   );
 }
 

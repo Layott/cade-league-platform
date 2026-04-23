@@ -1,5 +1,6 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 /**
  * Plan 16 amended — Miss Stinger (2s, full-screen).
  *
@@ -27,6 +28,7 @@ import { PreviewStub } from "../PreviewStub";
 import { stingerMissSchema } from "@/server/overlays/schemas";
 import { STINGER_IN, STINGER_OUT } from "@/lib/motion";
 import { useOverlaySound } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -38,14 +40,16 @@ const GREEN_BRIGHT = "#9fff2a";
 
 export default function StingerMissPage() {
   return (
-    <PreviewStub
-      templateKey="stinger_miss"
-      schema={stingerMissSchema}
-      position="fullscreen"
-      render={(p, { cycle }) => (
-        <StingerMissStage cycle={cycle} payload={p} />
-      )}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="stinger_miss"
+        schema={stingerMissSchema}
+        position="fullscreen"
+        render={(p, { cycle }) => (
+          <StingerMissStage cycle={cycle} payload={p} />
+        )}
+      />
+    </OverlayFrame>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { motion } from "framer-motion";
 import { PreviewStub } from "../PreviewStub";
 import {
@@ -8,6 +9,7 @@ import {
 } from "@/server/overlays/schemas";
 import { SCORE_FLIP, STINGER_IN } from "@/lib/motion";
 import { useOverlaySound } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +31,14 @@ export const dynamic = "force-dynamic";
  */
 export default function StingerWinnerPage() {
   return (
-    <PreviewStub
-      templateKey="stinger_winner"
-      schema={stingerWinnerSchema}
-      position="fullscreen"
-      render={(p, { cycle }) => <WinnerStage payload={p} cycle={cycle} />}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="stinger_winner"
+        schema={stingerWinnerSchema}
+        position="fullscreen"
+        render={(p, { cycle }) => <WinnerStage payload={p} cycle={cycle} />}
+      />
+    </OverlayFrame>
   );
 }
 

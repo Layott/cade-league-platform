@@ -1,11 +1,13 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { Suspense, useEffect, useId, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOverlayChannel } from "../../useOverlayChannel";
 import { featuredCommentSchema } from "@/server/overlays/schemas";
 import { ENTER, EXIT } from "@/lib/motion";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
  * Plan 45 — minimal CSS sanitizer for admin-authored overrides. Strips:
@@ -73,9 +75,11 @@ type Parsed = import("zod").infer<typeof featuredCommentSchema>;
 
 export default function FeaturedCommentPage() {
   return (
-    <Suspense fallback={null}>
-      <FeaturedCommentInner />
-    </Suspense>
+    <OverlayFrame>
+  <Suspense fallback={null}>
+        <FeaturedCommentInner />
+      </Suspense>
+    </OverlayFrame>
   );
 }
 

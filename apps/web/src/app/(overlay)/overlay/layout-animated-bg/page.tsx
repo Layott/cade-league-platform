@@ -1,7 +1,9 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { PreviewStub } from "../PreviewStub";
 import { layoutAnimatedBgSchema } from "@/server/overlays/schemas";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -84,16 +86,18 @@ const BANDS: Record<Intensity, IntensityBand> = {
 
 export default function LayoutAnimatedBgPage() {
   return (
-    <PreviewStub
-      templateKey="layout_animated_bg"
-      schema={layoutAnimatedBgSchema}
-      position="center"
-      render={(payload) => {
-        const intensity: Intensity = (payload.intensity ?? "medium") as Intensity;
-        const band = BANDS[intensity];
-        return <AnimatedBg band={band} intensity={intensity} />;
-      }}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="layout_animated_bg"
+        schema={layoutAnimatedBgSchema}
+        position="center"
+        render={(payload) => {
+          const intensity: Intensity = (payload.intensity ?? "medium") as Intensity;
+          const band = BANDS[intensity];
+          return <AnimatedBg band={band} intensity={intensity} />;
+        }}
+      />
+    </OverlayFrame>
   );
 }
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { PrimaryButton } from "@/components/admin/buttons";
 import { inputClass } from "@/components/admin/FormField";
+import { AssetUploader } from "@/components/broadcast/AssetUploader";
+import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
 import { triggerOverlayAction } from "../../actions";
 
 /**
@@ -62,6 +64,12 @@ export function StructuredStartingSoonForm({
       </div>
       <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
         Ad video URL (optional)
+        <AssetUploader
+          kind="video"
+          label="ad video"
+          onUploaded={(url) => setAdVideoUrl(url)}
+          data-testid="starting-soon-ad-upload"
+        />
         <input
           type="url"
           value={adVideoUrl}
@@ -73,6 +81,12 @@ export function StructuredStartingSoonForm({
       </label>
       <label className="flex flex-col gap-1 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
         Poster URL (optional)
+        <AssetUploader
+          kind="image"
+          label="poster"
+          onUploaded={(url) => setPosterUrl(url)}
+          data-testid="starting-soon-poster-upload"
+        />
         <input
           type="url"
           value={posterUrl}
@@ -85,19 +99,27 @@ export function StructuredStartingSoonForm({
       <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
         Resolves to {totalSeconds}s from now
       </div>
-      <form action={triggerOverlayAction} className="flex justify-end">
-        <input type="hidden" name="sessionId" value={sessionId} />
-        <input type="hidden" name="templateKey" value="starting_soon_timer" />
-        <input type="hidden" name="payload" value={JSON.stringify(payload)} />
-        <PrimaryButton
-          type="submit"
-          size="sm"
+      <div className="flex items-center justify-end gap-2">
+        <OffTriggerButton
+          templateKey="starting_soon_timer"
+          sessionId={sessionId}
           disabled={!isLive}
-          data-testid="starting-soon-trigger"
-        >
-          Trigger
-        </PrimaryButton>
-      </form>
+          data-testid="starting-soon-off"
+        />
+        <form action={triggerOverlayAction}>
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <input type="hidden" name="templateKey" value="starting_soon_timer" />
+          <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+          <PrimaryButton
+            type="submit"
+            size="sm"
+            disabled={!isLive}
+            data-testid="starting-soon-trigger"
+          >
+            Trigger
+          </PrimaryButton>
+        </form>
+      </div>
     </div>
   );
 }

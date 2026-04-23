@@ -30,6 +30,8 @@ import { StructuredUpNextForm } from "./forms/StructuredUpNextForm";
 import { StructuredStartingSoonForm } from "./forms/StructuredStartingSoonForm";
 import { StructuredBrbForm } from "./forms/StructuredBrbForm";
 import { StructuredFeaturedCommentForm } from "./forms/StructuredFeaturedCommentForm";
+import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
+import { AssetUploader } from "@/components/broadcast/AssetUploader";
 
 /**
  * Plan 37 / Plan 45 — rich panel for editable templates.
@@ -275,6 +277,26 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
               </div>
             ) : null}
 
+            {/* Plan 48 — generic asset uploaders so admins pasting JSON
+                payloads can mint signed public URLs without a round trip
+                to the CDN manager. Copy-to-clipboard fills the textarea
+                below. */}
+            <div className="space-y-1.5" data-testid={`asset-uploads-${templateKey}`}>
+              <AssetUploader
+                kind="image"
+                label="image"
+                onUploaded={() => {}}
+                showCopy
+                data-testid={`asset-upload-image-${templateKey}`}
+              />
+              <AssetUploader
+                kind="video"
+                label="video"
+                onUploaded={() => {}}
+                showCopy
+                data-testid={`asset-upload-video-${templateKey}`}
+              />
+            </div>
             <textarea
               name="payload"
               rows={6}
@@ -283,6 +305,18 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
               className={textareaClass}
             />
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <OffTriggerButton
+                templateKey={templateKey}
+                sessionId={sessionId}
+                latestEventId={activeSingle?.id ?? null}
+                instanceId={
+                  multiInstance && activeInstances && activeInstances.length > 0
+                    ? activeInstances[0].id
+                    : null
+                }
+                disabled={!isLive}
+                data-testid={`off-btn-${templateKey}`}
+              />
               <PrimaryButton
                 type="submit"
                 size="sm"

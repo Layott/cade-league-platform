@@ -7,6 +7,7 @@ import {
   DangerButton,
 } from "@/components/admin/buttons";
 import { inputClass } from "@/components/admin/FormField";
+import { AssetUploader } from "@/components/broadcast/AssetUploader";
 import type { SelectableMatch } from "@/server/broadcast/match_flow";
 import {
   triggerOverlayAction,
@@ -70,6 +71,8 @@ export function StructuredScoreBugForm({
   );
   const [homeScore, setHomeScore] = useState<number>(activeHome?.score ?? 0);
   const [awayScore, setAwayScore] = useState<number>(activeAway?.score ?? 0);
+  const [homePhotoUrl, setHomePhotoUrl] = useState<string>("");
+  const [awayPhotoUrl, setAwayPhotoUrl] = useState<string>("");
 
   // When the admin picks a match, snap names from the row; locked until they
   // switch back to "manual".
@@ -99,8 +102,16 @@ export function StructuredScoreBugForm({
 
   const payload = {
     players: [
-      { displayName: effectiveHome, score: homeScore },
-      { displayName: effectiveAway, score: awayScore },
+      {
+        displayName: effectiveHome,
+        score: homeScore,
+        ...(homePhotoUrl.trim() ? { photoUrl: homePhotoUrl.trim() } : {}),
+      },
+      {
+        displayName: effectiveAway,
+        score: awayScore,
+        ...(awayPhotoUrl.trim() ? { photoUrl: awayPhotoUrl.trim() } : {}),
+      },
     ],
     matchId: matchId || undefined,
     slot,
@@ -270,6 +281,55 @@ export function StructuredScoreBugForm({
               isLive={isLive}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Plan 48 — per-side photo uploaders. Optional; when present, the
+          score-bug avatar slot uses the uploaded image. */}
+      <div className="grid gap-2 md:grid-cols-2">
+        <div
+          className="space-y-1"
+          data-testid="score-bug-home-photo-group"
+        >
+          <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+            Home photo
+          </span>
+          <AssetUploader
+            kind="image"
+            label="home"
+            onUploaded={(url) => setHomePhotoUrl(url)}
+            data-testid="score-bug-home-photo-upload"
+          />
+          <input
+            type="url"
+            value={homePhotoUrl}
+            onChange={(e) => setHomePhotoUrl(e.target.value)}
+            placeholder="https://…/home.png"
+            className={inputClass}
+            data-testid="score-bug-home-photo"
+          />
+        </div>
+        <div
+          className="space-y-1"
+          data-testid="score-bug-away-photo-group"
+        >
+          <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+            Away photo
+          </span>
+          <AssetUploader
+            kind="image"
+            label="away"
+            onUploaded={(url) => setAwayPhotoUrl(url)}
+            data-testid="score-bug-away-photo-upload"
+          />
+          <input
+            type="url"
+            value={awayPhotoUrl}
+            onChange={(e) => setAwayPhotoUrl(e.target.value)}
+            placeholder="https://…/away.png"
+            className={inputClass}
+            data-testid="score-bug-away-photo"
+          />
         </div>
       </div>
 

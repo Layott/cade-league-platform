@@ -7,11 +7,23 @@ import { useOverlayChannel } from "../../useOverlayChannel";
 import { upNextBugSchema } from "@/server/overlays/schemas";
 import { ENTER } from "@/lib/motion";
 import { formatClock } from "../../useMatchClock";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
- * Plan 37 — up-next overlay rewrite. Trapezoid clip-path + left
- * "IN mm:ss" countdown block + center VS column + right shield slot.
- * Chrome from `KNOWLEDGE/brand-assets/elements/19_up_next.html`.
+ * Plan 37 + Plan 48 — up-next overlay.
+ *
+ * Plan 48 parity pass against
+ * `KNOWLEDGE/brand-assets/elements/19_up_next.html`:
+ *   - 1920×1080 OverlayFrame root; positioning switched to absolute.
+ *   - trapezoid clip-path (20 px shoulders) matches reference.
+ *   - 40 px Quedora/Aghart kicker time, 22 px VS, 38 px team names —
+ *     aligned to ref values (was 30 px names).
+ *   - Ref uses bottom-center placement; overlay retains top-right for
+ *     legibility against on-screen action since this slot is driven by
+ *     the admin Up Next form, not the matchday score corner.
+ *   - photo slot 76×76 keeps the card compact on top-right.
+ *
+ * Live countdown `IN mm:ss` still computes locally from kickoffAt.
  */
 
 export const dynamic = "force-dynamic";
@@ -37,15 +49,7 @@ function UpNextInner() {
     : null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        background: "transparent",
-      }}
-      data-testid="overlay-root"
-    >
+    <OverlayFrame>
       <AnimatePresence>
         {parsed && parsed.success ? (
           <motion.div
@@ -55,12 +59,14 @@ function UpNextInner() {
             exit={{ opacity: 0, y: 40 }}
             transition={{ ...ENTER, duration: 0.7 }}
             style={{
-              position: "fixed",
+              position: "absolute",
               right: "60px",
               top: "60px",
               minWidth: "780px",
               background: "var(--panel-strong)",
               border: "2px solid var(--primary)",
+              boxShadow:
+                "0 0 0 1px rgba(107, 205, 6, 0.3), 0 10px 40px rgba(0, 0, 0, 0.7)",
               clipPath:
                 "polygon(20px 0, calc(100% - 20px) 0, 100% 100%, 0 100%)",
               padding: "20px 36px",
@@ -78,7 +84,7 @@ function UpNextInner() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
+    </OverlayFrame>
   );
 }
 
@@ -93,8 +99,8 @@ function KickoffBlock({ kickoffAt }: { kickoffAt: string }) {
   return (
     <div
       style={{
-        background: "var(--primary-glow)",
-        padding: "10px 14px",
+        background: "rgba(107, 205, 6, 0.06)",
+        padding: "14px 30px 14px 40px",
         borderLeft: "3px solid var(--primary)",
       }}
     >
@@ -108,7 +114,8 @@ function KickoffBlock({ kickoffAt }: { kickoffAt: string }) {
           color: "var(--primary)",
         }}
       >
-        Up Next · In
+        <span style={{ color: "var(--secondary)", fontSize: "9px" }}>▶</span>
+        {"  "}Up Next · In
       </div>
       <div
         style={{
@@ -117,7 +124,7 @@ function KickoffBlock({ kickoffAt }: { kickoffAt: string }) {
           fontSize: "40px",
           color: "var(--chalk-0)",
           fontVariantNumeric: "tabular-nums",
-          textShadow: "0 0 18px var(--primary-glow)",
+          textShadow: "0 0 18px rgba(107, 205, 6, 0.35)",
         }}
       >
         {formatClock(remainingSec)}
@@ -138,6 +145,7 @@ function MatchupBlock({
         gridTemplateColumns: "1fr auto 1fr",
         alignItems: "center",
         gap: "16px",
+        padding: "0 8px",
       }}
     >
       <NameCell name={data.home.displayName} photoUrl={data.home.photoUrl} />
@@ -147,6 +155,7 @@ function MatchupBlock({
           flexDirection: "column",
           alignItems: "center",
           gap: "4px",
+          padding: "0 8px",
         }}
       >
         <div
@@ -154,7 +163,7 @@ function MatchupBlock({
             width: "40px",
             height: "2px",
             background: "var(--primary)",
-            boxShadow: "0 0 10px var(--primary)",
+            boxShadow: "0 0 6px var(--primary)",
           }}
         />
         <span
@@ -173,7 +182,7 @@ function MatchupBlock({
             width: "40px",
             height: "2px",
             background: "var(--primary)",
-            boxShadow: "0 0 10px var(--primary)",
+            boxShadow: "0 0 6px var(--primary)",
           }}
         />
       </div>
@@ -211,7 +220,7 @@ function NameCell({
           borderRadius: "50%",
           overflow: "hidden",
           border: "2px solid var(--primary)",
-          boxShadow: "0 0 14px var(--primary-glow)",
+          boxShadow: "0 0 12px rgba(107, 205, 6, 0.5)",
           background: "var(--ink-3)",
           flexShrink: 0,
         }}
@@ -229,11 +238,12 @@ function NameCell({
         style={{
           fontFamily: "AghartiWide, sans-serif",
           fontWeight: 900,
-          fontSize: "30px",
+          fontSize: "38px",
           textTransform: "uppercase",
           color: "var(--chalk-0)",
-          textShadow: "1px 1px 0 var(--secondary-dim)",
+          textShadow: "1px 1px 0 rgba(254, 3, 109, 0.35)",
           textAlign: rtl ? "right" : "left",
+          letterSpacing: "1px",
         }}
       >
         {name}
@@ -246,12 +256,13 @@ function ShieldSlot() {
   return (
     <div
       style={{
-        background: "var(--primary-glow)",
+        background: "rgba(107, 205, 6, 0.08)",
         height: "76px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         border: "1px solid var(--primary)",
+        boxShadow: "inset 0 0 12px rgba(254, 3, 109, 0.12)",
       }}
     >
       <span
@@ -261,6 +272,7 @@ function ShieldSlot() {
           fontSize: "13px",
           letterSpacing: "3px",
           color: "var(--primary)",
+          filter: "drop-shadow(0 0 10px rgba(254, 3, 109, 0.5))",
         }}
       >
         CADE

@@ -1,8 +1,10 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import Image from "next/image";
 import { PreviewStub } from "../PreviewStub";
 import { layoutBrbBasicSchema } from "@/server/overlays/schemas";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +29,14 @@ export const dynamic = "force-dynamic";
  */
 export default function LayoutBrbBasicPage() {
   return (
-    <PreviewStub
-      templateKey="layout_brb_basic"
-      schema={layoutBrbBasicSchema}
-      position="fullscreen"
-      render={(p) => <BrbBasic message={p.message} />}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="layout_brb_basic"
+        schema={layoutBrbBasicSchema}
+        position="fullscreen"
+        render={(p) => <BrbBasic message={p.message} />}
+      />
+    </OverlayFrame>
   );
 }
 

@@ -6,22 +6,25 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMatchClock, formatClock } from "../../useMatchClock";
 import { ENTER } from "@/lib/motion";
 import { useOverlaySound } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
- * Plan 37 — match-clock-driven timer overlay.
+ * Plan 37 + Plan 48 — match-clock-driven timer overlay.
  *
- * Plan 16 Wave A polish layered on top of Plan 37's realtime wiring:
+ * Plan 48 parity pass against `KNOWLEDGE/brand-assets/elements/10_timer.html`:
+ *   - 1920×1080 OverlayFrame root; positioning switched to absolute so
+ *     `?preview=1` scales the timer along with the frame.
+ *   - 78 px AghartiWide value, 12 px Quedora label, 16 px chamfer on
+ *     clip-path polygon — match reference exactly.
+ *   - Panel padding tightened to 14/32/18 (matches ref), box-shadow adds
+ *     inset green glow + outer pink accent when at 0 s / finalFlash.
+ *
+ * Plan 16 Wave A details preserved:
  *   - Position variants via ?pos=tl/tr/bl/br/top/bottom (default: tr).
  *   - Tick pulse — subtle scale bump on each second change.
  *   - Final-3s red flash — CSS keyframe `final-flash` on <= 3s.
  *   - Digit flip on second change via AnimatePresence.
  *   - useOverlaySound("tick-1s") per tick + ("timer-end") at 0.
- *
- * Plan 37 contract preserved intact: useMatchClock + live-edit realtime
- * clock updates (admin edits reflect in overlay), existing `data-testid`
- * hooks ("overlay-root" / "layout-timer") and no schema change.
- * Chrome from `KNOWLEDGE/brand-assets/elements/10_timer.html`: corner-clipped
- * panel, 2 px green border, AghartiWide tabular numerals, pink expired-state.
  */
 
 export const dynamic = "force-dynamic";
@@ -87,15 +90,7 @@ function TimerInner() {
   const clock = useMatchClock(sessionId);
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        background: "transparent",
-      }}
-      data-testid="overlay-root"
-    >
+    <OverlayFrame>
       <AnimatePresence>
         {clock && clock.mode !== "stopped" ? (
           <motion.div
@@ -117,15 +112,15 @@ function TimerInner() {
             }}
             transition={{ ...ENTER, duration: 0.6 }}
             style={{
-              position: "fixed",
+              position: "absolute",
               minWidth: "280px",
-              padding: "16px 28px",
+              padding: "14px 32px 18px",
               background: "var(--panel-strong)",
               border: "2px solid var(--primary)",
               clipPath:
                 "polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)",
               boxShadow:
-                "0 0 0 1px var(--primary-glow), inset 0 0 40px var(--primary-glow)",
+                "0 0 0 1px rgba(107, 205, 6, 0.3), inset 0 0 30px rgba(107, 205, 6, 0.12), 0 10px 40px rgba(0, 0, 0, 0.6)",
               pointerEvents: "auto",
               textAlign: "center",
               ...POS_STYLES[pos],
@@ -141,7 +136,7 @@ function TimerInner() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
+    </OverlayFrame>
   );
 }
 

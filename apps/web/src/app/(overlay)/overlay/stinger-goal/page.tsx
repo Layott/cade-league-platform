@@ -5,12 +5,19 @@ import { PreviewStub } from "../PreviewStub";
 import { stingerGoalSchema, type StingerGoalPayload } from "@/server/overlays/schemas";
 import { SCORE_FLIP, STINGER_IN } from "@/lib/motion";
 import { useOverlaySound } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Plan 16 Wave A — motion port of
+ * Plan 16 Wave A + Plan 48 — motion port of
  * `KNOWLEDGE/brand-assets/elements/04_stinger_goal.html`.
+ *
+ * Plan 48 parity pass: wrapped in 1920×1080 OverlayFrame so preview mode
+ * scales cleanly. All keyframes + timings preserved from Wave A — the
+ * reference bg-show → glow-breathe → wipes → hub-in → bang → lines →
+ * stripe cascade cadence is pixel-identical. Ring burst colours
+ * #8eff14 (green-bright) + #ff3b91 (pink-bright) confirmed against ref.
  *
  * 2-second sequence, preserved keyframes:
  *   - bg-show        (2s linear)          — dark background fade in/out
@@ -413,11 +420,13 @@ const KEYFRAMES_CSS = `
 
 export default function StingerGoalPage() {
   return (
-    <PreviewStub
-      templateKey="stinger_goal"
-      schema={stingerGoalSchema}
-      position="fullscreen"
-      render={(p, { cycle }) => <Stage cycle={cycle} payload={p} />}
-    />
+    <OverlayFrame>
+      <PreviewStub
+        templateKey="stinger_goal"
+        schema={stingerGoalSchema}
+        position="fullscreen"
+        render={(p, { cycle }) => <Stage cycle={cycle} payload={p} />}
+      />
+    </OverlayFrame>
   );
 }

@@ -1,18 +1,22 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useOverlayChannel } from "../../useOverlayChannel";
 import { OverlayFrame, getDebugFlag } from "../../OverlayFrame";
 import { standingsWidgetSchema } from "@/server/overlays/schemas";
+import { OverlayFrame as Frame1920 } from "@/components/overlay/OverlayFrame";
 
 export const dynamic = "force-dynamic";
 
 export default function StandingsWidgetPage() {
   return (
-    <Suspense fallback={null}>
-      <StandingsWidgetInner />
-    </Suspense>
+    <Frame1920>
+  <Suspense fallback={null}>
+        <StandingsWidgetInner />
+      </Suspense>
+    </Frame1920>
   );
 }
 

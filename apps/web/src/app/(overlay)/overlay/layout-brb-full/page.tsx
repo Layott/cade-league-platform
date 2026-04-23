@@ -1,11 +1,13 @@
 "use client";
 
+// TODO Plan 48 phase 2 — design parity
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { PreviewStub } from "../PreviewStub";
 import { layoutBrbFullSchema } from "@/server/overlays/schemas";
 import { ENTER } from "@/lib/motion";
 import { useOverlaySound, type OverlaySoundSlot } from "@/lib/overlay-sound";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
  * Plan 16 Wave A — `layout_brb_full` motion port of
@@ -31,21 +33,23 @@ export const dynamic = "force-dynamic";
 
 export default function LayoutBrbFullPage() {
   return (
-    <PreviewStub
-      templateKey="layout_brb_full"
-      schema={layoutBrbFullSchema}
-      position="center"
-      render={(p, ctx) => (
-        <BrbFullInner
-          resumeAt={p.resumeAt}
-          adVideoUrl={p.adVideoUrl}
-          socials={p.socials}
-          message={p.message}
-          soundSlot={(p.soundSlot ?? null) as OverlaySoundSlot}
-          cycle={ctx.cycle}
-        />
-      )}
-    />
+    <OverlayFrame>
+  <PreviewStub
+        templateKey="layout_brb_full"
+        schema={layoutBrbFullSchema}
+        position="center"
+        render={(p, ctx) => (
+          <BrbFullInner
+            resumeAt={p.resumeAt}
+            adVideoUrl={p.adVideoUrl}
+            socials={p.socials}
+            message={p.message}
+            soundSlot={(p.soundSlot ?? null) as OverlaySoundSlot}
+            cycle={ctx.cycle}
+          />
+        )}
+      />
+    </OverlayFrame>
   );
 }
 

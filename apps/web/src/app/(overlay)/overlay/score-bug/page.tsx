@@ -6,15 +6,26 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useOverlayChannel } from "../../useOverlayChannel";
 import { scoreBugSchema } from "@/server/overlays/schemas";
 import { ENTER } from "@/lib/motion";
+import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
- * Plan 37 — score-bug overlay rewrite.
+ * Plan 37 + Plan 48 — score-bug overlay.
  *
- * Single-instance (legacy `useOverlayChannel`), but the React key uses
- * the eventId only (NOT payload contents), so editing scores in the
- * admin updates `payload` in place without re-mounting the card / re-
- * playing enter motion. Chrome from
- * `KNOWLEDGE/brand-assets/elements/18_score_bug.html`.
+ * Plan 48 parity pass against
+ * `KNOWLEDGE/brand-assets/elements/18_score_bug.html`:
+ *   - 1920×1080 OverlayFrame root (was bare fixed inset).
+ *   - Card uses absolute positioning inside the frame so `?preview=1`
+ *     scaling carries the card along with the frame.
+ *   - 520 px card width (was minWidth 520), 10 px pulse dot (was 8 px),
+ *     header padding + gap tightened to 10 px / 18 px / 8 px to match
+ *     the reference. Header label tag changed to "LIVE" with separator
+ *     then "CADE PRO LEAGUE" aligned right.
+ *   - Team name 26 px, score number 40 px, "VS" 20 px — match ref.
+ *   - box-shadow tokens use brand rgba so the card lift looks identical
+ *     in preview + browser-source mode.
+ *
+ * React key still uses eventId only so live score edits update payload
+ * in place without re-mounting + replaying enter motion.
  */
 
 export const dynamic = "force-dynamic";
@@ -40,15 +51,7 @@ function ScoreBugInner() {
   const parsed = state.payload ? scoreBugSchema.safeParse(state.payload) : null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        pointerEvents: "none",
-        background: "transparent",
-      }}
-      data-testid="overlay-root"
-    >
+    <OverlayFrame>
       <AnimatePresence>
         {parsed && parsed.success ? (
           <motion.div
@@ -58,17 +61,17 @@ function ScoreBugInner() {
             exit={{ opacity: 0, x: 60 }}
             transition={{ ...ENTER, duration: 0.6 }}
             style={{
-              position: "fixed",
+              position: "absolute",
               right: "60px",
               bottom: "60px",
-              minWidth: "520px",
+              width: "520px",
               background: "var(--panel-strong)",
               border: "2px solid var(--primary)",
               clipPath:
                 "polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%)",
               pointerEvents: "auto",
               boxShadow:
-                "0 0 0 1px var(--primary-glow), inset 0 0 30px var(--primary-glow)",
+                "0 0 0 1px rgba(107, 205, 6, 0.3), 0 10px 40px rgba(0, 0, 0, 0.6)",
             }}
             data-testid="score-bug"
           >
@@ -76,7 +79,7 @@ function ScoreBugInner() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
+    </OverlayFrame>
   );
 }
 
@@ -88,15 +91,15 @@ function ScoreBugCard({
   const [home, away] = data.players;
   return (
     <div>
-      {/* header strip — LIVE pulse + label */}
+      {/* header strip — pink pulse dot + LIVE label + right-aligned tourney mark */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: "10px",
           padding: "8px 18px",
-          background: "var(--primary-glow)",
-          borderBottom: "1px solid var(--primary)",
+          background: "rgba(107, 205, 6, 0.12)",
+          borderBottom: "1px solid rgba(107, 205, 6, 0.3)",
           fontFamily: "Quedora, sans-serif",
           fontWeight: 700,
           fontSize: "11px",
@@ -107,12 +110,12 @@ function ScoreBugCard({
       >
         <span
           style={{
-            width: "8px",
-            height: "8px",
+            width: "10px",
+            height: "10px",
             borderRadius: "50%",
             background: "var(--secondary)",
-            boxShadow: "0 0 8px var(--secondary)",
-            animation: "pulse 1.4s ease-in-out infinite",
+            boxShadow: "0 0 10px var(--secondary)",
+            animation: "sb-pulse 1.2s ease-in-out infinite",
           }}
         />
         <span>LIVE</span>
@@ -141,7 +144,7 @@ function ScoreBugCard({
             fontSize: "40px",
             color: "var(--chalk-0)",
             fontVariantNumeric: "tabular-nums",
-            textShadow: "0 0 18px var(--primary-glow)",
+            textShadow: "0 0 18px rgba(107, 205, 6, 0.35)",
           }}
           data-testid="score-display"
         >
@@ -164,9 +167,9 @@ function ScoreBugCard({
         />
       </div>
       <style>{`
-        @keyframes pulse {
+        @keyframes sb-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.7); }
+          50% { opacity: 0.3; transform: scale(0.6); }
         }
       `}</style>
     </div>
@@ -198,7 +201,7 @@ function TeamCell({
           borderRadius: "50%",
           overflow: "hidden",
           border: "2px solid var(--primary)",
-          boxShadow: "0 0 12px var(--primary-glow)",
+          boxShadow: "0 0 12px rgba(107, 205, 6, 0.4)",
           background: "var(--ink-3)",
           flexShrink: 0,
         }}
@@ -220,6 +223,7 @@ function TeamCell({
           textTransform: "uppercase",
           color: "var(--chalk-0)",
           textAlign: align,
+          letterSpacing: "1px",
         }}
       >
         {name}
