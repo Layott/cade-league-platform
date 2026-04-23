@@ -74,7 +74,7 @@ export default async function StatsReviewPage() {
       />
 
       <div className="flex flex-wrap gap-2 text-xs">
-        <StatusPill tone="warning">{counts.pending} pending parse</StatusPill>
+        <StatusPill tone="amber">{counts.pending} pending parse</StatusPill>
         <StatusPill tone="primary">{counts.parsed} parsed, needs review</StatusPill>
         {counts.failed > 0 ? (
           <StatusPill tone="rose">{counts.failed} failed</StatusPill>
@@ -103,12 +103,12 @@ export default async function StatsReviewPage() {
                 const mdDate = r.matches?.match_days?.match_date ?? "—";
                 const mdId = r.matches?.match_day_id ?? "";
                 const reviewHref = `/admin/match-days/${mdId}/stats-upload/${r.id}/review`;
-                const tone: "warning" | "primary" | "rose" =
+                const tone: "amber" | "primary" | "rose" =
                   r.parse_status === "failed"
                     ? "rose"
                     : r.parse_status === "parsed"
                       ? "primary"
-                      : "warning";
+                      : "amber";
                 return (
                   <tr
                     key={r.id}
