@@ -163,15 +163,16 @@ describe("HamburgerNav (Plan 46)", () => {
     );
     const trigger = screen.getByTestId("nav-drawer-trigger");
     expect(trigger).toBeTruthy();
-    expect(screen.queryByTestId("nav-drawer")).toBeNull();
+    // Drawer always mounts (for slide animation) — closed state is signalled
+    // by aria-hidden=true + translate-x-full, not by unmount.
+    expect(screen.getByTestId("nav-drawer").getAttribute("aria-hidden")).toBe("true");
 
     fireEvent.click(trigger);
-    expect(screen.getByTestId("nav-drawer")).toBeTruthy();
-    // Referee gets the Referee group
+    expect(screen.getByTestId("nav-drawer").getAttribute("aria-hidden")).toBe("false");
     expect(screen.getByTestId("nav-drawer-group-referee")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("nav-drawer-close"));
-    expect(screen.queryByTestId("nav-drawer")).toBeNull();
+    expect(screen.getByTestId("nav-drawer").getAttribute("aria-hidden")).toBe("true");
   });
 
   it("restores focus to the trigger when the drawer closes via ESC", () => {
