@@ -31,6 +31,14 @@ function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
       ? r.cardImageUrl
       : `https://www.futbin.com${r.cardImageUrl}`;
   }
+  // Card frame background (the designed card art — gold/icon/hero/promo
+  // shell). Rendered behind the player portrait in the picker so the
+  // card looks like the Futbin original, not a black rectangle.
+  if (r.cardBgUrl) {
+    attrs.card_bg_url = r.cardBgUrl.startsWith("http")
+      ? r.cardBgUrl
+      : `https://www.futbin.com${r.cardBgUrl}`;
+  }
   return attrs;
 }
 

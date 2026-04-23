@@ -6,7 +6,9 @@ import {
   listSubmissionsForWeek,
   weekStartThursday,
   getSquadWindowOverride,
+  listPlayerSquadOverridesForWeek,
   type SubmissionRow,
+  type PlayerSquadOverride,
 } from "@/server/squads";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
@@ -14,11 +16,17 @@ import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SecondaryButton } from "@/components/admin/buttons";
 import { SquadWindowControls } from "@/components/admin/SquadWindowControls";
+import { PlayerOverrideControls } from "@/components/admin/PlayerOverrideControls";
 import {
   forceOpenSquadWindowAction,
   forceCloseSquadWindowAction,
   clearSquadWindowOverrideAction,
 } from "./window-actions";
+import {
+  banPlayerForWeekAction,
+  forceOpenPlayerForWeekAction,
+  clearPlayerOverrideAction,
+} from "./player-override-actions";
 import type { Actor } from "@/perms";
 
 export const dynamic = "force-dynamic";
@@ -69,9 +77,41 @@ export default async function AdminSquadsListPage({
   }
   const svc = getServiceRoleSupabase();
   const canManageWindow = await hasPermAsync(svc, actor, "squads.window.manage");
-  const squadWindowOverride = canManageWindow
-    ? await getSquadWindowOverride(svc, weekStart)
-    : null;
+  const canManagePlayerOverride = await hasPermAsync(
+    svc,
+    actor,
+    "squads.player_override.manage",
+  );
+  const [squadWindowOverride, playerOverrides, allPlayers] = await Promise.all([
+    canManageWindow ? getSquadWindowOverride(svc, weekStart) : Promise.resolve(null),
+    canManagePlayerOverride
+      ? listPlayerSquadOverridesForWeek(svc, weekStart)
+      : Promise.resolve([] as PlayerSquadOverride[]),
+    canManagePlayerOverride && season
+      ? svc
+          .from("players")
+          .select("id, gamer_tag, users:users!players_user_id_fkey(display_name)")
+          .is("deleted_at", null)
+          .order("gamer_tag", { ascending: true })
+          .then(({ data, error }) => {
+            if (error) throw new Error(`players list: ${error.message}`);
+            type R = {
+              id: string;
+              gamer_tag: string;
+              users: { display_name: string | null } | null;
+            };
+            return (data ?? []) as unknown as R[];
+          })
+      : Promise.resolve([] as Array<{
+          id: string;
+          gamer_tag: string;
+          users: { display_name: string | null } | null;
+        }>),
+  ]);
+  const playerOverrideByPlayerId = new Map(
+    playerOverrides.map((o) => [o.playerId, o]),
+  );
+  const submittedPlayerIds = new Set(rows.map((r) => r.player_id));
 
   const columns: DataTableColumn<SubmissionRow>[] = [
     {
@@ -100,6 +140,27 @@ export default async function AdminSquadsListPage({
       label: "Status",
       render: (r) => <StatusPill status={r.validation_status} />,
     },
+    ...(canManagePlayerOverride
+      ? [
+          {
+            key: "override",
+            label: "Override",
+            render: (r: SubmissionRow) => (
+              <div className="relative inline-block">
+                <PlayerOverrideControls
+                  playerId={r.player_id}
+                  playerLabel={r.player?.display_name ?? r.player_id.slice(0, 8)}
+                  weekStart={weekStart}
+                  override={playerOverrideByPlayerId.get(r.player_id) ?? null}
+                  banPlayer={banPlayerForWeekAction}
+                  forceOpenPlayer={forceOpenPlayerForWeekAction}
+                  clearPlayerOverride={clearPlayerOverrideAction}
+                />
+              </div>
+            ),
+          } satisfies DataTableColumn<SubmissionRow>,
+        ]
+      : []),
     {
       key: "actions",
       label: "Actions",
@@ -114,6 +175,13 @@ export default async function AdminSquadsListPage({
       ),
     },
   ];
+
+  // Players who have NOT submitted this week — admin may want to ban one
+  // preemptively (e.g. under investigation) or force-open for one who's
+  // had a genuine access issue.
+  const nonSubmittedPlayers = canManagePlayerOverride
+    ? allPlayers.filter((p) => !submittedPlayerIds.has(p.id))
+    : [];
 
   return (
     <div className="space-y-8">

@@ -92,6 +92,7 @@ async function extract(page) {
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
         position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
         variant, pricePs, pricePc, stats, weakFoot, skillMoves, metaTag, cardImageUrl,
+        cardBgUrl: cardBgSrc || null,
       });
     }
     const pagers = Array.from(document.querySelectorAll("a[href*='?page=']"))
@@ -125,6 +126,7 @@ async function upsertRows(sb, rows, stats, newCards) {
     if (r.skillMoves != null) attrs.skill_moves = r.skillMoves;
     if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
+    if (r.cardBgUrl) attrs.card_bg_url = r.cardBgUrl.startsWith("http") ? r.cardBgUrl : `https://www.futbin.com${r.cardBgUrl}`;
     const vLower = (r.variant || "").toLowerCase();
     let itemType = "normal";
     if (/\bicon\b/.test(vLower)) itemType = "icon";

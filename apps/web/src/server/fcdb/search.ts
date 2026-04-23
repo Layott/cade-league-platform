@@ -39,6 +39,7 @@ export type CardSearchResult = {
   itemType: string;
   priceCoins: number | null;
   cardImageUrl: string | null;
+  cardBgUrl: string | null;
   variant: string | null;
 };
 
@@ -62,6 +63,8 @@ function readAttrString(attrs: FCPlayer["attributes"], key: string): string | nu
 
 function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
   const cardImageUrl = readAttrString(row.attributes, "card_image_url");
+  const cardBgUrl = readAttrString(row.attributes, "card_bg_url");
+  const futbinVariant = readAttrString(row.attributes, "futbin_variant");
   const futggVariant = readAttrString(row.attributes, "futgg_variant");
   return {
     id: row.id,
@@ -74,15 +77,16 @@ function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
     nation: row.nation,
     nationIso: row.nation_iso,
     itemType: row.item_type,
-    // Plan 30 §3.5: the fc26_players table ships `value_coins_estimate`; a
-    // later Plan 24 "price refresh" job may introduce a denormalised
-    // `price_coins` column. Until then we mirror the estimate.
     priceCoins: row.value_coins_estimate,
     cardImageUrl,
-    // Prefer the exact fut.gg variant string ("Trophy Titans Hero", "Icon",
-    // "TOTY", "Fantasy UT"). Fall back to the coarse item_type when absent
-    // so pre-scrape rows still show something meaningful.
-    variant: futggVariant ?? (row.item_type && row.item_type !== "normal" ? row.item_type : null),
+    cardBgUrl,
+    // Prefer the exact scraped variant ("5-toty", "72-heroes", "30-fut-birthday").
+    // Fall back to fut.gg label then coarse item_type so pre-scrape rows still
+    // show something meaningful.
+    variant:
+      futbinVariant ??
+      futggVariant ??
+      (row.item_type && row.item_type !== "normal" ? row.item_type : null),
   };
 }
 

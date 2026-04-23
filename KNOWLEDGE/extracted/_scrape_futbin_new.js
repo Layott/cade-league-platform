@@ -81,16 +81,31 @@ async function extract(page) {
         skillMoves: intText("td.table-skills"),
         metaTag: row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null,
         cardImageUrl: cardImgEl?.getAttribute("src") || null,
+        cardBgUrl: cardBgSrc || null,
       });
     }
     return out;
   });
 }
 
+const STATE_PATH = path.resolve(__dirname, "futbin_new_state.json");
+
+function loadState() {
+  try { return JSON.parse(fs.readFileSync(STATE_PATH, "utf8")); }
+  catch { return { lastTopResourceIds: [], lastRunAt: null }; }
+}
+function saveState(s) { fs.writeFileSync(STATE_PATH, JSON.stringify(s, null, 2)); }
+
 async function main() {
   loadEnv();
   const maxArg = process.argv.indexOf("--max-pages");
-  const maxPages = maxArg >= 0 ? parseInt(process.argv[maxArg + 1], 10) : 30;
+  const maxPages = maxArg >= 0 ? parseInt(process.argv[maxArg + 1], 10) : 10;
+  const reset = process.argv.includes("--reset");
+  const state = reset ? { lastTopResourceIds: [], lastRunAt: null } : loadState();
+  const resumeHorizon = new Set(state.lastTopResourceIds ?? []);
+  if (resumeHorizon.size > 0) {
+    console.log(`[new] resume horizon: ${resumeHorizon.size} resource_ids from last run (${state.lastRunAt})`);
+  }
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   if (!fs.existsSync(PROFILE_DIR)) { console.error("run headful scraper first to warm profile"); process.exit(1); }
@@ -126,10 +141,23 @@ async function main() {
   const inserted = [];
   const updates = [];
   let consecutiveAllUnchanged = 0;
+  let hitResumeHorizon = false;
+  let horizonReason = "";
+
+  // Capture the top resource_ids from page 1 BEFORE processing so we can
+  // persist them for the next run (becomes the next resume horizon).
+  const thisRunTopResourceIds = probeRows.slice(0, 30).map((r) => r.resourceId).filter(Boolean);
 
   async function processPage(pageRows, pageNum) {
     let pUnchanged = 0, pUpdated = 0, pInserted = 0;
     for (const r of pageRows) {
+      // Resume horizon: if we reach a card we saw at the top of the list
+      // on last run, we've caught up — stop processing this + further pages.
+      if (resumeHorizon.has(String(r.resourceId))) {
+        hitResumeHorizon = true;
+        horizonReason = `hit resource_id ${r.resourceId} from previous run`;
+        break;
+      }
       const coinsPs = parseCoins(r.pricePs);
       const coinsPc = parseCoins(r.pricePc);
       const slug = slugify(r.name);
@@ -146,35 +174,52 @@ async function main() {
   stats.pages = 1; stats.rows = probeRows.length;
   if (firstAllUnchanged) consecutiveAllUnchanged++;
 
-  for (let p = 2; p <= maxPages; p++) {
-    await sleep(jitter());
-    let attempt = 0;
-    let pageRows = null;
-    while (pageRows === null) {
-      attempt++;
-      try {
-        await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
-        await page.waitForTimeout(3500);
-        pageRows = await extract(page);
-      } catch (e) {
-        const backoff = Math.min(300000, 10000 * attempt);
-        console.error(`[err] p${p} attempt ${attempt}: ${e.message} — retry in ${backoff / 1000}s`);
-        await sleep(backoff);
+  if (!hitResumeHorizon) {
+    for (let p = 2; p <= maxPages; p++) {
+      await sleep(jitter());
+      let attempt = 0;
+      let pageRows = null;
+      while (pageRows === null) {
+        attempt++;
+        try {
+          await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
+          await page.waitForTimeout(3500);
+          pageRows = await extract(page);
+        } catch (e) {
+          const backoff = Math.min(300000, 10000 * attempt);
+          console.error(`[err] p${p} attempt ${attempt}: ${e.message} — retry in ${backoff / 1000}s`);
+          await sleep(backoff);
+        }
       }
-    }
-    if (pageRows.length === 0) { console.log(`[new] p${p}: 0 rows — end of list`); break; }
-    const allUnchanged = await processPage(pageRows, p);
-    stats.pages++; stats.rows += pageRows.length;
-    if (allUnchanged) {
-      consecutiveAllUnchanged++;
-      if (consecutiveAllUnchanged >= 2) {
-        console.log(`[new] 2 consecutive unchanged pages — stopping (caught up).`);
+      if (pageRows.length === 0) { console.log(`[new] p${p}: 0 rows — end of list`); break; }
+      const allUnchanged = await processPage(pageRows, p);
+      stats.pages++; stats.rows += pageRows.length;
+      if (hitResumeHorizon) {
+        console.log(`[new] resume horizon reached: ${horizonReason} — stopping.`);
         break;
       }
-    } else {
-      consecutiveAllUnchanged = 0;
+      if (allUnchanged) {
+        consecutiveAllUnchanged++;
+        if (consecutiveAllUnchanged >= 2) {
+          console.log(`[new] 2 consecutive unchanged pages — stopping (caught up).`);
+          break;
+        }
+      } else {
+        consecutiveAllUnchanged = 0;
+      }
+    }
+    if (stats.pages >= maxPages) {
+      console.log(`[new] hit --max-pages=${maxPages} cap. Re-run without --reset to continue from same horizon.`);
     }
   }
+
+  // Persist new horizon: the top resource_ids we saw THIS run. Next run
+  // stops when it encounters any of these.
+  saveState({
+    lastTopResourceIds: thisRunTopResourceIds,
+    lastRunAt: new Date().toISOString(),
+    lastStats: stats,
+  });
 
   console.log("\n[new] done:", stats);
   if (inserted.length) console.log(`\n${inserted.length} new cards:`);

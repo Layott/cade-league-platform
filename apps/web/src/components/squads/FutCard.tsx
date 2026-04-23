@@ -101,7 +101,9 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
   const ratingSize = size === "md" ? "text-2xl" : "text-lg";
   const nameSize = size === "md" ? "text-[11px]" : "text-[9px]";
   const variantSize = size === "md" ? "text-[9px]" : "text-[7px]";
-  const hasImage = Boolean(card.cardImageUrl);
+  const hasPortrait = Boolean(card.cardImageUrl);
+  const hasFrame = Boolean(card.cardBgUrl);
+  const hasImage = hasPortrait || hasFrame;
 
   return (
     <button
@@ -112,11 +114,24 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
       title={`${card.name} — ${card.rating} — ${card.variant ?? "Normal"}`}
       className={
         `relative flex flex-col items-center justify-between overflow-hidden rounded-sm ${
-          hasImage ? "bg-[#0a0a0a]" : band.bg
-        } ${band.ring} ${band.text} ${dims} transition-transform hover:scale-[1.03]`
+          hasImage ? "bg-transparent" : band.bg
+        } ${hasFrame ? "" : band.ring} ${band.text} ${dims} transition-transform hover:scale-[1.03]`
       }
     >
-      {hasImage ? (
+      {/* Card frame (gold/icon/hero/promo shell). Rendered FIRST so the
+          portrait sits above it and the text overlays sit on top of both. */}
+      {hasFrame ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={card.cardBgUrl ?? ""}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : null}
+      {hasPortrait ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={card.cardImageUrl ?? ""}
@@ -124,17 +139,6 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
           className="pointer-events-none absolute inset-0 h-full w-full object-contain"
           loading="lazy"
           decoding="async"
-        />
-      ) : null}
-
-      {/* Text overlays sit above the image (if any). Keep rating + position
-          legible by gating them behind a faint gradient when imagery is
-          present — matches the FUT card layout where the number + position
-          chip sit on top of the card art. */}
-      {hasImage ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70"
         />
       ) : null}
 

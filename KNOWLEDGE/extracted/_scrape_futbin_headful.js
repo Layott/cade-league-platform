@@ -151,6 +151,7 @@ async function extractListPage(page) {
         popularity,
         metaTag,
         cardImageUrl,
+        cardBgUrl: cardBgSrc || null,
         nationImg: nationImg?.getAttribute("src") || null,
         clubImg: clubImg?.getAttribute("src") || null,
       });
@@ -192,6 +193,7 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     if (r.popularity != null) attrs.popularity = r.popularity;
     if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
+    if (r.cardBgUrl) attrs.card_bg_url = r.cardBgUrl.startsWith("http") ? r.cardBgUrl : `https://www.futbin.com${r.cardBgUrl}`;
 
     // item_type bucket from variant string.
     const vLower = (r.variant || "").toLowerCase();

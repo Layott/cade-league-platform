@@ -66,6 +66,7 @@ async function extract(page) {
         skillMoves: intText("td.table-skills"),
         metaTag: row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null,
         cardImageUrl: cardImgEl?.getAttribute("src") || null,
+        cardBgUrl: cardBgSrc || null,
       });
     }
     return out;
@@ -95,6 +96,7 @@ async function upsert(sb, rows, stats) {
     if (r.skillMoves != null) attrs.skill_moves = r.skillMoves;
     if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
+    if (r.cardBgUrl) attrs.card_bg_url = r.cardBgUrl.startsWith("http") ? r.cardBgUrl : `https://www.futbin.com${r.cardBgUrl}`;
     const v = (r.variant || "").toLowerCase();
     let itemType = "normal";
     if (/\bicon\b/.test(v)) itemType = "icon";
