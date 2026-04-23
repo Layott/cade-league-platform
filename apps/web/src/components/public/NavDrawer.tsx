@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Plan 46 — global hamburger drawer. Exposed in both desktop header + mobile
@@ -156,7 +157,15 @@ export function NavDrawer({
   // slide-in / slide-out. The `open` flag flips the translate-x + opacity
   // classes; pointer-events are muted when closed so clicks fall through
   // to the underlying page.
-  return (
+  //
+  // The drawer is portalled to document.body so the sticky-header
+  // `backdrop-filter` (which creates a new containing block) cannot clip
+  // `position: fixed`. Without the portal the drawer would only span the
+  // header band — user saw that bug on the first ship and asked for the
+  // full-height slide from the right side.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div role="presentation" data-testid="nav-drawer-shell">
       {/* Backdrop */}
       <button
@@ -178,8 +187,8 @@ export function NavDrawer({
         aria-hidden={!open}
         aria-labelledby={titleId}
         className={
-          "fixed inset-y-0 left-0 z-[120] flex w-[min(320px,85vw)] flex-col overflow-y-auto border-r border-[var(--ink-4)] bg-[var(--ink-0)] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.9)] transform transition-transform duration-300 ease-out " +
-          (open ? "translate-x-0" : "-translate-x-full pointer-events-none")
+          "fixed inset-y-0 right-0 z-[120] flex w-[min(320px,85vw)] flex-col overflow-y-auto border-l border-[var(--ink-4)] bg-[var(--ink-0)] shadow-[-25px_0_60px_-20px_rgba(0,0,0,0.9)] transform transition-transform duration-300 ease-out " +
+          (open ? "translate-x-0" : "translate-x-full pointer-events-none")
         }
         data-testid="nav-drawer"
       >
@@ -250,7 +259,8 @@ export function NavDrawer({
           ))}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
