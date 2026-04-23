@@ -48,10 +48,13 @@ function mkSb(opts: {
       if (table === "fc26_players") {
         return {
           select: () => ({
+            // .in(ids).eq('source_dataset','futbin.com').is('deleted_at',null)
             in: () => ({
-              is: vi
-                .fn()
-                .mockResolvedValue({ data: cards, error: null }),
+              eq: () => ({
+                is: vi
+                  .fn()
+                  .mockResolvedValue({ data: cards, error: null }),
+              }),
             }),
           }),
         };
@@ -97,6 +100,41 @@ function mkSb(opts: {
             eq: vi.fn().mockImplementation(async () => {
               itemUpdate();
               return { error: null };
+            }),
+          }),
+        };
+      }
+      if (table === "squad_window_overrides") {
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "squad_validation_rules") {
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "player_squad_overrides") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                is: () => ({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              }),
             }),
           }),
         };

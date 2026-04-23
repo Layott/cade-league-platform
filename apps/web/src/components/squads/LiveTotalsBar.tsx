@@ -79,7 +79,12 @@ export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarPro
     );
     let bannedCount = 0;
 
-    // Coins + Nigerian: sum over non-GK starters + subs.
+    // Coins: sum over non-GK starters + ALL subs (GK excluded only for the
+    //   starting XI position).
+    // Nigerian: ONLY non-GK starters (slot 1..10). Subs do NOT count toward
+    //   the "min N Nigerian in starting XI" rule — this matches
+    //   `server/squads/validate.ts` which filters to slotIndex 0..10 and
+    //   then excludes slot 0.
     for (const { card: c } of nonGkStarters) {
       if (c.priceCoins == null) priceMissing += 1;
       else coins += c.priceCoins;
@@ -88,7 +93,7 @@ export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarPro
     for (const c of benched) {
       if (c.priceCoins == null) priceMissing += 1;
       else coins += c.priceCoins;
-      if ((c.nationIso ?? "").toUpperCase() === "NG") nigerianCount += 1;
+      // NOTE: bench Nigerian cards do NOT count toward the minimum.
     }
 
     // Banned-type check DOES include GK — a banned keeper is still banned.

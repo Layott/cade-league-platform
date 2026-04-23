@@ -92,12 +92,24 @@ export async function submitPickerSquad(
 
   // Enforce slotIndex uniqueness at the helper layer (matches the DB's
   // unique(submission_id, slot_index) index in a friendlier error).
-  const seen = new Set<number>();
+  const seenSlot = new Set<number>();
   for (const s of v.slots) {
-    if (seen.has(s.slotIndex)) {
+    if (seenSlot.has(s.slotIndex)) {
       throw new ValidationError(`duplicate slotIndex ${s.slotIndex}`);
     }
-    seen.add(s.slotIndex);
+    seenSlot.add(s.slotIndex);
+  }
+  // A card can only appear once in the squad (starting XI + subs + reserves).
+  // Without this guard a player could stack multiple copies of the same
+  // Mbappé and artificially pump chemistry or visual clout.
+  const seenCard = new Set<string>();
+  for (const s of v.slots) {
+    if (seenCard.has(s.fcdbPlayerId)) {
+      throw new ValidationError(
+        `duplicate card: fcdbPlayerId ${s.fcdbPlayerId} appears in multiple slots`,
+      );
+    }
+    seenCard.add(s.fcdbPlayerId);
   }
 
   // 1. Hydrate the picked cards from `fc26_players` in one query.
