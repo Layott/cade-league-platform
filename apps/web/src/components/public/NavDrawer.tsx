@@ -191,8 +191,8 @@ export function NavDrawer({
         aria-hidden={!open}
         aria-labelledby={titleId}
         className={
-          "fixed inset-y-0 right-0 z-[120] flex w-[min(320px,85vw)] flex-col overflow-y-auto border-l border-[var(--ink-4)] bg-[var(--ink-0)] shadow-[-25px_0_60px_-20px_rgba(0,0,0,0.9)] transform transition-transform duration-300 ease-out " +
-          (open ? "translate-x-0" : "translate-x-full pointer-events-none")
+          "fixed inset-y-0 left-0 z-[120] flex w-[min(320px,85vw)] flex-col overflow-y-auto border-r border-[var(--ink-4)] bg-[var(--ink-0)] shadow-[25px_0_60px_-20px_rgba(0,0,0,0.9)] transform transition-transform duration-300 ease-out " +
+          (open ? "translate-x-0" : "-translate-x-full pointer-events-none")
         }
         data-testid="nav-drawer"
       >

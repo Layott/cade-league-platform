@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import {
   getCurrentWeekSubmissionForPlayer,
   getRuleForSeason,
   weekStartThursday,
   thursdayDeadline,
 } from "@/server/squads";
+import { getCurrentSquadStatus } from "@/server/profile/squadStatus";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
@@ -88,6 +90,16 @@ export default async function PlayerSquadPage() {
     }
   }
 
+  // Plan 10 + Plan 41 — squad window gating. If the deadline has
+  // passed AND no admin-reopen / change-window is in effect, hide the
+  // picker so players can't submit a late squad.
+  const svc = getServiceRoleSupabase();
+  const submissionStatus = await getCurrentSquadStatus(svc, player.id, new Date());
+  const windowOpen =
+    submissionStatus.kind === "pre_deadline" ||
+    submissionStatus.kind === "reopened_by_admin" ||
+    submissionStatus.kind === "friday_change_window";
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -127,6 +139,20 @@ export default async function PlayerSquadPage() {
               </li>
             ))}
           </ul>
+        </section>
+      ) : !windowOpen ? (
+        <section
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
+          data-testid="squad-window-closed"
+        >
+          <div className="mb-2 font-display text-lg font-bold text-[var(--chalk-0)]">
+            Squad window closed
+          </div>
+          <p className="text-sm text-[var(--chalk-2)]">
+            {submissionStatus.kind === "window_closed"
+              ? "This week's deadline has passed. Contact an admin to reopen submission for you."
+              : "Submission is not accepting new squads right now."}
+          </p>
         </section>
       ) : (
         <SquadPickerBuilder
