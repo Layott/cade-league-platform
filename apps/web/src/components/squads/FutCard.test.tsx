@@ -35,12 +35,14 @@ describe("FutCard", () => {
     expect(document.querySelector("img")).toBeNull();
   });
 
-  it("synthesises a frame URL from the variant when cardBgUrl is absent", () => {
-    render(<FutCard card={mkCard({ variant: "5-toty" })} />);
+  it("falls back to rating-band tile when cardBgUrl absent (no synthesis)", () => {
+    // Futbin frames require imgix-signed URLs we can't mint client-side.
+    // When cardBgUrl is null the card renders the solid-colour band + the
+    // variant label; no img element is emitted.
+    render(<FutCard card={mkCard({ variant: "5-toty", cardBgUrl: null })} />);
     const imgs = document.querySelectorAll("img");
-    // Exactly one image — the synthesised frame.
-    expect(imgs.length).toBe(1);
-    expect(imgs[0].getAttribute("src")).toMatch(/\/cards\/s26\/5-toty\.webp$/);
+    expect(imgs.length).toBe(0);
+    expect(screen.getByText("5-toty")).toBeTruthy();
   });
 
   it("renders portrait + frame when both cardImageUrl and cardBgUrl are present", () => {

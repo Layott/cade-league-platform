@@ -102,18 +102,14 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
   const nameSize = size === "md" ? "text-[11px]" : "text-[9px]";
   const variantSize = size === "md" ? "text-[9px]" : "text-[7px]";
   const hasPortrait = Boolean(card.cardImageUrl);
-  // Fallback: if the row hasn't been re-scraped since the cardBgUrl
-  // capture patch, synthesise the frame URL from the known variant label.
-  // Real Futbin pattern (observed in scraped HTML, 2026-04-23):
-  //   https://cdn3.futbin.com/content/fifa26/img/cards/tiny/{variant_underscored}.png
-  // Variants are canonically stored hyphenated ("5-toty", "72-heroes",
-  // "111-fantasy-fc"); Futbin's CDN uses underscores for the filename,
-  // so convert on the way out.
-  const fallbackFrameUrl =
-    !card.cardBgUrl && card.variant
-      ? `https://cdn3.futbin.com/content/fifa26/img/cards/tiny/${card.variant.toLowerCase().replace(/-/g, "_")}.png`
-      : null;
-  const frameUrl = card.cardBgUrl ?? fallbackFrameUrl;
+  // Futbin's card-frame CDN (cdn3.futbin.com/content/fifa26/img/cards/…)
+  // requires imgix-signed URLs (`?fm=png&ixlib=…&s=<hmac>`). The scraper
+  // captures the full signed URL into attributes.card_bg_url; we cannot
+  // synthesise it without Futbin's secret key. When the row hasn't been
+  // re-scraped since the capture patch landed, card.cardBgUrl is null —
+  // FutCard falls back to the rating-band colour tile with the portrait
+  // overlay, which still reads as a gold/silver/bronze/icon/hero card.
+  const frameUrl = card.cardBgUrl ?? null;
   const hasFrame = Boolean(frameUrl);
   const hasImage = hasPortrait || hasFrame;
 
