@@ -21,7 +21,10 @@ const { createClient } = require("@supabase/supabase-js");
 const { diffUpsertFutbinRow } = require("./_lib_diff_upsert");
 
 const PROFILE_DIR = path.resolve(__dirname, ".futbin_chromium_profile");
-const LIST_URL = (p) => `https://www.futbin.com/26/latest-released-players?page=${p}`;
+// Futbin's default /26/players view is already sorted newest-first, so
+// walking from page 1 surfaces brand-new drops. Diff-upsert + early-
+// stop (2 consecutive all-unchanged pages) does the rest.
+const LIST_URL = (p) => `https://www.futbin.com/26/players?page=${p}`;
 
 function loadEnv() {
   const p = path.resolve(__dirname, "..", "..", "apps", "web", ".env.local");
