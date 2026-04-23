@@ -97,13 +97,13 @@ async function upsert(sb, rows, stats) {
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
     const v = (r.variant || "").toLowerCase();
     let itemType = "normal";
-    if (/icon/.test(v)) itemType = "icon";
-    else if (/hero/.test(v)) itemType = "hero";
-    else if (/toty/.test(v)) itemType = "toty";
-    else if (/tots/.test(v)) itemType = "tots";
-    else if (/totw/.test(v)) itemType = "totw";
-    else if (/rttf|road-to/.test(v)) itemType = "rttf";
-    else if (r.variant && !/^(gold|silver|bronze|common|rare|normal|5_gold|4_silver|3_bronze|if)$/.test(v)) itemType = "special";
+    if (/\bicon\b/.test(v)) itemType = "icon";
+    else if (/\btoty\b/.test(v)) itemType = "toty";
+    else if (/\btots\b|team-of-the-season/.test(v)) itemType = "tots";
+    else if (/\btotw\b|\bin-form\b|\bif\b/.test(v)) itemType = "totw";
+    else if (/\bhero(es)?\b/.test(v)) itemType = "hero";
+    else if (/\brttf\b|road-to/.test(v)) itemType = "rttf";
+    else if (!/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/.test(v)) itemType = "special";
     if (exist) {
       await sb.from("fc26_players").update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
       stats.updated++;

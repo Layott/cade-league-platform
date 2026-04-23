@@ -196,13 +196,13 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     // item_type bucket from variant string.
     const vLower = (r.variant || "").toLowerCase();
     let itemType = "normal";
-    if (/icon/.test(vLower)) itemType = "icon";
-    else if (/hero/.test(vLower)) itemType = "hero";
-    else if (/toty/.test(vLower)) itemType = "toty";
-    else if (/tots/.test(vLower)) itemType = "tots";
-    else if (/totw/.test(vLower)) itemType = "totw";
-    else if (/rttf|road-to-final|road-to-the-final/.test(vLower)) itemType = "rttf";
-    else if (r.variant && !/^(gold|silver|bronze|common|rare|5_gold|4_silver|3_bronze|if|normal)$/.test(vLower)) itemType = "special";
+    if (/\bicon\b/.test(vLower)) itemType = "icon";
+    else if (/\btoty\b/.test(vLower)) itemType = "toty";
+    else if (/\btots\b|team-of-the-season/.test(vLower)) itemType = "tots";
+    else if (/\btotw\b|\bin-form\b|\bif\b/.test(vLower)) itemType = "totw";
+    else if (/\bhero(es)?\b/.test(vLower)) itemType = "hero";
+    else if (/\brttf\b|road-to/.test(vLower)) itemType = "rttf";
+    else if (!/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/.test(vLower)) itemType = "special";
 
     if (exist) {
       await sb.from("fc26_players")

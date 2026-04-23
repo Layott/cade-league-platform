@@ -58,3 +58,25 @@ KNOWLEDGE/extracted/.futbin_cookies.json
 KNOWLEDGE/extracted/futbin_cookies_state.json
 KNOWLEDGE/extracted/futbin_cookies_unmatched.json
 KNOWLEDGE/extracted/futbin_cookies_inserted.json
+
+# Headful + reverse + range scrapers — persistent Chromium profiles + per-run state
+KNOWLEDGE/extracted/.futbin_chromium_profile/
+KNOWLEDGE/extracted/.futbin_chromium_profile_reverse/
+KNOWLEDGE/extracted/futbin_headful_state.json
+KNOWLEDGE/extracted/futbin_headful_inserted.json
+KNOWLEDGE/extracted/futbin_headful_unmatched.json
+KNOWLEDGE/extracted/futbin_reverse_state.json
+
+# Futbin/futgg/futwiz probe/dump artefacts
+KNOWLEDGE/extracted/futbin_*.html
+KNOWLEDGE/extracted/futbin_*.png
+KNOWLEDGE/extracted/futgg_*.html
+KNOWLEDGE/extracted/futwiz_*.html
+KNOWLEDGE/extracted/futwiz_unmatched.json
+KNOWLEDGE/extracted/_futbin_*.html
+KNOWLEDGE/extracted/_futbin_*.png
+KNOWLEDGE/extracted/_futbin_*_probe.json
+KNOWLEDGE/extracted/_futbin_xhr.json
+
+# Large dataset CSVs — re-downloadable from Kaggle
+KNOWLEDGE/extracted/EAFC26*.csv
