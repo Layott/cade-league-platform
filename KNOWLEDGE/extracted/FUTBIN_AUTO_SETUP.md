@@ -31,17 +31,62 @@ node KNOWLEDGE/extracted/_scrape_futbin_auto.js
 
 ## Schedule with Windows Task Scheduler
 
-1. Open **Task Scheduler** (Start → type "task scheduler").
-2. **Create Basic Task** → Name: `Futbin Refresh`, Trigger: Daily at **03:00 AM**.
-3. **Action** → Start a program:
+Two tasks, both on **Wed / Thu / Fri at 20:00** (8 PM local):
+
+### Task 1 — Price refresh + new-card detection
+
+1. **Start** → type "Task Scheduler" → open it.
+2. **Create Task…** (NOT "Create Basic Task" — we need the weekly trigger options).
+3. **General** tab:
+   - Name: `Futbin Price Refresh`
+   - Check "Run whether user is logged on or not"
+   - Check "Run with highest privileges"
+4. **Triggers** tab → **New…**:
+   - Begin the task: **On a schedule**
+   - Settings: **Weekly** → recur every 1 week → check **Wednesday**, **Thursday**, **Friday**
+   - Start time: `20:00:00`
+   - Check "Enabled" at the bottom. OK.
+5. **Actions** tab → **New…**:
+   - Action: **Start a program**
    - Program: `C:\Program Files\nodejs\node.exe`
    - Arguments: `KNOWLEDGE\extracted\_scrape_futbin_auto.js`
    - Start in: `C:\Users\Sweez\Desktop\LAYO\CLAUDE\GAMEEVO\ESOCCER`
-4. **Conditions** tab → uncheck "Start only if computer is on AC power" if you want it to run on battery.
-5. **Settings** tab → check "Run task as soon as possible after a scheduled start is missed" so a missed night catches up.
-6. Before saving, set the account to run whether you are logged on or not (for PC-asleep wake via wake timer if that's wanted).
+6. **Conditions** tab → uncheck "Start only if the computer is on AC power" (safe for laptops).
+7. **Settings** tab → check "Run task as soon as possible after a scheduled start is missed".
+8. OK → enter Windows password if prompted.
 
-**Critical:** the VPN needs to be connected when the task fires. If you use Sharp VPN's auto-connect-on-boot, you are covered. If not, either leave Sharp running, or schedule the VPN to start 5 minutes before the scrape.
+### Task 2 — Stats enrichment + update-detector
+
+Repeat the above with these differences:
+- Name: `Futbin Enrichment`
+- Triggers: **Weekly** → **Wednesday / Thursday / Friday** at **20:30:00** (runs 30 min after the price refresh so the first task's Chromium profile is free)
+- Action arguments: `KNOWLEDGE\extracted\_enrich_futbin_details.js`
+
+**Critical:** Sharp VPN must be connected at 20:00 on those days. Best practice — set Sharp VPN to auto-connect on boot + leave the PC on Wed/Thu/Fri evenings. If the PC is off or asleep at 20:00, Task Scheduler re-runs the task on next wake (thanks to the "run as soon as possible after missed" flag).
+
+### Quick-create via PowerShell (optional)
+
+Paste this in an **elevated** PowerShell to create both tasks in one shot (adjust paths if your repo lives elsewhere):
+
+```powershell
+$repo = 'C:\Users\Sweez\Desktop\LAYO\CLAUDE\GAMEEVO\ESOCCER'
+$node = 'C:\Program Files\nodejs\node.exe'
+
+$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Wednesday,Thursday,Friday -At 8pm
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest
+
+Register-ScheduledTask -TaskName 'Futbin Price Refresh' `
+  -Trigger $trigger -Settings $settings -Principal $principal `
+  -Action (New-ScheduledTaskAction -Execute $node -Argument 'KNOWLEDGE\extracted\_scrape_futbin_auto.js' -WorkingDirectory $repo)
+
+$trigger2 = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Wednesday,Thursday,Friday -At '8:30pm'
+Register-ScheduledTask -TaskName 'Futbin Enrichment' `
+  -Trigger $trigger2 -Settings $settings -Principal $principal `
+  -Action (New-ScheduledTaskAction -Execute $node -Argument 'KNOWLEDGE\extracted\_enrich_futbin_details.js' -WorkingDirectory $repo)
+
+Get-ScheduledTask -TaskName 'Futbin*' | Format-Table TaskName, State, Triggers
+```
 
 ## What to check each morning
 
