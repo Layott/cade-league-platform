@@ -50,6 +50,8 @@ Read these before proposing changes:
 
 **Dormant datasets (kept, not mutated):** `fc26_players` rows with `source_dataset IN ('kaggle','fut.gg')` — 2,745 Kaggle + 1,405 fut.gg rows carry no Futbin pricing/images/stats. Left in place for provenance; all fcdb runtime lookups MUST filter `source_dataset='futbin.com' AND deleted_at IS NULL`.
 
+**Removed 2026-04-23 (was Plan 24):** automated nightly `fcdb-refresh` Vercel cron + `@/server/fcdb/refresh.ts` orchestrator + `@/server/fcdb/sources/{kaggle,futdb,sofifa}.ts` wrappers. The Futbin scrape scripts under `KNOWLEDGE/extracted/_scrape_futbin_*.js` are run locally on the admin's PC on a manual cadence — no server-side catalog refresh. Orphan table `fcdb_refresh_log` (migration `20260510000001`) left in place; no code reads it.
+
 **Now shipped (was "deferred" in Phase 1A):** vMix/OBS/Streamlabs overlay bridge (Plan 12), 12-role matrix + DB perms (Plan 9), squad submission + Friday change window (Plan 10), void-match propagation (Plan 11), orgs + disputes + appeals server modules (Plan 13A — content + preseason subsystems dropped 2026-04-22 per Plan 33), **Futbin scraper + FCDB enrichment** (Phase 3 attempt: 20,372 rows live as of 2026-04-23; shared classifier at `KNOWLEDGE/extracted/_classify_variant.js`).
 
 When in doubt, check `PRODUCT_STRUCTURE.md` §2.5 + `tasks/todo.md` review sections.
