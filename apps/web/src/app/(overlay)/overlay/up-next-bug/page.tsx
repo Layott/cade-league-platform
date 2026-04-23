@@ -56,7 +56,10 @@ function UpNextInner() {
             key={state.eventId ?? "up-next"}
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
+            // Plan 48.2 — exit reverses entry: opposite direction,
+            // same duration + easing. Entry from below (+40), exit to
+            // above (-40).
+            exit={{ opacity: 0, y: -40 }}
             transition={{ ...ENTER, duration: 0.7 }}
             style={{
               position: "absolute",

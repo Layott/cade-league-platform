@@ -1,12 +1,11 @@
 "use client";
 
-// TODO Plan 48 phase 2 — design parity
 import { Suspense, useEffect, useId, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOverlayChannel } from "../../useOverlayChannel";
-import { featuredCommentSchema } from "@/server/overlays/schemas";
-import { ENTER, EXIT } from "@/lib/motion";
+import { featuredCommentSchema, type FcDesign } from "@/server/overlays/schemas";
+import { ENTER } from "@/lib/motion";
 import { OverlayFrame } from "@/components/overlay/OverlayFrame";
 
 /**
@@ -83,6 +82,77 @@ export default function FeaturedCommentPage() {
   );
 }
 
+/**
+ * Plan 48.2 — map the enumerated `design.position` to CSS placement +
+ * enter/exit offsets. Exit mirrors entry so the card slides out the side
+ * it came from (reversed direction).
+ */
+type Placement = {
+  style: React.CSSProperties;
+  enter: { x?: number; y?: number };
+};
+const POSITION_PLACEMENTS: Record<
+  NonNullable<FcDesign["position"]>,
+  Placement
+> = {
+  "top-left": {
+    style: { left: "120px", top: "120px" },
+    enter: { x: -80 },
+  },
+  "top-right": {
+    style: { right: "120px", top: "120px" },
+    enter: { x: 80 },
+  },
+  "bottom-left": {
+    style: { left: "120px", bottom: "120px" },
+    enter: { x: -80 },
+  },
+  "bottom-right": {
+    style: { right: "120px", bottom: "120px" },
+    enter: { x: 80 },
+  },
+  center: {
+    style: {
+      left: "50%",
+      top: "50%",
+      transform: "translate(-50%, -50%)",
+    },
+    enter: { y: 40 },
+  },
+};
+
+const FONT_SIZE_SCALE: Record<
+  NonNullable<FcDesign["fontSize"]>,
+  number
+> = { small: 0.85, medium: 1, large: 1.2 };
+
+/** Hex (3 / 6 / 8) → `rgb(r, g, b)` / `rgba(r, g, b, a)`. Returns null on
+ * invalid input — caller falls back to the default CSS. */
+function hexToRgb(
+  hex: string,
+  alpha01?: number,
+): string | null {
+  const h = hex.replace("#", "");
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h.length === 3) {
+    r = parseInt(h[0]! + h[0]!, 16);
+    g = parseInt(h[1]! + h[1]!, 16);
+    b = parseInt(h[2]! + h[2]!, 16);
+  } else if (h.length === 6 || h.length === 8) {
+    r = parseInt(h.slice(0, 2), 16);
+    g = parseInt(h.slice(2, 4), 16);
+    b = parseInt(h.slice(4, 6), 16);
+  } else {
+    return null;
+  }
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b))
+    return null;
+  if (alpha01 != null) return `rgba(${r}, ${g}, ${b}, ${alpha01})`;
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 function FeaturedCommentInner() {
   const sp = useSearchParams();
   const sessionId = sp?.get("session") ?? null;
@@ -121,6 +191,39 @@ function FeaturedCommentInner() {
     state.eventId != null &&
     state.eventId !== expiredEventId;
 
+  // Compute structured-design-driven CSS vars + placement.
+  const design: FcDesign = parsed?.design ?? {};
+  const placement =
+    POSITION_PLACEMENTS[design.position ?? "bottom-left"] ??
+    POSITION_PLACEMENTS["bottom-left"];
+  const fontScale = FONT_SIZE_SCALE[design.fontSize ?? "medium"];
+  const designVars: Record<string, string> = {};
+  if (design.backgroundColor) {
+    const alpha =
+      design.backgroundOpacity != null
+        ? Math.max(0, Math.min(100, design.backgroundOpacity)) / 100
+        : 0.94;
+    const rgba = hexToRgb(design.backgroundColor, alpha);
+    if (rgba) designVars["--fc-bg"] = rgba;
+  } else if (design.backgroundOpacity != null) {
+    // No explicit colour — only adjust alpha on the default black panel.
+    const a = Math.max(0, Math.min(100, design.backgroundOpacity)) / 100;
+    designVars["--fc-bg"] = `rgba(7, 8, 11, ${a})`;
+  }
+  if (design.textColor) designVars["--fc-text"] = design.textColor;
+  if (design.authorColor) designVars["--fc-author"] = design.authorColor;
+  if (design.accentColor) designVars["--fc-accent"] = design.accentColor;
+  if (design.borderRadius != null) {
+    designVars["--fc-radius"] = `${Math.max(0, Math.min(40, design.borderRadius))}px`;
+  }
+  designVars["--fc-font-scale"] = String(fontScale);
+
+  // Exit animation mirrors entry (opposite direction same axis). Entry
+  // offsets come from POSITION_PLACEMENTS; exit flips the sign so the card
+  // slides out to where it came from (per Plan 48.2 mirror rule).
+  const enterX = placement.enter.x ?? 0;
+  const enterY = placement.enter.y ?? 0;
+
   return (
     <div
       style={{
@@ -135,22 +238,35 @@ function FeaturedCommentInner() {
         {visible && parsed ? (
           <motion.div
             key={state.eventId}
-            initial={{ opacity: 0, y: 60, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 40, scale: 0.96 }}
+            initial={{ opacity: 0, x: enterX, y: enterY, scale: 0.95 }}
+            animate={{
+              opacity: 1,
+              x: 0,
+              y: 0,
+              scale: 1,
+            }}
+            // Plan 48.2 — exit reverses entry: opposite direction,
+            // same duration + easing. Mirror entry offsets on x + y.
+            exit={{
+              opacity: 0,
+              x: -enterX,
+              y: -enterY,
+              scale: 0.95,
+            }}
             transition={{ ...ENTER, duration: 0.55 }}
             style={{
               position: "fixed",
-              left: "120px",
-              bottom: "120px",
               display: "flex",
               alignItems: "stretch",
               minHeight: "140px",
               maxWidth: "900px",
               pointerEvents: "auto",
+              ...placement.style,
+              ...(designVars as React.CSSProperties),
             }}
             data-testid="featured-comment-card"
             data-fc-scope={scopeId}
+            data-fc-position={design.position ?? "bottom-left"}
           >
             {parsed.cssOverrides ? (
               <style
@@ -161,12 +277,6 @@ function FeaturedCommentInner() {
               />
             ) : null}
             <FeaturedCommentCard data={parsed} />
-            {/* Exit fade-out uses a faster EXIT token on the wrapper via
-                AnimatePresence above — the explicit `exit` prop overrides
-                any default. EXIT re-export keeps type clean. */}
-            <span style={{ display: "none" }} aria-hidden>
-              {EXIT.duration}
-            </span>
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -175,15 +285,26 @@ function FeaturedCommentInner() {
 }
 
 function FeaturedCommentCard({ data }: { data: Parsed }) {
+  // CSS vars (set on the parent motion.div by FeaturedCommentInner) allow
+  // sidebar design controls to override colours + radius + font size.
+  // Fallback values preserve the stock brand look.
+  const accent = "var(--fc-accent, var(--secondary, #fe036d))";
+  const bg = "var(--fc-bg, rgba(7, 8, 11, 0.94))";
+  const textColor = "var(--fc-text, #e8f0dc)";
+  const authorColor = "var(--fc-author, #fff)";
+  const radius = "var(--fc-radius, 0px)";
+  const fontScale = "var(--fc-font-scale, 1)";
   return (
     <>
-      {/* Pink accent bar — 8 px, mirrors lower-third card */}
+      {/* Accent bar — 8 px, colour via --fc-accent */}
       <div
         className="fc-accent"
         style={{
           width: "8px",
-          background: "var(--secondary, #fe036d)",
-          boxShadow: "0 0 18px rgba(254, 3, 109, 0.5)",
+          background: accent,
+          boxShadow: `0 0 18px ${accent}`,
+          borderTopLeftRadius: radius,
+          borderBottomLeftRadius: radius,
         }}
       />
       {/* Avatar slot — 140 × 140, green border */}
@@ -223,7 +344,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
               color: "#6bcd06",
               fontFamily: "AghartiWide, sans-serif",
               fontWeight: 900,
-              fontSize: "48px",
+              fontSize: `calc(48px * ${fontScale})`,
             }}
           >
             {initialsFor(data.authorName)}
@@ -245,9 +366,11 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
         style={{
           minWidth: "420px",
           padding: "18px 32px 22px 24px",
-          background: "rgba(7, 8, 11, 0.94)",
+          background: bg,
           borderTop: "2px solid #6bcd06",
           borderBottom: "2px solid #6bcd06",
+          borderTopRightRadius: radius,
+          borderBottomRightRadius: radius,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -264,7 +387,7 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
             gap: "10px",
             fontFamily: "Quedora, sans-serif",
             fontWeight: 700,
-            fontSize: "11px",
+            fontSize: `calc(11px * ${fontScale})`,
             letterSpacing: "5px",
             color: "#6bcd06",
             textTransform: "uppercase",
@@ -275,9 +398,9 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
               display: "inline-block",
               width: "8px",
               height: "8px",
-              background: "#fe036d",
+              background: accent,
               borderRadius: "1px",
-              boxShadow: "0 0 8px #fe036d",
+              boxShadow: `0 0 8px ${accent}`,
             }}
           />
           <span>YT Live Chat</span>
@@ -287,9 +410,9 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
           style={{
             fontFamily: "AghartiWide, sans-serif",
             fontWeight: 900,
-            fontSize: "28px",
+            fontSize: `calc(28px * ${fontScale})`,
             lineHeight: "1",
-            color: "#fff",
+            color: authorColor,
             letterSpacing: "0.5px",
             textTransform: "uppercase",
             textShadow: "1px 1px 0 rgba(254, 3, 109, 0.5)",
@@ -303,9 +426,9 @@ function FeaturedCommentCard({ data }: { data: Parsed }) {
             marginTop: "4px",
             fontFamily: "Quedora, sans-serif",
             fontWeight: 500,
-            fontSize: "16px",
+            fontSize: `calc(16px * ${fontScale})`,
             lineHeight: "1.35",
-            color: "#e8f0dc",
+            color: textColor,
             maxWidth: "700px",
             wordBreak: "break-word",
           }}

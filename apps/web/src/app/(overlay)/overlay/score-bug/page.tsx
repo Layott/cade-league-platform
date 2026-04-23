@@ -58,7 +58,10 @@ function ScoreBugInner() {
             key={state.eventId ?? "score-bug"}
             initial={{ opacity: 0, x: 60 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 60 }}
+            // Plan 48.2 — exit reverses entry: opposite direction, same
+            // duration + easing. Entry slides in FROM right (+60),
+            // exit slides out TO left (-60).
+            exit={{ opacity: 0, x: -60 }}
             transition={{ ...ENTER, duration: 0.6 }}
             style={{
               position: "absolute",

@@ -64,13 +64,17 @@ export function OverlayFrame({
             }
           : { position: "fixed", left: 32, bottom: 32 };
 
+  // Plan 48.2 — exit reverses entry: opposite direction, same duration +
+  // easing. Non-fullscreen entry starts y: 8 (below), exit slides up to
+  // y: -8 (above). Fullscreen entry starts slightly larger (1.04), exit
+  // drops below unity (0.96) — still a mirror across the animate target.
   const enterFrom = isFullscreen
     ? { opacity: 0, scale: 1.04 }
     : { opacity: 0, y: 8, scale: 0.98 };
   const enterTo = { opacity: 1, y: 0, scale: 1 };
   const exitTo = isFullscreen
     ? { opacity: 0, scale: 0.96 }
-    : { opacity: 0, y: 8, scale: 0.98 };
+    : { opacity: 0, y: -8, scale: 1.02 };
 
   return (
     <div

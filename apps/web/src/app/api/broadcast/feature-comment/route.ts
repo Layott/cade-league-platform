@@ -72,6 +72,8 @@ export async function POST(req: NextRequest) {
     postedAt?: string;
     displaySeconds?: number;
     slot?: "primary" | "secondary";
+    design?: Record<string, unknown>;
+    cssOverrides?: string;
   } | null;
   if (
     !body ||
@@ -94,6 +96,13 @@ export async function POST(req: NextRequest) {
     slot: body.slot === "secondary" ? "secondary" : "primary",
   };
   if (body.authorPhotoUrl) payload.authorPhotoUrl = body.authorPhotoUrl;
+  // Plan 48.2 — optional structured design + freeform css overrides.
+  // `triggerOverlay` re-validates via featuredCommentSchema, so anything
+  // failing (bad hex, out-of-range number, unknown enum) is rejected there.
+  if (body.design) payload.design = body.design;
+  if (typeof body.cssOverrides === "string" && body.cssOverrides.trim()) {
+    payload.cssOverrides = body.cssOverrides;
+  }
 
   try {
     const out = await triggerOverlay(sb, {

@@ -108,10 +108,13 @@ function TimerInner() {
               x: pos === "top" || pos === "bottom" ? "-50%" : 0,
               y: 0,
             }}
+            // Plan 48.2 — exit reverses entry: opposite direction,
+            // same duration + easing. Timer slides out the far side
+            // from where it entered (sign flipped on both axes).
             exit={{
               opacity: 0,
-              x: ENTER_BY_POS[pos].x ?? 0,
-              y: ENTER_BY_POS[pos].y ?? 0,
+              x: -(ENTER_BY_POS[pos].x ?? 0),
+              y: -(ENTER_BY_POS[pos].y ?? 0),
             }}
             transition={{ ...ENTER, duration: 0.6 }}
             style={{

@@ -291,4 +291,33 @@ describe("StructuredFeaturedCommentForm", () => {
     };
     expect(payload.cssOverrides).toBe(".fc-card { background: red; }");
   });
+
+  it("emits structured design fields (Plan 48.2)", () => {
+    render(
+      <StructuredFeaturedCommentForm sessionId={SESSION_ID} isLive={true} />,
+    );
+    fireEvent.change(screen.getByTestId("fc-message"), {
+      target: { value: "GG" },
+    });
+    fireEvent.change(screen.getByTestId("fc-position"), {
+      target: { value: "top-right" },
+    });
+    fireEvent.change(screen.getByTestId("fc-font-size"), {
+      target: { value: "large" },
+    });
+    fireEvent.change(screen.getByTestId("fc-radius"), {
+      target: { value: "12" },
+    });
+    const payload = getHiddenPayload("fc-trigger") as {
+      design: Record<string, unknown>;
+    };
+    expect(payload.design.position).toBe("top-right");
+    expect(payload.design.fontSize).toBe("large");
+    expect(payload.design.borderRadius).toBe(12);
+    expect(typeof payload.design.backgroundColor).toBe("string");
+    expect(payload.design.backgroundColor).toMatch(/^#/);
+    // Full payload still schema-valid.
+    const res = featuredCommentSchema.safeParse(payload);
+    expect(res.success).toBe(true);
+  });
 });

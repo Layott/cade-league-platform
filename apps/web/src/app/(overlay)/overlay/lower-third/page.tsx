@@ -67,7 +67,10 @@ function LowerThirdInner() {
               key={inst.instanceId}
               initial={{ opacity: 0, x: -60 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -60 }}
+              // Plan 48.2 — exit reverses entry: opposite direction,
+              // same duration + easing. Entry from left (-60), exit to
+              // right (+60).
+              exit={{ opacity: 0, x: 60 }}
               transition={{ ...ENTER, duration: 0.7 }}
               style={{
                 position: "absolute",

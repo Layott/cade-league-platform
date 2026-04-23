@@ -466,7 +466,34 @@ export type PlayerPenaltiesPayload = z.infer<typeof playerPenaltiesSchema>;
  * `postedAt` is an ISO string from the YouTube API's `snippet.publishedAt`.
  * `slot` lets two concurrent matches each feature their own comment (same
  * dual-slot model as score_bug / lower_third).
+ *
+ * Plan 48.2 — structured design fields (see `fcDesignSchema`). Each maps
+ * to a CSS variable on the card root so the admin can restyle without
+ * writing CSS. `cssOverrides` remains available as an advanced escape
+ * hatch, applied AFTER the structured variables so it can still override
+ * anything. Values are strictly validated: only hex, numbers, and
+ * enumerated keywords land here — strings that smell like raw CSS are
+ * rejected before reaching the overlay.
  */
+const hexColorSchema = z
+  .string()
+  .trim()
+  .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+export const fcPositionSchema = z
+  .enum(["top-left", "top-right", "bottom-left", "bottom-right", "center"]);
+export const fcFontSizeSchema = z.enum(["small", "medium", "large"]);
+export const fcDesignSchema = z.object({
+  backgroundColor: hexColorSchema.optional(),
+  backgroundOpacity: z.coerce.number().int().min(0).max(100).optional(),
+  textColor: hexColorSchema.optional(),
+  authorColor: hexColorSchema.optional(),
+  accentColor: hexColorSchema.optional(),
+  borderRadius: z.coerce.number().int().min(0).max(40).optional(),
+  fontSize: fcFontSizeSchema.optional(),
+  position: fcPositionSchema.optional(),
+});
+export type FcDesign = z.infer<typeof fcDesignSchema>;
+
 export const featuredCommentSchema = z.object({
   authorName: z.string().trim().min(1).max(80),
   authorPhotoUrl: photoUrlSchema.optional(),
@@ -475,11 +502,16 @@ export const featuredCommentSchema = z.object({
   displaySeconds: z.coerce.number().int().min(3).max(30).default(10),
   soundSlot: soundSlotSchema,
   slot: matchSlotSchema,
+  /** Plan 48.2 — structured design parameters (validated). */
+  design: fcDesignSchema.optional(),
   /**
    * Plan 45 — optional raw CSS injected inside the card wrapper scoped via a
    * unique `data-fc-scope` attribute. Overlay page strips `</style>`,
    * `<script>`, and `javascript:` URLs before injection. Max 4000 chars
    * keeps the payload under the realtime-broadcast size budget.
+   *
+   * Kept post-Plan 48.2 as an advanced escape hatch — applied AFTER
+   * `design` variables so it can still override anything the sidebar set.
    */
   cssOverrides: z.string().max(4000).optional(),
 });
