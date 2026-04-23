@@ -24,12 +24,23 @@ The Futbin scrapers in `KNOWLEDGE/extracted/` write directly to the cloud Supaba
   - Delete the two `pause` lines.
   - Point the task at the `-auto` copy.
 
-## Recommended cadence
+## Recommended cadence (user's preferred slots 2026-04-23)
 
-| Task | Schedule | Purpose |
+| Task | Schedule (WAT) | Purpose |
 |---|---|---|
-| Delta (top 10 pages, newest-first) | Thursday 08:30 WAT + Sunday 20:00 WAT | Catch EA's Thu + Fri drops + Sunday price swings before new match day |
-| Full sweep | First Sunday each month 02:00 WAT | Belt-and-braces — re-verifies every card frame, stats, image URL |
+| Delta | **Wed 12:00** | Pre-weekly sanity check |
+| Delta | **Wed 20:00** | Catch Wednesday promo drops |
+| Delta | **Thu 01:00** | Catch overnight price rollovers before Thu 10am deadline |
+| Delta | **Fri 20:00** | Catch EA's Friday drop + weekend price action |
+| Full sweep | First Sunday each month 02:00 | Belt-and-braces — re-verifies every card frame, stats, image URL |
+
+Each delta run uses the shared resume-horizon (top resource_ids from last run) so a Thu 01:00 run that only takes 2 minutes is expected when nothing changed since Wed 20:00.
+
+## PC off — Task Scheduler limitations
+
+- **Fully powered off → Task Scheduler cannot start the PC.** Would need Wake-on-LAN from a separate always-on device or router.
+- **Sleep / hibernate → CAN wake** if BIOS allows wake timers + Power Options has "Allow wake timers" on + the task's **Conditions** tab has "Wake the computer to run this task" checked.
+- Recommended: leave PC in sleep (not shutdown) overnight. Most laptops/desktops under 5W in sleep.
 
 ## Verification after a scheduled run
 

@@ -92,20 +92,24 @@ const STATE_PATH = path.resolve(__dirname, "futbin_new_state.json");
 
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_PATH, "utf8")); }
-  catch { return { lastTopResourceIds: [], lastRunAt: null }; }
+  catch { return { seenResourceIds: [], lastRunAt: null }; }
 }
 function saveState(s) { fs.writeFileSync(STATE_PATH, JSON.stringify(s, null, 2)); }
 
 async function main() {
   loadEnv();
   const maxArg = process.argv.indexOf("--max-pages");
-  const maxPages = maxArg >= 0 ? parseInt(process.argv[maxArg + 1], 10) : 10;
+  const maxPages = maxArg >= 0 ? parseInt(process.argv[maxArg + 1], 10) : 50;
   const reset = process.argv.includes("--reset");
-  const state = reset ? { lastTopResourceIds: [], lastRunAt: null } : loadState();
-  const resumeHorizon = new Set(state.lastTopResourceIds ?? []);
-  if (resumeHorizon.size > 0) {
-    console.log(`[new] resume horizon: ${resumeHorizon.size} resource_ids from last run (${state.lastRunAt})`);
+  const state = reset ? { seenResourceIds: [], lastRunAt: null } : loadState();
+  // Full seen-set from last run — used for per-page overlap check.
+  // Back-compat: old state files used `lastTopResourceIds`.
+  const horizonIds = new Set(state.seenResourceIds ?? state.lastTopResourceIds ?? []);
+  if (horizonIds.size > 0) {
+    console.log(`[new] horizon: ${horizonIds.size} resource_ids from last run (${state.lastRunAt})`);
   }
+  // Stop when a page's overlap with the previous run's seen-set ≥ this %.
+  const OVERLAP_STOP_PCT = 0.8;
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   if (!fs.existsSync(PROFILE_DIR)) { console.error("run headful scraper first to warm profile"); process.exit(1); }
@@ -140,24 +144,26 @@ async function main() {
   const stats = { pages: 0, rows: 0, inserted: 0, updated: 0, unchanged: 0, noPrice: 0 };
   const inserted = [];
   const updates = [];
-  let consecutiveAllUnchanged = 0;
-  let hitResumeHorizon = false;
-  let horizonReason = "";
+  // Collect ALL resource_ids we encounter this run — becomes the horizon
+  // for the NEXT run.
+  const thisRunSeenIds = new Set();
+  let stopReason = "";
 
-  // Capture the top resource_ids from page 1 BEFORE processing so we can
-  // persist them for the next run (becomes the next resume horizon).
-  const thisRunTopResourceIds = probeRows.slice(0, 30).map((r) => r.resourceId).filter(Boolean);
+  function recordIds(rows) {
+    for (const r of rows) if (r.resourceId) thisRunSeenIds.add(String(r.resourceId));
+  }
+
+  function overlapPct(pageRows) {
+    if (horizonIds.size === 0 || pageRows.length === 0) return 0;
+    let hit = 0;
+    for (const r of pageRows) if (horizonIds.has(String(r.resourceId))) hit++;
+    return hit / pageRows.length;
+  }
 
   async function processPage(pageRows, pageNum) {
+    recordIds(pageRows);
     let pUnchanged = 0, pUpdated = 0, pInserted = 0;
     for (const r of pageRows) {
-      // Resume horizon: if we reach a card we saw at the top of the list
-      // on last run, we've caught up — stop processing this + further pages.
-      if (resumeHorizon.has(String(r.resourceId))) {
-        hitResumeHorizon = true;
-        horizonReason = `hit resource_id ${r.resourceId} from previous run`;
-        break;
-      }
       const coinsPs = parseCoins(r.pricePs);
       const coinsPc = parseCoins(r.pricePc);
       const slug = slugify(r.name);
@@ -166,15 +172,20 @@ async function main() {
       else if (status === "updated") { pUpdated++; updates.push({ name: r.name, rating: r.rating, diff }); }
       else if (status === "inserted") { pInserted++; inserted.push({ name: r.name, rating: r.rating, variant: r.variant }); }
     }
-    console.log(`[new] p${pageNum}: ${pInserted} new  ${pUpdated} changed  ${pUnchanged} unchanged  (${pageRows.length} total)`);
-    return pInserted + pUpdated === 0;
+    const overlap = overlapPct(pageRows);
+    const overlapLabel = horizonIds.size > 0
+      ? `  overlap=${(overlap * 100).toFixed(0)}%`
+      : "";
+    console.log(`[new] p${pageNum}: ${pInserted} new  ${pUpdated} changed  ${pUnchanged} unchanged  (${pageRows.length} total)${overlapLabel}`);
+    return overlap;
   }
 
-  const firstAllUnchanged = await processPage(probeRows, 1);
+  const firstOverlap = await processPage(probeRows, 1);
   stats.pages = 1; stats.rows = probeRows.length;
-  if (firstAllUnchanged) consecutiveAllUnchanged++;
 
-  if (!hitResumeHorizon) {
+  if (firstOverlap >= OVERLAP_STOP_PCT) {
+    stopReason = `page 1 overlap ${(firstOverlap * 100).toFixed(0)}% ≥ ${OVERLAP_STOP_PCT * 100}% — caught up immediately`;
+  } else {
     for (let p = 2; p <= maxPages; p++) {
       await sleep(jitter());
       let attempt = 0;
@@ -191,34 +202,27 @@ async function main() {
           await sleep(backoff);
         }
       }
-      if (pageRows.length === 0) { console.log(`[new] p${p}: 0 rows — end of list`); break; }
-      const allUnchanged = await processPage(pageRows, p);
+      if (pageRows.length === 0) { stopReason = `p${p} returned 0 rows — end of list`; break; }
+      const overlap = await processPage(pageRows, p);
       stats.pages++; stats.rows += pageRows.length;
-      if (hitResumeHorizon) {
-        console.log(`[new] resume horizon reached: ${horizonReason} — stopping.`);
+      if (overlap >= OVERLAP_STOP_PCT) {
+        stopReason = `p${p} overlap ${(overlap * 100).toFixed(0)}% ≥ ${OVERLAP_STOP_PCT * 100}% — caught up`;
         break;
       }
-      if (allUnchanged) {
-        consecutiveAllUnchanged++;
-        if (consecutiveAllUnchanged >= 2) {
-          console.log(`[new] 2 consecutive unchanged pages — stopping (caught up).`);
-          break;
-        }
-      } else {
-        consecutiveAllUnchanged = 0;
-      }
     }
-    if (stats.pages >= maxPages) {
-      console.log(`[new] hit --max-pages=${maxPages} cap. Re-run without --reset to continue from same horizon.`);
+    if (!stopReason && stats.pages >= maxPages) {
+      stopReason = `hit --max-pages=${maxPages}`;
     }
   }
 
-  // Persist new horizon: the top resource_ids we saw THIS run. Next run
-  // stops when it encounters any of these.
+  if (stopReason) console.log(`\n[new] stopped: ${stopReason}`);
+
+  // Persist the full seen-set so the NEXT run can compare against it.
   saveState({
-    lastTopResourceIds: thisRunTopResourceIds,
+    seenResourceIds: [...thisRunSeenIds],
     lastRunAt: new Date().toISOString(),
     lastStats: stats,
+    lastStopReason: stopReason,
   });
 
   console.log("\n[new] done:", stats);
