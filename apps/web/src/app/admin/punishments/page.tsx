@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { listAllForAdmin } from "@/server/punishments";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
@@ -11,8 +11,12 @@ export const dynamic = "force-dynamic";
 
 type Row = Awaited<ReturnType<typeof listAllForAdmin>>[number];
 
+// Plan 39 C3 enabled RLS on `disciplinary_actions` with a deny-all policy
+// for anon+authenticated. This admin surface is gated by the middleware
+// (ADMIN_ROLES must include the user) so we read via service role to
+// bypass RLS and see every row.
 export default async function PunishmentsAdminPage() {
-  const sb = await getServerSupabase();
+  const sb = getServiceRoleSupabase();
   const rows = await listAllForAdmin(sb);
 
   const columns: DataTableColumn<Row>[] = [

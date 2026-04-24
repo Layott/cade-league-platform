@@ -11,6 +11,7 @@ import {
 } from "@/components/admin/FormField";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import { SuspensionFields } from "./SuspensionFields";
+import { LadderHelper } from "./LadderHelper";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,11 @@ export default async function NewPunishmentPage() {
             />
           </FormField>
         </div>
+
+        {/* Client-side auto-ladder: watches (player, incidentType), fetches
+            prior-offense count, pre-fills sanction+magnitude + surfaces an
+            inline escalation notice. Admin can still override. */}
+        <LadderHelper />
 
         {/* Client-side helper: reveals suspension fields + live void preview
             when sanctionType='ban' is selected. Hidden otherwise. */}

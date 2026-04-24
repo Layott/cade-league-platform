@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { requirePermAsync } from "@/lib/perms-db";
 import { issue } from "@/server/punishments";
 
 export async function createPunishment(formData: FormData) {
@@ -17,9 +19,23 @@ export async function createPunishment(formData: FormData) {
     .single();
   if (!pub) redirect("/login");
 
+  const { data: rolesRows } = await sb
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", pub.id)
+    .is("deleted_at", null);
+  const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
+
   const service = getServiceRoleSupabase();
+  await requirePermAsync(
+    service,
+    { userId: pub.id, roles },
+    "punishments.issue",
+  );
+
+  const playerId = String(formData.get("playerId"));
   await issue(service, pub.id, {
-    playerId: String(formData.get("playerId")),
+    playerId,
     matchId: (formData.get("matchId") as string) || null,
     incidentType: formData.get("incidentType") as
       | "late_arrival"
@@ -45,5 +61,8 @@ export async function createPunishment(formData: FormData) {
     notes: (formData.get("notes") as string) || undefined,
   });
 
+  revalidatePath("/admin/punishments");
+  revalidatePath("/punishments");
+  revalidatePath(`/players/${playerId}`);
   redirect("/admin/punishments");
 }

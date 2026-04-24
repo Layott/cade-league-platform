@@ -102,6 +102,128 @@ export async function revoke(
   if (error) throw new Error(`revoke: ${error.message}`);
 }
 
+export const updateSchema = z
+  .object({
+    actionId: z.string().uuid(),
+    sanctionType: z.enum([
+      "warning",
+      "point_deduction",
+      "gd_deduction",
+      "forfeit",
+      "ban",
+    ]),
+    magnitude: z.coerce.number().int().min(0).default(0),
+    effectiveFrom: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
+    effectiveUntil: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
+    publicVisible: z.boolean().default(true),
+    notes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine(
+    (v) =>
+      v.sanctionType !== "ban" ||
+      (!!v.effectiveFrom && !!v.effectiveUntil && v.effectiveUntil >= v.effectiveFrom),
+    {
+      message:
+        "ban sanction requires effectiveFrom + effectiveUntil (with until >= from)",
+      path: ["effectiveUntil"],
+    },
+  );
+export type UpdateInput = z.infer<typeof updateSchema>;
+
+/**
+ * Edit a disciplinary_action in place. Admin-only — enforced at the caller.
+ * Does NOT change the underlying case (incident_type, player_id). The audit
+ * trigger logs the diff. Separate from `revoke` (which is a formal withdrawal
+ * with a reason) and from `softDelete` (which is typo/cleanup removal).
+ */
+export async function update(
+  sb: SupabaseClient,
+  raw: UpdateInput,
+): Promise<void> {
+  const input = updateSchema.parse(raw);
+  const { error } = await sb
+    .from("disciplinary_actions")
+    .update({
+      sanction_type: input.sanctionType,
+      magnitude: input.magnitude,
+      effective_from: input.effectiveFrom ?? null,
+      effective_until: input.effectiveUntil ?? null,
+      public_visible: input.publicVisible,
+      notes: input.notes ?? null,
+    })
+    .eq("id", input.actionId);
+  if (error) throw new Error(`update: ${error.message}`);
+}
+
+/**
+ * Soft-delete a disciplinary_action. Sets `deleted_at` so it disappears
+ * from every list + the player's precedent tally. The underlying case row
+ * is left intact (cases cascade to other actions — we don't want to soft-
+ * delete a case with a revoked-but-not-deleted sibling action). Admin-only.
+ */
+export async function softDelete(
+  sb: SupabaseClient,
+  actionId: string,
+): Promise<void> {
+  const { error } = await sb
+    .from("disciplinary_actions")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", actionId);
+  if (error) throw new Error(`softDelete: ${error.message}`);
+}
+
+/**
+ * Count prior offenses for a given player + incident_type. Only counts
+ * cases that have at least one non-revoked, non-deleted disciplinary_action.
+ * Returned count is the number of prior offenses (excludes the one the
+ * admin is about to create). The auto-ladder form uses `count + 1` as
+ * the 1-indexed offense number.
+ */
+export async function countPriorOffenses(
+  sb: SupabaseClient,
+  playerId: string,
+  incidentType: IssueInput["incidentType"],
+): Promise<number> {
+  const { data, error } = await sb
+    .from("disciplinary_cases")
+    .select(
+      `
+      id,
+      disciplinary_actions!inner ( id, revoked_at, deleted_at )
+      `,
+    )
+    .eq("player_id", playerId)
+    .eq("incident_type", incidentType)
+    .is("deleted_at", null);
+  if (error) throw new Error(`countPriorOffenses: ${error.message}`);
+
+  type Row = {
+    id: string;
+    disciplinary_actions: Array<{
+      id: string;
+      revoked_at: string | null;
+      deleted_at: string | null;
+    }>;
+  };
+
+  let n = 0;
+  for (const row of (data ?? []) as unknown as Row[]) {
+    const hasLive = row.disciplinary_actions.some(
+      (a) => !a.revoked_at && !a.deleted_at,
+    );
+    if (hasLive) n++;
+  }
+  return n;
+}
+
 export type PublicPunishment = {
   id: string;
   case_id: string;

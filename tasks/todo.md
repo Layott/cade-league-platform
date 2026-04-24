@@ -2,6 +2,18 @@
 
 Active plan: **Plan 47 — Site Manager (Wix/Hostinger-style admin backend)**. User brief 2026-04-22.
 
+## 2026-04-24 — Punishments: reflection bug + auto-ladder + edit/delete
+
+User brief: new punishments for FARUK/ADEFOLA don't reflect on `/admin/punishments` or `/punishments`.
+
+- [x] 1. Diagnose root cause via cloud DB script — 19 rows exist in `disciplinary_actions`, query via service-role returns all 19. Admin page uses `getServerSupabase()` (authenticated cookie client) → RLS policy `disciplinary_actions_deny_all` from Plan 39 C3 returns zero rows for `authenticated`. Same issue on public `/punishments` + detail page.
+- [x] 2. Bugfix — switch list fns (`listAllForAdmin`, `listPublic`, `listForPlayer`) + admin detail page to read via service-role client. Perms already gated by middleware + per-page `requirePermAsync`. `listPublic` still filters `public_visible=true + revoked_at IS NULL + deleted_at IS NULL`.
+- [x] 3. Feature — auto-ladder form. Client-island `PunishmentComposer` fetches offense count via lightweight route handler, pre-fills sanction+magnitude per Rule 5.4, surfaces inline "Nth offense → escalated" notice. Admin can still edit.
+- [x] 4. Feature — edit + soft-delete on detail page. New server actions `updatePunishment` + `softDeletePunishment` gated by `punishments.revoke` perm. Separate from revoke.
+- [x] 5. Auto-reflect — `revalidatePath("/admin/punishments")` + `revalidatePath("/punishments")` in issue/revoke/update/delete actions.
+- [x] 6. Verify — `npm run test` + `npm run lint` green + manually confirm admin + public lists render 19 rows + a fresh issue shows up without reload.
+- [x] 7. Commit + push.
+
 ## 2026-04-24 — Leaderboard/Top-Scorers/Match-Scores-Day live data (Slice 1 of audit)
 
 Audit spec: `docs/superpowers/specs/2026-04-24-leaderboard-broadcast-linking-audit.md`. Slice 1 closes gap #1 (P0) by making the 3 "preview-only stub" overlays read LIVE data + add a live-preview iframe modal on the broadcast admin.

@@ -1,4 +1,4 @@
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { listPublic } from "@/server/punishments";
 import { formatWat } from "@/lib/time";
 import Link from "next/link";
@@ -56,8 +56,11 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
+// Plan 39 C3 enabled deny-all RLS on `disciplinary_actions`; service role
+// bypasses RLS, and `listPublic` already filters to `public_visible=true`
+// + not revoked + not deleted. Read-only — no writes happen here.
 export default async function PublicPunishmentsPage() {
-  const sb = await getServerSupabase();
+  const sb = getServiceRoleSupabase();
   const rows = await listPublic(sb, 100);
 
   return (

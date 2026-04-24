@@ -14,6 +14,22 @@ Append patterns after any correction from the user. Keep each entry short: what 
 
 ## Entries
 
+**Date:** 2026-04-24
+**Context:** User reported newly-issued punishments for FARUK/ADEFOLA didn't reflect on `/admin/punishments` nor `/punishments`. Rows DID exist in `disciplinary_actions` (19 total confirmed via service-role diag) and the user's display_name + user_id were populated — so the earlier hypothesis that the `users:users!players_user_id_fkey!inner` embed was dropping rows was wrong.
+**Mistake:** The admin page + public page + detail page were reading via `getServerSupabase()` (authenticated cookie client). Plan 39 C3 migration `20260508000002_plan39_business_table_rls.sql` enabled RLS on `disciplinary_actions` with a deny-all policy for `anon` + `authenticated`. Service-role bypasses RLS, but the page-level callers weren't using it. Result: admin authenticated as `admin@cade.local` sees zero rows even though the table has 19.
+**Correction:** Switched the three list-page entry points — `/admin/punishments/page.tsx`, `/admin/punishments/[id]/page.tsx`, `/punishments/page.tsx` — to `getServiceRoleSupabase()`. Admin routes are gated by middleware; public `listPublic` filters `public_visible + !revoked + !deleted`. Added `revalidatePath` for `/admin/punishments`, `/punishments`, `/players/[id]` in every issue/revoke/update/delete server action.
+**Rule for future:** When a migration enables RLS on a table, grep the codebase for page-level callers (`getServerSupabase()` + `.from('<table>')`) and swap them to service-role OR add a permissive SELECT policy. `CLAUDE.md` §4 says "RLS on PII + financial tables only" — but Plan 39 expanded that to 6 business tables. Any new RLS migration needs a callers-audit commit in the same slice.
+
+---
+
+**Date:** 2026-04-24
+**Context:** Writing Vitest tests for a fn that uses `z.string().uuid()` schema validation.
+**Mistake:** Used UUID strings like `00000000-0000-0000-0000-000000000001` in test fixtures. Zod v4 rejects these as NOT matching the v4 UUID grammar — the fourth group needs a leading `[89ab]` nibble, and there's a special nil-UUID case `00000000-0000-0000-0000-000000000000` allowed but my fixture used `...000000000001` which is neither nil nor v4.
+**Correction:** Use clearly v4-shaped strings like `11111111-1111-4111-8111-111111111111` (version nibble = 4, variant nibble = 8). Or use `randomUUID()` from `node:crypto`.
+**Rule for future:** Any `z.string().uuid()` schema in a test fixture must either (a) use a real `randomUUID()` value, (b) match v4 grammar explicitly, or (c) be the all-zero nil UUID. Never try to "obvious fake" UUIDs like `...000000000001`.
+
+---
+
 **Date:** 2026-04-20
 **Context:** Scaffolding Next.js via `create-next-app` during Plan 0 Task 3.
 **Mistake:** Ran `npx --yes create-next-app@latest apps/web ... --yes` before creating the `apps/` parent dir; got "The application path is not writable". Also double `--yes` (npx-level + scaffolder-level) is ambiguous.
@@ -259,3 +275,20 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Lazy regex. `/\d-\d/` matches any digit-dash-digit pair, and ISO dates are full of those. The intent was "no trailing N-N score" but the regex didn't anchor to that context.
 **Correction:** Anchored to the suffix where scores actually live: `/· \d+-\d+$/`. Runs only at end-of-string after a ` · ` separator. The date segment never matches.
 **Rule for future:** When asserting "label does NOT contain score like 2-1", anchor the regex to the format boundary (`/· \d+-\d+$/`, or `/\bvs .* \d+-\d+/`). Bare `\d-\d` will false-match ANY ISO date. Before using a regex in a negative-match assertion, sanity-check it against plausible inputs other than the target.
+
+---
+
+**Date:** 2026-04-24
+**Context:** Extending the Friday 21:00-22:00 WAT `squad_change_requests` row to carry three coexisting intents (formation change, slot rearrangement, single swap). Original 2026-04-28 migration had `player_out_name`/`player_in_name`/`player_in_item_type`/`player_in_rating`/`player_in_value` all NOT NULL and inlined CHECK constraints.
+**Mistake:** First pass at the new migration only added `new_formation` + `new_slot_positions` — forgot that a formation-only change leaves swap columns NULL, which collides with the existing NOT NULL. The inline `check (x in (…))` and `check (x between 1 and 99)` constraints also auto-named by Postgres, so dropping them needs `IF EXISTS` + the conventional `<table>_<column>_check` name.
+**Correction:** Migration `20260520000100_plan10_change_request_formation_and_slots.sql` — `alter column … drop not null` on the five swap columns, `drop constraint if exists … _check` on each inline check, reattach null-tolerant versions `check (x is null or …)`. Added `squad_change_requests_nonempty_intent_check` so empty-intent rows are rejected at DB layer. Zod schema `.superRefine` enforces the same invariant at API layer + rejects the `playerIn-without-playerOut` foot-gun.
+**Rule for future:** When relaxing a NOT NULL on a column with inline CHECK, first `DROP CONSTRAINT IF EXISTS <table>_<column>_check`, then `ALTER … DROP NOT NULL`, then reattach a null-tolerant CHECK. Postgres auto-names inline column-level checks deterministically — no need to look them up, but always guard with `IF EXISTS` so the migration is re-runnable across environments where a prior failed attempt may have partially applied.
+
+---
+
+**Date:** 2026-04-24
+**Context:** Wrote a unit test with `XI_ITEM_IDS.map((id) => ({ kind: "existing" as const, itemId: id }))`, then tried to overwrite `plan[0] = { kind: "new" }`. tsc refused: the array element type narrowed to `{ kind: "existing"; itemId: string }` because of the `as const`.
+**Mistake:** Used `as const` on object literals inside `.map()` thinking it would preserve the discriminator without over-narrowing. It over-narrowed — the compiler inferred the element type as the single variant, losing the union.
+**Correction:** Defined `type PlanEntry = { kind: "existing"; itemId: string } | { kind: "new" }` and a `mkExistingPlan()` helper that returns `PlanEntry[]` via explicit `.map<PlanEntry>(…)`. Now `plan[i] = { kind: "new" }` compiles.
+**Rule for future:** When building a discriminated-union array via `.map()`, either explicitly annotate the element type on the map (`.map<Foo>(…)`) or construct via `[].push`. `as const` on literals inside a mapper narrows the array's element type to one variant and blocks future assignments of the other variants.
+

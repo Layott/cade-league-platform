@@ -1,22 +1,29 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { formatWat } from "@/lib/time";
-import { revokeAction } from "./actions";
+import { revokeAction, deleteAction } from "./actions";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
-import { DangerButton, SecondaryButton } from "@/components/admin/buttons";
+import {
+  DangerButton,
+  SecondaryButton,
+} from "@/components/admin/buttons";
 import { FormField, textareaClass } from "@/components/admin/FormField";
+import { EditPunishmentForm } from "./EditPunishmentForm";
 
 export const dynamic = "force-dynamic";
 
+// Middleware gates /admin/* so only ADMIN_ROLES land here. Plan 39 C3
+// enabled deny-all RLS on disciplinary_actions for authenticated users, so
+// we read via service role to bypass RLS.
 export default async function PunishmentDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const sb = await getServerSupabase();
+  const sb = getServiceRoleSupabase();
   const { data, error } = await sb
     .from("disciplinary_actions")
     .select(
@@ -197,6 +204,23 @@ export default async function PunishmentDetailPage({
         </section>
       ) : null}
 
+      <EditPunishmentForm
+        initial={{
+          actionId: row.id,
+          sanctionType: row.sanction_type as
+            | "warning"
+            | "point_deduction"
+            | "gd_deduction"
+            | "forfeit"
+            | "ban",
+          magnitude: row.magnitude,
+          effectiveFrom: row.effective_from,
+          effectiveUntil: row.effective_until,
+          publicVisible: row.public_visible,
+          notes: row.notes,
+        }}
+      />
+
       {row.revoked_at ? (
         <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
@@ -218,6 +242,8 @@ export default async function PunishmentDetailPage({
           </div>
           <p className="mt-1 text-xs text-[var(--chalk-3)]">
             Requires a written reason. Action is logged to the audit trail.
+            Use revoke for official withdrawal; use Delete below for typo
+            cleanup.
           </p>
           <form action={revokeAction} className="mt-4 space-y-3">
             <input type="hidden" name="actionId" value={row.id} />
@@ -234,6 +260,28 @@ export default async function PunishmentDetailPage({
           </form>
         </section>
       )}
+
+      <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--flare)]">
+          Delete (typo cleanup)
+        </div>
+        <p className="mt-1 text-xs text-[var(--chalk-3)]">
+          Soft-deletes this action. Use for wrong-player / duplicate entries,
+          not as a replacement for revoke. Row disappears from all lists and
+          from the player&apos;s precedent tally.
+        </p>
+        <form
+          action={deleteAction}
+          className="mt-3 flex items-center gap-3"
+          data-testid="delete-punishment-form"
+        >
+          <input type="hidden" name="actionId" value={row.id} />
+          <DangerButton type="submit">Delete</DangerButton>
+          <span className="text-[11px] text-[var(--chalk-3)]">
+            No confirm dialog — submit will immediately soft-delete.
+          </span>
+        </form>
+      </section>
     </div>
   );
 }
