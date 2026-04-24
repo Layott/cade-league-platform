@@ -91,10 +91,16 @@ export function SquadPickerBuilder({
   }, []);
 
   /**
-   * Remap filled slots when the formation changes. Strategy: for each
-   * destination slot (in order), find the first unconsumed source slot that
-   * shares the same position label. Remaining filled cards that don't match
-   * are dropped onto the subs bench if space is available; otherwise cleared.
+   * Remap filled slots when the formation changes. Strategy:
+   *   Pass 1: match by exact position label ("CB" → "CB", "CAM" → "CAM").
+   *   Pass 2: match remaining by position family (attackers ↔ attackers,
+   *           midfielders ↔ midfielders, defenders ↔ defenders, GK ↔ GK).
+   *   Pass 3: fill any still-empty destination slot with whatever cards
+   *           are left, preserving order.
+   * Result: NO cards are dropped from the pitch on formation swap. If the
+   * new formation has 11 slots and we had ≤11 filled, every card lands
+   * somewhere on the pitch. Leftovers (rare — only if we had >11 via drag
+   * shenanigans) spill to subs, then to a freshly grown bench tail.
    */
   const switchFormation = useCallback(
     (next: FormationKey) => {
@@ -112,7 +118,17 @@ export function SquadPickerBuilder({
       const remapped: Record<number, CardSearchResult | null> = {};
       for (let i = 0; i < 11; i++) remapped[i] = null;
 
+      const family = (label: string): "GK" | "DEF" | "MID" | "ATK" => {
+        const L = label.toUpperCase();
+        if (L === "GK") return "GK";
+        if (/^(LB|RB|CB|LWB|RWB)$/.test(L)) return "DEF";
+        if (/^(CDM|CM|CAM|LM|RM)$/.test(L)) return "MID";
+        return "ATK"; // LW / RW / LF / RF / CF / ST
+      };
+
       const consumed = new Set<number>();
+
+      // Pass 1: exact-label match.
       nextDefs.forEach((slot) => {
         const matchIdx = filled.findIndex(
           (f, i) => !consumed.has(i) && f.label === slot.label,
@@ -123,15 +139,41 @@ export function SquadPickerBuilder({
         }
       });
 
-      // Push unmatched cards onto the subs bench (first empty slots).
+      // Pass 2: family match for destination slots that are still empty.
+      nextDefs.forEach((slot) => {
+        if (remapped[slot.slotIndex]) return;
+        const fam = family(slot.label);
+        const matchIdx = filled.findIndex(
+          (f, i) => !consumed.has(i) && family(f.label) === fam,
+        );
+        if (matchIdx >= 0) {
+          remapped[slot.slotIndex] = filled[matchIdx].card;
+          consumed.add(matchIdx);
+        }
+      });
+
+      // Pass 3: fill any remaining empty destination slots with remaining
+      // cards in original order. Keeps every card on the pitch even when
+      // no family match exists (e.g. all-attacker team, new formation
+      // heavy on midfielders — a card still lands rather than vanishing).
+      nextDefs.forEach((slot) => {
+        if (remapped[slot.slotIndex]) return;
+        const matchIdx = filled.findIndex((_, i) => !consumed.has(i));
+        if (matchIdx >= 0) {
+          remapped[slot.slotIndex] = filled[matchIdx].card;
+          consumed.add(matchIdx);
+        }
+      });
+
+      // Only overflow cards (had >11 filled somehow) spill to subs.
       const leftover = filled.filter((_, i) => !consumed.has(i)).map((x) => x.card);
       if (leftover.length > 0) {
         setSubs((currentSubs) => {
           const nextSubs = [...currentSubs];
           for (const card of leftover) {
             const emptyIdx = nextSubs.findIndex((s) => s === null);
-            if (emptyIdx === -1) break;
-            nextSubs[emptyIdx] = card;
+            if (emptyIdx >= 0) nextSubs[emptyIdx] = card;
+            else nextSubs.push(card); // grow bench rather than drop
           }
           return nextSubs;
         });

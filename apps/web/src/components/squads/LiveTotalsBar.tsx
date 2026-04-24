@@ -85,10 +85,17 @@ export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarPro
     //   the "min N Nigerian in starting XI" rule — this matches
     //   `server/squads/validate.ts` which filters to slotIndex 0..10 and
     //   then excludes slot 0.
+    const isNG = (c: CardSearchResult) => {
+      const iso = (c.nationIso ?? "").toUpperCase();
+      if (iso === "NG" || iso === "NGA") return true;
+      // Futbin frequently leaves nation_iso empty but fills `nation` with
+      // the country name. Accept that too.
+      return (c.nation ?? "").trim().toLowerCase() === "nigeria";
+    };
     for (const { card: c } of nonGkStarters) {
       if (c.priceCoins == null) priceMissing += 1;
       else coins += c.priceCoins;
-      if ((c.nationIso ?? "").toUpperCase() === "NG") nigerianCount += 1;
+      if (isNG(c)) nigerianCount += 1;
     }
     for (const c of benched) {
       if (c.priceCoins == null) priceMissing += 1;

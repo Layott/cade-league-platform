@@ -44,6 +44,7 @@ type FcRow = {
   value_coins_estimate: number | null;
   item_type: string;
   nation_iso: string | null;
+  nation: string | null;
 };
 
 const ALLOWED_ITEM_TYPES = [
@@ -116,7 +117,7 @@ export async function submitPickerSquad(
   const cardIds = v.slots.map((s) => s.fcdbPlayerId);
   const { data: cards, error: cardsErr } = await sb
     .from("fc26_players")
-    .select("id, name, rating, position, value_coins_estimate, item_type, nation_iso")
+    .select("id, name, rating, position, value_coins_estimate, item_type, nation_iso, nation")
     .in("id", cardIds)
     .eq("source_dataset", "futbin.com")
     .is("deleted_at", null);
@@ -154,7 +155,11 @@ export async function submitPickerSquad(
         | "legend"
         | "special"
         | "other",
-      nationalityFlag: card.nation_iso,
+      // Futbin's /26/players list often leaves nation_iso null — the CDN
+      // nation icons don't carry the ISO code in an easily parseable spot.
+      // Fall back to the full nation name ("Nigeria"), which server-side
+      // validate.ts now accepts alongside the ISO form.
+      nationalityFlag: card.nation_iso ?? card.nation,
       slotIndex: slot.slotIndex,
     };
   });

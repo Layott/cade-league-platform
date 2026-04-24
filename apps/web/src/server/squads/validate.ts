@@ -48,11 +48,13 @@ export type Violation =
     };
 
 /**
- * Nigerian flag marker. Futbin uses ISO-2 country codes in most exports;
- * the league rulebook's "Nigerian item" requirement covers any flag
- * matching one of these strings (case-insensitive).
+ * Nigerian flag marker. Accepts either ISO-2/ISO-3 codes ("NG" / "NGA")
+ * OR the full country name ("Nigeria") as a fallback, since Futbin's
+ * /26/players list doesn't always populate nation_iso — it carries the
+ * nation via a CDN icon id in those cases. submit_picker.ts feeds the
+ * best-available string (iso ?? nation) into this validator.
  */
-const NG_FLAG_VALUES = new Set(["ng", "nga"]);
+const NG_FLAG_VALUES = new Set(["ng", "nga", "nigeria"]);
 
 function isNigerian(flag: string | null | undefined): boolean {
   if (!flag) return false;
