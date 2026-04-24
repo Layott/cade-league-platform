@@ -80,3 +80,9 @@ KNOWLEDGE/extracted/_futbin_xhr.json
 
 # Large dataset CSVs — re-downloadable from Kaggle
 KNOWLEDGE/extracted/EAFC26*.csv
+
+# Raw player camera files (ARW/CR3/PNG source for _process.py). ~1.9GB.
+# Only `processed/` outputs ship. Re-process locally when new photos drop.
+KNOWLEDGE/brand-assets/players/*.ARW
+KNOWLEDGE/brand-assets/players/*.CR3
+KNOWLEDGE/brand-assets/players/*.png
