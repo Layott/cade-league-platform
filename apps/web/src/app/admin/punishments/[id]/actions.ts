@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
-import { revoke, softDelete, update } from "@/server/punishments";
+import { revoke, softDelete, update, unrevoke } from "@/server/punishments";
+import { notify } from "@/server/notifications";
 
 /**
  * Resolve the player_id that owns a given disciplinary_action, so we can
@@ -26,6 +27,27 @@ async function playerIdForAction(
     | { disciplinary_cases: { player_id: string } }
     | null;
   return row?.disciplinary_cases?.player_id ?? null;
+}
+
+/**
+ * Resolve the owning user_id (`users.id`) for a disciplinary_action.
+ * Joins disciplinary_actions → disciplinary_cases → players → users.
+ */
+async function userIdForAction(
+  service: ReturnType<typeof getServiceRoleSupabase>,
+  actionId: string,
+): Promise<string | null> {
+  const { data } = await service
+    .from("disciplinary_actions")
+    .select(
+      "disciplinary_cases!inner ( players!inner ( user_id ) )",
+    )
+    .eq("id", actionId)
+    .maybeSingle();
+  const row = data as unknown as
+    | { disciplinary_cases: { players: { user_id: string } } }
+    | null;
+  return row?.disciplinary_cases?.players?.user_id ?? null;
 }
 
 async function authedAdmin(): Promise<{
@@ -70,6 +92,23 @@ export async function revokeAction(formData: FormData) {
 
   await revoke(ctx.service, actionId, reason);
   const playerId = await playerIdForAction(ctx.service, actionId);
+
+  try {
+    const userId = await userIdForAction(ctx.service, actionId);
+    if (userId) {
+      await notify(ctx.service, {
+        userId,
+        kind: "punishment_revoked",
+        title: "A punishment against you was revoked",
+        body: `An admin has revoked a previous sanction. Reason: ${reason}. Any matches voided by a related ban have been restored automatically.`,
+        href: "/profile",
+        metadata: { actionId, reason },
+      });
+    }
+  } catch (err) {
+    console.error(`[notifications] punishment_revoked fan-out failed: ${String(err)}`);
+  }
+
   revalidatePath("/admin/punishments");
   revalidatePath(`/admin/punishments/${actionId}`);
   revalidatePath("/punishments");
@@ -114,6 +153,38 @@ export async function updateAction(formData: FormData) {
   revalidatePath(`/admin/punishments/${actionId}`);
   revalidatePath("/punishments");
   revalidatePath("/profile");
+  if (playerId) revalidatePath(`/players/${playerId}`);
+  redirect(`/admin/punishments/${actionId}`);
+}
+
+/**
+ * Plan 50: clear the `revoked_at` on a disciplinary_action. Used by the
+ * "undo revoke" button on the punishment detail page when a previous
+ * revoke needs to be reversed (e.g. admin revoked by mistake, or an
+ * appeal was undone externally and the cascade left stragglers). The
+ * DB trigger on `disciplinary_actions` re-propagates ban voids when
+ * `revoked_at` flips back to NULL.
+ */
+export async function unrevokeAction(formData: FormData) {
+  const ctx = await authedAdmin();
+  if (!ctx) redirect("/login");
+  await requirePermAsync(
+    ctx.service,
+    { userId: ctx.pub.id, roles: ctx.roles },
+    "punishments.edit",
+  );
+
+  const actionId = String(formData.get("actionId") ?? "");
+  if (!actionId) return;
+
+  await unrevoke(ctx.service, actionId);
+  const playerId = await playerIdForAction(ctx.service, actionId);
+  revalidatePath("/admin/punishments");
+  revalidatePath(`/admin/punishments/${actionId}`);
+  revalidatePath("/punishments");
+  revalidatePath("/profile");
+  revalidatePath("/standings");
+  revalidatePath("/fixtures");
   if (playerId) revalidatePath(`/players/${playerId}`);
   redirect(`/admin/punishments/${actionId}`);
 }

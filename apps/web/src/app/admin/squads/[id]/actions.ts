@@ -10,8 +10,41 @@ import {
   acceptFcdbCandidate,
   reopenSubmission,
 } from "@/server/squads";
+import { notify } from "@/server/notifications";
 import type { Actor } from "@/perms";
 import { reopenSubmissionSchema } from "./schemas";
+
+/**
+ * Resolve the owning player's `users.id` for a squad submission. Used to
+ * route approve/reject notifications. Returns null if either join is
+ * empty (e.g. submission was deleted between the action and the notify).
+ */
+async function resolveSubmissionOwnerUserId(
+  svc: ReturnType<typeof getServiceRoleSupabase>,
+  submissionId: string,
+): Promise<{ userId: string; weekStartDate: string | null } | null> {
+  const { data } = await svc
+    .from("squad_submissions")
+    .select(
+      "week_start_date, player:players!squad_submissions_player_id_fkey(user_id)",
+    )
+    .eq("id", submissionId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const row = data as
+    | {
+        week_start_date: string | null;
+        player: { user_id: string } | { user_id: string }[] | null;
+      }
+    | null;
+  if (!row) return null;
+  const playerRel = row.player;
+  const userId = Array.isArray(playerRel)
+    ? playerRel[0]?.user_id
+    : playerRel?.user_id;
+  if (!userId) return null;
+  return { userId, weekStartDate: row.week_start_date };
+}
 
 async function loadActor(sb: Awaited<ReturnType<typeof getServerSupabase>>): Promise<Actor> {
   const {
@@ -39,8 +72,30 @@ export async function approveAction(submissionId: string): Promise<void> {
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
   await approveSubmission(sb, actor, submissionId);
+
+  // Notify the submitting player via the service-role client so the
+  // player → user join survives whatever RLS is active on squad_submissions.
+  try {
+    const svc = getServiceRoleSupabase();
+    const owner = await resolveSubmissionOwnerUserId(svc, submissionId);
+    if (owner) {
+      const weekLabel = owner.weekStartDate ?? "this week";
+      await notify(svc, {
+        userId: owner.userId,
+        kind: "squad_approved",
+        title: "Squad approved",
+        body: `Your squad for week ${weekLabel} has been approved by a referee. You're locked in for the match day.`,
+        href: "/player/squad",
+        metadata: { submissionId, weekStartDate: owner.weekStartDate },
+      });
+    }
+  } catch (err) {
+    console.error(`[notifications] squad_approved fan-out failed: ${String(err)}`);
+  }
+
   revalidatePath(`/admin/squads/${submissionId}`);
   revalidatePath("/admin/squads");
+  revalidatePath("/player/squad");
   redirect(`/admin/squads/${submissionId}`);
 }
 
@@ -51,8 +106,32 @@ export async function rejectAction(formData: FormData): Promise<void> {
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
   await rejectSubmission(sb, actor, submissionId, reason);
+
+  try {
+    const svc = getServiceRoleSupabase();
+    const owner = await resolveSubmissionOwnerUserId(svc, submissionId);
+    if (owner) {
+      const weekLabel = owner.weekStartDate ?? "this week";
+      await notify(svc, {
+        userId: owner.userId,
+        kind: "squad_rejected",
+        title: "Squad rejected",
+        body: `Your squad for week ${weekLabel} was rejected. Reason: ${reason || "(not provided)"}. Open /player/squad to fix and resubmit before the deadline.`,
+        href: "/player/squad",
+        metadata: {
+          submissionId,
+          weekStartDate: owner.weekStartDate,
+          reason,
+        },
+      });
+    }
+  } catch (err) {
+    console.error(`[notifications] squad_rejected fan-out failed: ${String(err)}`);
+  }
+
   revalidatePath(`/admin/squads/${submissionId}`);
   revalidatePath("/admin/squads");
+  revalidatePath("/player/squad");
   redirect(`/admin/squads/${submissionId}`);
 }
 
