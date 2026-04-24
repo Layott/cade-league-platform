@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getTemplateRoute,
   type TemplateKey,
@@ -21,6 +21,17 @@ import {
  *
  * `sandbox="allow-scripts allow-same-origin"` + `pointerEvents: none`
  * keep the mini from stealing clicks or navigating the admin page.
+ *
+ * Plan 48.4 (2026-04-24) — perf: /admin/broadcast/[sessionId] mounts 40+
+ * tiles across editable panels + legacy trigger cards. Eagerly spawning
+ * 40 concurrent Realtime WebSocket connections + 40 iframes (each laying
+ * out a full 1920×1080 DOM at scale(0.14)) froze first paint for seconds.
+ * Fix: IntersectionObserver-gated lazy mount. Each tile renders a sized
+ * placeholder until it enters the viewport (rootMargin 200 px) — only
+ * then do we inject the <iframe> + its subscription. `content-visibility:
+ * auto` lets the browser skip paint/layout for off-screen tiles. Once
+ * visible, the iframe stays mounted (no re-creation on scroll) so the
+ * producer's muscle-memory of "trigger → see it in that card" is kept.
  */
 export type OverlayMiniPreviewProps = {
   sessionId: string;
@@ -60,6 +71,77 @@ export function OverlayMiniPreview({
   const [copied, setCopied] = useState(false);
   const [absoluteUrl, setAbsoluteUrl] = useState<string | null>(null);
 
+  // Plan 48.4 — lazy-mount the iframe when the tile scrolls within
+  // ~200 px of the viewport. Before that, we render a cheap placeholder.
+  // `mounted` latches true on first visibility so scrolling past a tile
+  // doesn't unmount + re-create the iframe (would drop its Realtime
+  // subscription + re-hydrate the whole 1920×1080 DOM).
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (mounted) return;
+    const el = stageRef.current;
+    if (!el) return;
+
+    let cancelled = false;
+    let idleHandle: ReturnType<typeof setTimeout> | null = null;
+    let io: IntersectionObserver | null = null;
+
+    const mountNow = () => {
+      if (cancelled) return;
+      setMounted(true);
+    };
+
+    // Browsers without IntersectionObserver (older Chromium / SSR head-
+    // less) — fall back to eager mount so the producer still sees
+    // something.
+    if (typeof IntersectionObserver === "undefined") {
+      setMounted(true);
+      return;
+    }
+    io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            mountNow();
+            if (io) io.disconnect();
+            if (idleHandle) clearTimeout(idleHandle);
+            break;
+          }
+        }
+      },
+      { rootMargin: "200px 0px", threshold: 0.01 },
+    );
+    io.observe(el);
+
+    // Plan 48.4 — belt + suspenders: if the tile never scrolls into view
+    // (off-screen editable panels, below-the-fold legacy cards), still
+    // mount the iframe after a staggered idle delay. 30 tiles × 80ms
+    // stagger keeps the WebSocket spawn rate bounded while guaranteeing
+    // every tile is live inside ~3s. We key the stagger off the stage
+    // element's DOM position so the visible tiles mount first.
+    //
+    // Also — E2E specs (Playwright) bypass scroll + assert the iframe
+    // is present. This fallback keeps that contract.
+    const baseDelay = 400;
+    let extraDelay = 0;
+    try {
+      const rect = el.getBoundingClientRect();
+      // Elements further from the viewport wait proportionally longer.
+      extraDelay = Math.min(2400, Math.max(0, rect.top) * 0.4);
+    } catch {
+      // ignore — only runs client-side.
+    }
+    idleHandle = setTimeout(mountNow, baseDelay + extraDelay);
+
+    return () => {
+      cancelled = true;
+      if (io) io.disconnect();
+      if (idleHandle) clearTimeout(idleHandle);
+    };
+  }, [mounted]);
+
   // Compute the absolute URL client-side so copy-to-clipboard carries a
   // full https://.../overlay/... link into OBS / vMix. Falls back to
   // relative if window isn't available (SSR).
@@ -93,6 +175,14 @@ export function OverlayMiniPreview({
     <div
       className="overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)]"
       data-testid={`mini-preview-${templateKey}${slot ? `-${slot}` : ""}`}
+      style={{
+        // `content-visibility: auto` lets the browser skip paint + layout
+        // for tiles that are off-screen. `contain-intrinsic-size` gives
+        // the browser a size hint so scroll-height stays stable while the
+        // contents are skipped.
+        contentVisibility: "auto",
+        containIntrinsicSize: `${tileHeight + (compact ? 22 : 28)}px ${tileWidth}px`,
+      }}
     >
       {/* Header strip — label + slot pill + copy/open actions */}
       <div
@@ -151,8 +241,14 @@ export function OverlayMiniPreview({
         </div>
       </div>
 
-      {/* Iframe stage — clipping wrapper + transform-scaled 1920×1080 iframe */}
+      {/* Iframe stage — clipping wrapper + transform-scaled 1920×1080 iframe.
+          Tile starts with a cheap placeholder; only once IntersectionObserver
+          reports it in the viewport do we inject the <iframe>. Stays mounted
+          after first visibility (no scroll re-creation). */}
       <div
+        ref={stageRef}
+        data-testid={`mini-preview-stage-${templateKey}${slot ? `-${slot}` : ""}`}
+        data-mounted={mounted ? "true" : "false"}
         style={{
           width: `${tileWidth}px`,
           height: `${tileHeight}px`,
@@ -162,21 +258,43 @@ export function OverlayMiniPreview({
           margin: "0 auto",
         }}
       >
-        <iframe
-          src={overlayUrl}
-          title={`Mini preview — ${label}`}
-          data-testid={`mini-preview-iframe-${templateKey}${slot ? `-${slot}` : ""}`}
-          style={{
-            width: `${iframeWidth}px`,
-            height: `${iframeHeight}px`,
-            border: "none",
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-            pointerEvents: "none",
-          }}
-          sandbox="allow-scripts allow-same-origin"
-          loading="lazy"
-        />
+        {mounted ? (
+          <iframe
+            src={overlayUrl}
+            title={`Mini preview — ${label}`}
+            data-testid={`mini-preview-iframe-${templateKey}${slot ? `-${slot}` : ""}`}
+            style={{
+              width: `${iframeWidth}px`,
+              height: `${iframeHeight}px`,
+              border: "none",
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+              pointerEvents: "none",
+            }}
+            sandbox="allow-scripts allow-same-origin"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background:
+                "repeating-linear-gradient(135deg, rgba(107,205,6,0.04) 0 12px, transparent 12px 24px)",
+              color: "rgba(107,205,6,0.55)",
+              fontFamily: "Quedora, sans-serif",
+              fontSize: Math.max(9, Math.round(tileWidth / 32)),
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+            }}
+          >
+            loading preview…
+          </div>
+        )}
       </div>
     </div>
   );

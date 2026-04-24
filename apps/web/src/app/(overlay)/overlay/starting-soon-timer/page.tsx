@@ -71,10 +71,12 @@ function Inner({ payload, cycle }: { payload: StartingSoonTimerPayload; cycle: n
   const remainingSec = Math.max(0, Math.floor((startsAtMs - now) / 1000));
   const expired = remainingSec <= 0;
   // Tick identity — re-fires `useOverlaySound` on each whole-second change.
-  // Slot resolves to `tick-1s` by default, but if operator explicitly sets
-  // `null`, we stay silent (the hook short-circuits on null).
+  // Plan 48.4 (2026-04-24) — default to SILENT. Producers were getting a
+  // live audible tick every second while the starting-soon timer was
+  // up, which competed with caster VO + intro music. Must explicitly opt
+  // in via payload `soundSlot: "tick-1s"` to re-enable the tick cue.
   const tickTrigger = `${cycle}-${remainingSec}`;
-  const resolvedSlot = (soundSlot === undefined ? "tick-1s" : soundSlot) as OverlaySoundSlot;
+  const resolvedSlot = (soundSlot ?? null) as OverlaySoundSlot;
   useOverlaySound(resolvedSlot, tickTrigger);
 
   return (

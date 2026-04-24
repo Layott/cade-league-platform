@@ -90,6 +90,10 @@ function TimerInner() {
   // Plan 48.1 — /overlay/layout-timer?slot=primary|secondary addresses
   // the right per-instance clock. Default primary for legacy URLs.
   const slot = (sp?.get("slot") ?? "primary").trim() || "primary";
+  // Plan 48.4 (2026-04-24) — default SILENT. Producers complained the
+  // per-second tick competed with caster VO. Pass `?tick=1` on the
+  // browser-source URL to re-enable the audible tick (or ?silent=0).
+  const tickEnabled = sp?.get("tick") === "1" || sp?.get("silent") === "0";
   const clock = useMatchClock(sessionId, slot);
 
   return (
@@ -138,6 +142,7 @@ function TimerInner() {
               displaySeconds={clock.displaySeconds}
               label={clock.label}
               mode={clock.mode}
+              tickEnabled={tickEnabled}
             />
           </motion.div>
         ) : null}
@@ -150,10 +155,12 @@ function ClockBody({
   displaySeconds,
   label,
   mode,
+  tickEnabled,
 }: {
   displaySeconds: number;
   label: string | null;
   mode: "countdown" | "countup" | "paused" | "stopped";
+  tickEnabled: boolean;
 }) {
   const wholeSeconds = Math.max(0, Math.floor(displaySeconds));
   // Final-3s red flash only applies to countdown mode.
@@ -165,12 +172,13 @@ function ClockBody({
     ? "rgba(254, 3, 109, 0.7)"
     : "rgba(107, 205, 6, 0.5)";
 
-  // Tick sound on each whole-second change during active countdown/up.
-  // timer-end sound when countdown hits zero (whole seconds).
+  // Plan 48.4 — tick sound is OPT-IN via `?tick=1`. timer-end still fires
+  // on countdown hitting zero regardless, so the producer gets the
+  // "time's up" cue even when ticks are silenced.
   const isActive = mode === "countdown" || mode === "countup";
   useOverlaySound(
     "tick-1s",
-    isActive && !expired ? `tick:${wholeSeconds}` : null,
+    tickEnabled && isActive && !expired ? `tick:${wholeSeconds}` : null,
   );
   useOverlaySound("timer-end", expired ? `end:${Math.floor(Date.now() / 1000)}` : null);
 

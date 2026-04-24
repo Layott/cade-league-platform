@@ -2,6 +2,19 @@
 
 Active plan: **Plan 47 — Site Manager (Wix/Hostinger-style admin backend)**. User brief 2026-04-22.
 
+## 2026-04-24 — Broadcast mini-preview perf + timer-sound + OFF reliability + exit animations
+
+User brief (4 bugs): (1) `/admin/broadcast/[sessionId]` slow, 40+ scaled iframes each holding a WS. (2) starting-soon-timer + layout-timer tick audibly by default. (3) Trigger OFF silently does nothing on several overlays. (4) Missing / stale exit animations.
+
+- [x] 1. Root-cause Bug 3: `OffTriggerButton` `MULTI_INSTANCE_KEYS` wrongly includes `up_next_bug` + `layout_timer`. Both overlays trigger into `overlay_events` (single-instance) but OFF button routes to `clearInstanceAction` → `overlay_active_instances` (empty) → button disabled or no-op.
+- [x] 2. Fix Bug 1 (perf) — lazy mini-preview mount via IntersectionObserver + `content-visibility: auto` in `OverlayMiniPreview`; iframe only injected once tile scrolls into viewport.
+- [x] 3. Fix Bug 2 (sound) — default `starting_soon_timer` soundSlot to `null` (was falsy-default-tick). Make `layout_timer` read `soundSlot` from payload → null by default.
+- [x] 4. Fix Bug 3 (OFF reliability) — tighten `MULTI_INSTANCE_KEYS` to `lower_third` only. Extend OffTriggerButton tests.
+- [x] 5. Fix Bug 4 (exit animations) — audit each overlay; primary exit contract already lives in route-group `OverlayFrame` + local `AnimatePresence` wrappers. Starting-soon-timer + layout-brb-basic use pure CSS enter keyframes with no exit — rely on outer AnimatePresence fade. Verified scorebar, intro, outro, standings-widget, punishment-ticker, player-card inherit exit from route-group OverlayFrame.
+- [x] 6. Unit + lint pass.
+- [x] 7. Manual verification — dev server smoke: curl every overlay route + broadcast admin page.
+- [x] 8. Commit atomically (per phase) + push.
+
 ## 2026-04-24 — Punishments: reflection bug + auto-ladder + edit/delete
 
 User brief: new punishments for FARUK/ADEFOLA don't reflect on `/admin/punishments` or `/punishments`.

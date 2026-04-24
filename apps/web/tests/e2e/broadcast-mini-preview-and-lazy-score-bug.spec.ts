@@ -262,6 +262,12 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 48.3 inline mini 
       const scoreBugPanel = page.getByTestId("editable-panel-score_bug");
       await expect(scoreBugPanel).toBeVisible();
 
+      // Plan 48.4 — mini-preview iframes are now IntersectionObserver-
+      // gated lazy-mount. Scroll the panel into view so the observer
+      // fires; the tile then injects the iframe. Staggered fallback
+      // timer (≤ 3s) also trips regardless.
+      await scoreBugPanel.scrollIntoViewIfNeeded();
+
       // Primary + secondary mini-previews must live INSIDE that panel.
       const scoreBugPrimaryTile = scoreBugPanel.getByTestId(
         "mini-preview-score_bug-primary",
@@ -273,9 +279,12 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 48.3 inline mini 
       await expect(scoreBugSecondaryTile).toBeVisible();
 
       // The iframe inside should have the right src (session + slot + t).
+      // Allow up to the lazy-mount fallback budget for the iframe to
+      // be injected into the DOM.
       const iframe = scoreBugPanel.getByTestId(
         "mini-preview-iframe-score_bug-primary",
       );
+      await expect(iframe).toBeAttached({ timeout: 10_000 });
       const src = await iframe.getAttribute("src");
       expect(src).toContain(`/overlay/score-bug`);
       expect(src).toContain(`session=${sessionId}`);
@@ -292,6 +301,7 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 48.3 inline mini 
       // Sanity-check a legacy trigger card too — scorebar is not editable
       // but still gets an inline mini preview.
       const scorebarCard = page.getByTestId("trigger-card-scorebar");
+      await scorebarCard.scrollIntoViewIfNeeded();
       await expect(scorebarCard).toBeVisible();
       await expect(
         scorebarCard.getByTestId("mini-preview-scorebar"),

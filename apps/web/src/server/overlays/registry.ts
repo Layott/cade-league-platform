@@ -250,7 +250,9 @@ export const TEMPLATE_REGISTRY: Record<TemplateKey, TemplateEntry> = {
     route: "/overlay/layout-timer",
     group: "layouts",
     label: "Timer",
-    defaultSoundSlot: "tick-1s",
+    // Plan 48.4 (2026-04-24) — default silent; tick is disruptive during
+    // match-day chat and competes with caster VO. Operator must opt in.
+    defaultSoundSlot: null,
   },
   layout_animated_bg: {
     schema: layoutAnimatedBgSchema,
@@ -330,7 +332,9 @@ export const TEMPLATE_REGISTRY: Record<TemplateKey, TemplateEntry> = {
     route: "/overlay/starting-soon-timer",
     group: "fullscreen",
     label: "Starting Soon (Timer)",
-    defaultSoundSlot: "tick-1s",
+    // Plan 48.4 (2026-04-24) — default silent; operators opt in via the
+    // payload `soundSlot: "tick-1s"` when they want the per-second tick.
+    defaultSoundSlot: null,
   },
   stream_ended: {
     schema: streamEndedSchema,

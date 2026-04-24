@@ -81,17 +81,43 @@ describe("OffTriggerButton", () => {
     expect(evInput?.value).toBe("ev-9");
   });
 
-  it("up_next_bug treated as multi-instance", () => {
+  it("up_next_bug routes through single-instance clearOverlayAction", () => {
+    // Plan 48.4 — up_next_bug triggers via overlay_events (single), so OFF
+    // must hit clearOverlayAction with eventId (NOT clearInstanceAction
+    // with instanceId — previous routing left the button disabled + did
+    // nothing because overlay_active_instances had no row).
     render(
       <OffTriggerButton
         templateKey="up_next_bug"
         sessionId="s"
-        instanceId="i1"
+        latestEventId="ev-up-1"
       />,
     );
-    const form = screen
-      .getByTestId("off-up_next_bug")
-      .closest("form") as HTMLFormElement;
-    expect(form.querySelector("input[name=instanceId]")).toBeTruthy();
+    const btn = screen.getByTestId("off-up_next_bug") as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    const form = btn.closest("form") as HTMLFormElement;
+    const evInput = form.querySelector<HTMLInputElement>(
+      "input[name=eventId]",
+    );
+    expect(evInput?.value).toBe("ev-up-1");
+    expect(form.querySelector("input[name=instanceId]")).toBeNull();
+  });
+
+  it("layout_timer routes through single-instance clearOverlayAction", () => {
+    render(
+      <OffTriggerButton
+        templateKey="layout_timer"
+        sessionId="s"
+        latestEventId="ev-timer-1"
+      />,
+    );
+    const btn = screen.getByTestId("off-layout_timer") as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    const form = btn.closest("form") as HTMLFormElement;
+    const evInput = form.querySelector<HTMLInputElement>(
+      "input[name=eventId]",
+    );
+    expect(evInput?.value).toBe("ev-timer-1");
+    expect(form.querySelector("input[name=instanceId]")).toBeNull();
   });
 });
