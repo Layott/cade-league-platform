@@ -41,6 +41,7 @@ import {
 } from "./MatchControlPanel";
 import { YouTubeChatPanel } from "./YouTubeChatPanel";
 import { PreviewIframeTrigger } from "./PreviewIframeModal";
+import { BroadcastPreviewGrid } from "./BroadcastPreviewGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -324,6 +325,15 @@ export default async function BroadcastSessionPage({
         primaryCurrent={primaryDigest}
         secondaryCurrent={secondaryDigest}
         isLive={isLive}
+      />
+
+      {/* Plan 42.3 (2026-04-24) — inline mini-preview grid. Each tile is a
+          scaled iframe pointing at the actual overlay route so realtime
+          triggers reflect live. Copy button per tile produces the exact
+          URL for OBS/vMix browser sources. */}
+      <BroadcastPreviewGrid
+        sessionId={session.id}
+        viewToken={session.view_token}
       />
 
       {/* Plan 44 — YouTube chat picker + Feature-on-stream. Session-scoped
