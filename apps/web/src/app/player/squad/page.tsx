@@ -13,6 +13,7 @@ import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SquadPickerBuilder } from "@/components/squads/SquadPickerBuilder";
 import { SquadPitchView } from "@/components/squads/SquadPitchView";
+import { PlayerSquadLiveRefresh } from "@/components/player/PlayerSquadLiveRefresh";
 import {
   requestUploadUrlAction,
   submitPickerAction,
@@ -103,6 +104,10 @@ export default async function PlayerSquadPage() {
 
   return (
     <div className="space-y-6">
+      <PlayerSquadLiveRefresh
+        playerId={player.id}
+        weekStartDate={weekStart}
+      />
       <SectionHeader
         eyebrow={`Week of ${weekStart}`}
         title="This week's squad"

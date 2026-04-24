@@ -7,6 +7,7 @@ import {
   type FixtureRow,
 } from "@/components/public/FixtureList";
 import { FixtureSearch } from "@/components/public/FixtureSearch";
+import { FixturesLiveRefresh } from "@/components/public/FixturesLiveRefresh";
 
 export const revalidate = 60;
 
@@ -141,6 +142,7 @@ export default async function FixturesPage({
 
   return (
     <div>
+      <FixturesLiveRefresh seasonId={season?.id ?? null} />
       <PageHeader
         eyebrow={season ? `${season.division_name} · ${season.year_range}` : "Fixtures"}
         title="Match Days"

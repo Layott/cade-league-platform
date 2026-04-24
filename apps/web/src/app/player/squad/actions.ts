@@ -11,6 +11,7 @@ import {
   submitPickerSquad,
   weekStartThursday,
 } from "@/server/squads";
+import { publishSquadSubmitted } from "@/server/squads/realtime";
 
 /**
  * Plan 30 — player-side server actions for the picker flow.
@@ -88,7 +89,7 @@ export async function submitPickerAction(
     throw new Error("at least 11 starting slots required");
   }
 
-  await submitPickerSquad(sb, {
+  const submission = await submitPickerSquad(sb, {
     seasonId,
     playerId,
     weekStartDate: payload.weekStartDate,
@@ -96,6 +97,19 @@ export async function submitPickerAction(
     slots: payload.slots,
   });
 
+  // Live-refresh (2026-04-24) — ping the admin queue so a new
+  // submission row appears without reload. Fire-and-forget.
+  try {
+    await publishSquadSubmitted(sb, {
+      weekStartDate: payload.weekStartDate,
+      playerId,
+      submissionId: submission.id,
+    });
+  } catch {
+    // best-effort; DB row is the durable record
+  }
+
   revalidatePath("/player/squad");
+  revalidatePath("/admin/squads");
   redirect("/player/squad");
 }

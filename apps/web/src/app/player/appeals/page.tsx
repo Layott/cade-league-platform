@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/admin/StatusPill";
 import { DeadlineBadge } from "@/components/admin/DeadlineBadge";
 import { listForUser, type AppealRow } from "@/server/appeals";
 import { formatWat } from "@/lib/time";
+import { PlayerAppealsLiveRefresh } from "@/components/player/PlayerAppealsLiveRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,7 @@ export default async function PlayerAppealsListPage() {
 
   return (
     <div className="space-y-6">
+      <PlayerAppealsLiveRefresh userId={userId} />
       <SectionHeader
         eyebrow="Appeals"
         title="My appeals"

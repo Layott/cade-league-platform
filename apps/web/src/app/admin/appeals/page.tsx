@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/admin/StatusPill";
 import { DeadlineBadge } from "@/components/admin/DeadlineBadge";
 import { list as listAppeals, type AppealRow } from "@/server/appeals";
 import { formatWat } from "@/lib/time";
+import { AppealsLiveRefresh } from "@/components/admin/AppealsLiveRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +182,7 @@ export default async function AdminAppealsListPage({
 
   return (
     <div className="space-y-8">
+      <AppealsLiveRefresh />
       <SectionHeader
         eyebrow="Governance"
         title="Appeals"

@@ -17,6 +17,7 @@ import { StatusPill } from "@/components/admin/StatusPill";
 import { SecondaryButton } from "@/components/admin/buttons";
 import { SquadWindowControls } from "@/components/admin/SquadWindowControls";
 import { PlayerOverrideControls } from "@/components/admin/PlayerOverrideControls";
+import { SquadSubmissionsLiveRefresh } from "@/components/admin/SquadSubmissionsLiveRefresh";
 import {
   forceOpenSquadWindowAction,
   forceCloseSquadWindowAction,
@@ -185,6 +186,7 @@ export default async function AdminSquadsListPage({
 
   return (
     <div className="space-y-8">
+      <SquadSubmissionsLiveRefresh weekStartDate={weekStart} />
       <SectionHeader
         eyebrow={`Week of ${weekStart}`}
         title="Squads"

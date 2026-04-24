@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { gate } from "@/lib/server-actor";
 import { submit as submitDispute } from "@/server/disputes";
+import { publishDisputeSubmitted } from "@/server/disputes/realtime";
 import { createSignedUpload } from "@/server/storage/signed";
 import {
   buildDisputeEvidencePath,
@@ -26,7 +27,7 @@ export async function requestEvidenceUploadAction(input: {
 export async function submitDisputeAction(formData: FormData): Promise<void> {
   const { sb, userId } = await gate("disputes.submit");
   const input = parseSubmitDisputeForm(formData);
-  await submitDispute(sb, {
+  const created = await submitDispute(sb, {
     raisedByUserId: userId,
     subjectType: input.subjectType,
     subjectId: input.subjectId,
@@ -34,6 +35,20 @@ export async function submitDisputeAction(formData: FormData): Promise<void> {
     description: input.description,
     evidenceUrls: input.evidencePaths,
   });
+
+  // Live-refresh (2026-04-24) — wake the admin queue + dashboard
+  // counter so a newly-filed dispute is visible without reload.
+  try {
+    await publishDisputeSubmitted(sb, {
+      disputeId: created.id,
+      raisedByUserId: userId,
+    });
+  } catch {
+    // best-effort
+  }
+
   revalidatePath("/player/disputes");
+  revalidatePath("/admin/disputes");
+  revalidatePath("/admin");
   redirect("/player/disputes");
 }

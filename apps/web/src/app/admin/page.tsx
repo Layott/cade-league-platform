@@ -125,11 +125,16 @@ async function loadHero(
         .lte("match_date", weekOut)
         .order("match_date", { ascending: true })
         .limit(1),
+      // Linkage audit (2026-04-24) — the disputes table only knows
+      // 'submitted' | 'under_review' | 'resolved' | 'withdrawn'. The
+      // dashboard previously filtered on the phantom value 'open' so
+      // the counter was permanently zero. Active = unresolved +
+      // un-withdrawn, i.e. the two states that need admin action.
       sb
         .from("disputes")
         .select("id", { count: "exact", head: true })
         .is("deleted_at", null)
-        .eq("status", "open"),
+        .in("status", ["submitted", "under_review"]),
       sb
         .from("announcements")
         .select("id", { count: "exact", head: true })

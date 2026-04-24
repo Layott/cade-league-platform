@@ -104,10 +104,15 @@ export function LadderHelper() {
     const form = document.querySelector("form") as HTMLFormElement | null;
     if (!form) return;
 
-    const playerEl = form.elements.namedItem("playerId");
-    const incidentEl = form.elements.namedItem("incidentType");
-    const sanctionEl = form.elements.namedItem("sanctionType");
-    const magEl = form.elements.namedItem("magnitude");
+    // `form.elements.namedItem(...)` returns `Element | RadioNodeList | null`.
+    // RadioNodeList doesn't expose addEventListener directly — cast to
+    // HTMLElement so the event-listener API is available. Safe here:
+    // every field binds to a single control (select/input), never a
+    // radio group with duplicate names.
+    const playerEl = form.elements.namedItem("playerId") as HTMLElement | null;
+    const incidentEl = form.elements.namedItem("incidentType") as HTMLElement | null;
+    const sanctionEl = form.elements.namedItem("sanctionType") as HTMLElement | null;
+    const magEl = form.elements.namedItem("magnitude") as HTMLElement | null;
 
     const trigger = () => {
       if (debounceRef.current != null) window.clearTimeout(debounceRef.current);

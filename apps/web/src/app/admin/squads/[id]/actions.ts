@@ -10,9 +10,42 @@ import {
   acceptFcdbCandidate,
   reopenSubmission,
 } from "@/server/squads";
+import { publishSquadStatusChanged } from "@/server/squads/realtime";
 import { notify } from "@/server/notifications";
 import type { Actor } from "@/perms";
 import { reopenSubmissionSchema } from "./schemas";
+
+/**
+ * Live-refresh (2026-04-24) — fire a `squad.status_changed` broadcast
+ * on the player's scoped channel so `/player/squad` updates without
+ * a manual reload. Uses the service-role client for the lookup so
+ * RLS on squad_submissions doesn't hide the row. Fire-and-forget.
+ */
+async function pingPlayerAfterReview(
+  submissionId: string,
+  status: "approved" | "rejected" | "reopened" | "pending",
+): Promise<void> {
+  try {
+    const svc = getServiceRoleSupabase();
+    const { data } = await svc
+      .from("squad_submissions")
+      .select("player_id, week_start_date")
+      .eq("id", submissionId)
+      .maybeSingle();
+    const row = data as
+      | { player_id: string; week_start_date: string }
+      | null;
+    if (!row) return;
+    await publishSquadStatusChanged(svc, {
+      submissionId,
+      playerId: row.player_id,
+      weekStartDate: row.week_start_date,
+      status,
+    });
+  } catch {
+    // best-effort
+  }
+}
 
 /**
  * Resolve the owning player's `users.id` for a squad submission. Used to
@@ -72,6 +105,7 @@ export async function approveAction(submissionId: string): Promise<void> {
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
   await approveSubmission(sb, actor, submissionId);
+  await pingPlayerAfterReview(submissionId, "approved");
 
   // Notify the submitting player via the service-role client so the
   // player → user join survives whatever RLS is active on squad_submissions.
@@ -106,6 +140,7 @@ export async function rejectAction(formData: FormData): Promise<void> {
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
   await rejectSubmission(sb, actor, submissionId, reason);
+  await pingPlayerAfterReview(submissionId, "rejected");
 
   try {
     const svc = getServiceRoleSupabase();
@@ -176,7 +211,9 @@ export async function reopenSubmissionAction(
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
   await reopenSubmission(sb, actor, parsed.submissionId);
+  await pingPlayerAfterReview(parsed.submissionId, "reopened");
   revalidatePath(`/admin/squads/${parsed.submissionId}`);
   revalidatePath("/admin/squads");
+  revalidatePath("/player/squad");
   redirect(`/admin/squads/${parsed.submissionId}`);
 }

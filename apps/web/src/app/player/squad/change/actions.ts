@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requestChange } from "@/server/squads";
+import { publishSquadStatusChanged } from "@/server/squads/realtime";
 import type { SquadChangeSubmitPayload } from "@/components/squads/SquadChangeEditor";
 
 /**
@@ -37,7 +38,32 @@ export async function requestChangeAction(
     authorizedByRefUserId: payload.authorizedByRefUserId,
   });
 
+  // Live-refresh (2026-04-24) — Friday change touches an approved
+  // submission; notify admin queue + the player's scoped channel.
+  try {
+    const { data: sub } = await sb
+      .from("squad_submissions")
+      .select("player_id, week_start_date")
+      .eq("id", submissionId)
+      .maybeSingle();
+    const row = sub as
+      | { player_id: string; week_start_date: string }
+      | null;
+    if (row) {
+      await publishSquadStatusChanged(sb, {
+        submissionId,
+        playerId: row.player_id,
+        weekStartDate: row.week_start_date,
+        status: "pending",
+      });
+    }
+  } catch {
+    // best-effort
+  }
+
   revalidatePath(`/player/squad/change`);
   revalidatePath(`/player/squad`);
+  revalidatePath("/admin/squads");
+  revalidatePath(`/admin/squads/${submissionId}`);
   redirect("/player/squad/change?ok=1");
 }
