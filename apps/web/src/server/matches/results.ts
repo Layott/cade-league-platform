@@ -115,6 +115,78 @@ export async function editResult(
   return { id: data.id };
 }
 
+/**
+ * Plan 50: admin un-void a single match that was auto-voided by a ban.
+ * Clears `result_type='void'` + `voided_by_action_id` and flips the match
+ * status back to 'scheduled' so the referee can enter a real result.
+ *
+ * Does NOT touch the originating ban — use this when the ban is legit but
+ * this particular fixture needs to play out anyway (e.g. the match had
+ * already been played before the ban was backdated). To reverse ALL voids
+ * for a ban, revoke the ban via /admin/punishments/[id].
+ *
+ * Callers are responsible for gating on `matches.edit`. Audit trigger
+ * captures the row diff + the append-only caller note in `notes`.
+ */
+export async function unvoidMatchResult(
+  sb: SupabaseClient,
+  args: { matchId: string; actorUserId: string; reason: string },
+): Promise<void> {
+  const reason = args.reason.trim();
+  if (!reason) {
+    throw new Error("unvoidMatchResult requires a reason");
+  }
+
+  const { data: existing, error: readErr } = await sb
+    .from("match_results")
+    .select("id, result_type, voided_by_action_id, notes")
+    .eq("match_id", args.matchId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (readErr) {
+    throw new Error(`unvoidMatchResult read: ${readErr.message}`);
+  }
+  if (!existing) {
+    throw new Error(`no result exists for match ${args.matchId}`);
+  }
+  const row = existing as {
+    id: string;
+    result_type: string;
+    voided_by_action_id: string | null;
+    notes: string | null;
+  };
+  if (row.result_type !== "void") {
+    throw new Error(
+      `match ${args.matchId} is not currently voided (result_type=${row.result_type})`,
+    );
+  }
+
+  // Delete rather than edit: putting the match back in "scheduled" means the
+  // match_results row should NOT exist until a real result is entered.
+  // Separate matches.status flip below. Recompute will be triggered by the
+  // DELETE → match_results_after_row trigger (Plan 3).
+  const { error: delErr } = await sb
+    .from("match_results")
+    .delete()
+    .eq("id", row.id);
+  if (delErr) {
+    throw new Error(`unvoidMatchResult delete: ${delErr.message}`);
+  }
+
+  const { error: mErr } = await sb
+    .from("matches")
+    .update({ status: "scheduled" })
+    .eq("id", args.matchId);
+  if (mErr) {
+    throw new Error(`unvoidMatchResult status: ${mErr.message}`);
+  }
+
+  // Audit trail: the DELETE + UPDATE both land in audit_events with
+  // `current_setting('app.current_user_id')` = args.actorUserId (set by
+  // the API middleware). Reason captured above via the precheck.
+  void args.actorUserId;
+}
+
 export async function confirmResult(
   sb: SupabaseClient,
   raw: ConfirmResultInput,

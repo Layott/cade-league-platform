@@ -14,9 +14,39 @@ import {
   publishMatchDay,
   unpublishMatchDay,
 } from "@/server/matches/match-days";
-import { enterResult, editResult, confirmResult } from "@/server/matches/results";
+import {
+  enterResult,
+  editResult,
+  confirmResult,
+  unvoidMatchResult,
+} from "@/server/matches/results";
 import { requirePermAsync } from "@/lib/perms-db";
 import { syncScoreToLiveSessions } from "@/server/broadcast/match_sync";
+import {
+  publishFixturesChanged,
+  resolveSeasonIdFromMatchDay,
+  type FixturesChangedPayload,
+} from "@/server/fixtures/realtime";
+
+/**
+ * Live-refresh (2026-04-24) — wake the public `/fixtures` page
+ * (mounts `<FixturesLiveRefresh />`) whenever a fixture mutation
+ * lands. Resolves seasonId from the matchDayId. Fire-and-forget: a
+ * broadcast failure must never bubble up and block the write.
+ */
+async function pingFixtures(
+  sb: ReturnType<typeof getServiceRoleSupabase>,
+  matchDayId: string,
+  reason: FixturesChangedPayload["reason"],
+): Promise<void> {
+  try {
+    const seasonId = await resolveSeasonIdFromMatchDay(sb, matchDayId);
+    if (!seasonId) return;
+    await publishFixturesChanged(sb, seasonId, reason);
+  } catch {
+    // best-effort
+  }
+}
 
 async function currentPublicUserId(): Promise<string> {
   const sb = await getServerSupabase();
@@ -67,6 +97,7 @@ export async function addFixtureAction(formData: FormData) {
   await requireMatchEditPerm();
   const sb = getServiceRoleSupabase();
   await createMatch(sb, { matchDayId, homePlayerId, awayPlayerId, scheduledTime });
+  await pingFixtures(sb, matchDayId, "match_added");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
 }
@@ -87,6 +118,7 @@ export async function editMatchAction(formData: FormData) {
   await requireMatchEditPerm();
   const sb = getServiceRoleSupabase();
   await editMatch(sb, { matchId, homePlayerId, awayPlayerId });
+  await pingFixtures(sb, matchDayId, "match_edited");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
 }
@@ -98,6 +130,7 @@ export async function removeMatchAction(formData: FormData) {
   await requireMatchEditPerm();
   const sb = getServiceRoleSupabase();
   await softDeleteMatch(sb, { matchId });
+  await pingFixtures(sb, matchDayId, "match_removed");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
 }
@@ -174,6 +207,7 @@ export async function enterResultAction(formData: FormData) {
     actor
   );
   await bridgeScoreToBroadcast(sb, matchId, actor, resultType);
+  await pingFixtures(sb, matchDayId, "result_entered");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
@@ -204,8 +238,10 @@ export async function editResultAction(formData: FormData) {
   // editResult doesn't take an actor — currentPublicUserId handles it.
   const actor = await currentPublicUserId();
   await bridgeScoreToBroadcast(sb, matchId, actor, resultType);
+  await pingFixtures(sb, matchDayId, "result_edited");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
+  revalidatePath("/fixtures");
 }
 
 export async function confirmResultAction(formData: FormData) {
@@ -214,6 +250,7 @@ export async function confirmResultAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   const actor = await currentPublicUserId();
   await confirmResult(sb, { matchId }, actor);
+  await pingFixtures(sb, matchDayId, "result_confirmed");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
@@ -225,6 +262,7 @@ export async function publishMatchDayAction(formData: FormData) {
   const { userId, roles } = await requirePermInline("match_days.publish");
   const sb = getServiceRoleSupabase();
   await publishMatchDay(sb, { userId, roles }, matchDayId);
+  await pingFixtures(sb, matchDayId, "match_day_published");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
@@ -236,6 +274,7 @@ export async function unpublishMatchDayAction(formData: FormData) {
   const { userId, roles } = await requirePermInline("match_days.publish");
   const sb = getServiceRoleSupabase();
   await unpublishMatchDay(sb, { userId, roles }, matchDayId);
+  await pingFixtures(sb, matchDayId, "match_day_unpublished");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
@@ -278,7 +317,34 @@ export async function reorderMatchAction(formData: FormData) {
   const next = ids.slice();
   [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
   await reorderMatches(sb, { userId, roles }, matchDayId, next);
+  await pingFixtures(sb, matchDayId, "match_reordered");
   revalidatePath(`/admin/match-days/${matchDayId}`);
+  revalidatePath("/fixtures");
+}
+
+/**
+ * Plan 50: admin un-void a single auto-voided match without reversing the
+ * originating ban. Use case: ban was backdated and this specific fixture
+ * had already been played — admin wants to keep the ban but restore this
+ * one result for entry. Requires a short reason for the audit log.
+ *
+ * To un-void ALL matches for a ban, revoke the ban via
+ * /admin/punishments/[id] instead; the DB trigger sweeps every row.
+ */
+export async function unvoidMatchAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  const matchId = String(formData.get("matchId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!matchDayId || !matchId) return;
+  if (!reason) {
+    throw new Error("un-void requires a reason");
+  }
+  const { userId } = await requirePermInline("matches.edit");
+  const sb = getServiceRoleSupabase();
+  await unvoidMatchResult(sb, { matchId, actorUserId: userId, reason });
+  await pingFixtures(sb, matchDayId, "result_edited");
+  revalidatePath(`/admin/match-days/${matchDayId}`);
+  revalidatePath("/standings");
   revalidatePath("/fixtures");
 }
 

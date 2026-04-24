@@ -4,12 +4,15 @@ import {
   assignPanelSchema,
   ruleAppealSchema,
   withdrawAppealSchema,
+  undoAppealRulingSchema,
   type SubmitAppealInput,
   type AssignPanelInput,
   type RuleAppealInput,
   type WithdrawAppealInput,
+  type UndoAppealRulingInput,
 } from "./schemas";
 import { computeAppealDeadline } from "./deadline";
+import { onAppealUpheld, onAppealUndo, type AppealEffectSummary } from "./effects";
 
 export class AppealError extends Error {
   constructor(message: string) {
@@ -30,6 +33,13 @@ export type AppealRow = {
   ruled_at: string | null;
   deadline_at: string;
   status: "submitted" | "under_review" | "ruled" | "withdrawn" | "expired";
+  /**
+   * Plan 50: explicit panel decision. Populated when `status = 'ruled'`.
+   * `upheld` triggers auto-revoke of the linked disciplinary_actions +
+   * unwinds ban-propagated voids; `dismissed` leaves the sanction in force.
+   * Legacy pre-Plan-50 rulings carry `null` — the admin must re-rule them.
+   */
+  outcome: "upheld" | "dismissed" | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -97,21 +107,37 @@ export async function assignPanel(
   return data as AppealRow;
 }
 
+export type RuleAppealResult = {
+  appeal: AppealRow;
+  /**
+   * Side-effect summary when the outcome is 'upheld'. `null` for
+   * 'dismissed' rulings (no side effects). The admin UI uses this to
+   * render "N actions auto-revoked · M matches auto-voided" after ruling.
+   */
+  effects: AppealEffectSummary | null;
+};
+
 export async function rule(
   sb: SupabaseClient,
   raw: RuleAppealInput,
-): Promise<AppealRow> {
+  actorUserId?: string,
+): Promise<RuleAppealResult> {
   const input = ruleAppealSchema.parse(raw);
 
   const { data: cur, error: readErr } = await sb
     .from("appeals")
-    .select("id, status, deadline_at")
+    .select("id, status, deadline_at, disciplinary_case_id")
     .eq("id", input.appealId)
     .maybeSingle();
   if (readErr) throw new AppealError(`rule read: ${readErr.message}`);
   if (!cur) throw new AppealError(`appeal not found: ${input.appealId}`);
 
-  const c = cur as { id: string; status: string; deadline_at: string };
+  const c = cur as {
+    id: string;
+    status: string;
+    deadline_at: string;
+    disciplinary_case_id: string;
+  };
   if (c.status === "ruled") {
     throw new AppealError("appeal already ruled");
   }
@@ -128,6 +154,7 @@ export async function rule(
     .from("appeals")
     .update({
       ruling,
+      outcome: input.outcome,
       ruled_at: now.toISOString(),
       status: "ruled",
       updated_at: now.toISOString(),
@@ -136,7 +163,70 @@ export async function rule(
     .select("*")
     .single();
   if (error || !data) throw new AppealError(`rule: ${error?.message ?? "unknown"}`);
-  return data as AppealRow;
+  const appeal = data as AppealRow;
+
+  let effects: AppealEffectSummary | null = null;
+  if (input.outcome === "upheld") {
+    // Side effects: revoke every live action on the linked case, which in
+    // turn fires the DB trigger that unwinds any ban-propagated voids.
+    effects = await onAppealUpheld(sb, {
+      appealId: appeal.id,
+      disciplinaryCaseId: c.disciplinary_case_id,
+      actorUserId: actorUserId ?? null,
+    });
+  }
+
+  return { appeal, effects };
+}
+
+/**
+ * Plan 50: admin reverses an upheld ruling. Flips `outcome` back to NULL,
+ * bumps status back to 'under_review', clears ruling + ruled_at, and
+ * un-revokes every disciplinary_action that was auto-revoked by this
+ * appeal (DB trigger on disciplinary_actions.revoked_at flipping back to
+ * NULL re-propagates any ban voids).
+ */
+export async function undoRuling(
+  sb: SupabaseClient,
+  raw: UndoAppealRulingInput,
+): Promise<{ appeal: AppealRow; unrevokedActionIds: string[] }> {
+  const input = undoAppealRulingSchema.parse(raw);
+
+  const { data: cur, error: readErr } = await sb
+    .from("appeals")
+    .select("id, status, outcome")
+    .eq("id", input.appealId)
+    .maybeSingle();
+  if (readErr) throw new AppealError(`undoRuling read: ${readErr.message}`);
+  if (!cur) throw new AppealError(`appeal not found: ${input.appealId}`);
+  const c = cur as { id: string; status: string; outcome: string | null };
+  if (c.status !== "ruled") {
+    throw new AppealError("can only undo a ruled appeal");
+  }
+  if (c.outcome !== "upheld") {
+    throw new AppealError(
+      "undo applies to upheld rulings only (dismissed rulings have no side effects to reverse)",
+    );
+  }
+
+  const unrevokedActionIds = await onAppealUndo(sb, input.appealId);
+
+  const now = new Date();
+  const { data, error } = await sb
+    .from("appeals")
+    .update({
+      status: "under_review",
+      outcome: null,
+      ruling: null,
+      ruled_at: null,
+      updated_at: now.toISOString(),
+    })
+    .eq("id", input.appealId)
+    .select("*")
+    .single();
+  if (error || !data) throw new AppealError(`undoRuling: ${error?.message ?? "unknown"}`);
+
+  return { appeal: data as AppealRow, unrevokedActionIds };
 }
 
 export async function withdraw(
@@ -214,3 +304,12 @@ export async function listForUser(
 
 export { computeAppealDeadline } from "./deadline";
 export { markExpired } from "./expire";
+export {
+  onAppealUpheld,
+  onAppealUndo,
+  listEffectsForAppeal,
+  parseAppealIdFromReason,
+  appealRevokeReason,
+  type AppealEffectSummary,
+  type AppealEffectDetail,
+} from "./effects";

@@ -15,6 +15,7 @@ import {
   removeMatchAction,
   reorderMatchAction,
   unpublishMatchDayAction,
+  unvoidMatchAction,
 } from "./actions";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
@@ -225,6 +226,7 @@ export default async function MatchDayDetailPage({
                       away_score: number;
                       result_type: string;
                       confirmed_at: string | null;
+                      voided_by_action_id: string | null;
                     }
                   | Array<{
                       id: string;
@@ -232,9 +234,13 @@ export default async function MatchDayDetailPage({
                       away_score: number;
                       result_type: string;
                       confirmed_at: string | null;
+                      voided_by_action_id: string | null;
                     }>
                   | null,
               );
+              // Plan 50: spot auto-voids triggered by a ban.
+              const voidedByBan =
+                result?.result_type === "void" && !!result?.voided_by_action_id;
               const confirmed = !!result?.confirmed_at;
               const homePlayer = firstOrNull(
                 (
@@ -402,6 +408,59 @@ export default async function MatchDayDetailPage({
                       </DangerButton>
                     </form>
                   </div>
+
+                  {voidedByBan ? (
+                    <div
+                      data-testid={`voided-by-ban-${m.id}`}
+                      className="mt-3 rounded-sm border border-[var(--flare)]/50 bg-[var(--ink-1)] p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="rounded-sm border border-[var(--flare)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--flare)]">
+                          voided by ban
+                        </span>
+                        <Link
+                          href={`/admin/punishments/${result!.voided_by_action_id}`}
+                          className="font-mono text-[11px] text-[var(--signal)] underline decoration-dotted hover:no-underline"
+                          data-testid={`voided-by-ban-link-${m.id}`}
+                        >
+                          sanction #{result!.voided_by_action_id!.slice(0, 8)}
+                        </Link>
+                        <span className="text-[var(--chalk-3)]">
+                          Revoke the ban to auto-restore every match it
+                          touched, or un-void just this one below.
+                        </span>
+                      </div>
+                      <form
+                        action={unvoidMatchAction}
+                        className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
+                        data-testid={`unvoid-match-form-${m.id}`}
+                      >
+                        <input
+                          type="hidden"
+                          name="matchDayId"
+                          value={matchDay.id}
+                        />
+                        <input type="hidden" name="matchId" value={m.id} />
+                        <FormField label="Reason (audit)">
+                          <input
+                            name="reason"
+                            required
+                            minLength={3}
+                            maxLength={500}
+                            placeholder="Why un-void this specific match?"
+                            className={inputClass}
+                            data-testid={`unvoid-reason-${m.id}`}
+                          />
+                        </FormField>
+                        <DangerButton
+                          type="submit"
+                          data-testid={`unvoid-btn-${m.id}`}
+                        >
+                          Un-void match
+                        </DangerButton>
+                      </form>
+                    </div>
+                  ) : null}
 
                   <form
                     action={result ? editResultAction : enterResultAction}

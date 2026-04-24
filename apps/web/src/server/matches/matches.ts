@@ -79,7 +79,7 @@ export async function listByMatchDay(sb: SupabaseClient, matchDayId: string) {
       id, status, scheduled_time, notes, match_order,
       home_player:home_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( id, display_name ) ),
       away_player:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( id, display_name ) ),
-      result:match_results ( id, home_score, away_score, result_type, confirmed_at )
+      result:match_results ( id, home_score, away_score, result_type, confirmed_at, voided_by_action_id )
     `
     )
     .eq("match_day_id", matchDayId)

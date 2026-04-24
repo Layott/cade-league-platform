@@ -9,14 +9,23 @@ import {
   selectClass,
   textareaClass,
 } from "@/components/admin/FormField";
-import { PrimaryButton } from "@/components/admin/buttons";
+import Link from "next/link";
+import { DangerButton, PrimaryButton } from "@/components/admin/buttons";
 import { AuditTrail } from "@/components/admin/AuditTrail";
 import { DeadlineBadge } from "@/components/admin/DeadlineBadge";
-import { getById, type AppealRow } from "@/server/appeals";
+import {
+  getById,
+  listEffectsForAppeal,
+  type AppealRow,
+} from "@/server/appeals";
 import { trySignedRead } from "@/server/storage/signed";
 import { APPEAL_EVIDENCE_BUCKET } from "@/server/storage/paths";
 import { formatWat } from "@/lib/time";
-import { assignPanelAction, ruleAppealAction } from "./actions";
+import {
+  assignPanelAction,
+  ruleAppealAction,
+  undoAppealRulingAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +147,16 @@ export default async function AdminAppealDetailPage({
     appeal.status === "withdrawn" ||
     appeal.status === "expired";
   const pastDeadline = new Date(appeal.deadline_at).getTime() < Date.now();
+
+  // Plan 50: when the appeal is ruled UPHELD, list the disciplinary
+  // actions this appeal currently holds in a revoked state so the admin
+  // can see + undo the cascade. `listEffectsForAppeal` scans by the
+  // `[appeal:<id>]` prefix on `revoke_reason` — durable discriminator.
+  const effects =
+    appeal.status === "ruled" && appeal.outcome === "upheld"
+      ? await listEffectsForAppeal(sb, appeal.id)
+      : { actions: [], voidedMatches: [] };
+  const stillRevokedCount = effects.actions.filter((a) => a.revoked_at).length;
 
   return (
     <div className="space-y-8">
@@ -314,12 +333,51 @@ export default async function AdminAppealDetailPage({
               Deadline has passed — ruling will be tagged [LATE RULING].
             </p>
           ) : null}
+          {ruleLocked && appeal.outcome ? (
+            <p className="mt-2 text-xs text-[var(--chalk-2)]">
+              Ruled{" "}
+              <span
+                data-testid="appeal-outcome-pill"
+                className={
+                  appeal.outcome === "upheld"
+                    ? "rounded-sm border border-[var(--primary)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--primary)]"
+                    : "rounded-sm border border-[var(--ink-5)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-2)]"
+                }
+              >
+                {appeal.outcome}
+              </span>{" "}
+              on{" "}
+              {appeal.ruled_at
+                ? formatWat(appeal.ruled_at, "yyyy-MM-dd HH:mm")
+                : "—"}
+            </p>
+          ) : null}
           <form
             action={ruleAppealAction}
             className="mt-3 space-y-3"
             data-testid="appeal-rule-form"
           >
             <input type="hidden" name="appealId" value={appeal.id} />
+            <FormField label="Outcome">
+              <select
+                name="outcome"
+                required
+                defaultValue={appeal.outcome ?? ""}
+                disabled={ruleLocked}
+                className={selectClass}
+                data-testid="appeal-outcome-select"
+              >
+                <option value="" disabled>
+                  — choose outcome —
+                </option>
+                <option value="upheld">
+                  Upheld — auto-revoke linked punishment(s)
+                </option>
+                <option value="dismissed">
+                  Dismissed — sanction stays in force
+                </option>
+              </select>
+            </FormField>
             <FormField label="Ruling text">
               <textarea
                 name="ruling"
@@ -340,6 +398,81 @@ export default async function AdminAppealDetailPage({
               Rule
             </PrimaryButton>
           </form>
+        </section>
+      ) : null}
+
+      {/* EFFECTS (upheld cascades) + UNDO (Plan 50) */}
+      {appeal.status === "ruled" && appeal.outcome === "upheld" ? (
+        <section
+          className="rounded-sm border border-[var(--primary)]/40 bg-[var(--ink-2)] p-5"
+          data-testid="appeal-effects-section"
+        >
+          <h2 className="text-[10px] uppercase tracking-[0.22em] text-[var(--primary)]">
+            Cascaded effects
+          </h2>
+          {stillRevokedCount > 0 ? (
+            <>
+              <p
+                className="mt-2 text-sm text-[var(--chalk-1)]"
+                data-testid="appeal-effects-summary"
+              >
+                <span className="font-mono text-[var(--signal)]">
+                  {stillRevokedCount}
+                </span>{" "}
+                disciplinary{" "}
+                {stillRevokedCount === 1 ? "action" : "actions"} auto-revoked
+                by this upheld appeal. Any matches that a ban within this
+                cascade had voided were automatically restored and standings
+                recomputed.
+              </p>
+              <ul className="mt-3 space-y-1 font-mono text-[11px] tabular text-[var(--chalk-1)]">
+                {effects.actions.map((a) => (
+                  <li key={a.id}>
+                    <Link
+                      href={`/admin/punishments/${a.id}`}
+                      className="hover:text-[var(--signal)]"
+                    >
+                      {a.sanction_type} · {a.id.slice(0, 8)}…
+                    </Link>
+                    {a.effective_from ? (
+                      <span className="text-[var(--chalk-3)]">
+                        {" "}
+                        · window {a.effective_from}
+                        {a.effective_until ? `→${a.effective_until}` : ""}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {canRule ? (
+                <form
+                  action={undoAppealRulingAction}
+                  className="mt-4"
+                  data-testid="appeal-undo-form"
+                >
+                  <input type="hidden" name="appealId" value={appeal.id} />
+                  <DangerButton
+                    type="submit"
+                    data-testid="appeal-undo-btn"
+                  >
+                    Undo appeal ruling
+                  </DangerButton>
+                  <p className="mt-2 text-[11px] text-[var(--chalk-3)]">
+                    Un-revokes the cascaded punishments and resets this
+                    appeal to <span className="font-mono">under_review</span>{" "}
+                    so the panel can rule again. Ban-triggered voids will be
+                    re-propagated automatically by the DB.
+                  </p>
+                </form>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-2 text-xs text-[var(--chalk-3)]">
+              No cascaded revokes found — either the linked case had no
+              live actions at ruling time, or an admin has already reversed
+              every revoke on its own via the punishment detail page.
+            </p>
+          )}
         </section>
       ) : null}
 

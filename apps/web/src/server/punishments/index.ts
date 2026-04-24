@@ -102,6 +102,26 @@ export async function revoke(
   if (error) throw new Error(`revoke: ${error.message}`);
 }
 
+/**
+ * Plan 50: clear the revoke on a disciplinary_action. Used by the
+ * appeals-undo flow + the direct admin "un-revoke" button. The DB trigger
+ * on `disciplinary_actions` picks up the `revoked_at NOT NULL → NULL`
+ * flip on a ban action and re-propagates any voids via
+ * `propagate_suspension_voids`.
+ *
+ * Callers are responsible for gating this on `punishments.edit`.
+ */
+export async function unrevoke(
+  sb: SupabaseClient,
+  actionId: string,
+): Promise<void> {
+  const { error } = await sb
+    .from("disciplinary_actions")
+    .update({ revoked_at: null, revoke_reason: null })
+    .eq("id", actionId);
+  if (error) throw new Error(`unrevoke: ${error.message}`);
+}
+
 export const updateSchema = z
   .object({
     actionId: z.string().uuid(),

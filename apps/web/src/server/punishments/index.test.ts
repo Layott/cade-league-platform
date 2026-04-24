@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { update, softDelete, countPriorOffenses } from "./index";
+import {
+  update,
+  softDelete,
+  countPriorOffenses,
+  revoke,
+  unrevoke,
+} from "./index";
 
 function mkUpdateChain() {
   const eq = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -72,6 +78,35 @@ describe("softDelete — marks deleted_at", () => {
       "id",
       "33333333-3333-4333-8333-333333333333",
     );
+  });
+});
+
+describe("revoke / unrevoke — Plan 50 reversal pair", () => {
+  it("revoke writes revoked_at + revoke_reason; unrevoke clears both", async () => {
+    const { sb, upd } = mkUpdateChain();
+    await revoke(sb, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "admin mistake");
+    const revokeCall = upd.mock.calls[0][0] as {
+      revoked_at: string;
+      revoke_reason: string;
+    };
+    expect(typeof revokeCall.revoked_at).toBe("string");
+    expect(revokeCall.revoke_reason).toBe("admin mistake");
+
+    const { sb: sb2, upd: upd2 } = mkUpdateChain();
+    await unrevoke(sb2, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    const unrevokeCall = upd2.mock.calls[0][0] as {
+      revoked_at: unknown;
+      revoke_reason: unknown;
+    };
+    expect(unrevokeCall.revoked_at).toBeNull();
+    expect(unrevokeCall.revoke_reason).toBeNull();
+  });
+
+  it("revoke rejects empty / whitespace-only reason", async () => {
+    const { sb } = mkUpdateChain();
+    await expect(
+      revoke(sb, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "   "),
+    ).rejects.toThrow(/reason/);
   });
 });
 

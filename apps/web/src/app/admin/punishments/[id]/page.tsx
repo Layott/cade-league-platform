@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { formatWat } from "@/lib/time";
-import { revokeAction, deleteAction } from "./actions";
+import { parseAppealIdFromReason } from "@/server/appeals/effects";
+import { revokeAction, deleteAction, unrevokeAction } from "./actions";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
 import {
@@ -222,18 +223,63 @@ export default async function PunishmentDetailPage({
       />
 
       {row.revoked_at ? (
-        <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
+        <section
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+          data-testid="revoked-section"
+        >
           <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
             Revoked
           </div>
           <div className="mt-2 font-mono text-[12px] tabular text-[var(--chalk-1)]">
             {formatWat(row.revoked_at, "yyyy-MM-dd · HH:mm")}
           </div>
-          {row.revoke_reason ? (
-            <p className="mt-2 text-sm text-[var(--chalk-1)]">
-              {row.revoke_reason}
+          {(() => {
+            // Plan 50: if the revoke was triggered by an upheld appeal,
+            // the reason carries a `[appeal:<id>]` prefix. Show a link
+            // back to the appeal so the admin can trace the cause + undo
+            // from either side.
+            const appealId = parseAppealIdFromReason(row.revoke_reason);
+            if (!appealId) {
+              return row.revoke_reason ? (
+                <p className="mt-2 text-sm text-[var(--chalk-1)]">
+                  {row.revoke_reason}
+                </p>
+              ) : null;
+            }
+            return (
+              <div className="mt-2 space-y-2">
+                <div
+                  className="inline-flex items-center gap-2 rounded-sm border border-[var(--primary)] bg-[rgba(107,205,6,0.08)] px-2 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-[var(--primary)]"
+                  data-testid="revoked-by-appeal-tag"
+                >
+                  Revoked via appeal
+                  <Link
+                    href={`/admin/appeals/${appealId}`}
+                    className="font-mono underline decoration-dotted hover:text-[var(--signal)]"
+                  >
+                    #{appealId.slice(0, 8)}
+                  </Link>
+                </div>
+                <p className="text-sm text-[var(--chalk-1)]">
+                  {row.revoke_reason}
+                </p>
+              </div>
+            );
+          })()}
+          <form
+            action={unrevokeAction}
+            className="mt-4"
+            data-testid="unrevoke-form"
+          >
+            <input type="hidden" name="actionId" value={row.id} />
+            <SecondaryButton type="submit" data-testid="unrevoke-btn">
+              Un-revoke
+            </SecondaryButton>
+            <p className="mt-2 text-[11px] text-[var(--chalk-3)]">
+              Brings this sanction back into force. If it&apos;s a ban, the
+              associated match voids will be re-applied automatically.
             </p>
-          ) : null}
+          </form>
         </section>
       ) : (
         <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">

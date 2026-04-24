@@ -20,8 +20,17 @@ export type AssignPanelInput = z.infer<typeof assignPanelSchema>;
 export const ruleAppealSchema = z.object({
   appealId: z.string().uuid(),
   ruling: z.string().trim().min(1).max(4000),
+  // Plan 50: explicit panel decision. 'upheld' triggers auto-revoke of the
+  // linked disciplinary actions + unwinds any ban-propagated voids.
+  // 'dismissed' records the panel's "no" without side effects.
+  outcome: z.enum(["upheld", "dismissed"]),
 });
 export type RuleAppealInput = z.infer<typeof ruleAppealSchema>;
+
+export const undoAppealRulingSchema = z.object({
+  appealId: z.string().uuid(),
+});
+export type UndoAppealRulingInput = z.infer<typeof undoAppealRulingSchema>;
 
 export const withdrawAppealSchema = z.object({
   appealId: z.string().uuid(),

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   assignPanelFormSchema,
   ruleAppealFormSchema,
+  undoRulingFormSchema,
 } from "./schemas";
 
 const AID = "00000000-0000-4000-8000-00000000eeee";
@@ -44,7 +45,47 @@ describe("appeals action schemas (Plan 13B)", () => {
     const r = ruleAppealFormSchema.safeParse({
       appealId: AID,
       ruling: "  ",
+      outcome: "upheld",
     });
     expect(r.success).toBe(false);
+  });
+
+  it("ruleAppealFormSchema requires outcome in {upheld, dismissed} (Plan 50)", () => {
+    const upheld = ruleAppealFormSchema.safeParse({
+      appealId: AID,
+      ruling: "panel agrees with appellant",
+      outcome: "upheld",
+    });
+    expect(upheld.success).toBe(true);
+
+    const dismissed = ruleAppealFormSchema.safeParse({
+      appealId: AID,
+      ruling: "panel stands by sanction",
+      outcome: "dismissed",
+    });
+    expect(dismissed.success).toBe(true);
+
+    const bogus = ruleAppealFormSchema.safeParse({
+      appealId: AID,
+      ruling: "x",
+      outcome: "approved",
+    });
+    expect(bogus.success).toBe(false);
+
+    const missing = ruleAppealFormSchema.safeParse({
+      appealId: AID,
+      ruling: "x",
+    });
+    expect(missing.success).toBe(false);
+  });
+
+  it("undoRulingFormSchema requires a uuid appealId (Plan 50)", () => {
+    expect(
+      undoRulingFormSchema.safeParse({ appealId: AID }).success,
+    ).toBe(true);
+    expect(
+      undoRulingFormSchema.safeParse({ appealId: "not-a-uuid" }).success,
+    ).toBe(false);
+    expect(undoRulingFormSchema.safeParse({}).success).toBe(false);
   });
 });

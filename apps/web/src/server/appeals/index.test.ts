@@ -148,34 +148,55 @@ describe("assignPanel", () => {
 });
 
 describe("rule", () => {
-  it("rules in time (before deadline)", async () => {
+  it("rules in time (before deadline) with dismissed outcome (no side effects)", async () => {
     const future = new Date(Date.now() + 86400_000 * 5).toISOString();
     const sb = mkSb({
-      readRow: { id: UUID_APPEAL, status: "under_review", deadline_at: future },
+      readRow: {
+        id: UUID_APPEAL,
+        status: "under_review",
+        deadline_at: future,
+        disciplinary_case_id: UUID_CASE,
+      },
       updateRow: {
         id: UUID_APPEAL,
         status: "ruled",
-        ruling: "upheld",
+        outcome: "dismissed",
+        ruling: "panel stands by sanction",
         ruled_at: "2026-05-07",
       },
     });
-    const out = await rule(sb, { appealId: UUID_APPEAL, ruling: "upheld" });
-    expect(out.status).toBe("ruled");
-    expect(out.ruling).toBe("upheld");
+    const { appeal, effects } = await rule(sb, {
+      appealId: UUID_APPEAL,
+      ruling: "panel stands by sanction",
+      outcome: "dismissed",
+    });
+    expect(appeal.status).toBe("ruled");
+    expect(appeal.outcome).toBe("dismissed");
+    expect(effects).toBeNull();
   });
 
   it("flags late rulings", async () => {
     const past = new Date(Date.now() - 86400_000 * 5).toISOString();
     const sb = mkSb({
-      readRow: { id: UUID_APPEAL, status: "under_review", deadline_at: past },
+      readRow: {
+        id: UUID_APPEAL,
+        status: "under_review",
+        deadline_at: past,
+        disciplinary_case_id: UUID_CASE,
+      },
       updateRow: {
         id: UUID_APPEAL,
         status: "ruled",
-        ruling: "[LATE RULING] upheld",
+        outcome: "dismissed",
+        ruling: "[LATE RULING] declined",
       },
     });
-    const out = await rule(sb, { appealId: UUID_APPEAL, ruling: "upheld" });
-    expect(out.ruling).toContain("[LATE RULING]");
+    const { appeal } = await rule(sb, {
+      appealId: UUID_APPEAL,
+      ruling: "declined",
+      outcome: "dismissed",
+    });
+    expect(appeal.ruling).toContain("[LATE RULING]");
   });
 
   it("refuses double-rule", async () => {
@@ -184,10 +205,15 @@ describe("rule", () => {
         id: UUID_APPEAL,
         status: "ruled",
         deadline_at: new Date().toISOString(),
+        disciplinary_case_id: UUID_CASE,
       },
     });
     await expect(
-      rule(sb, { appealId: UUID_APPEAL, ruling: "whatever" }),
+      rule(sb, {
+        appealId: UUID_APPEAL,
+        ruling: "whatever",
+        outcome: "dismissed",
+      }),
     ).rejects.toThrow(/already ruled/);
   });
 
@@ -197,10 +223,15 @@ describe("rule", () => {
         id: UUID_APPEAL,
         status: "withdrawn",
         deadline_at: new Date().toISOString(),
+        disciplinary_case_id: UUID_CASE,
       },
     });
     await expect(
-      rule(sb, { appealId: UUID_APPEAL, ruling: "x" }),
+      rule(sb, {
+        appealId: UUID_APPEAL,
+        ruling: "x",
+        outcome: "dismissed",
+      }),
     ).rejects.toThrow(/withdrawn/);
   });
 });

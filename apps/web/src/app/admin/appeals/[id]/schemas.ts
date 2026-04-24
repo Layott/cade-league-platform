@@ -39,6 +39,10 @@ export function parseAssignPanelForm(fd: FormData): AssignPanelForm {
 export const ruleAppealFormSchema = z.object({
   appealId: z.string().uuid(),
   ruling: z.string().trim().min(1, "ruling required").max(4000),
+  // Plan 50 — panel decision wired to the server `rule()` call. Admins
+  // pass this via a radio/select on the ruling form. Required at the
+  // schema layer so compile-time + runtime stay in sync.
+  outcome: z.enum(["upheld", "dismissed"]),
 });
 export type RuleAppealForm = z.infer<typeof ruleAppealFormSchema>;
 
@@ -46,5 +50,17 @@ export function parseRuleAppealForm(fd: FormData): RuleAppealForm {
   return ruleAppealFormSchema.parse({
     appealId: fd.get("appealId"),
     ruling: fd.get("ruling"),
+    outcome: fd.get("outcome"),
+  });
+}
+
+export const undoRulingFormSchema = z.object({
+  appealId: z.string().uuid(),
+});
+export type UndoRulingForm = z.infer<typeof undoRulingFormSchema>;
+
+export function parseUndoRulingForm(fd: FormData): UndoRulingForm {
+  return undoRulingFormSchema.parse({
+    appealId: fd.get("appealId"),
   });
 }
