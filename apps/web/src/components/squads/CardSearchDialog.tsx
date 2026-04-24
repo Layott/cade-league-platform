@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CardSearchResult } from "@/server/fcdb/search";
+import { CardDetailModal } from "./CardDetailModal";
 
 /**
  * Plan 30 — typeahead search modal.
@@ -36,6 +37,7 @@ export function CardSearchDialog({
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [cursor, setCursor] = useState(0);
+  const [detailCard, setDetailCard] = useState<CardSearchResult | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -261,13 +263,23 @@ export function CardSearchDialog({
                         </div>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => pick(r)}
-                      className="rounded-sm bg-[var(--signal)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-black hover:brightness-110"
-                    >
-                      Pick
-                    </button>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => pick(r)}
+                        className="rounded-sm bg-[var(--signal)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-black hover:brightness-110"
+                      >
+                        Pick
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDetailCard(r)}
+                        className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--chalk-2)] hover:border-[var(--signal)] hover:text-[var(--signal)]"
+                        data-testid={`card-search-inspect-${idx}`}
+                      >
+                        View stats
+                      </button>
+                    </div>
                   </li>
                 );
               })}
@@ -275,6 +287,19 @@ export function CardSearchDialog({
           )}
         </div>
       </div>
+      <CardDetailModal
+        card={detailCard}
+        onClose={() => setDetailCard(null)}
+        onPick={
+          detailCard
+            ? () => {
+                const c = detailCard;
+                setDetailCard(null);
+                pick(c);
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

@@ -41,6 +41,11 @@ export type CardSearchResult = {
   cardImageUrl: string | null;
   cardBgUrl: string | null;
   variant: string | null;
+  // Plan 30.2 — expanded detail for the card-inspect modal.
+  mainStats: { pac: number | null; sho: number | null; pas: number | null; dri: number | null; def: number | null; phy: number | null } | null;
+  weakFoot: number | null;
+  skillMoves: number | null;
+  metaRating: string | null;
 };
 
 const FUZZY_THRESHOLD = 0.2;
@@ -59,6 +64,25 @@ function readAttrString(attrs: FCPlayer["attributes"], key: string): string | nu
   if (!attrs || typeof attrs !== "object") return null;
   const v = (attrs as Record<string, unknown>)[key];
   return typeof v === "string" && v.length > 0 ? v : null;
+}
+function readAttrInt(attrs: FCPlayer["attributes"], key: string): number | null {
+  if (!attrs || typeof attrs !== "object") return null;
+  const v = (attrs as Record<string, unknown>)[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+function readAttrMains(attrs: FCPlayer["attributes"]): {
+  pac: number | null; sho: number | null; pas: number | null;
+  dri: number | null; def: number | null; phy: number | null;
+} | null {
+  if (!attrs || typeof attrs !== "object") return null;
+  const m = (attrs as Record<string, unknown>)["mains"];
+  if (!m || typeof m !== "object") return null;
+  const rec = m as Record<string, unknown>;
+  const toInt = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    pac: toInt(rec.pac), sho: toInt(rec.sho), pas: toInt(rec.pas),
+    dri: toInt(rec.dri), def: toInt(rec.def), phy: toInt(rec.phy),
+  };
 }
 
 function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
@@ -87,6 +111,10 @@ function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
       futbinVariant ??
       futggVariant ??
       (row.item_type && row.item_type !== "normal" ? row.item_type : null),
+    mainStats: readAttrMains(row.attributes),
+    weakFoot: readAttrInt(row.attributes, "weak_foot"),
+    skillMoves: readAttrInt(row.attributes, "skill_moves"),
+    metaRating: readAttrString(row.attributes, "futbin_meta_rating"),
   };
 }
 
@@ -167,23 +195,10 @@ export async function searchCards(
 
   return fuzzyRows.slice(0, v.limit).map((row) => {
     // Strip the `sim` key before handing to callers — it's an internal
-    // ranking signal only.
-    const rest: CardSearchResult = {
-      id: row.id,
-      name: row.name,
-      rating: row.rating,
-      position: row.position,
-      positionsAlt: row.positionsAlt,
-      club: row.club,
-      league: row.league,
-      nation: row.nation,
-      nationIso: row.nationIso,
-      itemType: row.itemType,
-      priceCoins: row.priceCoins,
-      cardImageUrl: row.cardImageUrl,
-      cardBgUrl: row.cardBgUrl,
-      variant: row.variant,
-    };
-    return rest;
+    // ranking signal only. Use a deliberate full-copy so a missed field
+    // here can't silently drop data to the client (we've been bit twice
+    // now — see commits b6b8d4d, c39a772).
+    const { sim: _sim, ...rest } = row;
+    return rest as CardSearchResult;
   });
 }
