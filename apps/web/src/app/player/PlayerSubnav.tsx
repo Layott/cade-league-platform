@@ -12,13 +12,18 @@ import { usePathname } from "next/navigation";
  *
  * Plan 33 (2026-04-22): "Content" tab removed — content obligations
  * feature was dropped per user direction.
+ *
+ * 2026-04-24 — "Profile" tab now points directly at `/profile` (rich
+ * self-view under the (auth) group). `/player/profile` is preserved as a
+ * redirect stub for stale deep links but the subnav skips the hop.
+ * Audit 2026-04-24 stub-page sweep.
  */
 
 const TABS = [
   { href: "/player/squad", label: "Squad" },
   { href: "/player/disputes", label: "Disputes" },
   { href: "/player/appeals", label: "Appeals" },
-  { href: "/player/profile", label: "Profile" },
+  { href: "/profile", label: "Profile" },
 ];
 
 function matches(pathname: string, href: string) {

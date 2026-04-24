@@ -29,9 +29,13 @@ const PUBLIC_LINKS: LinkRow[] = [
   { href: "/punishments", label: "Discipline" },
 ];
 
+// 2026-04-24 — "Profile" deliberately points at `/profile` (the rich
+// self-view under the (auth) group). `/player/profile` still exists as
+// a redirect stub for stale bookmarks but the nav drawer skips the hop.
+// Audit 2026-04-24 stub-page sweep.
 const PLAYER_LINKS: LinkRow[] = [
   { href: "/player/squad", label: "Squad" },
-  { href: "/player/profile", label: "Profile" },
+  { href: "/profile", label: "Profile" },
   { href: "/player/appeals", label: "Appeals" },
   { href: "/player/disputes", label: "Disputes" },
 ];
