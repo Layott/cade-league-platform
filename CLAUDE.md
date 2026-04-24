@@ -145,6 +145,16 @@ If the same error recurs with a different symptom, **UPDATE** the existing entry
 
 Before starting ANY new work, grep `tasks/lessons.md` for keywords matching the problem space. A lesson that applies is not optional — it's a pre-flight check.
 
+## Player ↔ admin parity rule (user-mandated 2026-04-24)
+
+Any change that adds / renames / removes a field a PLAYER sees or submits MUST also update the ADMIN-side view + controls for the same field. Example: adding `disputes.title` to the player submit form also needs admin/disputes/[id] to show it; adding per-player squad override on /player/squad also needs /admin/squads controls for the same scope. If the admin side isn't updated in the same slice, the slice is incomplete.
+
+Pre-ship checklist for any player-facing change:
+1. Does `/admin/<same-surface>` let an admin READ the new field?
+2. Does `/admin/<same-surface>` let an admin EDIT / OVERRIDE / CLEAR the new state if relevant?
+3. Is the admin-side perm wired (usually separate perms per role — `disputes.read` for view, `disputes.rule` for action)?
+4. Does the admin view handle the NULL/legacy shape (old rows without the new field)?
+
 ## Seed Data
 
 `supabase/seed.sql` exists. Contains Elite 2025-2026 season + placeholder 13-player roster (`player01@cade.local..player13@cade.local`) + one `squad_validation_rules` row (10M coin budget, min 1 Nigerian item, banned EVO/SeasonPass/Objective). Real roster names are pending swap — 13 players with photos live at `KNOWLEDGE/brand-assets/players/`: ADEFOLA, ANIFE, BAJI JNR, DADABOI, FARUK, GURU, KAYKAY, KILLER FREAK, KINGNONEX, MITCH, MR OGA, TACTICAL, WOLEVATION.
