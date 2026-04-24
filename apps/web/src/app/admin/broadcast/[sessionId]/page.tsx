@@ -40,6 +40,7 @@ import {
   type CurrentMatchDigest,
 } from "./MatchControlPanel";
 import { YouTubeChatPanel } from "./YouTubeChatPanel";
+import { PreviewIframeTrigger } from "./PreviewIframeModal";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,9 @@ type SessionRow = {
   youtube_video_id: string | null;
   youtube_live_chat_id: string | null;
   youtube_bound_at: string | null;
+  // Plan 39 M3 — per-session shared secret for unauthenticated
+  // overlay endpoints. Null on pre-M3 historical rows.
+  view_token: string | null;
 };
 
 /** Editable templates upgraded to the rich panel in Plan 37, extended in
@@ -77,6 +81,16 @@ const EDITABLE_TEMPLATES: ReadonlyArray<TemplateKey> = [
 ];
 const MULTI_INSTANCE_TEMPLATES: ReadonlySet<TemplateKey> = new Set([
   "lower_third",
+]);
+
+/** Audit Slice 1 (2026-04-24) — data-feed overlays the admin can preview
+ *  via the PreviewIframeTrigger button. These 3 overlays pull LIVE data
+ *  from the DB + re-fetch on Realtime signals, so a pre-push preview
+ *  shows the operator exactly what will appear on-stream. */
+const LIVE_DATA_PREVIEW_TEMPLATES: ReadonlySet<TemplateKey> = new Set([
+  "leaderboard_animated",
+  "top_scorers",
+  "match_scores_day",
 ]);
 
 /** Plan 42.1 — templates that render match-specific data and therefore
@@ -138,7 +152,7 @@ export default async function BroadcastSessionPage({
   const { data: sessionRaw } = await sb
     .from("stream_sessions")
     .select(
-      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at, primary_match_id, primary_match_started_at, secondary_match_id, secondary_match_started_at, youtube_video_id, youtube_live_chat_id, youtube_bound_at",
+      "id, match_day_id, session_tag, started_at, ended_at, notes, current_match_id, match_started_at, primary_match_id, primary_match_started_at, secondary_match_id, secondary_match_started_at, youtube_video_id, youtube_live_chat_id, youtube_bound_at, view_token",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -410,14 +424,23 @@ export default async function BroadcastSessionPage({
                         {tpl.route}
                       </div>
                     </div>
-                    <Link
-                      href={`${getTemplateRoute(key)}?session=${session.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
-                    >
-                      Preview ↗
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      {LIVE_DATA_PREVIEW_TEMPLATES.has(key) ? (
+                        <PreviewIframeTrigger
+                          sessionId={session.id}
+                          viewToken={session.view_token}
+                          templateKey={key}
+                        />
+                      ) : null}
+                      <Link
+                        href={`${getTemplateRoute(key)}?session=${session.id}${session.view_token ? `&t=${session.view_token}` : ""}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
+                      >
+                        Preview ↗
+                      </Link>
+                    </div>
                   </div>
                   <form action={triggerOverlayAction} className="space-y-2">
                     <input

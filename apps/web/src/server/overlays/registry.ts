@@ -423,6 +423,12 @@ export function listTemplatesByGroup(): Array<{
  */
 export const REALTIME = {
   channel: (sessionId: string): string => `overlay:${sessionId}`,
+  // Audit Slice 1 (2026-04-24) — data-feed overlays subscribe to a separate
+  // per-season channel so they can refresh when the DB recompute fires,
+  // independent of whether a broadcast session is live. Matches the topic
+  // emitted from `recompute_standings()` (migration 20260518000100) and the
+  // server-side helper `server/standings/realtime.ts`.
+  standingsChannel: (seasonId: string): string => `public:standings:${seasonId}`,
   eventTriggered: "overlay.triggered" as const,
   eventCleared: "overlay.cleared" as const,
   eventSessionEnded: "session.ended" as const,
@@ -437,4 +443,8 @@ export const REALTIME = {
   eventMatchStarted: "match.started" as const,
   eventMatchEnded: "match.ended" as const,
   eventScoreChanged: "score.changed" as const,
+  // Audit Slice 1 (2026-04-24) — fired from the DB recompute_standings()
+  // function on `public:standings:<seasonId>`. Data-feed overlays (leader-
+  // board, top-scorers, match-scores-day) subscribe for re-fetch triggers.
+  eventStandingsChanged: "standings.changed" as const,
 };

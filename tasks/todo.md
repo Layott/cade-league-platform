@@ -2,6 +2,48 @@
 
 Active plan: **Plan 47 — Site Manager (Wix/Hostinger-style admin backend)**. User brief 2026-04-22.
 
+## 2026-04-24 — Leaderboard/Top-Scorers/Match-Scores-Day live data (Slice 1 of audit)
+
+Audit spec: `docs/superpowers/specs/2026-04-24-leaderboard-broadcast-linking-audit.md`. Slice 1 closes gap #1 (P0) by making the 3 "preview-only stub" overlays read LIVE data + add a live-preview iframe modal on the broadcast admin.
+
+- [x] 1. Server readers — `leaderboard_data.ts`, `top_scorers_data.ts`, `match_scores_day_data.ts` under `apps/web/src/server/overlays/` with fetch fn + realtime channel string.
+- [x] 2. Migration `20260517000100_goal_events.sql` — new table for per-match goal-scorer attribution (nullable for now; top-scorers aggregates fall back to `player_match_stats.goals`).
+- [x] 3. Replace the 3 stub pages with production client pages: SSR initial paint + live `useOverlayChannel`-equivalent Realtime re-fetch on `overlay_events` inserts + `score.changed` / `match.ended` / `standings.recomputed` triggers.
+- [x] 4. Admin `PreviewIframeModal.tsx` component + wire a "Preview" button beside each trigger card for the 3 overlay keys.
+- [x] 5. Unit tests for each reader (mocked Supabase client).
+- [x] 6. Run `npm run test` + `npm run lint`.
+- [x] 7. Commit + push.
+
+### Slice 1 review
+
+**Delta:**
+
+- 3 server readers (`leaderboard_data.ts`, `top_scorers_data.ts`, `match_scores_day_data.ts`) — +29 unit tests across 3 files mocking Supabase chainable queries.
+- 3 API routes under `/api/broadcast/sessions/[id]/{leaderboard, top-scorers, match-scores-day}/route.ts` — view_token-gated, resolve session → match_day → season, return `{ payload, channel | channels }`.
+- 3 overlay page rewrites (`leaderboard-animated`, `top-scorers`, `match-scores-day`) — fetch-on-mount + Realtime subscription via new `useDataFeed` hook; debounced 200 ms re-fetch; preview-mode still supported.
+- 1 shared hook `useDataFeed.ts` — wraps supabase-js channel subscribe across 1-or-2 channels with event filter + debounce.
+- 1 admin component `PreviewIframeModal.tsx` — 480×270 scaled iframe at 25% of 1920×1080; Preview button wired into the 3 data-feed trigger cards.
+- 1 migration `20260517000100_goal_events.sql` — new `goal_events` table (match_id, player_id, minute, own_goal) for future per-goal attribution; reader falls back to `player_match_stats.goals` for matches with no ge rows. Score-entry wiring deferred (another slice).
+- 1 registry addition — `REALTIME.standingsChannel` + `eventStandingsChanged` match the topic + event published by the DB `recompute_standings` function (commit 7019349, Slice 3).
+- 1 session select addition — admin broadcast page now reads `view_token` + passes it to the preview trigger + legacy Preview ↗ link.
+- 1 pre-existing build-bug fix — `admin/stats-review/page.tsx` line 122 called `formatWat(r.uploaded_at)` (1 arg, needs 2). Added `"MMM d · HH:mm"` pattern to unblock `npm run build`.
+
+**Verification:**
+
+- `npm run test` — 1082/1082 pass (+29 new tests).
+- `npm run lint` — 0 errors, only pre-existing warnings.
+- `npm run build` — clean (after the stats-review fix above).
+- `tsc --noEmit` — zero new type errors in my files; pre-existing errors in test-helpers unchanged.
+- Slice 3 compatibility — my overlays subscribe to `public:standings:<seasonId>` + `standings.changed`, which exactly matches the channel + event published by the DB `recompute_standings()` after the parallel Slice 3 agent's migration.
+
+**Ambiguous decisions:**
+
+1. Chose session-gated API routes (`/api/broadcast/sessions/[id]/leaderboard`) over a standalone public `/api/public/standings?season=<id>` endpoint — keeps the view_token gate consistent with the other overlay feeds; season is derived from session.
+2. For the overlay's "no loading flash" requirement, the initial render just shows nothing (AnimatePresence doesn't mount a null payload) rather than SSR-fetching the first payload into the page tree — keeps the overlay a pure client component and matches the existing score-bug / standings-widget pattern.
+3. `top-scorers` reader merges `goal_events` + `player_match_stats` by preferring ge-per-match when both cover the same (player, match). This avoids double-counting while letting OCR-seeded `player_match_stats` rows carry the weight until score-entry gets per-goal UI.
+4. Skipped wiring goal_events INSERT into any score-entry action — spec explicitly scopes that to a different slice.
+5. Did not add `eventStandingsChanged` to the `publish()` type union in `server/broadcast/realtime.ts` — that publish helper is session-channel-only; the standings broadcast goes through `server/standings/realtime.ts` (already shipped) or the DB `realtime.send()` call.
+
 ## Plan 47 tasks
 
 - [x] 1. Migration `20260511000100_plan47_brand_settings.sql` — brand_settings + brand_assets tables + brand-logos storage bucket + perm seed `branding.manage` on admin role.

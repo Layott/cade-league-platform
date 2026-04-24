@@ -119,7 +119,7 @@ export default async function StatsReviewPage() {
                       {mdDate}
                     </td>
                     <td className="px-4 py-3 text-[var(--chalk-2)]">
-                      {formatWat(r.uploaded_at)}
+                      {formatWat(r.uploaded_at, "MMM d · HH:mm")}
                     </td>
                     <td className="px-4 py-3 text-[var(--chalk-2)]">
                       {r.parsed_by_engine ?? "—"}
