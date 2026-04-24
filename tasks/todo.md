@@ -1083,3 +1083,33 @@ Spec: `docs/superpowers/specs/2026-04-22-plan-44-youtube-chat-overlay.md`.
 ### Plan 44 review
 
 _(To be filled once tasks 1-13 are complete.)_
+
+## 2026-04-24 — End-to-end notification system (in-app + email) — SHIPPED
+
+User brief: "No in-app notification, no email — the player has to notice the status change themselves. lets setup notification systems (in app and email, a way that actually works and is connected)."
+
+- [x] 1. Migration `20260520002000_notifications_full.sql` extends existing `notifications` table with `href`, `metadata`, `email_sent_at`; widens `type` CHECK to cover dispute_ruled, appeal_ruled, squad_approved, squad_rejected, punishment_issued, punishment_revoked, match_voided, match_unvoided, friday_window_open, friday_window_closed, generic (retains announcement + squad_reopened); adds RLS self-select policy. Applied to cloud.
+- [x] 2. Server module `apps/web/src/server/notifications/index.ts` — `notify()`, `markRead()`, `markAllRead()`, `listForUser()`, `unreadCount()`. Email via `@/lib/email/resend` wrapper; `email_sent_at` stamped on success; no-throw on email failure; branded HTML template (green accent, CTA button, unsubscribe placeholder) + plain-text fallback.
+- [x] 3. Integrations — `notify()` called from 4 admin action paths: disputes/[id]/actions.ts (dispute_ruled), appeals/[id]/actions.ts (appeal_ruled with cascade summary when upheld), squads/[id]/actions.ts (squad_approved + squad_rejected w/ reason), punishments/new/actions.ts (punishment_issued), punishments/[id]/actions.ts (punishment_revoked).
+- [x] 4. 14-test unit suite covers insert + email fan-out + email-failure swallow + no-email-on-file + sendEmail: false + markRead/markAllRead/listForUser/unreadCount.
+- [x] 5. `/api/notifications/all` API route (authed) returns every kind; existing `/api/notifications/unread-count`, `/api/notifications/[id]/read`, `/api/notifications/read-all`, `/api/notifications/announcements` continue to work.
+- [x] 6. UI — `NotificationsBell` (60 s poll + Supabase Realtime INSERT subscription scoped to user_id for live badge bump), `NotificationsDropdown` (10 most-recent, click-to-read + deep-link), `/notifications` page (full list w/ kind-filter chips + unread-only toggle + mark-all-read). `SiteChrome` swapped from AnnouncementBell → NotificationsBell.
+- [x] 7. Verify — `npm run test` 1176/1176 pass. `npm run lint` 0 errors. Cloud DB smoke (service-role INSERT + read + clean-up of a `dispute_ruled` row on a real player). Dev server boots + all routes return expected codes (/login 200, /notifications 307, /api/notifications/unread-count 401, /api/notifications/all 401).
+- [x] 8. 5 atomic commits on main: `58491e27` migration · `546da5f2` server module + API · `c8d4aac8` integrations · `b75f08b3` UI · `998590bc` SiteChrome swap. Pushed.
+
+### Review
+
+**Delta:**
+- 1 migration (`supabase/migrations/20260520002000_notifications_full.sql`).
+- 1 server module + 1 test suite (`apps/web/src/server/notifications/{index.ts,index.test.ts}` — 290 + 400 LoC).
+- 1 API route (`apps/web/src/app/api/notifications/all/route.ts`).
+- 3 client components (`NotificationsBell.tsx`, `NotificationsDropdown.tsx`, `NotificationsFilters.tsx`).
+- 1 listing page (`apps/web/src/app/notifications/page.tsx`).
+- 5 admin action integrations (disputes, appeals, squads approve, squads reject, punishments issue, punishments revoke).
+- SiteChrome swap.
+
+**Known gaps:**
+- `RESEND_API_KEY` empty in `.env.local` — `sendEmail()` stub-prints the payload + returns true; in-app bell still works fully. Populate the key to enable real email sends.
+- `match_voided` / `match_unvoided` / `friday_window_{open,closed}` kinds are allowlisted but no call site fires them yet. Deferred to dedicated slices (void-propagation + scheduler).
+- `npm run build` blocked by pre-existing TS error in `LadderHelper.tsx` (`RadioNodeList.addEventListener`) — not introduced by this slice, present on `origin/main` before my changes. Flagged for separate fix.
+- Parallel-agent churn during this slice silently wiped my notify() integrations from 3 admin action files after a bad `git stash` — re-applied after re-reading each file. Lesson logged in `tasks/lessons.md`.
