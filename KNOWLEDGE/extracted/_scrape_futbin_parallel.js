@@ -143,10 +143,36 @@ async function worker(workerId, fromPage, toPage, sb, sharedStats) {
   await page.goto(LIST_URL(fromPage), { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(8000);
 
+  // Auto CF resolver: probe → if empty, try clicking the CF turnstile
+  // checkbox + wait, retry up to 3 times. Falls back to manual-gate
+  // prompt only when auto fails (IP-banned / aggressive challenge).
   let probeRows = await extract(page);
   if (probeRows.length === 0) {
+    for (let attempt = 1; attempt <= 3 && probeRows.length === 0; attempt++) {
+      console.log(`[w${workerId}] auto-CF attempt ${attempt}/3…`);
+      try {
+        // CF renders the challenge inside an iframe from challenges.cloudflare.com.
+        // Look for common checkbox patterns + click.
+        const frames = page.frames();
+        for (const f of frames) {
+          const url = f.url();
+          if (!/cloudflare|turnstile|challenges/.test(url)) continue;
+          const candidates = ["input[type='checkbox']", "label[for]", ".ctp-checkbox-label", ".cf-turnstile-wrapper"];
+          for (const sel of candidates) {
+            const el = await f.$(sel).catch(() => null);
+            if (el) { await el.click({ delay: 100 }).catch(() => {}); break; }
+          }
+        }
+      } catch {}
+      await page.waitForTimeout(6000);
+      try { await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }); } catch {}
+      await page.waitForTimeout(4000);
+      probeRows = await extract(page);
+    }
+  }
+  if (probeRows.length === 0) {
     const readline = require("readline");
-    console.log(`\n[w${workerId}] === Cloudflare? Solve in worker ${workerId} window + press ENTER ===`);
+    console.log(`\n[w${workerId}] === Auto-CF failed. Solve in worker ${workerId} window + press ENTER ===`);
     await new Promise((r) => {
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
       rl.question(`w${workerId} ready: `, () => { rl.close(); r(); });
@@ -198,8 +224,9 @@ async function main() {
   const fromArg = process.argv.indexOf("--from");
   const toArg = process.argv.indexOf("--to");
   const workersArg = process.argv.indexOf("--workers");
+  const resetProfiles = process.argv.includes("--reset-profiles");
   if (fromArg < 0 || toArg < 0 || workersArg < 0) {
-    console.error("usage: --from N --to M --workers K   (max workers = 6)");
+    console.error("usage: --from N --to M --workers K [--reset-profiles]   (max workers = 6)");
     process.exit(1);
   }
   const from = parseInt(process.argv[fromArg + 1], 10);
@@ -207,6 +234,21 @@ async function main() {
   const workers = Math.min(MAX_WORKERS, parseInt(process.argv[workersArg + 1], 10));
   if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) { console.error("bad --from/--to"); process.exit(1); }
   if (!Number.isFinite(workers) || workers < 1) { console.error("bad --workers"); process.exit(1); }
+
+  // Optional pre-run wipe of every worker's Chromium profile. Forces a
+  // fresh CF solve in each window but cures stuck profiles (p1 crash
+  // symptom where one worker's profile corrupts mid-scrape and every
+  // subsequent launch hits a Windows permission error on the lock file).
+  if (resetProfiles) {
+    for (let i = 1; i <= workers; i++) {
+      const dir = path.resolve(__dirname, `.futbin_chromium_profile_p${i}`);
+      if (fs.existsSync(dir)) {
+        console.log(`[reset] wiping ${dir}`);
+        try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 }); }
+        catch (e) { console.error(`[reset] failed to wipe ${dir}: ${e.message}`); }
+      }
+    }
+  }
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
