@@ -81,13 +81,18 @@ export async function buildStandingsWidgetPayload(
 ): Promise<StandingsWidgetPayload | null> {
   // Cap topN defensively — matches schema bound.
   const n = Math.min(Math.max(topN, 1), 20);
+  // standings has NO `rank` column; it's materialized per-player per-season.
+  // We order by (points desc, goal_difference desc, goals_for desc) — the
+  // same tiebreak that `standings_season_points_idx` was built for — and
+  // assign rank from the sorted position. Read a superset (up to topN+gap)
+  // and slice in case of ties at the boundary.
   const { data } = await sb
     .from("standings")
     .select(
       `
-      rank,
       points,
       goal_difference,
+      goals_for,
       player:player_id (
         users:users!players_user_id_fkey ( display_name )
       )
@@ -95,18 +100,20 @@ export async function buildStandingsWidgetPayload(
     )
     .eq("season_id", seasonId)
     .is("deleted_at", null)
-    .order("rank", { ascending: true })
+    .order("points", { ascending: false })
+    .order("goal_difference", { ascending: false })
+    .order("goals_for", { ascending: false })
     .limit(n);
 
   if (!data || data.length === 0) return null;
 
   const rows = (data as unknown as {
-    rank: number;
     points: number;
     goal_difference: number;
+    goals_for: number;
     player: { users: { display_name: string | null } | null } | null;
-  }[]).map((r) => ({
-    rank: r.rank,
+  }[]).map((r, i) => ({
+    rank: i + 1,
     displayName: r.player?.users?.display_name ?? "—",
     pts: r.points,
     gd: r.goal_difference,
@@ -205,7 +212,7 @@ export async function buildPlayerCardPayload(
   const { data: row } = await sb
     .from("standings")
     .select(
-      "games_played, wins, draws, losses, goals_for, goals_against, points",
+      "matches_played, wins, draws, losses, goals_for, goals_against, points",
     )
     .eq("season_id", seasonId)
     .eq("player_id", playerId)
@@ -214,7 +221,7 @@ export async function buildPlayerCardPayload(
 
   const stats = row as
     | {
-        games_played: number;
+        matches_played: number;
         wins: number;
         draws: number;
         losses: number;
@@ -238,7 +245,7 @@ export async function buildPlayerCardPayload(
     gamerTag: p.gamer_tag ?? "—",
     photoUrl: resolvedPhoto,
     seasonStats: {
-      gp: stats?.games_played ?? 0,
+      gp: stats?.matches_played ?? 0,
       w: stats?.wins ?? 0,
       d: stats?.draws ?? 0,
       l: stats?.losses ?? 0,
@@ -278,7 +285,7 @@ export async function buildLowerThirdPayload(
 
   const { data: row } = await sb
     .from("standings")
-    .select("games_played, wins, draws, losses, points")
+    .select("matches_played, wins, draws, losses, points")
     .eq("season_id", seasonId)
     .eq("player_id", playerId)
     .is("deleted_at", null)
@@ -286,7 +293,7 @@ export async function buildLowerThirdPayload(
 
   const stats = row as
     | {
-        games_played: number;
+        matches_played: number;
         wins: number;
         draws: number;
         losses: number;
@@ -306,7 +313,7 @@ export async function buildLowerThirdPayload(
     photoUrl: resolvedLowerThirdPhoto,
     stats: stats
       ? {
-          gp: stats.games_played,
+          gp: stats.matches_played,
           w: stats.wins,
           d: stats.draws,
           l: stats.losses,

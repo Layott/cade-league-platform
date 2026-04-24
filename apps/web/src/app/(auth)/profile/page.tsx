@@ -151,18 +151,24 @@ export default async function ProfileSelfPage({
           getCurrentSquadStatus(svc, playerRow.id, now),
         ]);
 
-      const { data: appealedRows } = await svc
-        .from("appeals")
-        .select("disciplinary_action_id, status")
-        .in(
-          "disciplinary_action_id",
-          sanctions.map((s) => s.id),
-        )
-        .neq("status", "withdrawn")
-        .is("deleted_at", null);
-      const appealedSet = new Set(
-        (appealedRows ?? []).map((r: { disciplinary_action_id: string }) =>
-          r.disciplinary_action_id,
+      // Appeals are filed against the underlying `disciplinary_case_id`, not
+      // the action — so "already appealed" applies to every sanction sharing
+      // the same case. Column is `disciplinary_case_id` (no `disciplinary_action_id`
+      // exists on the table).
+      const caseIds = Array.from(
+        new Set(sanctions.map((s) => s.disciplinary_case_id).filter((x): x is string => !!x)),
+      );
+      const { data: appealedRows } = caseIds.length
+        ? await svc
+            .from("appeals")
+            .select("disciplinary_case_id, status")
+            .in("disciplinary_case_id", caseIds)
+            .neq("status", "withdrawn")
+            .is("deleted_at", null)
+        : { data: [] as { disciplinary_case_id: string }[] };
+      const appealedCaseIds = new Set(
+        (appealedRows ?? []).map(
+          (r: { disciplinary_case_id: string }) => r.disciplinary_case_id,
         ),
       );
 
@@ -181,7 +187,7 @@ export default async function ProfileSelfPage({
           now,
           s.sanction_type as never,
         ),
-        alreadyAppealed: appealedSet.has(s.id as string),
+        alreadyAppealed: appealedCaseIds.has(s.disciplinary_case_id as string),
       }));
 
       // Adapt P41-D server shapes → P41-E component prop shapes.

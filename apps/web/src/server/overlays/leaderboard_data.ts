@@ -59,10 +59,11 @@ export type LeaderboardData = {
  * Returns an empty `rows` list (not null) when the season is empty so the
  * overlay can render "NO STANDINGS YET" without a `null`-check.
  *
- * NOTE: the `rank` field is computed client-side from the sorted list
- * index (1-based), NOT from a SQL rank column. The `standings` table
- * historically had a `rank` column but it is populated elsewhere and may
- * lag; computing locally guarantees the visible order matches.
+ * NOTE: the `rank` field is computed server-side from the sorted list
+ * index (1-based), NOT from a SQL rank column — the `standings` table
+ * has no `rank` column. Sort order is
+ * (points desc, goal_difference desc, goals_for desc), the same tiebreak
+ * hierarchy `standings_season_points_idx` is built for.
  */
 export async function fetchLeaderboardData(
   sb: SupabaseClient,

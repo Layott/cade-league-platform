@@ -147,18 +147,20 @@ describe("buildPunishmentTickerPayload", () => {
 });
 
 describe("buildStandingsWidgetPayload", () => {
-  it("returns schema-valid rows in rank order", async () => {
+  it("derives rank from order-by position (standings has no rank column)", async () => {
+    // The table is sorted server-side by points desc → gd desc → gf desc;
+    // rank is assigned 1..N from the resulting row index.
     const rows = [
       {
-        rank: 1,
         points: 9,
         goal_difference: 5,
+        goals_for: 8,
         player: { users: { display_name: "Anon-01" } },
       },
       {
-        rank: 2,
         points: 7,
         goal_difference: 2,
+        goals_for: 6,
         player: { users: { display_name: "Anon-02" } },
       },
     ];
@@ -177,6 +179,7 @@ describe("buildStandingsWidgetPayload", () => {
       pts: 9,
       gd: 5,
     });
+    expect(out?.rows[1].rank).toBe(2);
   });
 });
 
