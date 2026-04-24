@@ -13,6 +13,7 @@ import { getCurrentSquadStatus } from "@/server/profile/squadStatus";
 import { isAppealWindowOpen } from "@/server/appeals/window";
 import { getActiveSeason } from "@/server/seasons";
 import { ProfilePanel } from "@/components/profile/ProfilePanel";
+import { StandingsLiveRefresh } from "@/components/public/StandingsLiveRefresh";
 import { SeasonStatsCard } from "@/components/profile/SeasonStatsCard";
 import { FormStrip } from "@/components/profile/FormStrip";
 import { CurrentStreaks } from "@/components/profile/CurrentStreaks";
@@ -85,6 +86,10 @@ export default async function ProfileSelfPage({
   const PAGE_SIZE = 10;
 
   let playerBlock: React.ReactNode = null;
+  // Audit Slice 3 (2026-04-24) — id used to mount the Realtime
+  // live-refresh subscriber for the player block's standings-derived
+  // season stats. Only populated when the player has an active season.
+  let liveRefreshSeasonId: string | null = null;
   if (hasPlayerRole) {
     const [season, playerRow] = await Promise.all([
       getActiveSeason(svc),
@@ -98,6 +103,7 @@ export default async function ProfileSelfPage({
     ]);
 
     if (season && playerRow) {
+      liveRefreshSeasonId = season.id;
       const now = new Date();
       const [stats, form, streaks, history, h2h, sanctions, squadStatus] =
         await Promise.all([
@@ -218,6 +224,7 @@ export default async function ProfileSelfPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 md:px-6 md:py-10">
+      <StandingsLiveRefresh seasonId={liveRefreshSeasonId} />
       <div className="flex items-center justify-between">
         <Link
           href={back.href}

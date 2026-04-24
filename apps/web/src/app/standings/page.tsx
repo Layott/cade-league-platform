@@ -4,6 +4,7 @@ import { getActiveSeason } from "@/server/seasons";
 import { PageHeader } from "@/components/public/PageHeader";
 import { StandingsTable } from "@/components/public/StandingsTable";
 import { EmptyState } from "@/components/public/EmptyState";
+import { StandingsLiveRefresh } from "@/components/public/StandingsLiveRefresh";
 
 export const revalidate = 60;
 
@@ -19,6 +20,7 @@ export default async function StandingsPage() {
 
   return (
     <div>
+      <StandingsLiveRefresh seasonId={season?.id ?? null} />
       <PageHeader
         eyebrow={season ? `${season.division_name} · ${season.year_range}` : "Standings"}
         title="League Table"
