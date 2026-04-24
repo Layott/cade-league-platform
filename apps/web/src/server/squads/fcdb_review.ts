@@ -68,6 +68,11 @@ type ItemRow = {
   item_type: string;
   nationality_flag: string | null;
   slot_index: number;
+  // Set by submit_picker when the player chose this exact card via the
+  // Futbin-style picker. When populated, fcdb_review skips the fuzzy
+  // search entirely — the player already picked the specific FC26
+  // card, no admin disambiguation needed.
+  resolved_fc_player_id: string | null;
 };
 
 /**
@@ -145,7 +150,7 @@ export async function reviewSquadAgainstFCDB(
   const { data: itemsData, error: itemsErr } = await sb
     .from("squad_player_items")
     .select(
-      "id, submission_id, name, rating, position, value, item_type, nationality_flag, slot_index",
+      "id, submission_id, name, rating, position, value, item_type, nationality_flag, slot_index, resolved_fc_player_id",
     )
     .eq("submission_id", submissionId)
     .is("deleted_at", null)
@@ -192,6 +197,31 @@ export async function reviewSquadAgainstFCDB(
   const summary = emptySummary(items.length, false);
 
   for (const it of items) {
+    // Picker-resolved short-circuit: the player chose this exact card
+    // via the Futbin-style picker, so `resolved_fc_player_id` already
+    // points at the authoritative `fc26_players.id`. No findPlayer call,
+    // no ambiguity, no "pick one" dropdown. Look up the card so the
+    // admin UI can render the card + its frame alongside the squad item.
+    if (it.resolved_fc_player_id) {
+      const { data: fc } = await sb
+        .from("fc26_players")
+        .select(
+          "id, source_dataset, source_row_id, name, short_name, slug, rating, position, alt_positions, club, league, nation, nation_iso, age, height_cm, weight_kg, preferred_foot, weak_foot, skill_moves, body_type, work_rate_atk, work_rate_def, attributes, item_type, value_coins_estimate, imported_at, created_at, updated_at, deleted_at",
+        )
+        .eq("id", it.resolved_fc_player_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      reviews.push({
+        itemId: it.id,
+        slotIndex: it.slot_index,
+        status: "resolved",
+        candidate: (fc ?? undefined) as SquadItemReview["candidate"],
+        alternatives: [],
+      });
+      summary.resolved += 1;
+      continue;
+    }
+
     const candidates = await findPlayer(sb, {
       name: it.name,
       rating: it.rating,
