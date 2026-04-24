@@ -374,3 +374,19 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - Grep for multi-form pages: `apps/web/src/**` → `grep "<form" -n`. Audit any file with >1 `<form>` — are any nested? If the outer form has children components, check those components for inner forms too.
 - HTML-invalid nesting triggers hydration mismatch even when it "looks fine" in dev — React reconciles by throwing away the client tree and re-mounting. Any interactive state (open dialogs, focused inputs, pending submissions) gets wiped. This is silent data loss, not just a warning.
 
+---
+
+**Date:** 2026-04-24
+**Context:** Linkage audit slice. Closed §3 (no "My disputes" on /profile), §6 (no attendance visibility for player or admin), §9 (org/coach/manager IDs loaded but unrendered) + replaced Plan 39's over-coupling of service-role-everywhere on `/profile` + `/players/[id]` sanctions reads.
+**Mistake:** Plan 39 C3 took the fast route — a deny-all RLS policy on `disciplinary_actions` + `attendance_marks` + `match_stat_screenshots` + `organization_contracts`. Any page that wanted to surface these tables then had to use service-role, bypassing RLS. That pattern is "trust the function" not "trust the database" — a future refactor that queries the table directly from an authenticated client leaks every private row. The audit (§Over-coupling #1) flagged this as the wrong abstraction.
+**Correction:** Migration `20260520003000_disciplinary_rls_self_and_public.sql` replaces deny-all with two narrow policies per table:
+  - `_public_select` — everyone can see rows that are public_visible + not revoked + not deleted.
+  - `_self_select` — authenticated user can see every row whose chain of FKs traces back to `users.supabase_auth_id = auth.uid()`.
+  `disciplinary_cases` + `appeals` get mirror policies so PostgREST nested embeds (`disciplinary_cases!inner(...)`) can traverse the join. `attendance_marks` + `organization_contracts` + `match_stat_screenshots` get matching narrow policies. Staff reads continue via service-role (bypasses RLS) — no change.
+**Rule for future:**
+- When a feature needs a page-level read of a sensitive table, **default to designing an RLS policy first**, not a service-role escape hatch. Service-role inside a Server Component is a weaker contract than a row-level policy: the former depends on a developer remembering to filter in-function; the latter cannot be bypassed without replacing the client.
+- Policy pairs: `_public_select` + `_self_select` is the right shape when "everyone sees some, owner sees all". Single deny-all + app-layer filter is the wrong shape because it rules out anon reads entirely.
+- Anon + authenticated are two different roles for policy purposes — but `auth.uid()` returns NULL for anon. A policy with `EXISTS (SELECT 1 FROM users WHERE supabase_auth_id = auth.uid())` scopes itself correctly without needing role-based branching.
+- Every new RLS policy touching `users.supabase_auth_id` in a subquery MUST be scoped `TO authenticated`, NOT `TO PUBLIC` / unscoped. See §Plan 39 C2 lesson above for the plan-error pattern this avoids.
+- When a page was reverted by a linter / concurrent edit, always re-verify the full set of changes with a `git status` + targeted `grep` for each expected token BEFORE running tests. Files silently rewinding to pre-edit state is a quiet failure mode in parallel-agent workflows.
+
