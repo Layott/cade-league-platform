@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { SiteChromeClient } from "./SiteChromeClient";
 import { UserBadge } from "./UserBadge";
-import { AnnouncementBell } from "./AnnouncementBell";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 /**
  * SiteChrome is a Server Component wrapper that reads the current session
@@ -12,12 +12,18 @@ import { AnnouncementBell } from "./AnnouncementBell";
  * It renders on every route except /login + /logout (those are deliberately
  * minimal). The /admin/* routes get the same global header so admins always
  * have a single nav surface with "Back to site" semantics baked in.
+ *
+ * 2026-04-24 — swapped AnnouncementBell for NotificationsBell. The new
+ * bell covers every notification kind (disputes, appeals, squads,
+ * punishments, announcements) in a single unified dropdown + Realtime
+ * INSERT subscription scoped to the viewer's user_id.
  */
 
 export async function SiteChrome({ children }: { children: ReactNode }) {
   let isStaff = false;
   let authenticated = false;
   let roles: string[] = [];
+  let userId: string | null = null;
 
   try {
     const sb = await getServerSupabase();
@@ -34,6 +40,7 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (pub) {
+        userId = pub.id as string;
         const { data: rolesRows } = await sb
           .from("user_roles")
           .select("role")
@@ -56,17 +63,15 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
     // crashing the entire site. The /admin middleware still gates writes.
   }
 
-  // UserBadge (server component) + AnnouncementBell (client) rendered in
-  // the server parent so the client shell can slot them without having to
-  // compute auth itself. UserBadge falls back to a Sign-in link when the
-  // session read fails, so this stays safe under auth errors.
   return (
     <SiteChromeClient
       authenticated={authenticated}
       isStaff={isStaff}
       roles={roles}
       userBadge={<UserBadge />}
-      announcementBell={authenticated ? <AnnouncementBell /> : null}
+      announcementBell={
+        authenticated && userId ? <NotificationsBell userId={userId} /> : null
+      }
     >
       {children}
     </SiteChromeClient>
