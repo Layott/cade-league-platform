@@ -58,6 +58,16 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs) {
   if (oldRow.value_coins_estimate !== newCoins) changes.push("price");
   if (oldRow.item_type !== newItemType) changes.push("item_type");
   if ((oldAttrs.card_image_url || null) !== (newAttrs.card_image_url || null)) changes.push("card_image");
+  // Card frame background (the gold/silver/bronze/icon/hero shell image
+  // from Futbin's /img/cards/tiny/ CDN path, signed with imgix HMAC).
+  // MUST be diffed — prior to this check a row that had `card_bg_url`
+  // freshly captured by a re-scrape (silvers + bronzes pre-86e4aba),
+  // but whose price/stats/image were otherwise unchanged, would be
+  // labelled "unchanged" and the UPDATE skipped → the bg never landed
+  // in the DB and the picker kept rendering a black rectangle. This
+  // single comparison was the primary reason 12,931 rows still lacked
+  // bg after the selector fix shipped.
+  if ((oldAttrs.card_bg_url || null) !== (newAttrs.card_bg_url || null)) changes.push("card_bg");
   if ((oldAttrs.futbin_variant || null) !== (newAttrs.futbin_variant || null)) changes.push("variant");
   if ((oldAttrs.futbin_meta_rating || null) !== (newAttrs.futbin_meta_rating || null)) changes.push("meta");
   if ((oldAttrs.weak_foot ?? null) !== (newAttrs.weak_foot ?? null)) changes.push("weak_foot");

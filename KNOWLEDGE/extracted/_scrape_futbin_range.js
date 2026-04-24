@@ -54,9 +54,25 @@ async function extract(page) {
         def: intText("td.table-defending .table-key-stats, td.table-defending"),
         phy: intText("td.table-physicality .table-key-stats, td.table-physicality"),
       };
-      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
-      const cardBgSrc = row.querySelector("img.playercard-s-26-bg")?.getAttribute("src") || "";
-      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+      // Player portrait + card frame — broadened selectors keep parity
+      // with the parallel + delta scrapers shipped in 86e4aba. Class-only
+      // on silver/bronze rows misses the frame entirely.
+      const cardImgEl =
+        row.querySelector(".playercard-26 img[alt]:not([alt=''])") ||
+        row.querySelector(".playercard-26-special-img") ||
+        row.querySelector("img[src*='/img/players/']");
+      const bgCandidates = [
+        row.querySelector("img.playercard-s-26-bg"),
+        row.querySelector(".playercard-s-26-bg img"),
+        row.querySelector("img[src*='/img/cards/tiny/']"),
+        row.querySelector("img[src*='/img/cards/']"),
+      ].filter(Boolean);
+      let cardBgSrc = "";
+      for (const el of bgCandidates) {
+        const s = el.getAttribute("src") || el.getAttribute("data-src") || "";
+        if (s) { cardBgSrc = s; break; }
+      }
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
       // Futbin-internal nation / league / club IDs — parsed from the
       // CDN icon URLs since the list page doesn't expose raw ISO codes.
       const nationImg = row.querySelector("img.nation, img[src*='/img/nation/']");

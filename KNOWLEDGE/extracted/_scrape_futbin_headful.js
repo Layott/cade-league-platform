@@ -115,15 +115,35 @@ async function extractListPage(page) {
       // Futbin meta-rating ("95.1" tier tag)
       const metaTag = row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null;
 
-      // Card art — the big inline <img alt="Name"> inside the card anchor.
-      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
+      // Player portrait — specials use .playercard-26-special-img, normals
+      // use .playercard-26 img[alt]; fallback to any <img> whose src points
+      // at the /img/players/ path. Matches the broadened selector shipped
+      // in 86e4aba across the other scrapers.
+      const cardImgEl =
+        row.querySelector(".playercard-26 img[alt]:not([alt=''])") ||
+        row.querySelector(".playercard-26-special-img") ||
+        row.querySelector("img[src*='/img/players/']");
       const cardImageUrl = cardImgEl?.getAttribute("src") || null;
 
-      // Variant — derived from the card background <img alt="" src="...<type>.png">.
-      // Futbin naming pattern: /cards/tiny/5_toty.png → variant "toty".
-      const cardBgEl = row.querySelector("img.playercard-s-26-bg");
-      const cardBgSrc = cardBgEl?.getAttribute("src") || "";
-      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+      // Card frame — class-based selectors first, then fall back to any
+      // <img> whose src hits the /img/cards/tiny/ Futbin CDN path. The
+      // class-only selector used here pre-86e4aba missed silvers/bronzes
+      // (different class). Keeps parity with _scrape_futbin_new.js +
+      // _scrape_futbin_parallel.js.
+      const bgCandidates = [
+        row.querySelector("img.playercard-s-26-bg"),
+        row.querySelector(".playercard-s-26-bg img"),
+        row.querySelector("img[src*='/img/cards/tiny/']"),
+        row.querySelector("img[src*='/img/cards/']"),
+      ].filter(Boolean);
+      let cardBgSrc = "";
+      for (const el of bgCandidates) {
+        const s = el.getAttribute("src") || el.getAttribute("data-src") || "";
+        if (s) { cardBgSrc = s; break; }
+      }
+      // Variant pattern: /cards/tiny/5_toty.png → "5-toty". Same regex
+      // the other scrapers use — accept png/webp/jpg.
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
       const variant = variantM ? variantM[1].replace(/_/g, "-") : null;
 
       // Position — Futbin list page sometimes lacks a dedicated position column.

@@ -82,10 +82,25 @@ async function extract(page) {
       };
       const weakFoot = intText("td.table-weak-foot");
       const skillMoves = intText("td.table-skills");
-      const cardImgEl = row.querySelector(".playercard-26 img[alt]:not([alt=''])");
+      // Broadened selectors match the parallel + delta + headful scrapers
+      // (86e4aba + this commit). Class-only misses silvers + bronzes.
+      const cardImgEl =
+        row.querySelector(".playercard-26 img[alt]:not([alt=''])") ||
+        row.querySelector(".playercard-26-special-img") ||
+        row.querySelector("img[src*='/img/players/']");
       const cardImageUrl = cardImgEl?.getAttribute("src") || null;
-      const cardBgSrc = row.querySelector("img.playercard-s-26-bg")?.getAttribute("src") || "";
-      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
+      const bgCandidates = [
+        row.querySelector("img.playercard-s-26-bg"),
+        row.querySelector(".playercard-s-26-bg img"),
+        row.querySelector("img[src*='/img/cards/tiny/']"),
+        row.querySelector("img[src*='/img/cards/']"),
+      ].filter(Boolean);
+      let cardBgSrc = "";
+      for (const el of bgCandidates) {
+        const s = el.getAttribute("src") || el.getAttribute("data-src") || "";
+        if (s) { cardBgSrc = s; break; }
+      }
+      const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
       const variant = variantM ? variantM[1].replace(/_/g, "-") : null;
       const metaTag = row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null;
       // Futbin-internal nation / league / club IDs — parsed from the
