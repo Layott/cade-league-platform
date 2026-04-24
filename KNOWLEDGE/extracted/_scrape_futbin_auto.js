@@ -88,11 +88,23 @@ async function extract(page) {
       const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp)/i);
       const variant = variantM ? variantM[1].replace(/_/g, "-") : null;
       const metaTag = row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null;
+      // Futbin-internal nation / league / club IDs — parsed from the
+      // CDN icon URLs since the list page doesn't expose raw ISO codes.
+      const nationImg = row.querySelector("img.nation, img[src*='/img/nation/']");
+      const leagueImg = row.querySelector("img[src*='/img/league/']");
+      const clubImg = row.querySelector("img[src*='/img/clubs/']");
+      const pathId = (src) => {
+        const m = (src || "").match(/\/img\/(?:nation|league|clubs)\/(?:dark\/|light\/)?(\d+)\.(?:png|webp|jpg)/i);
+        return m ? parseInt(m[1], 10) : null;
+      };
       out.push({
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
         position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
         variant, pricePs, pricePc, stats, weakFoot, skillMoves, metaTag, cardImageUrl,
         cardBgUrl: cardBgSrc || null,
+        nationId: pathId(nationImg?.getAttribute("src")),
+        leagueId: pathId(leagueImg?.getAttribute("src")),
+        clubId: pathId(clubImg?.getAttribute("src")),
       });
     }
     const pagers = Array.from(document.querySelectorAll("a[href*='?page=']"))
@@ -127,6 +139,10 @@ async function upsertRows(sb, rows, stats, newCards) {
     if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
     if (r.cardBgUrl) attrs.card_bg_url = r.cardBgUrl.startsWith("http") ? r.cardBgUrl : `https://www.futbin.com${r.cardBgUrl}`;
+    // Futbin-internal IDs — capture for Nigerian-check / league filters.
+    if (r.nationId != null) attrs.futbin_nation_id = r.nationId;
+    if (r.leagueId != null) attrs.futbin_league_id = r.leagueId;
+    if (r.clubId != null) attrs.futbin_club_id = r.clubId;
     const vLower = (r.variant || "").toLowerCase();
     let itemType = "normal";
     if (/\bicon\b/.test(vLower)) itemType = "icon";

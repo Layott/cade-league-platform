@@ -21,6 +21,11 @@ export type ItemForValidation = {
   value: number;
   itemType: ItemType;
   nationalityFlag?: string | null;
+  /** Futbin-internal nation registry ID. When populated (Futbin-sourced
+   *  cards, post-scraper patch), takes precedence over `nationalityFlag`
+   *  string matching for the Nigerian-count rule — fixes the case where
+   *  Futbin rows have empty `nation_iso` + a non-English `nation` field. */
+  futbinNationId?: number | null;
   slotIndex: number;
 };
 
@@ -53,10 +58,36 @@ export type Violation =
  * /26/players list doesn't always populate nation_iso — it carries the
  * nation via a CDN icon id in those cases. submit_picker.ts feeds the
  * best-available string (iso ?? nation) into this validator.
+ *
+ * When a Futbin-internal nation ID is present (captured from the CDN
+ * icon URL by the scrapers), it's the authoritative signal — since
+ * historical Kaggle rows without ISO codes would otherwise fail the
+ * text match. The env-driven constant lets the ID shift across FC
+ * years without a code change.
  */
 const NG_FLAG_VALUES = new Set(["ng", "nga", "nigeria"]);
 
-function isNigerian(flag: string | null | undefined): boolean {
+/**
+ * Futbin's FC26 Nigeria nation_id. Best-guess default is 133 (Nigeria's
+ * ID in prior FIFA years — Futbin's internal registry is stable across
+ * FIFA 22/23/24, but FC26 may differ). Override via env once confirmed
+ * empirically (run KNOWLEDGE/extracted/_find_futbin_nation_id.js after
+ * the first post-patch scrape).
+ */
+export const NG_FUTBIN_NATION_ID: number = (() => {
+  const raw = process.env.NG_FUTBIN_NATION_ID;
+  if (!raw) return 133;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 133;
+})();
+
+function isNigerian(item: Pick<ItemForValidation, "nationalityFlag" | "futbinNationId">): boolean {
+  // ID match wins — authoritative when present because the scrapers
+  // pull it straight from Futbin's CDN-keyed nation icon.
+  if (item.futbinNationId != null && item.futbinNationId === NG_FUTBIN_NATION_ID) {
+    return true;
+  }
+  const flag = item.nationalityFlag;
   if (!flag) return false;
   return NG_FLAG_VALUES.has(flag.trim().toLowerCase());
 }
@@ -85,7 +116,7 @@ export function evaluateRules(
   //    same carve-out used for the budget check above.
   const startingXi = items.filter((i) => i.slotIndex >= 0 && i.slotIndex <= 10);
   const nigerianCount = startingXi
-    .filter((i) => i.slotIndex !== 0 && isNigerian(i.nationalityFlag))
+    .filter((i) => i.slotIndex !== 0 && isNigerian(i))
     .length;
   if (nigerianCount < rule.minNigerianItems) {
     violations.push({

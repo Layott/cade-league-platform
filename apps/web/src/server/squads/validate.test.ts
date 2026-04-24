@@ -96,4 +96,35 @@ describe("evaluateRules", () => {
     const out = evaluateRules(items, RULE);
     expect(out.violations.find((v) => v.code === "missing_nigerian_items")).toBeUndefined();
   });
+
+  it("matches by futbinNationId when set to the NG default (133), overriding a missing flag", () => {
+    // Represents the real Futbin-sourced row shape: nation_iso is null, the
+    // row only carries the Futbin-internal integer nation id.
+    const items = startingXi(null);
+    // Swap slot 5 to an ID-only Nigerian — no flag, just the Futbin ID.
+    items[5] = mkItem({
+      slotIndex: 5,
+      nationalityFlag: null,
+      futbinNationId: 133,
+      name: "ID-Only NG",
+    });
+    const out = evaluateRules(items, RULE);
+    const missing = out.violations.find((v) => v.code === "missing_nigerian_items");
+    // 1 Nigerian ID-match should satisfy the min-1 rule.
+    expect(missing).toBeUndefined();
+  });
+
+  it("futbinNationId mismatch does NOT count toward Nigerian min", () => {
+    const items = startingXi(null);
+    items[5] = mkItem({
+      slotIndex: 5,
+      nationalityFlag: null,
+      futbinNationId: 14, // e.g. England (unrelated value)
+      name: "Non-NG",
+    });
+    const out = evaluateRules(items, RULE);
+    expect(
+      out.violations.some((v) => v.code === "missing_nigerian_items"),
+    ).toBe(true);
+  });
 });

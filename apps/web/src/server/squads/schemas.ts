@@ -28,6 +28,15 @@ export const itemSchema = z.object({
   value: z.number().int().min(0),
   itemType: itemTypeEnum,
   nationalityFlag: z.string().min(2).max(6).nullable().optional(),
+  /**
+   * Futbin-internal nation registry ID. Captured by the list-page
+   * scrapers (img.nation → /img/nation/{id}.png). Used by the Nigerian-
+   * count rule to handle Futbin rows with empty `nation_iso`.
+   *
+   * Kept out of persistence (see `submit.ts` row shape) — only threaded
+   * into `evaluateRules` at submit-time.
+   */
+  futbinNationId: z.number().int().positive().nullable().optional(),
   slotIndex: z.number().int().min(0).max(22),
 });
 

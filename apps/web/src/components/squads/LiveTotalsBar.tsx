@@ -9,6 +9,21 @@ import {
 } from "./PitchLayout";
 
 /**
+ * Futbin's internal nation_id for Nigeria (FC26). Env-driven so it can
+ * be flipped if Futbin's registry shifts between FC years — default 133
+ * matches Nigeria's ID in earlier FIFA titles and is the current best
+ * guess for FC26. NEXT_PUBLIC_ so it's readable client-side.
+ *
+ * Counterpart on the server: `server/squads/validate.ts`. Keep in sync.
+ */
+const NG_FUTBIN_NATION_ID: number = (() => {
+  const raw = process.env.NEXT_PUBLIC_NG_FUTBIN_NATION_ID;
+  if (!raw) return 133;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 133;
+})();
+
+/**
  * Plan 30.1 — always-visible totals bar.
  *
  * Reads the parent's picker state (slot map + subs array + formation), computes:
@@ -86,6 +101,11 @@ export function LiveTotalsBar({ slots, subs, rule, formation }: LiveTotalsBarPro
     //   `server/squads/validate.ts` which filters to slotIndex 0..10 and
     //   then excludes slot 0.
     const isNG = (c: CardSearchResult) => {
+      // Futbin-internal nation_id wins when present — authoritative
+      // because the scrapers pull it from Futbin's CDN-keyed nation icon.
+      if (c.futbinNationId != null && c.futbinNationId === NG_FUTBIN_NATION_ID) {
+        return true;
+      }
       const iso = (c.nationIso ?? "").toUpperCase();
       if (iso === "NG" || iso === "NGA") return true;
       // Futbin frequently leaves nation_iso empty but fills `nation` with

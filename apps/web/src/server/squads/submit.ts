@@ -121,6 +121,7 @@ export async function createSubmission(
       value: it.value,
       itemType: it.itemType,
       nationalityFlag: it.nationalityFlag ?? null,
+      futbinNationId: it.futbinNationId ?? null,
       slotIndex: it.slotIndex,
     }));
     const result = evaluateRules(itemsForRules, {

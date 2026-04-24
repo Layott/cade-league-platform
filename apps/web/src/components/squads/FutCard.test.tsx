@@ -6,6 +6,7 @@ import type { CardSearchResult } from "@/server/fcdb/search";
 function mkCard(over: Partial<CardSearchResult> = {}): CardSearchResult {
   return {
     id: "id-x",
+    slug: "lionel_messi",
     name: "Lionel Messi",
     rating: 94,
     position: "RW",
@@ -19,6 +20,13 @@ function mkCard(over: Partial<CardSearchResult> = {}): CardSearchResult {
     cardImageUrl: null,
     cardBgUrl: null,
     variant: null,
+    mainStats: null,
+    weakFoot: null,
+    skillMoves: null,
+    metaRating: null,
+    futbinNationId: null,
+    futbinLeagueId: null,
+    futbinClubId: null,
     ...over,
   };
 }

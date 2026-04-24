@@ -102,6 +102,19 @@ async function extract(page) {
       }
       const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
 
+      // Futbin nation / league / club — IDs are Futbin-internal integers
+      // embedded in the CDN icon path (e.g. /img/nation/18.png). No raw
+      // ISO code is exposed on the list page, so we capture the ID here
+      // and resolve to names via a separate mapping (see
+      // _find_futbin_nation_id.js).
+      const nationImg = row.querySelector("img.nation, img[src*='/img/nation/']");
+      const leagueImg = row.querySelector("img[src*='/img/league/']");
+      const clubImg = row.querySelector("img[src*='/img/clubs/']");
+      const pathId = (src) => {
+        const m = (src || "").match(/\/img\/(?:nation|league|clubs)\/(?:dark\/|light\/)?(\d+)\.(?:png|webp|jpg)/i);
+        return m ? parseInt(m[1], 10) : null;
+      };
+
       out.push({
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
         position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
@@ -114,6 +127,9 @@ async function extract(page) {
         cardBgUrl: cardBgSrc || null,
         // Kept for debug — show raw string even when the /cards/ regex misses.
         cardBgRaw: cardBgSrc || null,
+        nationId: pathId(nationImg?.getAttribute("src")),
+        leagueId: pathId(leagueImg?.getAttribute("src")),
+        clubId: pathId(clubImg?.getAttribute("src")),
       });
     }
     return out;

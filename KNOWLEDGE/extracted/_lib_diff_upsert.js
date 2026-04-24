@@ -39,6 +39,16 @@ function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
       ? r.cardBgUrl
       : `https://www.futbin.com${r.cardBgUrl}`;
   }
+  // Futbin-internal IDs for nation / league / club — parsed from the
+  // row-level icon CDN paths. Futbin doesn't ship raw ISO codes or
+  // readable names on the list page (they're purely image assets keyed
+  // by Futbin's internal registry), so we capture the IDs and resolve
+  // them to human-readable values via a separate mapping. Chief use
+  // case: the Nigerian-in-starting-XI count, which keys off these IDs
+  // when `nation_iso` is empty on a Futbin-sourced row.
+  if (r.nationId != null) attrs.futbin_nation_id = r.nationId;
+  if (r.leagueId != null) attrs.futbin_league_id = r.leagueId;
+  if (r.clubId != null) attrs.futbin_club_id = r.clubId;
   return attrs;
 }
 
@@ -63,6 +73,12 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs) {
   const newPC = newAttrs.platform_prices?.pc ?? null;
   if (oldPS !== newPS) changes.push("ps_price");
   if (oldPC !== newPC) changes.push("pc_price");
+  // Futbin-internal registry IDs — trigger a re-write when any of the
+  // three shift (rare but happens: league reassignment, transfer). Keeps
+  // downstream consumers (Nigerian check, league filters) in sync.
+  if ((oldAttrs.futbin_nation_id ?? null) !== (newAttrs.futbin_nation_id ?? null)) changes.push("nation_id");
+  if ((oldAttrs.futbin_league_id ?? null) !== (newAttrs.futbin_league_id ?? null)) changes.push("league_id");
+  if ((oldAttrs.futbin_club_id ?? null) !== (newAttrs.futbin_club_id ?? null)) changes.push("club_id");
   return changes;
 }
 

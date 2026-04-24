@@ -135,6 +135,20 @@ async function extractListPage(page) {
       const clubImg = row.querySelector("img[alt='Club'], img[alt*='Club']");
       // Futbin stores nation/club names on the card anchor title attribute in some views — fall back blank.
 
+      // Futbin-internal IDs — CDN icons are keyed by Futbin's internal
+      // registry. Capture the ID from the path; names are resolved via
+      // a separate mapping (Nigeria check keys off nation_id).
+      const nationIconEl = row.querySelector("img.nation, img[src*='/img/nation/']");
+      const leagueIconEl = row.querySelector("img[src*='/img/league/']");
+      const clubIconEl = row.querySelector("img[src*='/img/clubs/']");
+      const pathId = (src) => {
+        const m = (src || "").match(/\/img\/(?:nation|league|clubs)\/(?:dark\/|light\/)?(\d+)\.(?:png|webp|jpg)/i);
+        return m ? parseInt(m[1], 10) : null;
+      };
+      const nationId = pathId(nationIconEl?.getAttribute("src"));
+      const leagueId = pathId(leagueIconEl?.getAttribute("src"));
+      const clubId = pathId(clubIconEl?.getAttribute("src"));
+
       if (!name || !rating) continue;
       out.push({
         resourceId,
@@ -154,6 +168,9 @@ async function extractListPage(page) {
         cardBgUrl: cardBgSrc || null,
         nationImg: nationImg?.getAttribute("src") || null,
         clubImg: clubImg?.getAttribute("src") || null,
+        nationId,
+        leagueId,
+        clubId,
       });
     }
 
@@ -194,6 +211,11 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     if (r.metaTag) attrs.futbin_meta_rating = r.metaTag;
     if (r.cardImageUrl) attrs.card_image_url = r.cardImageUrl.startsWith("http") ? r.cardImageUrl : `https://www.futbin.com${r.cardImageUrl}`;
     if (r.cardBgUrl) attrs.card_bg_url = r.cardBgUrl.startsWith("http") ? r.cardBgUrl : `https://www.futbin.com${r.cardBgUrl}`;
+    // Futbin-internal IDs (nation / league / club). Keyed by Futbin's
+    // private registry — names resolved via a separate mapping.
+    if (r.nationId != null) attrs.futbin_nation_id = r.nationId;
+    if (r.leagueId != null) attrs.futbin_league_id = r.leagueId;
+    if (r.clubId != null) attrs.futbin_club_id = r.clubId;
 
     // item_type bucket from variant string.
     const vLower = (r.variant || "").toLowerCase();
