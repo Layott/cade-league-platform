@@ -132,6 +132,19 @@ If verification fails, the plan is NOT complete. Fix or raise it with the user. 
 - **Audit trigger** has a dedicated smoke test at `supabase/tests/audit_smoke.sql`, runnable via `npm run audit:smoke`.
 - **Do NOT skip unit tests** for server modules just because E2E covers the flow. Unit tests catch regressions 10× faster than E2E.
 
+## Error log rule (user-mandated 2026-04-24)
+
+Every error + fix lands in `tasks/lessons.md` **as it happens**, not retrospectively. Format:
+- `**Date:** YYYY-MM-DD`
+- `**Context:**` what the user reported + what the system was doing
+- `**Mistake:**` the specific wrong assumption / missing check / bad abstraction
+- `**Correction:**` the fix applied (with commit ref if pushed)
+- `**Rule for future:**` the durable guard — selector, test, check, pre-flight — that would have caught this before it shipped
+
+If the same error recurs with a different symptom, **UPDATE** the existing entry's "Correction" + append the new symptom to "Context" — don't create a duplicate. Cross-reference commit SHAs so the before/after is always reproducible.
+
+Before starting ANY new work, grep `tasks/lessons.md` for keywords matching the problem space. A lesson that applies is not optional — it's a pre-flight check.
+
 ## Seed Data
 
 `supabase/seed.sql` exists. Contains Elite 2025-2026 season + placeholder 13-player roster (`player01@cade.local..player13@cade.local`) + one `squad_validation_rules` row (10M coin budget, min 1 Nigerian item, banned EVO/SeasonPass/Objective). Real roster names are pending swap — 13 players with photos live at `KNOWLEDGE/brand-assets/players/`: ADEFOLA, ANIFE, BAJI JNR, DADABOI, FARUK, GURU, KAYKAY, KILLER FREAK, KINGNONEX, MITCH, MR OGA, TACTICAL, WOLEVATION.

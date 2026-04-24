@@ -155,3 +155,83 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Exact-match regex against external-source labels. Treated the upstream's label shape as stable without testing the regex against a sample of the real data distribution.
 **Correction:** Widened to `/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/` for the base tiers, and added word-boundary `\b` checks for icon/toty/tots/hero/rttf so prefix/suffix variants route correctly. Shared the classifier in `KNOWLEDGE/extracted/_classify_variant.js` so all scrapers + ingest scripts import the same logic (commit `518be6b`).
 **Rule for future:** Never use `^X$` exact-match regex on labels emitted by an external source. Always allow for common prefix/suffix drift (`(\d+-)?`, `-v\d+$`, trailing whitespace, Unicode normalization). Before shipping a classifier, run it across a representative sample of real data and assert the "default/special/unknown" bucket count is below a sanity threshold (e.g. <5%). If the default bucket explodes, the regex is wrong — don't trust that the classifier is correct just because no row errored.
+
+---
+
+**Date:** 2026-04-23
+**Context:** Futbin card-frame CDN (`cdn3.futbin.com/content/fifa26/img/cards/tiny/`) is an imgix source enforcing HMAC-signed URLs (`?fm=png&ixlib=...&s=<HMAC>`). I shipped a FutCard client fallback + `_backfill_card_bg.js` that synthesised unsigned URLs like `.../1_gold.png`. All 20,424 rows got `sig_invalid` when the browser fetched them; picker showed black boxes.
+**Mistake:** Treated the URL as path-addressable after grepping a static HTML snippet. Didn't notice the snippet already had `?s=<hmac>` attached — bare URLs are rejected.
+**Correction:** `_revert_card_bg_backfill.js` cleared all 20,424 unsigned URLs. Removed the client synthesis from FutCard. The scraper captures Futbin's full signed URL from `<img src>` — let it populate `card_bg_url` naturally on subsequent runs.
+**Rule for future:** Never synthesise imgix/CDN URLs. If the upstream page serves query-signed URLs, the signature is mandatory. Test ONE URL end-to-end (curl the exact string) before fanning out a backfill. When a scraper captures a URL, always store the FULL string (scheme + host + path + query), never re-assemble from parts.
+
+---
+
+**Date:** 2026-04-23
+**Context:** `searchCards()` fuzzy path hand-listed fields in its return projection. After adding `cardBgUrl` to `CardSearchResult`, the exact-slug path carried it through via `...row` spread but the fuzzy path silently dropped it. Picker dropdown showed portraits without frames. Same class of bug had already bit us once when `attributes` jsonb was added to SELECT_COLUMNS but projectRow didn't read it.
+**Mistake:** Hand-listed return projections — adding a new field requires editing N projections. Miss one and the field comes back undefined; downstream defaults take over silently.
+**Correction:** Fuzzy path rewritten to `{ sim: _sim, ...rest } = row; return rest as CardSearchResult`. Exact-slug path already used spread. No field can silently drop now.
+**Rule for future:** Never hand-list "all fields from source minus N internal ones". Always destructure-rest: `const { _internal, ...rest } = source; return rest`. Hand-listing is only acceptable when the target contract is significantly smaller than the source AND must stay authoritatively declared.
+
+---
+
+**Date:** 2026-04-23
+**Context:** `LiveTotalsBar` Nigerian counter incremented for any NG-flagged card in starters OR bench subs. Server `validate.ts` only counts starting XI (slots 1-10, GK excluded). UI showed "1 / 1 NG ✓" while server refused the submission for missing Nigerians.
+**Mistake:** Client-side counter diverged from server rule. No shared predicate for "is this item counted for the NG minimum".
+**Correction:** Split client-side loops: coins sum all cards (budget includes subs), but Nigerian count iterates non-GK starters only. Matches `validate.ts` line-for-line.
+**Rule for future:** Any UI counter claiming to mirror a server rule must share the scope predicate. Divergent scopes mean the UI lies — worse than not showing the metric. If the scope is non-trivial, extract a shared pure function both client + server import.
+
+---
+
+**Date:** 2026-04-23
+**Context:** `createSubmission()` accepted any squad as `pending`. `evaluateRules()` only ran at admin-review time. A tampered request or JS-disabled client could land a squad 50M over budget with 0 Nigerian and 11 banned cards; ref would only catch it on review.
+**Mistake:** Trusted client-side LiveTotalsBar warnings as "enforcement". They were advisory only.
+**Correction:** `evaluateRules()` guard added inside `createSubmission()` between deadline check + insert. Any violation raises `ValidationError` with a human-readable first-offence summary. Server is now authoritative.
+**Rule for future:** Client validation is ALWAYS advisory. The server action that writes to the DB must independently enforce every business rule, with no dependency on the client having shown a warning. Audit every mutation for this guard before shipping.
+
+---
+
+**Date:** 2026-04-23
+**Context:** Futbin `/26/players` DOM puts the card-frame img under `img.playercard-s-26-bg` on TOTY/icon/hero rows but NOT silvers/bronzes (those use a different class we didn't enumerate). Class-based selector captured ~40% of the catalog; silvers + bronzes scraped with `card_bg_url` null.
+**Mistake:** Calibrated the selector against the first 3 rows of page 1 (all TOTYs). Assumed DOM consistency across the full catalog.
+**Correction:** Added a broader fallback: `img[src*='/img/cards/tiny/']` matches any img whose src hits the frame CDN regardless of class. Also fallback to computed `background-image` style on wrapper divs.
+**Rule for future:** When scraping a paginated list, sample rows from ALL page ranges (first, mid, last) + ALL variant types (specials, normals, low-rated) before calibrating selectors. Paginated DOMs often vary by content type — page-1 shape may break on page 600.
+
+---
+
+**Date:** 2026-04-23
+**Context:** Futbin's list page exposes nation only as a CDN icon URL (`/img/nation/18.png`) keyed by Futbin-internal integer IDs. No raw ISO code or country name text. `nation_iso` was 0% populated on all 22,407 futbin-sourced rows. Nigerian-count rule never ticked even for obvious Nigerians.
+**Mistake:** Assumed any list page would expose nation in a text field. Didn't inspect the icon element structure before declaring scrape complete.
+**Correction:** (a) Kaggle CSV backfill copied `nation` string for ~15k matching rows. (b) Slug-propagation pass: variants of the same player inherit the nation from any sibling. (c) Hand-curated famous-names map for ~60 icons Kaggle didn't cover (Kanu, Mikel, Pele…). (d) Scraper now captures `futbin_nation_id` from the CDN icon path; Nigerian check keys on string OR ID (env-overridable via `NG_FUTBIN_NATION_ID`).
+**Rule for future:** External metadata may arrive as opaque numeric IDs rather than strings. Before committing to a scrape pipeline, dump ONE row's full extracted shape and check every semantic field has a durable representation. If it's ID-only, capture the ID AND plan the mapping path upfront.
+
+---
+
+**Date:** 2026-04-23
+**Context:** `NavDrawer` uses `createPortal(document.body)` to escape the sticky-header `backdrop-filter` clip. SSR + first-client render mismatched — server rendered nothing for the portal subtree; client mounted it immediately. Hydration warnings on every page.
+**Mistake:** Mounted the portal unconditionally on first client render, ignoring that SSR can't serialise portal output.
+**Correction:** `const [mounted, setMounted] = useState(false); useEffect(() => setMounted(true), []);` — portal mounts on the next tick after hydration. SSR-null matches first-client-null.
+**Rule for future:** `createPortal` in an SSR tree is ALWAYS a hydration hazard. Every portal-emitting Client Component gates the portal behind a `mounted` flag. If this pattern repeats more than twice, extract a `<ClientOnly>` utility.
+
+---
+
+**Date:** 2026-04-23
+**Context:** Formation switcher dropped cards that didn't map slot-for-slot between old + new formations. User reported "Kanu disappeared when I swapped 4-3-3 → 3-4-1-2". Old code matched by exact position label then spilled overflow to subs; if subs saturated, cards were silently cleared.
+**Mistake:** Lossy remap prioritised shape fidelity over card preservation.
+**Correction:** Three-pass remap: (1) exact label match, (2) family match (DEF/MID/ATK/GK), (3) fill remaining empties in order. Every filled card always lands somewhere. Overflow grows the bench rather than dropping.
+**Rule for future:** State transitions that remap user-picked items between shapes must preserve every item unless the user explicitly drops. Loss of user work is catastrophic. Prefer "put it somewhere sensible" over "clear it, they'll redo it". Explicit test: start with 11 slots filled, swap formations, assert final filled count = 11.
+
+---
+
+**Date:** 2026-04-24
+**Context:** User reported "page loads without any UI design, just text." Dev log showed workspace-root warning: Next.js picked `C:\Users\Sweez\Desktop\LAYO\CLAUDE\package-lock.json` as workspace root instead of the repo itself. Misrouted the asset-path base — HTML rendered fine but Tailwind CSS 404'd from the wrong prefix.
+**Mistake:** Didn't pin `outputFileTracingRoot`. Next 15's heuristic walks upward looking for the nearest lockfile; a stray parent-dir lockfile hijacked detection silently — no error, just broken asset paths.
+**Correction:** `apps/web/next.config.ts` sets `outputFileTracingRoot: path.resolve(__dirname, "..", "..")`. Warning line gone; CSS serves correctly.
+**Rule for future:** Any Next.js project nested inside a "workspace of workspaces" folder MUST set `outputFileTracingRoot` explicitly. If `next dev` logs "We detected multiple lockfiles" — fix immediately, don't ignore, because every other subtle issue (CSS paths, image optimisation, server action serialisation) silently misroutes.
+
+---
+
+**Date:** 2026-04-24
+**Context:** Dev server crashed with `ENOENT: .next/routes-manifest.json` + `.next/server/app/api/fcdb/search/route.js` mid-session. 500 cascade on every page. `.next/` existed but only held `cache/diagnostics/types` — compiled output vanished.
+**Mistake:** Ran `next dev` in parallel with a background agent editing `apps/web/src/**`. HMR tried to recompile while the agent's writes were mid-flight; Next 15 on Windows occasionally wipes the partial output without restoring.
+**Correction:** Kill dev → `rm -rf apps/web/.next apps/web/node_modules/.cache` → relaunch. Server rebuilds from scratch.
+**Rule for future:** Don't start `next dev` until all parallel agents writing to `apps/web/src/**` have finished. If `ENOENT .next/routes-manifest.json` appears, DO NOT retry requests — error is self-inflicted. Sequence: kill → wipe `.next` → 2s pause → relaunch. Consider a pre-flight script that `rm -rf .next` every `pre-dev`.
