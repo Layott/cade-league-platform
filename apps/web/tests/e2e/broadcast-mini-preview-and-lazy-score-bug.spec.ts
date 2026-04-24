@@ -4,7 +4,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 
 /**
- * Plan 42.2 + 42.3 (2026-04-24) — verification for two shipped changes:
+ * Plan 42.2 + 42.3 + 48.3 (2026-04-24) — verification for three shipped changes:
  *
  *   1) `updateScoreBug` now lazily auto-creates the missing score_bug row
  *      instead of throwing "no active score_bug for primary slot". This
@@ -12,10 +12,17 @@ import * as fs from "node:fs";
  *      calls the score delta action without firing startMatch, and
  *      asserts the score updates to 1 : 0.
  *
- *   2) The new `BroadcastPreviewGrid` renders inline mini iframes for
- *      every default overlay tile on /admin/broadcast/<id>. This test
- *      asserts the grid exists + at least the score_bug primary iframe
- *      loads with the correct ?session= & ?slot= query string.
+ *   2) Plan 48.3 — the old standalone `BroadcastPreviewGrid` is GONE. Mini
+ *      iframes are now embedded INSIDE each `EditableTemplatePanel` and
+ *      legacy `trigger-card-*` container so the producer sees a change
+ *      take effect next to the control that fired it. The test asserts
+ *      the mini-preview nests inside `editable-panel-score_bug` (slot-
+ *      capable, so two tiles — primary + secondary).
+ *
+ *   3) Plan 48.3 — the nested-form DOM violation from OffTriggerButton
+ *      inside the Edit & trigger form is fixed. Zero "cannot be a
+ *      descendant" / "cannot contain a nested form" warnings in the
+ *      browser console after page load.
  *
  * Tolerant of network / seed gating: if required prerequisites are
  * missing the test is skipped rather than failing. Mirrors the existing
@@ -67,8 +74,8 @@ async function login(page: Page): Promise<boolean> {
   }
 }
 
-test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 42.3 mini preview grid", () => {
-  test("score +1 without startMatch seeds the bug + mini preview grid renders", async ({
+test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 48.3 inline mini preview", () => {
+  test("score +1 without startMatch seeds the bug + mini preview nests inside editable panel", async ({
     page,
   }) => {
     const sb = getServiceRoleClient();
@@ -216,25 +223,20 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 42.3 mini preview
       const plusBtn = page.getByTestId("score-primary-home-plus");
       await expect(plusBtn).toBeVisible();
 
-      // Wait for hydration to settle (a pre-existing hydration warning on
-      // the page from OffTriggerButton can delay form listeners attaching).
-      // Poll until React has hooked up the submit handler by probing the
-      // click and re-checking the score; fall back after 3 attempts.
+      // Plan 48.3 fixed the nested-form hydration blocker, so a single
+      // click is now enough. Keep a tight retry in case the dev-server
+      // cold-starts the chunk on first navigation.
       let scored = false;
-      for (let attempt = 0; attempt < 3 && !scored; attempt++) {
+      for (let attempt = 0; attempt < 2 && !scored; attempt++) {
         await plusBtn.click();
         try {
           await expect(page.getByTestId("score-primary-home")).toHaveText(
             "1",
-            { timeout: 8_000 },
+            { timeout: 6_000 },
           );
           scored = true;
         } catch {
-          // Hydration may not have attached the form submit listener yet
-          // (pre-existing nested-form hydration warning from OffTriggerButton
-          // in EditableTemplatePanel delays client-side hydration across the
-          // whole page). Small backoff + retry.
-          await page.waitForTimeout(1500);
+          await page.waitForTimeout(800);
         }
       }
       expect(scored).toBe(true);
@@ -253,17 +255,27 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 42.3 mini preview
       });
       expect(bugs.length).toBeGreaterThan(0);
 
-      // --- Plan 42.3: mini preview grid --------------------------------
-      await expect(page.getByTestId("broadcast-preview-grid")).toBeVisible();
+      // --- Plan 48.3: inline mini preview inside editable panel --------
+      // The old standalone BroadcastPreviewGrid is gone — mini-previews
+      // now nest inside each EditableTemplatePanel (slot-capable → two
+      // tiles) and legacy trigger-card-*.
+      const scoreBugPanel = page.getByTestId("editable-panel-score_bug");
+      await expect(scoreBugPanel).toBeVisible();
 
-      // Default grid has score_bug (slot-capable → primary + secondary).
-      const scoreBugPrimaryTile = page.getByTestId(
+      // Primary + secondary mini-previews must live INSIDE that panel.
+      const scoreBugPrimaryTile = scoreBugPanel.getByTestId(
         "mini-preview-score_bug-primary",
       );
+      const scoreBugSecondaryTile = scoreBugPanel.getByTestId(
+        "mini-preview-score_bug-secondary",
+      );
       await expect(scoreBugPrimaryTile).toBeVisible();
+      await expect(scoreBugSecondaryTile).toBeVisible();
 
       // The iframe inside should have the right src (session + slot + t).
-      const iframe = page.getByTestId("mini-preview-iframe-score_bug-primary");
+      const iframe = scoreBugPanel.getByTestId(
+        "mini-preview-iframe-score_bug-primary",
+      );
       const src = await iframe.getAttribute("src");
       expect(src).toContain(`/overlay/score-bug`);
       expect(src).toContain(`session=${sessionId}`);
@@ -272,26 +284,27 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 42.3 mini preview
         expect(src).toContain(`t=${viewToken}`);
       }
 
-      // Copy button per tile.
+      // Copy button per tile — also INSIDE the panel.
       await expect(
-        page.getByTestId("mini-preview-copy-score_bug-primary"),
+        scoreBugPanel.getByTestId("mini-preview-copy-score_bug-primary"),
       ).toBeVisible();
 
-      // No *new* runtime errors introduced by the Plan 42.2/42.3 changes
-      // themselves. We filter out pre-existing hydration warnings from the
-      // OffTriggerButton / nested-form chain in EditableTemplatePanel —
-      // those predate this slice and are tracked separately. This guard
-      // only tripwires for errors coming out of match_flow or the new
-      // mini-preview grid.
+      // Sanity-check a legacy trigger card too — scorebar is not editable
+      // but still gets an inline mini preview.
+      const scorebarCard = page.getByTestId("trigger-card-scorebar");
+      await expect(scorebarCard).toBeVisible();
+      await expect(
+        scorebarCard.getByTestId("mini-preview-scorebar"),
+      ).toBeVisible();
+
+      // No runtime errors. Plan 48.3 also fixes the nested-form DOM
+      // violation so "cannot be a descendant" warnings should be GONE.
+      // Tripwire ANY such warning now.
       const relevantErrors = errors.filter((e) => {
         const lower = e.toLowerCase();
         if (lower.includes("favicon")) return false;
         if (lower.includes("download the react devtools")) return false;
         if (lower.includes("failed to load resource")) return false;
-        // Pre-existing hydration warnings from nested-form pattern.
-        if (lower.includes("hydration")) return false;
-        if (lower.includes("cannot be a descendant")) return false;
-        if (lower.includes("cannot contain a nested")) return false;
         return true;
       });
       expect(relevantErrors).toEqual([]);

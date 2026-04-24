@@ -41,7 +41,7 @@ import {
 } from "./MatchControlPanel";
 import { YouTubeChatPanel } from "./YouTubeChatPanel";
 import { PreviewIframeTrigger } from "./PreviewIframeModal";
-import { BroadcastPreviewGrid } from "./BroadcastPreviewGrid";
+import { OverlayMiniPreview } from "@/components/broadcast/OverlayMiniPreview";
 
 export const dynamic = "force-dynamic";
 
@@ -327,14 +327,10 @@ export default async function BroadcastSessionPage({
         isLive={isLive}
       />
 
-      {/* Plan 42.3 (2026-04-24) — inline mini-preview grid. Each tile is a
-          scaled iframe pointing at the actual overlay route so realtime
-          triggers reflect live. Copy button per tile produces the exact
-          URL for OBS/vMix browser sources. */}
-      <BroadcastPreviewGrid
-        sessionId={session.id}
-        viewToken={session.view_token}
-      />
+      {/* Plan 48.3 — inline mini-previews moved into each trigger panel
+          itself (below). The old standalone BroadcastPreviewGrid was
+          removed because producers asked for the live preview to sit
+          directly next to the control that changes it. */}
 
       {/* Plan 44 — YouTube chat picker + Feature-on-stream. Session-scoped
           (shared across both match slots); the panel itself lets the admin
@@ -396,6 +392,8 @@ export default async function BroadcastSessionPage({
               multiInstance={MULTI_INSTANCE_TEMPLATES.has(key)}
               selectable={selectableMatches}
               unplayed={unplayedToday}
+              viewToken={session.view_token}
+              slotCapable={SLOT_CAPABLE_TEMPLATES.has(key)}
             />
           ))}
         </div>
@@ -451,6 +449,43 @@ export default async function BroadcastSessionPage({
                         Preview ↗
                       </Link>
                     </div>
+                  </div>
+                  {/* Plan 48.3 — inline mini-preview iframe(s) sit right
+                      above the JSON editor so the producer sees the trigger
+                      take effect without leaving the card. Slot-capable
+                      templates render two tiles stacked. */}
+                  <div
+                    className="mb-3 flex flex-wrap items-start gap-2"
+                    data-testid={`mini-preview-wrap-${key}`}
+                  >
+                    {isSlotCapable ? (
+                      <>
+                        <OverlayMiniPreview
+                          sessionId={session.id}
+                          viewToken={session.view_token}
+                          templateKey={key}
+                          slot="primary"
+                          tileWidth={240}
+                          compact
+                        />
+                        <OverlayMiniPreview
+                          sessionId={session.id}
+                          viewToken={session.view_token}
+                          templateKey={key}
+                          slot="secondary"
+                          tileWidth={240}
+                          compact
+                        />
+                      </>
+                    ) : (
+                      <OverlayMiniPreview
+                        sessionId={session.id}
+                        viewToken={session.view_token}
+                        templateKey={key}
+                        tileWidth={320}
+                        compact
+                      />
+                    )}
                   </div>
                   <form action={triggerOverlayAction} className="space-y-2">
                     <input

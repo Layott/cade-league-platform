@@ -32,6 +32,7 @@ import { StructuredBrbForm } from "./forms/StructuredBrbForm";
 import { StructuredFeaturedCommentForm } from "./forms/StructuredFeaturedCommentForm";
 import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
 import { AssetUploader } from "@/components/broadcast/AssetUploader";
+import { OverlayMiniPreview } from "@/components/broadcast/OverlayMiniPreview";
 
 /**
  * Plan 37 / Plan 45 — rich panel for editable templates.
@@ -61,6 +62,12 @@ export type EditableTemplatePanelProps = {
   /** Plan 45 — extra context for the structured forms. */
   selectable?: SelectableMatch[];
   unplayed?: UnplayedMatch[];
+  /** Plan 48.3 — per-session shared secret so the inline mini-preview
+   *  iframe can reach unauthenticated overlay endpoints. */
+  viewToken?: string | null;
+  /** Plan 48.3 — templates whose payloads carry `slot: 'primary'|'secondary'`
+   *  render TWO mini-previews side-by-side (primary + secondary). */
+  slotCapable?: boolean;
 };
 
 /**
@@ -88,6 +95,8 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
     multiInstance,
     selectable,
     unplayed,
+    viewToken = null,
+    slotCapable = false,
   } = props;
   const tpl = TEMPLATE_REGISTRY[templateKey as TemplateKey] ?? null;
   const starter = STARTER_PAYLOADS[templateKey] ?? {};
@@ -124,6 +133,40 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
           </Link>
         ) : null}
       </div>
+
+      {/* Plan 48.3 — inline mini-preview(s) mounted WITH the controls.
+          Producer sees entry / exit / score edits the moment the button
+          fires. Slot-capable templates render both primary + secondary
+          side-by-side; everything else renders a single tile. */}
+      {tpl ? (
+        <div
+          className="mb-4 flex flex-wrap items-start gap-3"
+          data-testid={`mini-preview-wrap-${templateKey}`}
+        >
+          {slotCapable ? (
+            <>
+              <OverlayMiniPreview
+                sessionId={sessionId}
+                viewToken={viewToken}
+                templateKey={templateKey as TemplateKey}
+                slot="primary"
+              />
+              <OverlayMiniPreview
+                sessionId={sessionId}
+                viewToken={viewToken}
+                templateKey={templateKey as TemplateKey}
+                slot="secondary"
+              />
+            </>
+          ) : (
+            <OverlayMiniPreview
+              sessionId={sessionId}
+              viewToken={viewToken}
+              templateKey={templateKey as TemplateKey}
+            />
+          )}
+        </div>
+      ) : null}
 
       {/* Structured form path — renders a dedicated component for the
           templateKey. Presets + save-preset still available below. */}
@@ -241,68 +284,85 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
           </ul>
         </div>
 
-        {/* Edit + Trigger form — hidden for structured templates. */}
+        {/* Edit + Trigger form — hidden for structured templates. The
+            OffTriggerButton renders its own <form>, so it MUST sit as a
+            sibling of this <form> (browsers reject <form> inside <form>). */}
         {isStructured ? (
           <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)] md:col-span-1">
             Structured form above replaces the raw JSON editor.
           </div>
         ) : (
-          <form
-            action={multiInstance ? triggerInstanceAction : triggerOverlayAction}
-            className="space-y-2"
-            data-testid={`trigger-form-${templateKey}`}
-          >
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-              Edit & trigger
-            </h3>
-            <input type="hidden" name="sessionId" value={sessionId} />
-            <input type="hidden" name="templateKey" value={templateKey} />
+          <div className="space-y-2">
+            <form
+              action={multiInstance ? triggerInstanceAction : triggerOverlayAction}
+              className="space-y-2"
+              data-testid={`trigger-form-${templateKey}`}
+            >
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+                Edit & trigger
+              </h3>
+              <input type="hidden" name="sessionId" value={sessionId} />
+              <input type="hidden" name="templateKey" value={templateKey} />
 
-            {slots ? (
-              <div className="flex items-center gap-3 text-[11px]">
-                {slots.map((slot, i) => (
-                  <label key={slot} className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      name="instanceSlot"
-                      value={slot}
-                      defaultChecked={i === 0}
-                      data-testid={`slot-radio-${templateKey}-${slot}`}
-                    />
-                    <span className="text-[var(--chalk-2)]">
-                      {slot} · {slotLabels[i]}
-                    </span>
-                  </label>
-                ))}
+              {slots ? (
+                <div className="flex items-center gap-3 text-[11px]">
+                  {slots.map((slot, i) => (
+                    <label key={slot} className="flex items-center gap-1">
+                      <input
+                        type="radio"
+                        name="instanceSlot"
+                        value={slot}
+                        defaultChecked={i === 0}
+                        data-testid={`slot-radio-${templateKey}-${slot}`}
+                      />
+                      <span className="text-[var(--chalk-2)]">
+                        {slot} · {slotLabels[i]}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Plan 48 — generic asset uploaders so admins pasting JSON
+                  payloads can mint signed public URLs without a round trip
+                  to the CDN manager. Copy-to-clipboard fills the textarea
+                  below. */}
+              <div className="space-y-1.5" data-testid={`asset-uploads-${templateKey}`}>
+                <AssetUploader
+                  kind="image"
+                  label="image"
+                  showCopy
+                  data-testid={`asset-upload-image-${templateKey}`}
+                />
+                <AssetUploader
+                  kind="video"
+                  label="video"
+                  showCopy
+                  data-testid={`asset-upload-video-${templateKey}`}
+                />
               </div>
-            ) : null}
-
-            {/* Plan 48 — generic asset uploaders so admins pasting JSON
-                payloads can mint signed public URLs without a round trip
-                to the CDN manager. Copy-to-clipboard fills the textarea
-                below. */}
-            <div className="space-y-1.5" data-testid={`asset-uploads-${templateKey}`}>
-              <AssetUploader
-                kind="image"
-                label="image"
-                showCopy
-                data-testid={`asset-upload-image-${templateKey}`}
+              <textarea
+                name="payload"
+                rows={6}
+                defaultValue={JSON.stringify(starter, null, 2)}
+                data-testid={`trigger-payload-${templateKey}`}
+                className={textareaClass}
               />
-              <AssetUploader
-                kind="video"
-                label="video"
-                showCopy
-                data-testid={`asset-upload-video-${templateKey}`}
-              />
-            </div>
-            <textarea
-              name="payload"
-              rows={6}
-              defaultValue={JSON.stringify(starter, null, 2)}
-              data-testid={`trigger-payload-${templateKey}`}
-              className={textareaClass}
-            />
-            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex justify-end">
+                <PrimaryButton
+                  type="submit"
+                  size="sm"
+                  disabled={!isLive}
+                  data-testid={`trigger-btn-${templateKey}`}
+                >
+                  {multiInstance ? "Trigger to slot" : "Trigger"}
+                </PrimaryButton>
+              </div>
+            </form>
+            {/* Sibling to the trigger form — OffTriggerButton owns its own
+                <form action=clear*Action>. Kept outside to avoid a nested
+                <form> DOM violation (browser console: "form inside form"). */}
+            <div className="flex justify-end">
               <OffTriggerButton
                 templateKey={templateKey}
                 sessionId={sessionId}
@@ -315,16 +375,8 @@ export function EditableTemplatePanel(props: EditableTemplatePanelProps) {
                 disabled={!isLive}
                 data-testid={`off-btn-${templateKey}`}
               />
-              <PrimaryButton
-                type="submit"
-                size="sm"
-                disabled={!isLive}
-                data-testid={`trigger-btn-${templateKey}`}
-              >
-                {multiInstance ? "Trigger to slot" : "Trigger"}
-              </PrimaryButton>
             </div>
-          </form>
+          </div>
         )}
 
         {/* Save preset (separate small form) + Active list */}
