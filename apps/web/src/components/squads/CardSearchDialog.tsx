@@ -203,18 +203,33 @@ export function CardSearchDialog({
                         : "hover:bg-[var(--ink-3)]")
                     }
                   >
-                    {r.cardImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={r.cardImageUrl}
-                        alt={rowTitle}
-                        width={40}
-                        height={56}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-[56px] w-[40px] flex-shrink-0 rounded-sm bg-[var(--ink-2)] object-contain"
+                    {(r.cardBgUrl || r.cardImageUrl) ? (
+                      <div
+                        className="relative h-[56px] w-[40px] flex-shrink-0 overflow-hidden rounded-sm bg-[var(--ink-2)]"
                         data-testid={`card-search-thumb-${idx}`}
-                      />
+                      >
+                        {r.cardBgUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.cardBgUrl}
+                            alt=""
+                            aria-hidden="true"
+                            loading="lazy"
+                            decoding="async"
+                            className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                          />
+                        ) : null}
+                        {r.cardImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.cardImageUrl}
+                            alt={rowTitle}
+                            loading="lazy"
+                            decoding="async"
+                            className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                          />
+                        ) : null}
+                      </div>
                     ) : (
                       <div
                         data-testid={`card-search-thumb-fallback-${idx}`}
