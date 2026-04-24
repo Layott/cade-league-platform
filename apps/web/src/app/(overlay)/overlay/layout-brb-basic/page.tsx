@@ -694,7 +694,7 @@ function BrbBasic({ message }: { message?: string }) {
         <div className="partners">
           <div className="pitem">
             <Image
-              src="/brand/logos/primary/gameevo-white.png"
+              src="/brand/logos/partners/gameevo-white.png"
               alt="GameEvo"
               width={180}
               height={56}

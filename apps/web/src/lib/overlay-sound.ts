@@ -133,12 +133,25 @@ export function useOverlaySound(
     }
     setMuted(false);
     // Restart sound on re-trigger so repeat goals still punch.
+    //
+    // `HTMLMediaElement.play()` returns a Promise that REJECTS on the
+    // browser autoplay policy (NotAllowedError: "play() failed because
+    // the user didn't interact with the document first"). A try/catch
+    // around `void el.play()` ignores the return value — the rejection
+    // escapes to the microtask queue and Next's dev-error overlay
+    // paints it as a runtime crash in the bottom-left. Overlays rendered
+    // inside OBS/vMix would still play because the embed counts as a
+    // user gesture on session start, but the browser-tab preview trips
+    // it every cold load. Chain `.catch(() => {})` so the rejection is
+    // handled silently + never surfaces to the error overlay.
     try {
       el.currentTime = 0;
-      void el.play();
     } catch {
-      /* autoplay blocked — silent-fail */
+      /* setting currentTime pre-load is harmless to ignore */
     }
+    el.play().catch(() => {
+      /* autoplay blocked — silent-fail; overlay still renders visually */
+    });
   }, [trigger]);
 
   return { ready, muted, url };

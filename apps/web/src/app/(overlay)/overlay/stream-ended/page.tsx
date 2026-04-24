@@ -429,7 +429,7 @@ function StreamEndedScene({
           }}
         >
           {[
-            "/brand/logos/primary/gameevo-white.png",
+            "/brand/logos/partners/gameevo-white.png",
             "/brand/logos/primary/pro-league.png",
             "/brand/logos/partners/esports-africa-news-white.png",
             "/brand/logos/partners/gamepride.png",

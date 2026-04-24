@@ -683,7 +683,7 @@ function BrbFullInner({
           }}
         >
           <img
-            src="/brand/logos/primary/gameevo-white.png"
+            src="/brand/logos/partners/gameevo-white.png"
             alt="GameEvo"
             style={{
               height: 78,

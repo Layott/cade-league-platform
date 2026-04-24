@@ -9,8 +9,8 @@
 
 export const PRIMARY_LOGOS = {
   cade: "/brand/logos/primary/cade.png",
-  gameevoBlack: "/brand/logos/primary/gameevo-black.png",
-  gameevoWhite: "/brand/logos/primary/gameevo-white.png",
+  gameevoBlack: "/brand/logos/partners/gameevo-black.png",
+  gameevoWhite: "/brand/logos/partners/gameevo-white.png",
   proLeague: "/brand/logos/primary/pro-league.png",
 } as const;
 

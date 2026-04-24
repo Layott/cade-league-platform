@@ -92,7 +92,7 @@ export default function StartingSoonBasicPage() {
               <div className="ss-partners">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/brand/logos/primary/gameevo-white.png"
+                  src="/brand/logos/partners/gameevo-white.png"
                   alt=""
                   className="ss-partner-img"
                 />
