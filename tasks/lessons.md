@@ -390,3 +390,17 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - Every new RLS policy touching `users.supabase_auth_id` in a subquery MUST be scoped `TO authenticated`, NOT `TO PUBLIC` / unscoped. See §Plan 39 C2 lesson above for the plan-error pattern this avoids.
 - When a page was reverted by a linter / concurrent edit, always re-verify the full set of changes with a `git status` + targeted `grep` for each expected token BEFORE running tests. Files silently rewinding to pre-edit state is a quiet failure mode in parallel-agent workflows.
 
+**Date:** 2026-04-24
+**Context:** Plan 50 (appeals auto-void + ban void-propagation link). User reported that (a) appeals were auto-voiding the linked sanction on submission — should instead wait for ruling outcome=upheld; (b) ban sanctions covering already-played matches needed automated match_results void propagation with admin un-void.
+**Mistake:** (prior) The original appeals `rule()` wrote the ruling as free text only; the linked `disciplinary_actions` row was never touched, so an upheld appeal required the admin to manually revoke the punishment. And when a ban window covered already-entered results, `match_results.result_type='void'` was set but there was no structured link back to the originating action — only a free-text `notes` marker. That made admin debugging + undo logic fragile.
+**Correction:** (commit `42591d79`)
+- Added `appeals.outcome` enum column (`upheld`/`dismissed`) + `match_results.voided_by_action_id` uuid FK.
+- `rule()` now takes outcome. On `upheld`, `onAppealUpheld()` revokes every live action on the case with a `[appeal:<id>] Upheld on YYYY-MM-DD. Panel ruling: ...` prefix; the Plan 11 ban trigger already unwinds voids on revoked_at→NOT NULL.
+- `undoRuling()` scans by the prefix, un-revokes each; `on_ban_action_change` now has a fourth branch that re-propagates voids when revoked_at flips NOT NULL → NULL.
+- Updated `propagate_suspension_voids` to write the uuid column (plus retain the marker for legacy rows); `unpropagate_suspension_voids` queries by column first, falls back to marker.
+- UI: outcome selector + effects summary + undo on `/admin/appeals/[id]`; revoked-via-appeal tag + un-revoke button on `/admin/punishments/[id]`; voided-by-ban banner + per-match un-void form on `/admin/match-days/[id]`.
+**Rule for future:**
+- Cross-entity cascades (A-ruling → B-revoke → C-unvoid) must carry a durable discriminator so an undo path can find exactly what the original action touched. Free-text markers work but burn implementation detail into user-visible columns; dedicated FK columns + structured prefixes on reason fields are the right shape.
+- When extending a DB trigger, audit every branch: the existing `on_ban_action_change` handled INSERT + revoke + soft-delete + date-edit but silently missed UN-revoke (revoked_at NOT NULL → NULL). A "propagate on state-flip" trigger needs a branch for every direction of every flip.
+- For admin undo/reverse UX on a cascade, show the set of affected rows before the undo button so the admin knows what it will touch. `listEffectsForAppeal` exists exactly so the confirm dialog isn't a black box.
+
