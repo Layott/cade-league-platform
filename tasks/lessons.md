@@ -414,3 +414,17 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - When extending a DB trigger, audit every branch: the existing `on_ban_action_change` handled INSERT + revoke + soft-delete + date-edit but silently missed UN-revoke (revoked_at NOT NULL → NULL). A "propagate on state-flip" trigger needs a branch for every direction of every flip.
 - For admin undo/reverse UX on a cascade, show the set of affected rows before the undo button so the admin knows what it will touch. `listEffectsForAppeal` exists exactly so the confirm dialog isn't a black box.
 
+
+---
+
+**Date:** 2026-04-24
+**Context:** User reported "site says Internal Server Error" on `/player/disputes` + "home page loaded without design". Both symptoms had separate root causes but appeared in the same bug report. I jumped to fixes before grepping `tasks/lessons.md` — exactly the pre-flight check my own rule requires. User called it out: "this error is not supposed to happen again are you not supposed to load info of errors?"
+**Mistake:** Skipped the pre-flight grep. Had I grepped "lockfile" / "CSS" / "workspace root" first I would have landed immediately on the 2026-04-24 entry documenting the stray `C:\Users\Sweez\Desktop\LAYO\CLAUDE\package-lock.json` hijacking Next's workspace-root detection. The `outputFileTracingRoot` fix only works AFTER config load; the lockfile-heuristic runs earlier and silently misroutes asset paths when a parent-dir lockfile exists. Deleting the stray file is the only reliable cure.
+**Correction:**
+1. Deleted `C:\Users\Sweez\Desktop\LAYO\CLAUDE\package-lock.json` AGAIN. Something — probably an npm install run from the parent dir — recreates it over time.
+2. Wiped `apps/web/.next`, killed the dev server, restarted. Fresh dev comes up clean with no lockfile warning.
+3. On the `/player/disputes` 500: verified columns (`opened_at`, `raised_by_user_id`, `title`, `subject_type`, `status`, `deleted_at` all present), verified admin has `disputes.read.own` perm in DB, verified page imports look correct. Likely the 500 was stale `.next` output referencing old column names / old RLS policies from before today's migrations. Cache wipe + restart should clear it. If it recurs, need an actual browser-side or dev-log stack trace — guessing from code grep isn't enough.
+**Rule for future:**
+- **Grep `tasks/lessons.md` FIRST on every new bug report.** Keywords from the symptom, not from guessed root causes. "Server error" → grep `500|ENOENT|compile`. "No design / broken CSS" → grep `lockfile|workspace|Tailwind|CSS`. This is the load-bearing rule I keep violating; next session must hardwire it.
+- **If a fix removes a file but the file keeps coming back, add a guardrail** — `.gitignore` to prevent accidental commit, or a `postinstall`/prestart script that deletes the stray file. Leaving the recurrence unguarded means this lesson gets re-learned every time `npm install` runs in the wrong dir.
+- **Never "fix from code grep alone" when diagnosing a 500.** Get the stack trace. Log-tail the dev server; ask the user for the Response-tab body; attach cookies and curl the authenticated path. Code grep is necessary but insufficient — the running server tells you which symbolic error fires and at what line.
