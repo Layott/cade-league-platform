@@ -27,7 +27,12 @@ export const itemSchema = z.object({
   position: z.string().min(1).max(8),
   value: z.number().int().min(0),
   itemType: itemTypeEnum,
-  nationalityFlag: z.string().min(2).max(6).nullable().optional(),
+  // Accepts either an ISO-2/ISO-3 code ("NG"/"NGA") or the full country
+  // name ("Nigeria", "United States", "Bosnia and Herzegovina"). Futbin's
+  // list page emits nation via CDN icon only (no ISO), so submit_picker
+  // falls back to the full `nation` string when `nation_iso` is null.
+  // Max 64 covers the longest real country name.
+  nationalityFlag: z.string().min(2).max(64).nullable().optional(),
   /**
    * Futbin-internal nation registry ID. Captured by the list-page
    * scrapers (img.nation → /img/nation/{id}.png). Used by the Nigerian-
@@ -84,7 +89,12 @@ export const changeSchema = z.object({
     itemType: itemTypeEnum,
     rating: z.number().int().min(1).max(99),
     value: z.number().int().min(0),
-    nationalityFlag: z.string().min(2).max(6).nullable().optional(),
+    // Accepts either an ISO-2/ISO-3 code ("NG"/"NGA") or the full country
+  // name ("Nigeria", "United States", "Bosnia and Herzegovina"). Futbin's
+  // list page emits nation via CDN icon only (no ISO), so submit_picker
+  // falls back to the full `nation` string when `nation_iso` is null.
+  // Max 64 covers the longest real country name.
+  nationalityFlag: z.string().min(2).max(64).nullable().optional(),
   }),
   authorizedByRefUserId: z.string().uuid(),
 });
