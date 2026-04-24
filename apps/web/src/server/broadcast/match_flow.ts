@@ -262,6 +262,53 @@ async function findScoreBugForSlot(
 }
 
 /**
+ * Plan 42.2 — ensureScoreBug. Lazily seeds a score_bug row for a slot when
+ * the admin clicks +1 / -1 / reset before the startMatch path had a chance
+ * to create one (e.g. the `startMatch` call was never fired for this
+ * match, or an earlier clear removed the row without re-inserting).
+ *
+ * Behavior:
+ *   - If an active row already exists for the slot, returns it untouched.
+ *   - Otherwise, requires the slot to have a pinned matchId. Fetches the
+ *     match's home/away display names, builds a 0-0 payload via
+ *     buildScoreBugFromMatch(), triggers a new overlay_events row, and
+ *     refetches the freshly-inserted row so the caller can apply deltas
+ *     to it in the same call.
+ *   - If no match is pinned for the slot, returns null so the caller can
+ *     raise `no current_match` — the existing guard.
+ */
+async function ensureScoreBug(
+  sb: SupabaseClient,
+  sessionId: string,
+  slot: MatchSlot,
+  slotMatchId: string,
+  actor: Actor,
+): Promise<{ id: string; payload: Record<string, unknown> } | null> {
+  // Fast path — row already exists.
+  const existing = await findScoreBugForSlot(sb, sessionId, slot);
+  if (existing) return existing;
+
+  // Lazy auto-create. Need the match's player names to seed the payload.
+  const match = await loadMatchForFlow(sb, slotMatchId);
+  if (!match) return null; // caller raises 'no current_match for ... slot'
+
+  const scoreBugBase = buildScoreBugFromMatch(toMatchLite(match));
+  if (!scoreBugBase) return null;
+
+  const seeded: Record<string, unknown> = { ...scoreBugBase, slot };
+  await triggerOverlay(sb, {
+    sessionId,
+    templateKey: SCORE_BUG_KEY,
+    payload: seeded,
+    userId: actor.userId ?? "",
+  });
+
+  // Re-read so we pick up the inserted row's id (the caller will clear it
+  // before re-triggering with the updated score payload).
+  return findScoreBugForSlot(sb, sessionId, slot);
+}
+
+/**
  * Plan 42 / 42.1 — startMatch.
  *
  * Pins `matchId` onto `stream_sessions.<slot>_match_id`, flips the match
@@ -443,10 +490,21 @@ export async function updateScoreBug(
     throw new Error(`no current_match for ${slot} slot on session ${sessionId}`);
   }
 
-  const existing = await findScoreBugForSlot(sb, sessionId, slot);
+  // Plan 42.2 — lazy auto-create when the slot has a match pinned but no
+  // score_bug overlay was seeded yet (e.g. admin never clicked Start match).
+  // ensureScoreBug returns null only when the match row itself can't be
+  // hydrated — safety net, caller never expects that path since we already
+  // validated slotMatchId above.
+  const existing = await ensureScoreBug(
+    sb,
+    sessionId,
+    slot,
+    slotMatchId,
+    actor,
+  );
   if (!existing) {
     throw new Error(
-      `no active score_bug for ${slot} slot on session ${sessionId}`,
+      `failed to seed score_bug for ${slot} slot on session ${sessionId} (match ${slotMatchId} missing?)`,
     );
   }
 

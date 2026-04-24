@@ -543,13 +543,92 @@ describe("updateScoreBug (slot-aware)", () => {
     ).rejects.toThrow(/no current_match for primary slot/);
   });
 
-  it("throws when no active score_bug overlay exists for the slot", async () => {
+  it("Plan 42.2 — lazily auto-creates the score_bug when none exists + applies the delta on top", async () => {
+    // First active-overlays call (inside ensureScoreBug): empty — no seed yet.
+    // Second call (inside ensureScoreBug after triggerOverlay): returns the
+    // freshly-inserted 0-0 row. Third call is not made (updateScoreBug uses
+    // the row returned by ensureScoreBug directly).
+    listActiveOverlaysMock
+      .mockResolvedValueOnce([]) // pre-seed lookup
+      .mockResolvedValueOnce([
+        {
+          id: "ev-new",
+          stream_session_id: SESSION_ID,
+          template_id: "tpl",
+          template_key: "score_bug",
+          payload: {
+            players: [
+              { displayName: "Adefola", score: 0 },
+              { displayName: "Faruk", score: 0 },
+            ],
+            matchId: MATCH_ID,
+            slot: "primary",
+          },
+          triggered_at: "2026-04-22T00:00:00Z",
+          cleared_at: null,
+        },
+      ]);
+
+    const sb = mkSb({
+      stream_sessions: makeQuery({
+        data: sessionRow({ primary_match_id: MATCH_ID }),
+        error: null,
+      }),
+      matches: makeQuery({ data: matchJoinRow(), error: null }),
+      overlay_events: makeQuery({ data: null, error: null }),
+    });
+
+    const out = await updateScoreBug(
+      sb as never,
+      SESSION_ID,
+      "primary",
+      { homeDelta: 1 },
+      actorAdmin,
+    );
+
+    // Two triggerOverlay calls: one for the seed 0-0, one for the 1-0 delta.
+    expect(triggerOverlayMock).toHaveBeenCalledTimes(2);
+    // First call seeds 0-0 with the correct player names from the match.
+    expect(triggerOverlayMock).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({
+        sessionId: SESSION_ID,
+        templateKey: "score_bug",
+        payload: expect.objectContaining({
+          slot: "primary",
+          players: [
+            expect.objectContaining({ displayName: "Adefola", score: 0 }),
+            expect.objectContaining({ displayName: "Faruk", score: 0 }),
+          ],
+        }),
+      }),
+    );
+    // Second call applies +1 home on top of the seeded row.
+    expect(triggerOverlayMock).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          slot: "primary",
+          players: [
+            expect.objectContaining({ displayName: "Adefola", score: 1 }),
+            expect.objectContaining({ displayName: "Faruk", score: 0 }),
+          ],
+        }),
+      }),
+    );
+    expect(out).toEqual({ home: 1, away: 0, slot: "primary" });
+  });
+
+  it("Plan 42.2 — lazy auto-create bubbles an error when the pinned match cannot be hydrated", async () => {
     listActiveOverlaysMock.mockResolvedValueOnce([]);
     const sb = mkSb({
       stream_sessions: makeQuery({
         data: sessionRow({ primary_match_id: MATCH_ID }),
         error: null,
       }),
+      matches: makeQuery({ data: null, error: null }),
     });
     await expect(
       updateScoreBug(
@@ -559,7 +638,7 @@ describe("updateScoreBug (slot-aware)", () => {
         { homeDelta: 1 },
         actorAdmin,
       ),
-    ).rejects.toThrow(/no active score_bug for primary slot/);
+    ).rejects.toThrow(/failed to seed score_bug for primary slot/);
   });
 });
 
