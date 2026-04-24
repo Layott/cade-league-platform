@@ -100,6 +100,24 @@ export default async function AdminSquadDetailPage({
     screenshotUrl = null;
   }
 
+  // Plan 10 extension — load the live Friday change request (if any) so
+  // admins can see the player's proposed formation/slot/swap delta.
+  const { data: changeRow } = await sb
+    .from("squad_change_requests")
+    .select(
+      `id, created_at, new_formation, new_slot_positions,
+       player_out_name, player_out_item_id,
+       player_in_name, player_in_item_type, player_in_rating, player_in_value,
+       player_in_nationality_flag,
+       authorized_by_ref_user_id,
+       ref:users!squad_change_requests_authorized_by_ref_user_id_fkey (display_name)`,
+    )
+    .eq("submission_id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  const itemById = new Map(items.map((it) => [it.id, it]));
+
   const isPending = submission.validation_status === "pending";
 
   return (
@@ -220,6 +238,123 @@ export default async function AdminSquadDetailPage({
           </div>
         </section>
       </div>
+
+      {changeRow ? (
+        <section
+          data-testid="change-request-panel"
+          className="rounded-sm border border-[rgba(107,205,6,0.35)] bg-[rgba(107,205,6,0.04)] p-4"
+        >
+          <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
+            Friday change request
+          </h2>
+          <p className="mb-3 text-xs text-[var(--chalk-3)]">
+            Filed {formatWat(changeRow.created_at, "yyyy-MM-dd HH:mm")} WAT ·
+            Authorised by{" "}
+            <span className="font-semibold text-[var(--chalk-1)]">
+              {(() => {
+                // Supabase PostgREST embed shape depends on FK metadata —
+                // narrow to a null-tolerant display_name read either way.
+                const ref = changeRow.ref as unknown as
+                  | { display_name: string | null }
+                  | Array<{ display_name: string | null }>
+                  | null;
+                if (!ref) return changeRow.authorized_by_ref_user_id;
+                if (Array.isArray(ref)) {
+                  return ref[0]?.display_name ?? changeRow.authorized_by_ref_user_id;
+                }
+                return ref.display_name ?? changeRow.authorized_by_ref_user_id;
+              })()}
+            </span>
+          </p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                Formation
+              </div>
+              <div
+                data-testid="change-formation-value"
+                className="mt-1 font-mono text-sm text-[var(--chalk-0)]"
+              >
+                {changeRow.new_formation ?? "— unchanged"}
+              </div>
+            </div>
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                Slot rearrangement
+              </div>
+              <div
+                data-testid="change-slot-plan"
+                className="mt-1 text-xs text-[var(--chalk-0)]"
+              >
+                {changeRow.new_slot_positions ? (
+                  <ul className="font-mono text-[11px] text-[var(--chalk-1)]">
+                    {(
+                      changeRow.new_slot_positions as Array<
+                        | { kind: "existing"; itemId: string }
+                        | { kind: "new" }
+                      >
+                    ).map((entry, idx) => {
+                      if (entry.kind === "new") {
+                        return (
+                          <li key={idx} className="text-[var(--primary)]">
+                            Slot {idx}: NEW ({changeRow.player_in_name ?? "?"})
+                          </li>
+                        );
+                      }
+                      const item = itemById.get(entry.itemId);
+                      return (
+                        <li key={idx}>
+                          Slot {idx}:{" "}
+                          {item ? (
+                            <>
+                              {item.name}{" "}
+                              <span className="text-[var(--chalk-3)]">
+                                (was #{item.slot_index})
+                              </span>
+                            </>
+                          ) : (
+                            "(unknown)"
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <span className="text-[var(--chalk-3)]">— unchanged</span>
+                )}
+              </div>
+            </div>
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                Card swap
+              </div>
+              <div
+                data-testid="change-swap-value"
+                className="mt-1 text-xs text-[var(--chalk-0)]"
+              >
+                {changeRow.player_in_name ? (
+                  <>
+                    <div>
+                      <span className="text-[var(--chalk-3)]">OUT:</span>{" "}
+                      {changeRow.player_out_name ?? "?"}
+                    </div>
+                    <div>
+                      <span className="text-[var(--primary)]">IN:</span>{" "}
+                      {changeRow.player_in_name}{" "}
+                      <span className="text-[var(--chalk-3)]">
+                        ({changeRow.player_in_rating} ·{" "}
+                        {changeRow.player_in_item_type})
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-[var(--chalk-3)]">— no swap</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {isPending ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -9,12 +9,50 @@ import {
 } from "@/server/squads";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
-import { FormField, inputClass, selectClass } from "@/components/admin/FormField";
-import { PrimaryButton } from "@/components/admin/buttons";
 import { CountdownBadge } from "@/components/squads/CountdownBadge";
+import { SquadChangeEditor } from "@/components/squads/SquadChangeEditor";
+import type { SquadChangeEditorItem } from "@/components/squads/SquadChangeEditor";
 import { requestChangeAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Infer the starting formation from the positions of the 11 starters.
+ * Crude heuristic — counts defender/mid/attacker slots, then picks the
+ * closest canonical formation. Falls back to 4-3-3 when ambiguous.
+ */
+function inferInitialFormation(
+  positions: string[],
+): "433" | "442" | "4231" | "352" | "343" | "532" | "541" {
+  const def = positions.filter((p) =>
+    /^(LB|RB|CB|LWB|RWB)$/i.test(p),
+  ).length;
+  const mid = positions.filter((p) =>
+    /^(CDM|CM|CAM|LM|RM)$/i.test(p),
+  ).length;
+  const att = positions.filter((p) => /^(LW|RW|LF|RF|CF|ST)$/i.test(p)).length;
+  const sig = `${def}-${mid}-${att}`;
+  // Best-effort match; only a handful covered, rest fall through to 4-3-3.
+  switch (sig) {
+    case "4-3-3":
+      return "433";
+    case "4-4-2":
+      return "442";
+    case "4-2-3-1":
+    case "4-5-1":
+      return "4231";
+    case "3-5-2":
+      return "352";
+    case "3-4-3":
+      return "343";
+    case "5-3-2":
+      return "532";
+    case "5-4-1":
+      return "541";
+    default:
+      return "433";
+  }
+}
 
 export default async function PlayerSquadChangePage({
   searchParams,
@@ -44,7 +82,7 @@ export default async function PlayerSquadChangePage({
   if (!player) {
     return (
       <SectionHeader
-        eyebrow="Swap"
+        eyebrow="Change"
         title="Friday change window"
         description="No player profile linked to your account."
       />
@@ -61,8 +99,8 @@ export default async function PlayerSquadChangePage({
   const approved = await getApprovedSubmissionForPlayer(sb, player.id, weekStart);
   const refs = open ? await listChangeAuthorizingRefs(sb) : [];
 
-  // Existing change request (swap already used)?
-  let swapUsed = false;
+  // Existing change request (already used this week)?
+  let changeUsed = false;
   if (approved) {
     const { data: existing } = await sb
       .from("squad_change_requests")
@@ -70,15 +108,36 @@ export default async function PlayerSquadChangePage({
       .eq("submission_id", approved.submission.id)
       .is("deleted_at", null)
       .maybeSingle();
-    swapUsed = !!existing;
+    changeUsed = !!existing;
   }
+
+  const startingXI = (approved?.items ?? []).filter(
+    (it) => it.slot_index >= 0 && it.slot_index <= 10,
+  );
+
+  const editorItems: SquadChangeEditorItem[] = startingXI.map((it) => ({
+    itemId: it.id,
+    slotIndex: it.slot_index,
+    name: it.name,
+    rating: it.rating,
+    position: it.position,
+    itemType: it.item_type,
+    nationalityFlag: it.nationality_flag,
+  }));
+
+  // Sort so slot 0 is first — the editor relies on this order to seed.
+  editorItems.sort((a, b) => a.slotIndex - b.slotIndex);
+
+  const initialFormation = inferInitialFormation(
+    editorItems.map((i) => i.position),
+  );
 
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow={`Week of ${weekStart}`}
         title="Friday change window"
-        description={`Window opens ${formatWat(window.openAt, "EEE HH:mm")} and closes ${formatWat(window.closeAt, "HH:mm")} WAT. One swap per player per week.`}
+        description={`Window opens ${formatWat(window.openAt, "EEE HH:mm")} and closes ${formatWat(window.closeAt, "HH:mm")} WAT. You may change formation, rearrange cards, and/or replace ONE card per week.`}
         action={
           before ? (
             <CountdownBadge targetIso={window.openAt.toISOString()} prefix="Opens in" />
@@ -89,128 +148,47 @@ export default async function PlayerSquadChangePage({
       />
 
       {sp.ok === "1" ? (
-        <div className="rounded-sm border border-[rgba(107,205,6,0.35)] bg-[rgba(107,205,6,0.08)] p-3 text-sm text-[var(--primary)]">
-          Swap recorded. Referee authorization logged.
+        <div
+          data-testid="change-success"
+          className="rounded-sm border border-[rgba(107,205,6,0.35)] bg-[rgba(107,205,6,0.08)] p-3 text-sm text-[var(--primary)]"
+        >
+          Change recorded. Referee authorization logged.
         </div>
       ) : null}
 
       {!approved ? (
         <div className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-4 text-sm text-[var(--chalk-2)]">
-          You have no approved squad for this week yet — nothing to swap.
+          You have no approved squad for this week yet — nothing to change.
         </div>
       ) : after ? (
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4 text-sm text-[var(--chalk-2)]">
           Change window closed. Next opens Friday 21:00 WAT.
         </div>
-      ) : swapUsed ? (
+      ) : changeUsed ? (
         <div
           className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4 text-sm text-[var(--chalk-2)]"
           data-testid="swap-already-used"
         >
-          You have used your single swap for this week.
+          You have used your change allowance for this week.
         </div>
       ) : before ? (
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4 text-sm text-[var(--chalk-2)]">
           Form unlocks automatically at 21:00 WAT. Reload at that time.
         </div>
+      ) : editorItems.length !== 11 ? (
+        <div className="rounded-sm border border-[var(--flare)] bg-[rgba(255,91,59,0.08)] p-4 text-sm text-[var(--flare)]">
+          Your approved squad has {editorItems.length} starters (expected 11). Contact an admin.
+        </div>
       ) : (
-        <form action={requestChangeAction} className="space-y-5" data-testid="change-form">
-          <input type="hidden" name="submissionId" value={approved.submission.id} />
-
-          <FormField label="Player to swap OUT" hint="Must be one of this week's items.">
-            <select
-              name="playerOutItemId"
-              required
-              className={selectClass}
-              data-testid="change-out-select"
-            >
-              <option value="">Select an item…</option>
-              {approved.items.map((it) => (
-                <option key={it.id} value={it.id}>
-                  #{it.slot_index} — {it.name} ({it.rating} {it.position})
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Out player (display name)">
-            <input
-              name="playerOutName"
-              required
-              className={inputClass}
-              placeholder="Copy the name of the swapped-out player"
-            />
-          </FormField>
-
-          <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4 space-y-3">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-              Player to swap IN
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Name">
-                <input name="playerIn.name" required className={inputClass} />
-              </FormField>
-              <FormField label="Rating">
-                <input
-                  name="playerIn.rating"
-                  type="number"
-                  min={1}
-                  max={99}
-                  required
-                  className={inputClass}
-                />
-              </FormField>
-              <FormField label="Value (coins)">
-                <input
-                  name="playerIn.value"
-                  type="number"
-                  min={0}
-                  required
-                  className={inputClass}
-                />
-              </FormField>
-              <FormField label="Item type">
-                <select name="playerIn.itemType" className={selectClass} defaultValue="gold">
-                  <option value="gold">Gold</option>
-                  <option value="silver">Silver</option>
-                  <option value="bronze">Bronze</option>
-                  <option value="hero">Hero</option>
-                  <option value="icon">Icon</option>
-                  <option value="legend">Legend</option>
-                  <option value="special">Special</option>
-                  <option value="other">Other</option>
-                </select>
-              </FormField>
-              <FormField label="Nationality flag">
-                <input
-                  name="playerIn.nationalityFlag"
-                  maxLength={6}
-                  className={inputClass}
-                  placeholder="NG / GB …"
-                />
-              </FormField>
-            </div>
-          </div>
-
-          <FormField label="Authorizing referee" hint="Pick a referee who has authorized this swap on-site.">
-            <select
-              name="authorizedByRefUserId"
-              required
-              className={selectClass}
-              data-testid="change-ref-select"
-            >
-              <option value="">Select a referee…</option>
-              {refs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.display_name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-
-          <PrimaryButton type="submit" data-testid="change-submit">
-            Record swap
-          </PrimaryButton>
-        </form>
+        <SquadChangeEditor
+          initialFormation={initialFormation}
+          existingItems={editorItems}
+          refOptions={refs}
+          submitAction={async (payload) => {
+            "use server";
+            await requestChangeAction(approved.submission.id, payload);
+          }}
+        />
       )}
     </div>
   );

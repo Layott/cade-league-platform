@@ -3,12 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
-import {
-  requestChange,
-  weekStartThursday,
-} from "@/server/squads";
+import { requestChange } from "@/server/squads";
+import type { SquadChangeSubmitPayload } from "@/components/squads/SquadChangeEditor";
 
-export async function requestChangeAction(formData: FormData): Promise<void> {
+/**
+ * Plan 10 extension — accepts the structured change payload from
+ * <SquadChangeEditor />. Supports three coexisting intents in a single
+ * request: formation change, slot rearrangement, and at most one swap.
+ */
+export async function requestChangeAction(
+  submissionId: string,
+  payload: SquadChangeSubmitPayload,
+): Promise<void> {
   const sb = await getServerSupabase();
   const {
     data: { user },
@@ -21,43 +27,17 @@ export async function requestChangeAction(formData: FormData): Promise<void> {
     .single();
   if (!pub) throw new Error("no public user row");
 
-  const submissionId = String(formData.get("submissionId") ?? "");
-  const playerOutItemId =
-    String(formData.get("playerOutItemId") ?? "") || null;
-  const playerOutName = String(formData.get("playerOutName") ?? "");
-  const playerIn = {
-    name: String(formData.get("playerIn.name") ?? ""),
-    itemType: String(formData.get("playerIn.itemType") ?? "gold") as
-      | "gold"
-      | "silver"
-      | "bronze"
-      | "hero"
-      | "icon"
-      | "legend"
-      | "special"
-      | "other",
-    rating: Number(formData.get("playerIn.rating") ?? 0),
-    value: Number(formData.get("playerIn.value") ?? 0),
-    nationalityFlag:
-      String(formData.get("playerIn.nationalityFlag") ?? "") || null,
-  };
-  const authorizedByRefUserId = String(
-    formData.get("authorizedByRefUserId") ?? "",
-  );
-
   await requestChange(sb, {
     submissionId,
-    playerOutItemId,
-    playerOutName,
-    playerIn,
-    authorizedByRefUserId,
+    newFormation: payload.newFormation,
+    newSlotPlan: payload.newSlotPlan,
+    playerOutItemId: payload.playerOutItemId,
+    playerOutName: payload.playerOutName,
+    playerIn: payload.playerIn,
+    authorizedByRefUserId: payload.authorizedByRefUserId,
   });
 
-  const weekStart = weekStartThursday(new Date());
   revalidatePath(`/player/squad/change`);
   revalidatePath(`/player/squad`);
-  // Suppress unused var warning while keeping the value available for
-  // future redirect targeting by week.
-  void weekStart;
   redirect("/player/squad/change?ok=1");
 }
