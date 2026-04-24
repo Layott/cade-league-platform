@@ -470,3 +470,20 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - **When shipping a new rich page that supersedes a stub, update the stub in the SAME commit — either delete it, redirect it, or converge the two.** Leaving the stub at its old URL means the subnav keeps pointing at dead content. This is a parallel to the player↔admin parity rule in CLAUDE.md, applied to player↔player.
 - **Ask for the exact browser URL before guessing**. The user is looking at their URL bar; we're blind without it.
 
+---
+
+**Date:** 2026-04-24
+**Context:** After shipping `34ac6ed7` (redirect `/player/profile` → `/profile`), user asked whether any OTHER pages suffer the same stub-vs-rich mismatch. Full repo sweep required across 96 `page.tsx` files + every nav component (`SiteChromeClient`, `NavDrawer`, `AdminSubnav`, `PlayerSubnav`, `UserBadgeShell`, `TrashTabs`, `NotificationsDropdown`).
+**Mistake:** No new mistake — this is a proactive audit ruling out whether the profile-stub bug class repeats elsewhere. BUT: two leftover nav href values (`NavDrawer` PLAYER_LINKS + `PlayerSubnav` TABS) were still pointing at the now-redirecting `/player/profile`, meaning every "Profile" click did a hop → server redirect → `/profile`. Functional but slower + the URL bar flashed the wrong path.
+**Correction:**
+1. Audited all 96 pages; only stubs found were (a) the already-fixed `/player/profile` redirect, (b) `/admin/trash` → `/admin/trash/[first-entity]` (intentional index pattern, not a stub), (c) `(overlay)/overlay/*` `PreviewStub` pages which are production OBS/vMix browser sources + not user-nav targets.
+2. Updated `NavDrawer.tsx` PLAYER_LINKS "Profile" href `/player/profile` → `/profile`.
+3. Updated `PlayerSubnav.tsx` TABS "Profile" href `/player/profile` → `/profile`.
+4. Kept `/player/profile` redirect page for stale bookmarks / deep links.
+5. Report: `docs/superpowers/specs/2026-04-24-stub-page-audit.md`.
+**Rule for future:**
+- **When shipping a redirect fix, also update every nav href that pointed at the old URL.** The redirect works but the hop adds latency + flashes the wrong path in the address bar. Grep every nav component (not just `PlayerSubnav.tsx`) for the old href and switch to the canonical rich URL.
+- **When auditing for stub-vs-rich mismatch across a repo, sort pages by line count ascending — stubs cluster at the bottom.** Combined with a grep for "placeholder", "TODO", "richer version", "later plan" this surfaces ~90% of candidates in one pass.
+- **Distinguish INDEX-to-first-tab redirects from STUB redirects.** `/admin/trash` redirecting to `/admin/trash/[first-entity]` is a canonical UX pattern (you always land on some content). A stub redirect exists because the original page never got the intended content. The audit table should call these out separately so future passes don't re-flag the index ones.
+- **Overlay/browser-source routes are DISTINCT from user-nav routes by design.** They render transparent + are loaded by OBS/vMix at 1920×1080. Never treat them as stubs just because they use a `PreviewStub` harness — the harness is the production wrapper.
+
