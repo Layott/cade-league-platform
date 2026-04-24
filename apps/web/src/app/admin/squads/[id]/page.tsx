@@ -25,6 +25,7 @@ import {
   FcdbBadge,
   FcdbSummaryChip,
 } from "@/components/squads/FcdbBadge";
+import { SquadPitchView } from "@/components/squads/SquadPitchView";
 import {
   approveAction,
   rejectAction,
@@ -153,6 +154,16 @@ export default async function AdminSquadDetailPage({
           Submission can still be reviewed manually below.
         </div>
       ) : null}
+
+      <section
+        data-testid="admin-squad-pitch-view"
+        className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4"
+      >
+        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+          Submitted squad (pitch view)
+        </h2>
+        <SquadPitchView items={items} />
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4">

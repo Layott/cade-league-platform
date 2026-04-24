@@ -34,6 +34,24 @@ export type SquadItemRow = {
   item_type: string;
   nationality_flag: string | null;
   slot_index: number;
+  /** Link back to fc26_players — present when the picker resolved the card
+   *  at submit time (Plan 30) or when a ref locked in a candidate via
+   *  /admin/squads/[id] (Plan 23). Nullable for legacy / OCR-only flows. */
+  resolved_fc_player_id?: string | null;
+  /** Optional embedded card-catalogue row. Fetched by the page-level
+   *  query via `fc_player:resolved_fc_player_id(...)` so the pitch
+   *  visualizer can render the Futbin card art (frame + portrait) for
+   *  each slot without an extra per-item round-trip. */
+  fc_player?: {
+    id: string;
+    name: string;
+    rating: number;
+    position: string;
+    item_type: string;
+    nation_iso: string | null;
+    nation: string | null;
+    attributes: Record<string, unknown> | null;
+  } | null;
 };
 
 export async function listSubmissionsForWeek(
@@ -100,7 +118,13 @@ export async function getSubmissionWithItems(
 
   const { data: items, error: iErr } = await sb
     .from("squad_player_items")
-    .select("id, submission_id, name, rating, position, value, item_type, nationality_flag, slot_index")
+    .select(
+      `id, submission_id, name, rating, position, value, item_type,
+       nationality_flag, slot_index, resolved_fc_player_id,
+       fc_player:resolved_fc_player_id (
+         id, name, rating, position, item_type, nation_iso, nation, attributes
+       )`,
+    )
     .eq("submission_id", submissionId)
     .is("deleted_at", null)
     .order("slot_index", { ascending: true });
@@ -130,8 +154,32 @@ export async function getSubmissionWithItems(
 
   return {
     submission,
-    items: (items ?? []) as SquadItemRow[],
+    items: normalizeItems(items),
   };
+}
+
+/**
+ * Supabase-js types embedded FK joins as arrays by default (see
+ * tasks/lessons.md 2026-04-26). `fc_player:resolved_fc_player_id(...)` is a
+ * many-to-one embed so PostgREST actually returns a single object, but the
+ * generated TS types still allow either. Normalize to a single object once
+ * so every page-level consumer can deref `items[i].fc_player?.name` without
+ * array-shape gymnastics.
+ */
+function normalizeItems(raw: unknown): SquadItemRow[] {
+  const rows = (raw ?? []) as Array<
+    Omit<SquadItemRow, "fc_player"> & {
+      fc_player?:
+        | SquadItemRow["fc_player"]
+        | NonNullable<SquadItemRow["fc_player"]>[]
+        | null;
+    }
+  >;
+  return rows.map((r) => {
+    const fp = r.fc_player;
+    const single = Array.isArray(fp) ? fp[0] ?? null : fp ?? null;
+    return { ...r, fc_player: single } as SquadItemRow;
+  });
 }
 
 export async function getApprovedSubmissionForPlayer(
@@ -156,7 +204,13 @@ export async function getApprovedSubmissionForPlayer(
 
   const { data: items, error: iErr } = await sb
     .from("squad_player_items")
-    .select("id, submission_id, name, rating, position, value, item_type, nationality_flag, slot_index")
+    .select(
+      `id, submission_id, name, rating, position, value, item_type,
+       nationality_flag, slot_index, resolved_fc_player_id,
+       fc_player:resolved_fc_player_id (
+         id, name, rating, position, item_type, nation_iso, nation, attributes
+       )`,
+    )
     .eq("submission_id", sub.id)
     .is("deleted_at", null)
     .order("slot_index", { ascending: true });
@@ -164,7 +218,7 @@ export async function getApprovedSubmissionForPlayer(
 
   return {
     submission: sub as unknown as SubmissionRow,
-    items: (items ?? []) as SquadItemRow[],
+    items: normalizeItems(items),
   };
 }
 
@@ -189,7 +243,13 @@ export async function getCurrentWeekSubmissionForPlayer(
 
   const { data: items, error: iErr } = await sb
     .from("squad_player_items")
-    .select("id, submission_id, name, rating, position, value, item_type, nationality_flag, slot_index")
+    .select(
+      `id, submission_id, name, rating, position, value, item_type,
+       nationality_flag, slot_index, resolved_fc_player_id,
+       fc_player:resolved_fc_player_id (
+         id, name, rating, position, item_type, nation_iso, nation, attributes
+       )`,
+    )
     .eq("submission_id", sub.id)
     .is("deleted_at", null)
     .order("slot_index", { ascending: true });
@@ -197,7 +257,7 @@ export async function getCurrentWeekSubmissionForPlayer(
 
   return {
     submission: sub as unknown as SubmissionRow,
-    items: (items ?? []) as SquadItemRow[],
+    items: normalizeItems(items),
   };
 }
 

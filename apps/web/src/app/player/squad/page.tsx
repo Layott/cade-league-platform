@@ -12,6 +12,7 @@ import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SquadPickerBuilder } from "@/components/squads/SquadPickerBuilder";
+import { SquadPitchView } from "@/components/squads/SquadPitchView";
 import {
   requestUploadUrlAction,
   submitPickerAction,
@@ -124,21 +125,9 @@ export default async function PlayerSquadPage() {
               Rejection reason: {existing.submission.rejection_reason}
             </p>
           ) : null}
-          <ul className="mt-4 grid grid-cols-2 gap-2 text-xs text-[var(--chalk-1)] md:grid-cols-3">
-            {existing.items.map((it) => (
-              <li
-                key={it.id}
-                className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-2"
-              >
-                <div className="font-semibold text-[var(--chalk-0)]">
-                  #{it.slot_index} {it.name}
-                </div>
-                <div className="font-mono text-[11px] text-[var(--chalk-3)]">
-                  {it.rating} · {it.position} · {it.item_type} · {it.nationality_flag ?? "—"}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-4">
+            <SquadPitchView items={existing.items} />
+          </div>
         </section>
       ) : !windowOpen ? (
         <section
