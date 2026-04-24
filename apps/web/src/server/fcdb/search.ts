@@ -181,6 +181,7 @@ export async function searchCards(
       itemType: row.itemType,
       priceCoins: row.priceCoins,
       cardImageUrl: row.cardImageUrl,
+      cardBgUrl: row.cardBgUrl,
       variant: row.variant,
     };
     return rest;
