@@ -196,6 +196,32 @@ export function SquadPickerBuilder({
         setDialogOpen(false);
         return;
       }
+      // One-per-player rule: block adding a card whose player (slug) is
+      // already on the pitch or bench — regardless of variant. Two
+      // Mbappés (gold + TOTY) = same slug, same real-world player,
+      // blocked. Skip-check when dropping INTO a slot currently holding
+      // the SAME player (a replace, no duplication).
+      const existingTargetCard =
+        dialogTarget.kind === "slot"
+          ? slots[dialogTarget.slot.slotIndex] ?? null
+          : subs[dialogTarget.index] ?? null;
+      const allCurrent = [
+        ...Object.values(slots).filter((c): c is CardSearchResult => !!c),
+        ...subs.filter((c): c is CardSearchResult => !!c),
+      ];
+      const dup = allCurrent.find(
+        (c) =>
+          c.slug === card.slug &&
+          c.id !== existingTargetCard?.id, // allow replacing at the same slot
+      );
+      if (dup) {
+        setError(
+          `${card.name} is already in your squad — only one card per player is allowed.`,
+        );
+        setDialogOpen(false);
+        setDialogTarget(null);
+        return;
+      }
       if (dialogTarget.kind === "slot") {
         setSlots((s) => ({ ...s, [dialogTarget.slot.slotIndex]: card }));
       } else {
@@ -207,8 +233,9 @@ export function SquadPickerBuilder({
       }
       setDialogOpen(false);
       setDialogTarget(null);
+      setError(null);
     },
-    [dialogTarget],
+    [dialogTarget, slots, subs],
   );
 
   const clearSlot = useCallback((slotIndex: number) => {

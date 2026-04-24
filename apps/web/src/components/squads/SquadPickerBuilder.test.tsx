@@ -4,8 +4,12 @@ import { SquadPickerBuilder } from "./SquadPickerBuilder";
 import type { CardSearchResult } from "@/server/fcdb/search";
 
 function mkCard(over: Partial<CardSearchResult> = {}): CardSearchResult {
+  // Unique slug by default so the picker's one-per-player dedup doesn't
+  // reject repeat picks in tests that simulate filling 11 slots.
+  const uid = Math.random().toString(36).slice(2, 8);
   return {
-    id: "id-" + Math.random().toString(36).slice(2, 8),
+    id: "id-" + uid,
+    slug: "test_player_" + uid,
     name: "Test Player",
     rating: 82,
     position: "ST",
@@ -17,7 +21,15 @@ function mkCard(over: Partial<CardSearchResult> = {}): CardSearchResult {
     itemType: "gold",
     priceCoins: 50_000,
     cardImageUrl: null,
+    cardBgUrl: null,
     variant: null,
+    mainStats: null,
+    weakFoot: null,
+    skillMoves: null,
+    metaRating: null,
+    futbinNationId: null,
+    futbinLeagueId: null,
+    futbinClubId: null,
     ...over,
   };
 }

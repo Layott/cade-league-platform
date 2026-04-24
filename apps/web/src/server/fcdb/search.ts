@@ -28,6 +28,10 @@ export type SearchCardsInput = z.infer<typeof searchCardsInputSchema>;
 
 export type CardSearchResult = {
   id: string;
+  /** Diacritic-stripped slug of the player's name. Two cards with the
+   *  same slug are the SAME player in different variants (e.g. Mbappé
+   *  gold + Mbappé TOTY). Used by the picker to enforce one-per-player. */
+  slug: string;
   name: string;
   rating: number;
   position: string;
@@ -46,6 +50,12 @@ export type CardSearchResult = {
   weakFoot: number | null;
   skillMoves: number | null;
   metaRating: string | null;
+  // Futbin-internal IDs. Flows from the scraper → jsonb.attributes → here.
+  // Needed for the Nigerian-in-XI rule on Futbin rows where nation_iso is
+  // null but the CDN icon carries the nation as an integer ID.
+  futbinNationId: number | null;
+  futbinLeagueId: number | null;
+  futbinClubId: number | null;
 };
 
 const FUZZY_THRESHOLD = 0.2;
@@ -53,7 +63,7 @@ const FUZZY_THRESHOLD = 0.2;
 // the Futbin scraper — must be selected so the picker renders the real
 // FUT card art instead of the solid-colour fallback tile.
 const SELECT_COLUMNS =
-  "id, name, rating, position, alt_positions, club, league, nation, nation_iso, item_type, value_coins_estimate, attributes";
+  "id, slug, name, rating, position, alt_positions, club, league, nation, nation_iso, item_type, value_coins_estimate, attributes";
 
 // fut.gg scraper stashes card visuals + the full variant label in
 // `attributes.card_image_url` + `attributes.futgg_variant`. The column is
@@ -92,6 +102,7 @@ function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
   const futggVariant = readAttrString(row.attributes, "futgg_variant");
   return {
     id: row.id,
+    slug: row.slug,
     name: row.name,
     rating: row.rating,
     position: row.position,
@@ -115,6 +126,9 @@ function projectRow(row: FCPlayer & { sim?: number }): CardSearchResult {
     weakFoot: readAttrInt(row.attributes, "weak_foot"),
     skillMoves: readAttrInt(row.attributes, "skill_moves"),
     metaRating: readAttrString(row.attributes, "futbin_meta_rating"),
+    futbinNationId: readAttrInt(row.attributes, "futbin_nation_id"),
+    futbinLeagueId: readAttrInt(row.attributes, "futbin_league_id"),
+    futbinClubId: readAttrInt(row.attributes, "futbin_club_id"),
   };
 }
 

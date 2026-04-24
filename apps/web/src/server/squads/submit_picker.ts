@@ -38,6 +38,7 @@ export type SubmitPickerInput = z.infer<typeof submitPickerInputSchema>;
 
 type FcRow = {
   id: string;
+  slug: string;
   name: string;
   rating: number;
   position: string;
@@ -45,6 +46,9 @@ type FcRow = {
   item_type: string;
   nation_iso: string | null;
   nation: string | null;
+  // jsonb — may carry the Futbin-internal nation ID populated by the
+  // scrapers. Read defensively at use site.
+  attributes: Record<string, unknown> | null;
 };
 
 const ALLOWED_ITEM_TYPES = [
@@ -113,11 +117,16 @@ export async function submitPickerSquad(
     seenCard.add(s.fcdbPlayerId);
   }
 
+  // Also dedup on PLAYER identity — same Mbappé in a gold + a TOTY form
+  // are different fcdbPlayerIds but the same real-world player. We use
+  // the diacritic-stripped slug as the player key. Requires the hydrate
+  // query below to return `slug`; gate enforced here for clarity.
+
   // 1. Hydrate the picked cards from `fc26_players` in one query.
   const cardIds = v.slots.map((s) => s.fcdbPlayerId);
   const { data: cards, error: cardsErr } = await sb
     .from("fc26_players")
-    .select("id, name, rating, position, value_coins_estimate, item_type, nation_iso, nation")
+    .select("id, slug, name, rating, position, value_coins_estimate, item_type, nation_iso, nation, attributes")
     .in("id", cardIds)
     .eq("source_dataset", "futbin.com")
     .is("deleted_at", null);
@@ -135,9 +144,35 @@ export async function submitPickerSquad(
     }
   }
 
+  // Post-hydrate slug-based dedup. Must run AFTER hydrate so we can read
+  // the canonical slug from fc26_players (trusting the submitter's slug
+  // would let them forge two distinct rows for the same player by
+  // sending intentionally different slugs). Same-slug implies same
+  // real-world player regardless of card variant.
+  const seenSlug = new Set<string>();
+  for (const slot of v.slots) {
+    const card = byId.get(slot.fcdbPlayerId)!;
+    if (card.slug && seenSlug.has(card.slug)) {
+      throw new ValidationError(
+        `${card.name} appears twice — only one card per player is allowed, even across different variants`,
+      );
+    }
+    if (card.slug) seenSlug.add(card.slug);
+  }
+
   // 2. Build the Plan 10 item payload, one row per slot.
   const items = v.slots.map((slot) => {
     const card = byId.get(slot.fcdbPlayerId)!;
+    // Pull the Futbin-internal nation ID if the scraper captured it.
+    // jsonb column is `unknown`-shaped — read defensively.
+    const attrs = card.attributes && typeof card.attributes === "object"
+      ? (card.attributes as Record<string, unknown>)
+      : {};
+    const futbinNationIdRaw = attrs.futbin_nation_id;
+    const futbinNationId =
+      typeof futbinNationIdRaw === "number" && Number.isFinite(futbinNationIdRaw)
+        ? futbinNationIdRaw
+        : null;
     return {
       name: card.name,
       rating: card.rating,
@@ -160,6 +195,9 @@ export async function submitPickerSquad(
       // Fall back to the full nation name ("Nigeria"), which server-side
       // validate.ts now accepts alongside the ISO form.
       nationalityFlag: card.nation_iso ?? card.nation,
+      // Futbin-internal ID — authoritative for the Nigerian-in-XI rule
+      // when the string flag is missing (validate.ts checks both).
+      futbinNationId,
       slotIndex: slot.slotIndex,
     };
   });
