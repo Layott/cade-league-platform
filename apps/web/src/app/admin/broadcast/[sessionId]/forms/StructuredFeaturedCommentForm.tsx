@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PrimaryButton } from "@/components/admin/buttons";
 import { inputClass, textareaClass } from "@/components/admin/FormField";
 import { OffTriggerButton } from "@/components/broadcast/OffTriggerButton";
 import { triggerOverlayAction } from "../../actions";
+
+type ChatMsg = {
+  id: string;
+  authorName: string;
+  authorPhotoUrl: string | null;
+  text: string;
+  postedAt: string;
+};
 
 /**
  * Plan 45 + Plan 48.2 — Structured featured_comment form.
@@ -59,6 +67,71 @@ export function StructuredFeaturedCommentForm({
 
   const [cssOverrides, setCssOverrides] = useState<string>("");
 
+  // Chat-picker: fetch recent live-chat messages from the session's bound
+  // YouTube stream + let the admin click one to auto-fill author + message.
+  // Reuses the same /api/youtube/chat endpoint the top-of-page chat panel
+  // polls; this inline view is simpler (no dedup / no feature-button — just
+  // click-to-fill). Silent when the session isn't bound to a stream OR the
+  // endpoint returns an error (quota / invalid key).
+  const [chatOpen, setChatOpen] = useState<boolean>(false);
+  const [chatMsgs, setChatMsgs] = useState<ChatMsg[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState<boolean>(false);
+  const pageTokenRef = useRef<string | null>(null);
+
+  const loadChat = useCallback(async () => {
+    setChatLoading(true);
+    setChatError(null);
+    try {
+      const qs = new URLSearchParams({ sessionId });
+      if (pageTokenRef.current) qs.set("pageToken", pageTokenRef.current);
+      const res = await fetch(`/api/youtube/chat?${qs.toString()}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const json = (await res.json()) as {
+        messages: ChatMsg[];
+        nextPageToken: string | null;
+      };
+      pageTokenRef.current = json.nextPageToken;
+      setChatMsgs((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const merged = [...prev];
+        for (const m of json.messages) if (!seen.has(m.id)) merged.push(m);
+        return merged.slice(-50); // keep last 50
+      });
+    } catch (e) {
+      setChatError((e as Error).message);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [sessionId]);
+
+  // Poll while the picker is open; stop on close so we don't burn YT quota.
+  useEffect(() => {
+    if (!chatOpen) return;
+    let cancelled = false;
+    loadChat();
+    const id = window.setInterval(() => {
+      if (cancelled) return;
+      loadChat();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [chatOpen, loadChat]);
+
+  function pickMessage(m: ChatMsg) {
+    setAuthorName(m.authorName);
+    setMessage(m.text);
+  }
+
   const payload: Record<string, unknown> = {
     authorName: authorName.trim() || "Viewer",
     message: message.trim() || "(empty)",
@@ -108,6 +181,76 @@ export function StructuredFeaturedCommentForm({
           secondary
         </label>
       </fieldset>
+
+      {/* Chat picker — click a live message to auto-fill author + text. */}
+      <div
+        className="rounded-sm border border-[var(--ink-4)]/50 bg-[var(--ink-3)]/30"
+        data-testid="fc-chat-picker"
+      >
+        <button
+          type="button"
+          onClick={() => setChatOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
+        >
+          <span>
+            {chatOpen ? "▼" : "▶"} Pick from live chat{" "}
+            {chatMsgs.length > 0 ? `(${chatMsgs.length})` : ""}
+          </span>
+          <span className="text-[var(--chalk-3)]">
+            {chatLoading ? "…" : chatError ? "error" : chatOpen ? "polling 5s" : ""}
+          </span>
+        </button>
+        {chatOpen ? (
+          <div className="border-t border-[var(--ink-4)]/50 px-2 py-2">
+            {chatError ? (
+              <div className="px-2 py-1 text-[11px] text-[#ffa3b0]">
+                {chatError} — paste author + message below manually.
+              </div>
+            ) : chatMsgs.length === 0 ? (
+              <div className="px-2 py-3 text-[11px] text-[var(--chalk-3)]">
+                {chatLoading
+                  ? "Loading chat…"
+                  : "No messages yet — waiting for live chat to bind."}
+              </div>
+            ) : (
+              <ul
+                className="max-h-56 space-y-1 overflow-y-auto pr-1"
+                data-testid="fc-chat-list"
+              >
+                {[...chatMsgs].reverse().map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => pickMessage(m)}
+                      className="flex w-full items-start gap-2 rounded-sm border border-transparent bg-[var(--ink-2)] px-2 py-1.5 text-left hover:border-[var(--signal)]/60 hover:bg-[var(--ink-3)]"
+                      data-testid={`fc-chat-row-${m.id}`}
+                    >
+                      {m.authorPhotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={m.authorPhotoUrl}
+                          alt=""
+                          className="h-5 w-5 shrink-0 rounded-full"
+                        />
+                      ) : (
+                        <span className="h-5 w-5 shrink-0 rounded-full bg-[var(--ink-4)]" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] font-semibold text-[var(--chalk-0)]">
+                          {m.authorName}
+                        </div>
+                        <div className="text-[11px] text-[var(--chalk-2)]">
+                          {m.text}
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-[1fr_280px]">
         {/* LEFT column — author / message / duration. */}
