@@ -458,3 +458,15 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - **Mutation helpers should return a count, not void.** An append-only `.select("id")` at the tail of every UPDATE costs one extra column-read but gives callers a truthful observability signal. Silent `{ error: null, data: [] }` is indistinguishable from success without it.
 - **For RLS migrations on tables with existing writers, ship a cloud-DB smoke in the same commit.** Drop a `_smoke_<X>.mjs` at the root that mints a magic-link session (via `auth.admin.generateLink`), replays the exact UPDATE shape, asserts rows-flipped + DB state, cleans up, then `rm`s itself post-run. Takes ~30s, catches RLS regressions that unit tests with mocked Supabase never will. Magic-link > password because dev passwords rotate and password-based smoke breaks silently.
 
+
+---
+
+**Date:** 2026-04-24
+**Context:** User reported "disciplinary history is still blank" even after the 2-step RLS-safe fetch fix on `/profile` landed. Had convinced self that the bug was RLS-related. Actually the user's subnav "Profile" link pointed to `/player/profile` — a Plan-13B stub that only shows email + display_name. Rich profile (sanctions + everything else) lives at `/profile`. Two different URLs, one wired into nav, the other not.
+**Mistake:** Did not audit ALL pages named "profile" when investigating the empty-sanctions report. Stopped at `/(auth)/profile/page.tsx` assuming that was where the user was. Real browser URL would have shown the mismatch in ~5 seconds. Also: the user-visible link in the subnav wasn't updated when the rich profile shipped.
+**Correction:** Replaced `/player/profile/page.tsx` with a server redirect to `/profile`. Both entry points now resolve to the full view. Subnav + NavDrawer links untouched (redirect is transparent).
+**Rule for future:**
+- **When a user reports "X is missing on page Y", `grep -rn "page.tsx" apps/web/src/app` for every page named Y.** Multiple route groups in Next.js = multiple pages can share a logical name. Don't assume; enumerate.
+- **When shipping a new rich page that supersedes a stub, update the stub in the SAME commit — either delete it, redirect it, or converge the two.** Leaving the stub at its old URL means the subnav keeps pointing at dead content. This is a parallel to the player↔admin parity rule in CLAUDE.md, applied to player↔player.
+- **Ask for the exact browser URL before guessing**. The user is looking at their URL bar; we're blind without it.
+
