@@ -41,7 +41,7 @@ export function CreateContractForm({
           try {
             await createContractAction(fd);
           } catch (err) {
-            setError((err as Error).message);
+            { const msg = (err as Error).message ?? ""; if (msg.toLowerCase().includes("next_redirect")) throw err; setError(msg); }
           }
         })
       }

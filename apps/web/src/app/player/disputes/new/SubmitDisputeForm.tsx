@@ -30,7 +30,11 @@ export function SubmitDisputeForm() {
           try {
             await submitDisputeAction(fd);
           } catch (err) {
-            setError((err as Error).message);
+            // Next's `redirect()` throws NEXT_REDIRECT to short-circuit —
+            // let it bubble so the navigation fires. Only show real errors.
+            const msg = (err as Error).message ?? "";
+            if (msg.toLowerCase().includes("next_redirect")) throw err;
+            setError(msg);
           }
         })
       }

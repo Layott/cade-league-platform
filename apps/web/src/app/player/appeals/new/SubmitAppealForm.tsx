@@ -27,7 +27,7 @@ export function SubmitAppealForm({ caseId }: { caseId: string }) {
             await submitAppealAction(fd);
           } catch (err) {
             if (isRedirectError(err)) throw err;
-            setError((err as Error).message);
+            { const msg = (err as Error).message ?? ""; if (msg.toLowerCase().includes("next_redirect")) throw err; setError(msg); }
           }
         })
       }
