@@ -161,37 +161,48 @@ export async function notify(
 /**
  * Mark a set of notification ids as read. Scoped to the actor's user_id
  * server-side so a client can't mark other users' rows as read.
+ *
+ * Returns the number of rows flipped. When a user-scoped client hits a
+ * missing UPDATE RLS policy Postgres silently reports zero affected
+ * rows — callers can assert the count to detect that condition.
  */
 export async function markRead(
   sb: SupabaseClient,
   actorUserId: string,
   ids: string[],
-): Promise<void> {
-  if (ids.length === 0) return;
-  const { error } = await sb
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const { data, error } = await sb
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .in("id", ids)
     .eq("user_id", actorUserId)
-    .is("read_at", null);
+    .is("read_at", null)
+    .select("id");
   if (error) throw new Error(`markRead failed: ${error.message}`);
+  return (data ?? []).length;
 }
 
 /**
  * Mark every unread notification owned by this user as read. Idempotent:
  * a second call matches zero rows.
+ *
+ * Returns the number of rows flipped so the API layer can sanity-check
+ * the mutation actually landed (guards against RLS silent-no-op).
  */
 export async function markAllRead(
   sb: SupabaseClient,
   actorUserId: string,
-): Promise<void> {
-  const { error } = await sb
+): Promise<number> {
+  const { data, error } = await sb
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("user_id", actorUserId)
     .is("deleted_at", null)
-    .is("read_at", null);
+    .is("read_at", null)
+    .select("id");
   if (error) throw new Error(`markAllRead failed: ${error.message}`);
+  return (data ?? []).length;
 }
 
 /**

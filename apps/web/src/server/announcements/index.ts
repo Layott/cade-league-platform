@@ -179,15 +179,18 @@ export async function markRead(
   sb: SupabaseClient,
   notificationId: string,
   userId: string
-): Promise<void> {
+): Promise<number> {
   // Only update if unread and owned by this user — idempotent + authorized.
-  const { error } = await sb
+  // Returns rows-flipped so the API layer can detect an RLS silent-no-op.
+  const { data, error } = await sb
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("id", notificationId)
     .eq("user_id", userId)
-    .is("read_at", null);
+    .is("read_at", null)
+    .select("id");
   if (error) throw new Error(`markRead failed: ${error.message}`);
+  return (data ?? []).length;
 }
 
 /**
@@ -257,18 +260,27 @@ export async function listAnnouncementsForUser(
  * Plan 40 §5 — mark every unread notification owned by this user as
  * read. Idempotent: a second call is a no-op because `.is("read_at",
  * null)` matches zero rows.
+ *
+ * Returns the number of rows flipped so callers can sanity-check the
+ * mutation actually hit the DB. When the caller passes a user-scoped
+ * (cookie) client and the table's RLS is missing an UPDATE policy,
+ * Postgres silently returns zero rows without an error — so returning
+ * the count lets the API layer assert "we intended to flip N, but only
+ * flipped 0" and throw instead of returning a false 204.
  */
 export async function markAllRead(
   sb: SupabaseClient,
   userId: string
-): Promise<void> {
-  const { error } = await sb
+): Promise<number> {
+  const { data, error } = await sb
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("user_id", userId)
     .is("deleted_at", null)
-    .is("read_at", null);
+    .is("read_at", null)
+    .select("id");
   if (error) throw new Error(`markAllRead failed: ${error.message}`);
+  return (data ?? []).length;
 }
 
 // --- local helpers ---

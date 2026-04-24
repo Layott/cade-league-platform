@@ -267,11 +267,12 @@ describe("notify()", () => {
 describe("markRead()", () => {
   it("no-ops for an empty id list", async () => {
     const sb = { from: vi.fn() };
-    await markRead(sb as never, "u-1", []);
+    const flipped = await markRead(sb as never, "u-1", []);
+    expect(flipped).toBe(0);
     expect(sb.from).not.toHaveBeenCalled();
   });
 
-  it("issues a single UPDATE scoped to user_id + unread rows", async () => {
+  it("issues a single UPDATE scoped to user_id + unread rows and returns flip count", async () => {
     const filters: Array<{ op: string; args: unknown[] }> = [];
     const thenable: Record<string, unknown> = {};
     const record = (op: string) => (...args: unknown[]) => {
@@ -281,8 +282,10 @@ describe("markRead()", () => {
     thenable.in = vi.fn(record("in"));
     thenable.eq = vi.fn(record("eq"));
     thenable.is = vi.fn(record("is"));
-    thenable.then = (resolve: (v: { error: null }) => unknown) =>
-      resolve({ error: null });
+    thenable.select = vi.fn((col: string) => {
+      filters.push({ op: "select", args: [col] });
+      return Promise.resolve({ data: [{ id: "n-1" }, { id: "n-2" }], error: null });
+    });
 
     const patches: Array<Record<string, unknown>> = [];
     const sb = {
@@ -294,19 +297,22 @@ describe("markRead()", () => {
       })),
     };
 
-    await markRead(sb as never, "u-42", ["n-1", "n-2"]);
+    const flipped = await markRead(sb as never, "u-42", ["n-1", "n-2"]);
 
+    expect(flipped).toBe(2);
     expect(patches.length).toBe(1);
     expect(patches[0]?.read_at).toBeTypeOf("string");
     const byOp = (op: string) => filters.filter((f) => f.op === op);
     expect(byOp("in")[0]?.args).toEqual(["id", ["n-1", "n-2"]]);
     expect(byOp("eq")[0]?.args).toEqual(["user_id", "u-42"]);
     expect(byOp("is")[0]?.args).toEqual(["read_at", null]);
+    // terminal .select() so the function can read rowsFlipped length
+    expect(byOp("select").length).toBe(1);
   });
 });
 
 describe("markAllRead()", () => {
-  it("updates every unread row owned by the user", async () => {
+  it("updates every unread row owned by the user; returns the flip count and patches read_at to a non-null ISO string", async () => {
     const filters: Array<{ op: string; args: unknown[] }> = [];
     const thenable: Record<string, unknown> = {};
     const record = (op: string) => (...args: unknown[]) => {
@@ -315,8 +321,13 @@ describe("markAllRead()", () => {
     };
     thenable.eq = vi.fn(record("eq"));
     thenable.is = vi.fn(record("is"));
-    thenable.then = (resolve: (v: { error: null }) => unknown) =>
-      resolve({ error: null });
+    thenable.select = vi.fn((col: string) => {
+      filters.push({ op: "select", args: [col] });
+      return Promise.resolve({
+        data: [{ id: "a" }, { id: "b" }, { id: "c" }],
+        error: null,
+      });
+    });
 
     const patches: Array<Record<string, unknown>> = [];
     const sb = {
@@ -328,11 +339,34 @@ describe("markAllRead()", () => {
       })),
     };
 
-    await markAllRead(sb as never, "u-7");
+    const flipped = await markAllRead(sb as never, "u-7");
+    expect(flipped).toBe(3);
     expect(patches.length).toBe(1);
+    // Regression guard against the "badge reverts" bug: patch MUST carry a
+    // non-null ISO timestamp for read_at. A silent RLS-blocked UPDATE still
+    // passes call-count checks, but an empty patch would instantly break
+    // the happy path AND signal a refactor gone wrong.
+    const patch = patches[0] as { read_at: unknown };
+    expect(patch.read_at).toBeTypeOf("string");
+    expect(new Date(patch.read_at as string).toString()).not.toBe("Invalid Date");
+
     const isKeys = filters.filter((f) => f.op === "is").map((f) => f.args[0]);
     expect(isKeys).toContain("read_at");
     expect(isKeys).toContain("deleted_at");
+  });
+
+  it("returns zero when no rows matched (idempotent second call)", async () => {
+    const thenable: Record<string, unknown> = {};
+    thenable.eq = vi.fn(() => thenable);
+    thenable.is = vi.fn(() => thenable);
+    thenable.select = vi.fn(() =>
+      Promise.resolve({ data: [], error: null }),
+    );
+    const sb = {
+      from: vi.fn(() => ({ update: vi.fn(() => thenable) })),
+    };
+    const flipped = await markAllRead(sb as never, "u-7");
+    expect(flipped).toBe(0);
   });
 });
 

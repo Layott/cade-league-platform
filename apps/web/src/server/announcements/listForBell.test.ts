@@ -18,7 +18,7 @@ function mkListSb(rows: unknown[]) {
   return { from: vi.fn(() => chain) };
 }
 
-function mkUpdateSb() {
+function mkUpdateSb(rowsFlipped: Array<{ id: string }> = [{ id: "n-flipped" }]) {
   const patches: Array<Record<string, unknown>> = [];
   const filterCalls: Array<{ op: string; args: unknown[] }> = [];
   return {
@@ -30,7 +30,9 @@ function mkUpdateSb() {
         // Build a thenable chain: every .eq/.is returns the same
         // thenable so the terminal-await resolves whenever the caller
         // stops chaining. This mirrors how the real Supabase builder
-        // works and sidesteps fragile call-count counting.
+        // works and sidesteps fragile call-count counting. `.select()`
+        // ends the chain with the resolved rows payload so the new
+        // markAllRead can return the flip count for RLS-silence guard.
         const thenable: Record<string, unknown> = {};
         const record = (op: string) => (...args: unknown[]) => {
           filterCalls.push({ op, args });
@@ -38,6 +40,10 @@ function mkUpdateSb() {
         };
         thenable.eq = vi.fn(record("eq"));
         thenable.is = vi.fn(record("is"));
+        thenable.select = vi.fn((col: string) => {
+          filterCalls.push({ op: "select", args: [col] });
+          return Promise.resolve({ data: rowsFlipped, error: null });
+        });
         thenable.then = (
           resolve: (v: { error: null }) => unknown
         ) => resolve({ error: null });
@@ -154,11 +160,18 @@ describe("listAnnouncementsForUser (Plan 40)", () => {
 });
 
 describe("markAllRead (Plan 40)", () => {
-  it("issues a single UPDATE scoped to user_id + unread rows", async () => {
-    const sb = mkUpdateSb();
-    await markAllRead(sb as never, "user-42");
+  it("issues a single UPDATE scoped to user_id + unread rows; patches read_at to a non-null ISO string", async () => {
+    const sb = mkUpdateSb([{ id: "n-1" }, { id: "n-2" }, { id: "n-3" }]);
+    const flipped = await markAllRead(sb as never, "user-42");
     expect(sb._patches.length).toBe(1);
-    expect(sb._patches[0]).toMatchObject({ read_at: expect.any(String) });
+    // Regression guard: the patch MUST set read_at to a truthy ISO timestamp
+    // so the prior-unread rows flip to read. A silent no-op (badge-reverts
+    // bug) would still pass the call-count check but leave the db unchanged;
+    // asserting the exact patch shape protects against a future refactor
+    // accidentally dropping the field.
+    const patch = sb._patches[0] as { read_at: unknown };
+    expect(patch.read_at).toBeTypeOf("string");
+    expect(new Date(patch.read_at as string).toString()).not.toBe("Invalid Date");
 
     const eqCalls = sb._filters.filter((c) => c.op === "eq");
     const isCalls = sb._filters.filter((c) => c.op === "is");
@@ -168,6 +181,15 @@ describe("markAllRead (Plan 40)", () => {
     const isKeys = isCalls.map((c) => c.args[0]);
     expect(isKeys).toContain("deleted_at");
     expect(isKeys).toContain("read_at");
+    // Returned count mirrors the `.select()` payload length — the route
+    // layer uses this to sanity-check the mutation actually landed.
+    expect(flipped).toBe(3);
+  });
+
+  it("returns zero when no rows were unread (idempotent second call)", async () => {
+    const sb = mkUpdateSb([]);
+    const flipped = await markAllRead(sb as never, "user-42");
+    expect(flipped).toBe(0);
   });
 
   it("is idempotent: a second call doesn't throw", async () => {
