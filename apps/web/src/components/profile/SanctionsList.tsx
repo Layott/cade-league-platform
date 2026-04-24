@@ -23,6 +23,14 @@ export type SanctionType =
   | "fine";
 
 // TODO (plan 41 P41-D): import from server/profile/playerStats or server/sanctions/read
+export type SanctionAppealStatus =
+  | "none"
+  | "submitted"
+  | "under_review"
+  | "ruled"
+  | "withdrawn"
+  | "expired";
+
 export type Sanction = {
   id: string;
   disciplinaryCaseId: string;
@@ -35,6 +43,26 @@ export type Sanction = {
   notes: string | null;
   isAppealWindowOpen: boolean;
   alreadyAppealed: boolean;
+  /**
+   * Linkage audit slice (2026-04-24) — surface the linked appeal's
+   * status so the player can see "Appealed · under review" / "Appeal
+   * upheld" / "Appeal dismissed" without reloading. Omit or set to
+   * `"none"` when there is no appeal yet. Server resolves by grouping
+   * on `disciplinary_case_id` (appeals are filed per case, not per
+   * action — see tasks/lessons.md 2026-04-24).
+   */
+  appealStatus?: SanctionAppealStatus;
+  /**
+   * Optional ruling text when appealStatus === "ruled". Shown as a
+   * tooltip on the "Ruled" pill when present.
+   */
+  appealRuling?: string | null;
+  /**
+   * True when the linked action has been revoked via the appeal ruling
+   * (either manually by an admin following the panel's decision or by
+   * a future auto-void). Client renders a "Revoked by appeal" badge.
+   */
+  revokedByAppeal?: boolean;
 };
 
 /**
@@ -155,7 +183,10 @@ function DesktopRow({
         </span>
       </td>
       <td className="px-4 py-3 align-middle">
-        <SanctionPill type={s.sanctionType} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <SanctionPill type={s.sanctionType} />
+          <AppealStatusBadge sanction={s} />
+        </div>
       </td>
       <td className="px-4 py-3 align-middle">
         <span className="text-xs text-[var(--chalk-1)]">
@@ -213,8 +244,9 @@ function MobileCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SanctionPill type={s.sanctionType} />
+            <AppealStatusBadge sanction={s} />
             <span className="font-mono text-[11px] tabular text-[var(--chalk-2)]">
               {dateLabel}
             </span>
@@ -336,6 +368,73 @@ const PILL_CONFIG: Record<SanctionType, { cls: string; label: string }> = {
   auto_forfeit: { cls: ROSE_DARK, label: "Auto forfeit" },
   ban: { cls: ROSE, label: "Ban" },
   fine: { cls: NEUTRAL, label: "Fine" },
+};
+
+/**
+ * Linkage audit slice (2026-04-24) — visible appeal-status badge.
+ * Placed inline beside the SanctionPill so both admin-view (selfView
+ * = false) and self-view see the same status at a glance.
+ *
+ * Copy rules:
+ *   - revokedByAppeal → "Revoked by appeal" (strongest signal; wins).
+ *   - submitted / under_review → "Appeal · Under review".
+ *   - ruled → "Appeal ruled" (title-tooltip on ruling text when present).
+ *   - withdrawn → "Appeal withdrawn".
+ *   - expired → "Appeal lapsed".
+ *   - none / undefined → render nothing.
+ */
+function AppealStatusBadge({ sanction: s }: { sanction: Sanction }) {
+  if (s.revokedByAppeal) {
+    return (
+      <span
+        className="inline-flex items-center rounded-sm border border-[var(--signal)]/50 bg-[var(--signal)]/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-[var(--signal)]"
+        data-appeal-state="revoked-by-appeal"
+      >
+        Revoked by appeal
+      </span>
+    );
+  }
+  const state = s.appealStatus;
+  if (!state || state === "none") return null;
+  const cfg = APPEAL_STATUS_CONFIG[state];
+  return (
+    <span
+      className={
+        "inline-flex items-center rounded-sm border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] " +
+        cfg.cls
+      }
+      data-appeal-state={state}
+      title={s.appealRuling ?? undefined}
+    >
+      {cfg.label}
+    </span>
+  );
+}
+
+const APPEAL_STATUS_CONFIG: Record<
+  Exclude<SanctionAppealStatus, "none">,
+  { cls: string; label: string }
+> = {
+  submitted: {
+    cls: "border-[var(--chalk-3)]/50 bg-[var(--ink-3)] text-[var(--chalk-1)]",
+    label: "Appeal · Submitted",
+  },
+  under_review: {
+    cls: "border-[var(--amber)]/50 bg-[var(--amber)]/10 text-[var(--amber)]",
+    label: "Appeal · Under review",
+  },
+  ruled: {
+    cls: "border-[var(--signal)]/50 bg-[var(--signal)]/10 text-[var(--signal)]",
+    label: "Appeal ruled",
+  },
+  withdrawn: {
+    cls: "border-[var(--chalk-3)]/50 bg-[var(--ink-3)] text-[var(--chalk-2)]",
+    label: "Appeal withdrawn",
+  },
+  expired: {
+    cls: "border-[var(--ink-5)] bg-[var(--ink-3)] text-[var(--chalk-3)]",
+    label: "Appeal lapsed",
+  },
 };
 
 function prettifyIncident(t: string): string {

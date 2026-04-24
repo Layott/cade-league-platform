@@ -6,8 +6,11 @@ import { getPlayerById } from "@/server/players";
 import { getActiveSeason } from "@/server/seasons";
 import { listStandings } from "@/server/standings/read";
 import { listForPlayer } from "@/server/punishments";
+import { hasPermAsync } from "@/lib/perms-db";
 import { PlayerAvatar } from "@/components/players/PlayerAvatar";
 import { CadePlayerCard } from "@/components/players/CadePlayerCard";
+import { OrgCoachManagerPanel } from "@/components/players/OrgCoachManagerPanel";
+import { AttendancePanel, type AttendanceRow } from "@/components/players/AttendancePanel";
 import { getPlayerHeadshotUrl } from "@/lib/player-photos";
 import {
   getApprovedSubmissionForPlayer,
@@ -24,16 +27,49 @@ export default async function PlayerProfilePage({
 }) {
   const { id } = await params;
   const sb = await getServerSupabase();
-  // Plan 39 RLS on disciplinary_actions blocks authenticated reads; use
-  // service role for the sanctions list (public_visible filtering still
-  // enforced in-function).
+  // Linkage audit slice (2026-04-24) — sanctions now read through the
+  // authenticated (or anon) SSR client. Migration
+  // 20260520003000_disciplinary_rls_self_and_public.sql lets everyone
+  // see public_visible rows and lets the owning player see their own
+  // rows. Service-role retained for admin-gated reads (attendance
+  // panel, the org/staff joins that peek into users.display_name).
   const svc = getServiceRoleSupabase();
   const [player, season, sanctions] = await Promise.all([
     getPlayerById(sb, id),
     getActiveSeason(sb),
-    listForPlayer(svc, id),
+    listForPlayer(sb, id),
   ]);
   if (!player) notFound();
+
+  // Linkage audit slice (2026-04-24) — admin-gated panels. Resolve the
+  // current viewer's roles once so we can decide what admin-only panels
+  // (attendance history) to mount. Wildcard perms (admin) satisfy the
+  // check; moderator + referee also have attendance.mark.
+  let viewerIsStaff = false;
+  const { data: viewerAuth } = await sb.auth.getUser();
+  if (viewerAuth?.user) {
+    const { data: viewerRow } = await svc
+      .from("users")
+      .select("id")
+      .eq("supabase_auth_id", viewerAuth.user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (viewerRow) {
+      const { data: viewerRoleRows } = await svc
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", viewerRow.id)
+        .is("deleted_at", null);
+      const viewerRoles = (viewerRoleRows ?? []).map(
+        (r: { role: string }) => r.role,
+      );
+      viewerIsStaff = await hasPermAsync(
+        svc,
+        { userId: viewerRow.id, roles: viewerRoles },
+        "attendance.mark",
+      );
+    }
+  }
 
   const standings = season ? await listStandings(sb, season.id) : [];
   const stats = standings.find((r) => r.player_id === player.id);
@@ -43,13 +79,145 @@ export default async function PlayerProfilePage({
   const weekStart = weekStartThursday(new Date());
   const approvedSquad = await getApprovedSubmissionForPlayer(sb, player.id, weekStart);
 
-  // Plan 14 — recent match stats card. Pulls player_match_stats rows whose
-  // originating screenshot has parse_status='confirmed'. Unreviewed OCR
-  // never leaks: the inner join on match_stat_screenshots with the status
-  // filter excludes any PMS row lacking a confirmed screenshot.
-  // Supabase-js types join columns as to-many by default (see
-  // tasks/lessons.md 2026-04-26). We express every nested join as an
-  // array-or-single union and go through `as unknown as` on read.
+  // Linkage audit slice (2026-04-24) — resolve org + coach + manager
+  // affiliations. Null-tolerant: each panel renders only what has data.
+  // Contract filter `status='active'` matches the policy added in
+  // migration 20260520003000.
+  let orgInfo: {
+    id: string;
+    name: string;
+    logoUrl: string | null;
+  } | null = null;
+  if (player.organization_id) {
+    const { data: orgRow } = await sb
+      .from("organizations")
+      .select("id, name, logo_url")
+      .eq("id", player.organization_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (orgRow) {
+      const r = orgRow as { id: string; name: string; logo_url: string | null };
+      orgInfo = { id: r.id, name: r.name, logoUrl: r.logo_url };
+    }
+  }
+
+  type StaffInfo = { id: string; displayName: string; photoUrl: string | null };
+  let coachInfo: StaffInfo | null = null;
+  let managerInfo: StaffInfo | null = null;
+  const staffUserIds: string[] = [];
+  if (player.coach_id) staffUserIds.push(player.coach_id);
+  if (player.team_manager_id) staffUserIds.push(player.team_manager_id);
+  if (staffUserIds.length > 0) {
+    // display_name is PII per Plan 39 — use service-role to read safely.
+    const { data: staffRows } = await svc
+      .from("users")
+      .select("id, display_name")
+      .in("id", staffUserIds)
+      .is("deleted_at", null);
+    const byId = new Map<string, { id: string; display_name: string | null }>();
+    for (const r of (staffRows ?? []) as Array<{
+      id: string;
+      display_name: string | null;
+    }>) {
+      byId.set(r.id, r);
+    }
+    if (player.coach_id) {
+      const row = byId.get(player.coach_id);
+      if (row?.display_name) {
+        coachInfo = {
+          id: row.id,
+          displayName: row.display_name,
+          photoUrl: null,
+        };
+      }
+    }
+    if (player.team_manager_id) {
+      const row = byId.get(player.team_manager_id);
+      if (row?.display_name) {
+        managerInfo = {
+          id: row.id,
+          displayName: row.display_name,
+          photoUrl: null,
+        };
+      }
+    }
+  }
+
+  // Linkage audit slice (2026-04-24) — admin-gated attendance panel.
+  // Service-role read (attendance_marks has self-only RLS; admin view
+  // needs to see another player's rows).
+  let attendanceRows: AttendanceRow[] = [];
+  if (viewerIsStaff && season) {
+    const { data: marks } = await svc
+      .from("attendance_marks")
+      .select(
+        "id, match_day_id, status, marked_at, override_reason, match_days!inner ( match_date, season_id )",
+      )
+      .eq("player_id", player.id)
+      .eq("match_days.season_id", season.id)
+      .is("deleted_at", null)
+      .order("marked_at", { ascending: false });
+    type AttendanceRaw = {
+      id: string;
+      match_day_id: string;
+      status: AttendanceRow["status"];
+      marked_at: string;
+      override_reason: string | null;
+      match_days:
+        | { match_date: string; season_id: string }
+        | { match_date: string; season_id: string }[]
+        | null;
+    };
+    attendanceRows = ((marks ?? []) as unknown as AttendanceRaw[]).map((m) => {
+      const mdRaw = m.match_days;
+      const md = Array.isArray(mdRaw) ? mdRaw[0] : mdRaw;
+      return {
+        id: m.id,
+        matchDayId: m.match_day_id,
+        matchDate: md?.match_date ?? "",
+        status: m.status,
+        markedAt: m.marked_at,
+        overrideReason: m.override_reason,
+      };
+    });
+  }
+
+  // Plan 14 + linkage audit slice (2026-04-24) — recent match stats card.
+  //
+  // Rewritten to a two-step flow for clarity + tight RLS correctness:
+  //   1. Resolve confirmed screenshot match_ids (RLS post-migration
+  //      20260520003000 lets anon + authenticated read parse_status
+  //      'confirmed' rows). This gates which matches can contribute
+  //      stats to the public view — unreviewed OCR never leaks.
+  //   2. Pull player_match_stats for this player, joined with matches
+  //      + match_day, filtered to the match_ids resolved in step 1.
+  //
+  // Service-role fallback: when the caller is a logged-in admin viewing
+  // another player BEFORE the RLS policy lands (migration still
+  // queued), use `svc` so the page doesn't go blank. The fallback is
+  // invisible to the user.
+  const { data: confirmedShotsRaw } = await sb
+    .from("match_stat_screenshots")
+    .select("match_id")
+    .eq("parse_status", "confirmed")
+    .is("deleted_at", null);
+  let confirmedMatchIds = ((confirmedShotsRaw ?? []) as Array<{ match_id: string }>)
+    .map((r) => r.match_id);
+  if (confirmedMatchIds.length === 0 && viewerIsStaff) {
+    // Fallback for admin view: the RLS migration may not be applied yet
+    // in ephemeral envs. Service-role bypasses RLS — admins can still
+    // see the data.
+    const { data: adminShots } = await svc
+      .from("match_stat_screenshots")
+      .select("match_id")
+      .eq("parse_status", "confirmed")
+      .is("deleted_at", null);
+    confirmedMatchIds = ((adminShots ?? []) as Array<{ match_id: string }>).map(
+      (r) => r.match_id,
+    );
+  }
+  confirmedMatchIds = Array.from(new Set(confirmedMatchIds));
+
   type RecentRow = {
     match_id: string;
     goals: number;
@@ -61,10 +229,6 @@ export default async function PlayerProfilePage({
           match_day_id: string;
           home_player_id: string;
           away_player_id: string;
-          match_stat_screenshots:
-            | { id: string; parse_status: string; confirmed_at: string | null }[]
-            | { id: string; parse_status: string; confirmed_at: string | null }
-            | null;
           match_day:
             | { match_date: string }
             | { match_date: string }[]
@@ -75,10 +239,6 @@ export default async function PlayerProfilePage({
           match_day_id: string;
           home_player_id: string;
           away_player_id: string;
-          match_stat_screenshots:
-            | { id: string; parse_status: string; confirmed_at: string | null }[]
-            | { id: string; parse_status: string; confirmed_at: string | null }
-            | null;
           match_day:
             | { match_date: string }
             | { match_date: string }[]
@@ -86,20 +246,23 @@ export default async function PlayerProfilePage({
         }[]
       | null;
   };
-  const { data: recentRaw } = await sb
-    .from("player_match_stats")
-    .select(
-      `match_id, goals, assists, custom_metrics,
-       matches:match_id (
-         id, match_day_id, home_player_id, away_player_id,
-         match_stat_screenshots!inner ( id, parse_status, confirmed_at ),
-         match_day:match_day_id ( match_date )
-       )`
-    )
-    .eq("player_id", player.id)
-    .is("deleted_at", null)
-    .eq("matches.match_stat_screenshots.parse_status", "confirmed")
-    .limit(10);
+  const recentRaw: RecentRow[] =
+    confirmedMatchIds.length === 0
+      ? []
+      : await sb
+          .from("player_match_stats")
+          .select(
+            `match_id, goals, assists, custom_metrics,
+             matches:match_id (
+               id, match_day_id, home_player_id, away_player_id,
+               match_day:match_day_id ( match_date )
+             )`,
+          )
+          .eq("player_id", player.id)
+          .is("deleted_at", null)
+          .in("match_id", confirmedMatchIds)
+          .limit(10)
+          .then((r) => (r.data ?? []) as unknown as RecentRow[]);
 
   const recentStats: Array<{
     matchId: string;
@@ -112,14 +275,11 @@ export default async function PlayerProfilePage({
     passAccuracyPct: number | null;
   }> = [];
 
-  for (const raw of (recentRaw ?? []) as unknown as RecentRow[]) {
+  for (const raw of recentRaw) {
     const mRaw = raw.matches;
     if (!mRaw) continue;
     const m = Array.isArray(mRaw) ? mRaw[0] : mRaw;
     if (!m) continue;
-    const ssRaw = m.match_stat_screenshots;
-    const ss = Array.isArray(ssRaw) ? ssRaw : ssRaw ? [ssRaw] : [];
-    if (!ss.some((s) => s.parse_status === "confirmed")) continue;
     const md = Array.isArray(m.match_day)
       ? m.match_day[0]?.match_date
       : m.match_day?.match_date;
@@ -227,6 +387,12 @@ export default async function PlayerProfilePage({
       </section>
 
       <div className="mx-auto max-w-6xl space-y-10 px-5 py-10">
+        <OrgCoachManagerPanel
+          org={orgInfo}
+          coach={coachInfo}
+          manager={managerInfo}
+        />
+
         <section>
           <h2 className="mb-4 font-display text-xl font-bold text-[var(--chalk-0)]">
             Season stats
@@ -334,6 +500,15 @@ export default async function PlayerProfilePage({
             </ul>
           )}
         </section>
+
+        {viewerIsStaff ? (
+          <AttendancePanel
+            rows={attendanceRows}
+            title={`${player.display_name} · attendance`}
+            emptyHint="No attendance marks yet this season."
+            testId="admin-player-attendance"
+          />
+        ) : null}
 
         {player.bio ? (
           <section>
