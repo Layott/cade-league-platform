@@ -115,9 +115,12 @@ describe("buildPunishmentTickerPayload", () => {
     const rows = Array.from({ length: 5 }, (_, i) => ({
       sanction_type: "warning",
       magnitude: `-${i + 1}`,
-      issued_at: `2026-04-${10 + i}`,
+      imposed_at: `2026-04-${10 + i}`,
       public_visible: true,
-      player: { users: { display_name: `P${i}` } },
+      disciplinary_cases: {
+        player_id: `p${i}`,
+        players: { users: { display_name: `P${i}` } },
+      },
     }));
     const sb = mkSb({
       disciplinary_actions: chain({ data: rows, error: null }),

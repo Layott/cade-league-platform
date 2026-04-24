@@ -7,6 +7,27 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
 import { revoke, softDelete, update } from "@/server/punishments";
 
+/**
+ * Resolve the player_id that owns a given disciplinary_action, so we can
+ * revalidate the public /players/[id] + /profile surfaces after any
+ * edit/revoke/delete. Returns null silently if the join fails (we still
+ * revalidate the non-player surfaces).
+ */
+async function playerIdForAction(
+  service: ReturnType<typeof getServiceRoleSupabase>,
+  actionId: string,
+): Promise<string | null> {
+  const { data } = await service
+    .from("disciplinary_actions")
+    .select("disciplinary_cases!inner ( player_id )")
+    .eq("id", actionId)
+    .maybeSingle();
+  const row = data as unknown as
+    | { disciplinary_cases: { player_id: string } }
+    | null;
+  return row?.disciplinary_cases?.player_id ?? null;
+}
+
 async function authedAdmin(): Promise<{
   service: ReturnType<typeof getServiceRoleSupabase>;
   pub: { id: string };
@@ -48,9 +69,12 @@ export async function revokeAction(formData: FormData) {
   );
 
   await revoke(ctx.service, actionId, reason);
+  const playerId = await playerIdForAction(ctx.service, actionId);
   revalidatePath("/admin/punishments");
   revalidatePath(`/admin/punishments/${actionId}`);
   revalidatePath("/punishments");
+  revalidatePath("/profile");
+  if (playerId) revalidatePath(`/players/${playerId}`);
   redirect(`/admin/punishments/${actionId}`);
 }
 
@@ -85,9 +109,12 @@ export async function updateAction(formData: FormData) {
     notes: (formData.get("notes") as string) || null,
   });
 
+  const playerId = await playerIdForAction(ctx.service, actionId);
   revalidatePath("/admin/punishments");
   revalidatePath(`/admin/punishments/${actionId}`);
   revalidatePath("/punishments");
+  revalidatePath("/profile");
+  if (playerId) revalidatePath(`/players/${playerId}`);
   redirect(`/admin/punishments/${actionId}`);
 }
 
@@ -108,9 +135,14 @@ export async function deleteAction(formData: FormData) {
   const actionId = String(formData.get("actionId") ?? "");
   if (!actionId) return;
 
+  // Fetch player BEFORE the soft-delete, so we can still revalidate
+  // the /players/[id] surface (post-delete join filters out the row).
+  const playerId = await playerIdForAction(ctx.service, actionId);
   await softDelete(ctx.service, actionId);
 
   revalidatePath("/admin/punishments");
   revalidatePath("/punishments");
+  revalidatePath("/profile");
+  if (playerId) revalidatePath(`/players/${playerId}`);
   redirect("/admin/punishments");
 }

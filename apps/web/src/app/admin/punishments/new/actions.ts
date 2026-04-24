@@ -63,6 +63,7 @@ export async function createPunishment(formData: FormData) {
 
   revalidatePath("/admin/punishments");
   revalidatePath("/punishments");
+  revalidatePath("/profile");
   revalidatePath(`/players/${playerId}`);
   redirect("/admin/punishments");
 }

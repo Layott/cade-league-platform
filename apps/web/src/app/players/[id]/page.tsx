@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { getPlayerById } from "@/server/players";
 import { getActiveSeason } from "@/server/seasons";
 import { listStandings } from "@/server/standings/read";
+import { listForPlayer } from "@/server/punishments";
 import { PlayerAvatar } from "@/components/players/PlayerAvatar";
 import { CadePlayerCard } from "@/components/players/CadePlayerCard";
 import { getPlayerHeadshotUrl } from "@/lib/player-photos";
@@ -11,6 +13,7 @@ import {
   getApprovedSubmissionForPlayer,
   weekStartThursday,
 } from "@/server/squads";
+import { SquadPitchView } from "@/components/squads/SquadPitchView";
 
 export const revalidate = 60;
 
@@ -21,9 +24,14 @@ export default async function PlayerProfilePage({
 }) {
   const { id } = await params;
   const sb = await getServerSupabase();
-  const [player, season] = await Promise.all([
+  // Plan 39 RLS on disciplinary_actions blocks authenticated reads; use
+  // service role for the sanctions list (public_visible filtering still
+  // enforced in-function).
+  const svc = getServiceRoleSupabase();
+  const [player, season, sanctions] = await Promise.all([
     getPlayerById(sb, id),
     getActiveSeason(sb),
+    listForPlayer(svc, id),
   ]);
   if (!player) notFound();
 
@@ -284,23 +292,48 @@ export default async function PlayerProfilePage({
             <p className="mb-3 text-xs uppercase tracking-[0.18em] text-[var(--chalk-3)]">
               Week of {approvedSquad.submission.week_start_date}
             </p>
-            <ul className="grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
-              {approvedSquad.items.map((it) => (
+            <SquadPitchView items={approvedSquad.items} />
+          </section>
+        ) : null}
+
+        <section data-testid="public-player-sanctions">
+          <h2 className="mb-4 font-display text-xl font-bold text-[var(--chalk-0)]">
+            Sanctions
+          </h2>
+          {sanctions.length === 0 ? (
+            <p className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)]/60 p-6 text-sm text-[var(--chalk-2)]">
+              Clean sheet. No public sanctions on record.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {sanctions.map((s) => (
                 <li
-                  key={it.id}
-                  className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-2"
+                  key={s.id}
+                  data-testid={`public-sanction-${s.id}`}
+                  className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3"
                 >
-                  <div className="font-semibold text-[var(--chalk-0)]">
-                    #{it.slot_index} {it.name}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-[var(--signal)]">
+                      {s.sanction_type.replace(/_/g, " ")}
+                      {s.magnitude ? ` · ${s.magnitude}` : ""}
+                    </span>
+                    <span className="font-mono text-[11px] text-[var(--chalk-3)] tabular">
+                      {s.imposed_at.slice(0, 10)}
+                    </span>
                   </div>
-                  <div className="font-mono text-[11px] text-[var(--chalk-3)]">
-                    {it.rating} · {it.position} · {it.item_type}
+                  <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-[var(--chalk-2)]">
+                    {s.incident_type.replace(/_/g, " ")}
                   </div>
+                  {s.notes ? (
+                    <p className="mt-2 text-[13px] text-[var(--chalk-1)]">
+                      {s.notes}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
-          </section>
-        ) : null}
+          )}
+        </section>
 
         {player.bio ? (
           <section>

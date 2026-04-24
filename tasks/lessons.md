@@ -308,3 +308,34 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Correction:** Defined `type PlanEntry = { kind: "existing"; itemId: string } | { kind: "new" }` and a `mkExistingPlan()` helper that returns `PlanEntry[]` via explicit `.map<PlanEntry>(…)`. Now `plan[i] = { kind: "new" }` compiles.
 **Rule for future:** When building a discriminated-union array via `.map()`, either explicitly annotate the element type on the map (`.map<Foo>(…)`) or construct via `[].push`. `as const` on literals inside a mapper narrows the array's element type to one variant and blocks future assignments of the other variants.
 
+
+---
+
+**Date:** 2026-04-24
+**Context:** User issued punishments against Faruk + Adefola but `/(auth)/profile` self-view, `/players/[id]` public profile, and `/admin/punishments` admin list all showed "clean slate"/zero rows. Earlier session fixed the list pages via service-role (RLS bypass) but the profile pages were still broken.
+**Mistake:** Two separate schema-column bugs conflated with the RLS bug:
+1. `/(auth)/profile/page.tsx` queried `disciplinary_actions.player_id` + `.order("issued_at")` + selected `disciplinary_case_id` + `incident_type` FROM `disciplinary_actions`. NONE of those columns exist on that table. The real schema: `disciplinary_actions.case_id → disciplinary_cases.player_id`, column is `imposed_at` (not `issued_at`), `incident_type` lives on `disciplinary_cases` not actions. Query silently returned zero rows for every player.
+2. `apps/web/src/server/overlays/autofill.ts` (punishment ticker overlay) had the IDENTICAL bug: `player:player_id (...)` + `.eq("season_id", seasonId)` + `.order("issued_at", ...)`. `disciplinary_actions` has no `player_id` column AND no `season_id` column. Ticker overlay always empty.
+3. `/players/[id]/page.tsx` had no sanctions section at all — user expected "punishments should show on Faruk's profile" but there was literally no UI for them.
+**Correction:**
+1. Rewrote profile query to embed `disciplinary_cases!inner ( player_id, incident_type )` + filter on `disciplinary_cases.player_id`; remapped response fields (`imposed_at → issued_at`, `case_id → disciplinary_case_id`) so downstream mapping untouched.
+2. Rewrote autofill ticker query to join via `disciplinary_cases!inner → players!inner → users`; dropped the phantom `season_id` filter (scope deferred — would need join through matches/match_days); updated test rows to new shape.
+3. Added `/players/[id]` Sanctions section using `listForPlayer(svc, id)` with service-role client (Plan 39 RLS bypass — same fix pattern).
+4. Extended revalidation: `/admin/punishments/[id]/actions.ts` (revoke/update/softDelete) now fetches `player_id` via case-join BEFORE mutating, then revalidates `/profile` + `/players/[id]`. `/admin/punishments/new/actions.ts` adds `/profile` revalidation too. Punishments now reflect on every surface after issue/edit/delete/revoke.
+**Rule for future:**
+- When a bug involves a DB column, FIRST verify the column exists in the migration before patching. `grep -n "<col_name>" supabase/migrations/` or read the `CREATE TABLE` statement. Never trust field names in existing code — they rot when schemas evolve.
+- When patching a query, `git grep` for every OTHER query on the same table to see if the same column-name mistake propagated. Column-name typos travel in packs (copy-paste).
+- When a mutation action exists (create/update/delete/revoke), audit EVERY surface that reads the same row type. Revalidate them all. Lack of revalidation on one surface = stale data + "why isn't it reflecting" bug reports.
+- RLS is a second-order gotcha: even a correct query returns zero rows if RLS blocks the authenticated client. Check RLS before assuming the query is wrong. Check the query before assuming RLS is wrong. Both are possible; both were live in this session.
+
+---
+
+**Date:** 2026-04-24
+**Context:** /admin/broadcast/[sessionId] console: "In HTML, <form> cannot be a descendant of <form>" — `OffTriggerButton` (`<form action={clearInstanceAction}>`) rendered inside `EditableTemplatePanel`'s outer `<form action={triggerInstanceAction}>`. Produces a hydration warning + subtle form-submission bugs (inner form takes precedence, some buttons fire twice).
+**Mistake:** Two separate components each own their own `<form>` wrapper, nested when composed. The pattern "each button has its own self-submitting form" works in isolation but composes badly — the second `<form>` is auto-unwrapped by the browser on hydration, causing the structure React SSR'd and the structure the DOM actually holds to diverge.
+**Correction:** Rewrote `OffTriggerButton` to NOT wrap in `<form>`; switched to `<button formAction={clearAction}>` pattern OR rendered as sibling outside the outer form in `EditableTemplatePanel`. (Implementation handed to broadcast-refactor agent; commit forthcoming.)
+**Rule for future:**
+- Never compose two components each owning their own `<form>`. Either (a) one component wraps, the other uses `formAction` on its buttons, or (b) they render as siblings.
+- Grep for multi-form pages: `apps/web/src/**` → `grep "<form" -n`. Audit any file with >1 `<form>` — are any nested? If the outer form has children components, check those components for inner forms too.
+- HTML-invalid nesting triggers hydration mismatch even when it "looks fine" in dev — React reconciles by throwing away the client tree and re-mounting. Any interactive state (open dialogs, focused inputs, pending submissions) gets wiped. This is silent data loss, not just a warning.
+

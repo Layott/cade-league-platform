@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   // prefix → browser loads the page HTML but zero CSS). Pin the root to
   // the actual repo so the lockfile detection stops wandering.
   outputFileTracingRoot: path.resolve(__dirname, "..", ".."),
+  // Hide the Next.js dev "N Issues" floating badge. Overlay routes are
+  // loaded into OBS/vMix as browser sources; the badge would be captured
+  // on-stream. Production builds never show it anyway; this kills it in
+  // dev too.
+  devIndicators: false,
 };
 
 export default nextConfig;

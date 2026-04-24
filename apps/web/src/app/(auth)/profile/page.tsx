@@ -118,12 +118,36 @@ export default async function ProfileSelfPage({
           svc
             .from("disciplinary_actions")
             .select(
-              "id, disciplinary_case_id, sanction_type, magnitude, incident_type, issued_at, effective_from, effective_until, notes",
+              "id, case_id, sanction_type, magnitude, imposed_at, effective_from, effective_until, notes, disciplinary_cases!inner ( player_id, incident_type )",
             )
-            .eq("player_id", playerRow.id)
+            .eq("disciplinary_cases.player_id", playerRow.id)
             .is("deleted_at", null)
-            .order("issued_at", { ascending: false })
-            .then((r) => r.data ?? []),
+            .is("revoked_at", null)
+            .order("imposed_at", { ascending: false })
+            .then((r) => {
+              type Row = {
+                id: string;
+                case_id: string;
+                sanction_type: string;
+                magnitude: number;
+                imposed_at: string;
+                effective_from: string | null;
+                effective_until: string | null;
+                notes: string | null;
+                disciplinary_cases: { player_id: string; incident_type: string };
+              };
+              return ((r.data ?? []) as unknown as Row[]).map((s) => ({
+                id: s.id,
+                disciplinary_case_id: s.case_id,
+                sanction_type: s.sanction_type,
+                magnitude: s.magnitude,
+                incident_type: s.disciplinary_cases.incident_type,
+                issued_at: s.imposed_at,
+                effective_from: s.effective_from,
+                effective_until: s.effective_until,
+                notes: s.notes,
+              }));
+            }),
           getCurrentSquadStatus(svc, playerRow.id, now),
         ]);
 

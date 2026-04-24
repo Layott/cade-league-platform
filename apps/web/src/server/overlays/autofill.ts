@@ -121,23 +121,36 @@ export async function buildPunishmentTickerPayload(
   limit: number = 8,
 ): Promise<PunishmentTickerPayload | null> {
   const n = Math.min(Math.max(limit, 1), 20);
+  // disciplinary_actions has NO `player_id` or `season_id` column; the
+  // FK is via `case_id → disciplinary_cases.player_id`. Column is
+  // `imposed_at` not `issued_at`. There is no per-season scoping on
+  // discipline at the schema level — all active-season punishments are
+  // returned. (Season filter is deferred; would require joining through
+  // matches/match_days to derive season, not a bare column lookup.)
+  //
+  // NOTE: seasonId arg is retained in the signature for future use; this
+  // implementation currently ignores it.
+  void seasonId;
   const { data } = await sb
     .from("disciplinary_actions")
     .select(
       `
       sanction_type,
       magnitude,
-      issued_at,
+      imposed_at,
       public_visible,
-      player:player_id (
-        users:users!players_user_id_fkey ( display_name )
+      disciplinary_cases!inner (
+        player_id,
+        players!inner (
+          users:users!players_user_id_fkey ( display_name )
+        )
       )
       `,
     )
-    .eq("season_id", seasonId)
     .eq("public_visible", true)
     .is("deleted_at", null)
-    .order("issued_at", { ascending: false })
+    .is("revoked_at", null)
+    .order("imposed_at", { ascending: false })
     .limit(n);
 
   if (!data || data.length === 0) return null;
@@ -145,13 +158,18 @@ export async function buildPunishmentTickerPayload(
   const items = (data as unknown as {
     sanction_type: string;
     magnitude: string | number | null;
-    issued_at: string;
-    player: { users: { display_name: string | null } | null } | null;
+    imposed_at: string;
+    disciplinary_cases: {
+      player_id: string;
+      players: {
+        users: { display_name: string | null } | null;
+      } | null;
+    };
   }[]).map((r) => ({
-    playerName: r.player?.users?.display_name ?? "—",
+    playerName: r.disciplinary_cases.players?.users?.display_name ?? "—",
     sanction: r.sanction_type,
     magnitude: r.magnitude === null ? "" : String(r.magnitude),
-    issuedAt: r.issued_at,
+    issuedAt: r.imposed_at,
   }));
 
   return punishmentTickerSchema.parse({ items });
