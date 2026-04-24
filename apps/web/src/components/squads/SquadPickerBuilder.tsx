@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { FutCard } from "./FutCard";
 import {
   PitchLayout,
@@ -71,6 +71,13 @@ export function SquadPickerBuilder({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Drag-to-reorder source. Lifted here so drops can cross the pitch <->
+  // subs bench boundary. Cleared on drag-end regardless of drop.
+  const dragSourceRef = useRef<
+    | { kind: "slot"; index: number }
+    | { kind: "sub"; index: number }
+    | null
+  >(null);
 
   const filledCount = useMemo(
     () => Object.values(slots).filter((c) => !!c).length,
@@ -173,6 +180,44 @@ export function SquadPickerBuilder({
       return next;
     });
   }, []);
+
+  // Drag & drop. Supports both intra-starting-XI swaps and crossing
+  // starter <-> sub. Dropping onto an empty slot moves the card; onto a
+  // filled slot swaps. No-op when source === target or source is null.
+  const handleDragStart = useCallback(
+    (kind: "slot" | "sub", index: number) => {
+      dragSourceRef.current = { kind, index };
+    },
+    [],
+  );
+  const handleDragEnd = useCallback(() => {
+    dragSourceRef.current = null;
+  }, []);
+  const handleDrop = useCallback(
+    (targetKind: "slot" | "sub", targetIndex: number) => {
+      const src = dragSourceRef.current;
+      dragSourceRef.current = null;
+      if (!src) return;
+      if (src.kind === targetKind && src.index === targetIndex) return;
+      const srcCard =
+        src.kind === "slot" ? slots[src.index] ?? null : subs[src.index] ?? null;
+      const dstCard =
+        targetKind === "slot" ? slots[targetIndex] ?? null : subs[targetIndex] ?? null;
+      if (!srcCard) return;
+      // Build next states.
+      const nextSlots = { ...slots };
+      const nextSubs = [...subs];
+      const writeAt = (kind: "slot" | "sub", idx: number, c: CardSearchResult | null) => {
+        if (kind === "slot") nextSlots[idx] = c;
+        else nextSubs[idx] = c;
+      };
+      writeAt(targetKind, targetIndex, srcCard);
+      writeAt(src.kind, src.index, dstCard); // dst may be null — acts as a move
+      setSlots(nextSlots);
+      setSubs(nextSubs);
+    },
+    [slots, subs],
+  );
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -307,6 +352,9 @@ export function SquadPickerBuilder({
           formation={formation}
           slots={slots}
           onSlotClick={openSlot}
+          onCardDragStart={(idx) => handleDragStart("slot", idx)}
+          onCardDrop={(idx) => handleDrop("slot", idx)}
+          onCardDragEnd={handleDragEnd}
         />
 
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
@@ -314,25 +362,44 @@ export function SquadPickerBuilder({
             Subs (optional)
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            {subs.map((c, i) => (
-              <div key={i} className="flex flex-col items-center gap-1">
-                <FutCard
-                  card={c}
-                  size="sm"
-                  onClick={() => openSub(i)}
-                  dataTestId={`sub-slot-${i}`}
-                />
-                {c ? (
-                  <button
-                    type="button"
-                    onClick={() => clearSub(i)}
-                    className="text-[9px] uppercase tracking-[0.14em] text-[var(--chalk-3)] hover:text-[var(--flare)]"
-                  >
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-            ))}
+            {subs.map((c, i) => {
+              const isDraggable = !!c;
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-1"
+                  draggable={isDraggable}
+                  onDragStart={
+                    isDraggable
+                      ? (e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          try { e.dataTransfer.setData("text/plain", `sub:${i}`); } catch {}
+                          handleDragStart("sub", i);
+                        }
+                      : undefined
+                  }
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+                  onDrop={(e) => { e.preventDefault(); handleDrop("sub", i); }}
+                >
+                  <FutCard
+                    card={c}
+                    size="sm"
+                    onClick={() => openSub(i)}
+                    dataTestId={`sub-slot-${i}`}
+                  />
+                  {c ? (
+                    <button
+                      type="button"
+                      onClick={() => clearSub(i)}
+                      className="text-[9px] uppercase tracking-[0.14em] text-[var(--chalk-3)] hover:text-[var(--flare)]"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
 

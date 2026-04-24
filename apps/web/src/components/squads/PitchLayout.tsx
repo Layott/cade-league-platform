@@ -465,9 +465,15 @@ export type PitchLayoutProps = {
   formation: FormationKey;
   slots: Record<number, CardSearchResult | null>;
   onSlotClick: (slot: SlotPosition) => void;
+  // Drag-to-reorder (optional — omit for read-only uses). Caller lifts
+  // the drag state up so drops from the subs bench can also land on the
+  // pitch and vice-versa.
+  onCardDragStart?: (slotIndex: number) => void;
+  onCardDrop?: (slotIndex: number) => void;
+  onCardDragEnd?: () => void;
 };
 
-export function PitchLayout({ formation, slots, onSlotClick }: PitchLayoutProps) {
+export function PitchLayout({ formation, slots, onSlotClick, onCardDragStart, onCardDrop, onCardDragEnd }: PitchLayoutProps) {
   const defs = FORMATIONS[formation];
   return (
     <div
@@ -489,6 +495,7 @@ export function PitchLayout({ formation, slots, onSlotClick }: PitchLayoutProps)
 
       {defs.map((s) => {
         const card = slots[s.slotIndex] ?? null;
+        const isDraggable = !!card && !!onCardDragStart;
         return (
           <div
             key={s.slotIndex}
@@ -497,6 +504,29 @@ export function PitchLayout({ formation, slots, onSlotClick }: PitchLayoutProps)
               left: `${s.left}%`,
             }}
             className="absolute -translate-x-1/2 -translate-y-1/2"
+            draggable={isDraggable}
+            onDragStart={
+              isDraggable
+                ? (e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    // Some browsers require setData to start the drag at all.
+                    try { e.dataTransfer.setData("text/plain", `slot:${s.slotIndex}`); } catch {}
+                    onCardDragStart?.(s.slotIndex);
+                  }
+                : undefined
+            }
+            onDragEnd={onCardDragEnd}
+            onDragOver={
+              onCardDrop
+                ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }
+                : undefined
+            }
+            onDrop={
+              onCardDrop
+                ? (e) => { e.preventDefault(); onCardDrop(s.slotIndex); }
+                : undefined
+            }
+            data-slot-droppable={onCardDrop ? s.slotIndex : undefined}
           >
             <div className="flex flex-col items-center gap-0.5">
               <FutCard
