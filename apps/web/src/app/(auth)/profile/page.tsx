@@ -123,42 +123,78 @@ export default async function ProfileSelfPage({
       // SELECT on (a) rows owned by the caller and (b) public rows.
       // Includes revoked rows for self-view so the player can see the
       // full ruling trail; UI badges differentiate.
-      const sanctionsReadP = sb
-        .from("disciplinary_actions")
-        .select(
-          "id, case_id, sanction_type, magnitude, imposed_at, effective_from, effective_until, notes, revoked_at, revoke_reason, disciplinary_cases!inner ( player_id, incident_type )",
-        )
-        .eq("disciplinary_cases.player_id", playerRow.id)
-        .is("deleted_at", null)
-        .order("imposed_at", { ascending: false })
-        .then((r) => {
-          type Row = {
+      //
+      // 2026-04-24 followup — PostgREST inline filter on an RLS-protected
+      // embed (`.eq("disciplinary_cases.player_id", X)`) did NOT resolve
+      // reliably through the self_select policy chain. Two-step fetch
+      // instead: load the player's disciplinary_cases first, then actions
+      // where case_id IN (...). Matches the shape listForPlayer uses for
+      // /players/[id]. Returns both public AND self-only rows (RLS
+      // enforces; no manual public_visible gate here — self view wants
+      // the full history including private admin warnings).
+      const sanctionsReadP = (async () => {
+        const { data: caseRows } = await sb
+          .from("disciplinary_cases")
+          .select("id, incident_type, player_id, deleted_at")
+          .eq("player_id", playerRow.id)
+          .is("deleted_at", null);
+        const caseIdToIncident = new Map<string, string>();
+        for (const c of (caseRows ?? []) as Array<{
+          id: string;
+          incident_type: string;
+        }>) {
+          caseIdToIncident.set(c.id, c.incident_type);
+        }
+        const caseIds = Array.from(caseIdToIncident.keys());
+        if (caseIds.length === 0) {
+          return [] as Array<{
             id: string;
-            case_id: string;
+            disciplinary_case_id: string;
             sanction_type: string;
             magnitude: number;
-            imposed_at: string;
+            incident_type: string;
+            issued_at: string;
             effective_from: string | null;
             effective_until: string | null;
             notes: string | null;
             revoked_at: string | null;
             revoke_reason: string | null;
-            disciplinary_cases: { player_id: string; incident_type: string };
-          };
-          return ((r.data ?? []) as unknown as Row[]).map((s) => ({
-            id: s.id,
-            disciplinary_case_id: s.case_id,
-            sanction_type: s.sanction_type,
-            magnitude: s.magnitude,
-            incident_type: s.disciplinary_cases.incident_type,
-            issued_at: s.imposed_at,
-            effective_from: s.effective_from,
-            effective_until: s.effective_until,
-            notes: s.notes,
-            revoked_at: s.revoked_at,
-            revoke_reason: s.revoke_reason,
-          }));
-        });
+          }>;
+        }
+        const { data: actionRows } = await sb
+          .from("disciplinary_actions")
+          .select(
+            "id, case_id, sanction_type, magnitude, imposed_at, effective_from, effective_until, notes, revoked_at, revoke_reason",
+          )
+          .in("case_id", caseIds)
+          .is("deleted_at", null)
+          .order("imposed_at", { ascending: false });
+        type Row = {
+          id: string;
+          case_id: string;
+          sanction_type: string;
+          magnitude: number;
+          imposed_at: string;
+          effective_from: string | null;
+          effective_until: string | null;
+          notes: string | null;
+          revoked_at: string | null;
+          revoke_reason: string | null;
+        };
+        return ((actionRows ?? []) as Row[]).map((s) => ({
+          id: s.id,
+          disciplinary_case_id: s.case_id,
+          sanction_type: s.sanction_type,
+          magnitude: s.magnitude,
+          incident_type: caseIdToIncident.get(s.case_id) ?? "unknown",
+          issued_at: s.imposed_at,
+          effective_from: s.effective_from,
+          effective_until: s.effective_until,
+          notes: s.notes,
+          revoked_at: s.revoked_at,
+          revoke_reason: s.revoke_reason,
+        }));
+      })();
 
       const [
         stats,

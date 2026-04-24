@@ -428,3 +428,19 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - **Grep `tasks/lessons.md` FIRST on every new bug report.** Keywords from the symptom, not from guessed root causes. "Server error" → grep `500|ENOENT|compile`. "No design / broken CSS" → grep `lockfile|workspace|Tailwind|CSS`. This is the load-bearing rule I keep violating; next session must hardwire it.
 - **If a fix removes a file but the file keeps coming back, add a guardrail** — `.gitignore` to prevent accidental commit, or a `postinstall`/prestart script that deletes the stray file. Leaving the recurrence unguarded means this lesson gets re-learned every time `npm install` runs in the wrong dir.
 - **Never "fix from code grep alone" when diagnosing a 500.** Get the stack trace. Log-tail the dev server; ask the user for the Response-tab body; attach cookies and curl the authenticated path. Code grep is necessary but insufficient — the running server tells you which symbolic error fires and at what line.
+
+---
+
+**Date:** 2026-04-24
+**Context:** Faruk logged in as himself, viewed `/profile` (self-view), disciplinary history empty. Also admins viewing `/players/[id]` for any player still saw only public sanctions even though the RLS migration `20260520003000` was in place.
+**Mistake:** Two cousin bugs, both from RLS-protected embeds:
+1. `/profile` sanctions query used `.select("... disciplinary_cases!inner ( ... )")` + `.eq("disciplinary_cases.player_id", X)`. PostgREST inline filter on an embed whose table has its own RLS policy silently drops rows when the policy predicate can't be evaluated in the embed subquery context — even though querying `disciplinary_cases` alone WITH the same predicate would work.
+2. `server/punishments/index.ts` `listForPlayer` embedded `players!inner ( users:users!players_user_id_fkey!inner ( display_name ) )`. Plan 39 locked down `users` PII so the `users!inner` requirement drops EVERY case row for an authenticated client that isn't the user themselves. Admin viewing Faruk → zero cases → zero sanctions.
+**Correction:**
+1. `/profile` rewrite: two-step — fetch `disciplinary_cases` by `player_id` first, then `disciplinary_actions` by `case_id IN (...)`. No embed, no PostgREST inline-filter-on-embed. Policy predicates evaluate per-row on the base table, which works.
+2. `listForPlayer` rewrite: three-step — fetch `players` row for id+gamer_tag, fetch cases by player_id, fetch actions by case_id IN (...). Drop the `users` embed entirely; display_name now falls back to `gamer_tag` since the users PII column is off-limits to non-self authenticated clients post-Plan-39.
+**Rule for future:**
+- **Never put a PostgREST `!inner` embed on a table with its own restrictive RLS** unless you have verified (a) the caller qualifies under every embedded table's policy OR (b) the embed is truly needed and you're on service-role. Prefer 2-step / 3-step manual joins.
+- **PII columns on `users` (email, display_name) are off-limits to authenticated cookie clients viewing other users.** Rely on `players.gamer_tag` (public-readable) instead for display purposes in client-facing reads. Admin surfaces that truly need display_name go through service-role.
+- When a list surface ships "empty state" unexpectedly, TEST the query against ACTUAL cookie session auth, not service-role. Vitest mocks can't catch this. Either write an E2E spec that logs in as a seeded player OR manually curl with a JWT.
+

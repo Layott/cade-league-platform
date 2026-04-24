@@ -378,63 +378,79 @@ export async function listForPlayer(
   sb: SupabaseClient,
   playerId: string
 ): Promise<PublicPunishment[]> {
-  const { data, error } = await sb
+  // 2026-04-24 followup — removed the `users!inner` embed. Plan 39 locked
+  // down users PII, so an authenticated cookie client viewing another
+  // player's profile gets zero rows back through the nested join (users
+  // row is not self-readable). Two-step instead: fetch player + cases
+  // first, then actions. Display name derived from players.display_name
+  // so we don't need the users embed at all.
+  const { data: player, error: playerErr } = await sb
+    .from("players")
+    .select("id, gamer_tag")
+    .eq("id", playerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (playerErr) throw new Error(`listForPlayer player: ${playerErr.message}`);
+  if (!player) return [];
+
+  const { data: caseRows, error: caseErr } = await sb
     .from("disciplinary_cases")
-    .select(
-      `
-      incident_type,
-      players!inner ( id, gamer_tag, users:users!players_user_id_fkey!inner ( display_name ) ),
-      disciplinary_actions!inner (
-        id, case_id, sanction_type, magnitude, imposed_at, effective_from, notes,
-        public_visible, revoked_at, deleted_at
-      )
-      `
-    )
+    .select("id, incident_type")
     .eq("player_id", playerId)
     .is("deleted_at", null);
-  if (error) throw new Error(`listForPlayer: ${error.message}`);
+  if (caseErr) throw new Error(`listForPlayer cases: ${caseErr.message}`);
 
-  type Row = {
-    incident_type: string;
-    players: {
-      id: string;
-      gamer_tag: string;
-      users: { display_name: string };
-    };
-    disciplinary_actions: Array<{
-      id: string;
-      case_id: string;
-      sanction_type: string;
-      magnitude: number;
-      imposed_at: string;
-      effective_from: string;
-      notes: string | null;
-      public_visible: boolean;
-      revoked_at: string | null;
-      deleted_at: string | null;
-    }>;
+  const caseIncidents = new Map<string, string>();
+  for (const c of (caseRows ?? []) as Array<{ id: string; incident_type: string }>) {
+    caseIncidents.set(c.id, c.incident_type);
+  }
+  if (caseIncidents.size === 0) return [];
+
+  const { data: actionRows, error: actionErr } = await sb
+    .from("disciplinary_actions")
+    .select(
+      "id, case_id, sanction_type, magnitude, imposed_at, effective_from, notes, public_visible, revoked_at, deleted_at",
+    )
+    .in("case_id", Array.from(caseIncidents.keys()))
+    .is("deleted_at", null);
+  if (actionErr) throw new Error(`listForPlayer actions: ${actionErr.message}`);
+
+  type ActionRow = {
+    id: string;
+    case_id: string;
+    sanction_type: string;
+    magnitude: number;
+    imposed_at: string;
+    effective_from: string;
+    notes: string | null;
+    public_visible: boolean;
+    revoked_at: string | null;
+    deleted_at: string | null;
+  };
+
+  const p = player as unknown as {
+    id: string;
+    gamer_tag: string;
   };
 
   const rows: PublicPunishment[] = [];
-  for (const r of (data ?? []) as unknown as Row[]) {
-    for (const a of r.disciplinary_actions) {
-      if (a.deleted_at || a.revoked_at || !a.public_visible) continue;
-      rows.push({
-        id: a.id,
-        case_id: a.case_id,
-        sanction_type: a.sanction_type,
-        magnitude: a.magnitude,
-        imposed_at: a.imposed_at,
-        effective_from: a.effective_from,
-        notes: a.notes,
-        player: {
-          id: r.players.id,
-          gamer_tag: r.players.gamer_tag,
-          display_name: r.players.users.display_name,
-        },
-        incident_type: r.incident_type,
-      });
-    }
+  for (const a of ((actionRows ?? []) as ActionRow[])) {
+    if (a.deleted_at || a.revoked_at || !a.public_visible) continue;
+    rows.push({
+      id: a.id,
+      case_id: a.case_id,
+      sanction_type: a.sanction_type,
+      magnitude: a.magnitude,
+      imposed_at: a.imposed_at,
+      effective_from: a.effective_from,
+      notes: a.notes,
+      player: {
+        id: p.id,
+        gamer_tag: p.gamer_tag,
+        display_name: p.gamer_tag,
+      },
+      incident_type: caseIncidents.get(a.case_id) ?? "other",
+    });
   }
   return rows.sort((a, b) => b.imposed_at.localeCompare(a.imposed_at));
 }
