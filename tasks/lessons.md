@@ -487,3 +487,19 @@ Append patterns after any correction from the user. Keep each entry short: what 
 - **Distinguish INDEX-to-first-tab redirects from STUB redirects.** `/admin/trash` redirecting to `/admin/trash/[first-entity]` is a canonical UX pattern (you always land on some content). A stub redirect exists because the original page never got the intended content. The audit table should call these out separately so future passes don't re-flag the index ones.
 - **Overlay/browser-source routes are DISTINCT from user-nav routes by design.** They render transparent + are loaded by OBS/vMix at 1920×1080. Never treat them as stubs just because they use a `PreviewStub` harness — the harness is the production wrapper.
 
+
+---
+
+**Date:** 2026-04-24
+**Context:** `/profile` disciplinary history blank for every player despite: (a) rows in DB, (b) RLS self+public policies in place, (c) 2-step fetch rewrite. Added runtime diag that printed `error=infinite recursion detected in policy for relation "disciplinary_cases"`.
+**Mistake:** Migration `20260520003000_disciplinary_rls_self_and_public.sql` wrote **mutually-recursive EXISTS clauses**:
+- `disciplinary_cases_public_select` USING: EXISTS (... from disciplinary_actions ...)
+- `disciplinary_actions_self_select` USING: EXISTS (... from disciplinary_cases ...)
+
+Postgres can't statically resolve which policy applies first → infinite recursion at query time. The error is silent to the client except via `error.message`; data just comes back empty. Vitest mocks + service-role smoke both bypass RLS, so this class of bug never surfaces until an actual authenticated session makes the query.
+**Correction:** `20260521004000_fix_disciplinary_rls_recursion.sql` drops the EXISTS from `disciplinary_cases_public_select`. Case metadata (player_id, incident_type, opened_at, status) is non-sensitive — actions table still gates the sensitive payload. Policy now just `USING (deleted_at IS NULL)`.
+**Rule for future:**
+- **Never write two RLS policies that reference each other.** If you're about to add an EXISTS clause on table A that references table B, check whether B's own policies reference A. If yes, one of them has to be unconditional (no cross-reference). Draw the dependency graph on paper before writing the migration.
+- **Every new RLS migration must ship with an authenticated-session smoke test.** Service-role smokes don't catch recursion. The real test is: mint a JWT → SELECT → assert row count > 0. Without this, recursion + policy-misconfiguration bugs ship silently.
+- **When a list shows "empty state" unexpectedly, log `.error.message` from the Supabase response.** The Supabase client doesn't throw on RLS errors; it returns `{ data: null, error: {...} }`. Code that ignores `.error` turns every policy bug into a silent empty state. Add `if (error) throw ...` or at least `console.warn(error)` to every server-side query.
+
