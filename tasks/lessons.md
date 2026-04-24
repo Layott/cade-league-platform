@@ -235,3 +235,11 @@ Append patterns after any correction from the user. Keep each entry short: what 
 **Mistake:** Ran `next dev` in parallel with a background agent editing `apps/web/src/**`. HMR tried to recompile while the agent's writes were mid-flight; Next 15 on Windows occasionally wipes the partial output without restoring.
 **Correction:** Kill dev → `rm -rf apps/web/.next apps/web/node_modules/.cache` → relaunch. Server rebuilds from scratch.
 **Rule for future:** Don't start `next dev` until all parallel agents writing to `apps/web/src/**` have finished. If `ENOENT .next/routes-manifest.json` appears, DO NOT retry requests — error is self-inflicted. Sequence: kill → wipe `.next` → 2s pause → relaunch. Consider a pre-flight script that `rm -rf .next` every `pre-dev`.
+
+---
+
+**Date:** 2026-04-24
+**Context:** User submitted squad, got Zod error `Too big: expected string to have <=6 characters`. Squad `nationalityFlag` schema was `z.string().min(2).max(6)` — sized for ISO-2/ISO-3 codes only ("NG"/"NGA"). submit_picker.ts had been patched earlier (commit `2673395`) to fall back to `card.nation_iso ?? card.nation` because Futbin rows have empty nation_iso; the fallback sent "Nigeria" (7 chars) which blew the cap.
+**Mistake:** Tight upstream input contract (max 6) didn't get revisited when the feeder code changed to emit longer strings. Related pattern to the Futbin nation saga in the log — when a field changes shape due to a fallback path, every downstream validator scoped to the old shape needs a re-audit.
+**Correction:** Bumped `nationalityFlag` max to 64 (covers longest real country name). DB column is `text` (unbounded) so no downstream truncation. Both copies in `schemas.ts` updated — itemSchema + changeSchema (commit `5828a91`).
+**Rule for future:** Whenever a code path adds a fallback that emits a differently-shaped string, `git grep` for every zod schema validating that same field shape downstream. Relax any schema whose constraints were written for the pre-fallback format. Pre-flight: before shipping a fallback, run the full test suite to catch rejected schemas; a silent production reject is worse than a failing test.
