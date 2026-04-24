@@ -36,12 +36,12 @@ function mkSb(stub: SbStub) {
     if (table === "matches") {
       return {
         select: vi.fn(() => ({
-          or: vi.fn(() => ({
-            is: vi.fn(() => ({
-              limit: vi
-                .fn()
-                .mockResolvedValue({ data: stub.matches ?? [], error: null }),
-            })),
+          // pickers.ts dropped the .or() player filter — any signed-in
+          // user now sees all matches. Chain: select().is().limit().
+          is: vi.fn(() => ({
+            limit: vi
+              .fn()
+              .mockResolvedValue({ data: stub.matches ?? [], error: null }),
           })),
         })),
       };
@@ -79,13 +79,29 @@ function mkSb(stub: SbStub) {
 }
 
 describe("listMatchesForUser", () => {
-  it("returns [] when the user has no player row", async () => {
-    const sb = mkSb({ players: null });
+  it("lists matches even when the caller has no player row (e.g. admin)", async () => {
+    const sb = mkSb({
+      players: null,
+      matches: [
+        {
+          id: MATCH_ID,
+          match_day_id: MATCH_DAY_ID,
+          status: "completed",
+          home_player_id: PLAYER_ID,
+          away_player_id: OTHER_PLAYER_ID,
+          match_days: { id: MATCH_DAY_ID, match_date: "2026-04-16", venue_name: "Lagos HQ" },
+          match_results: [{ home_score: 2, away_score: 1, result_type: "normal", confirmed_at: "2026-04-16T20:00:00Z" }],
+          home: { id: PLAYER_ID, gamer_tag: "ME", users: { display_name: "Me" } },
+          away: { id: OTHER_PLAYER_ID, gamer_tag: "WOLE", users: { display_name: "WOLEVATION" } },
+        },
+      ],
+    });
     const out = await listMatchesForUser(sb, USER_ID);
-    expect(out).toEqual([]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.label).toMatch(/Me vs WOLEVATION/);
   });
 
-  it("builds a compact label and handles home-side scoring", async () => {
+  it("builds a compact label showing both players + home-anchored score", async () => {
     const sb = mkSb({
       players: { id: PLAYER_ID },
       matches: [
@@ -120,14 +136,14 @@ describe("listMatchesForUser", () => {
     const out = await listMatchesForUser(sb, USER_ID);
     expect(out).toHaveLength(1);
     expect(out[0]!.id).toBe(MATCH_ID);
-    expect(out[0]!.opponentDisplayName).toBe("WOLEVATION");
+    expect(out[0]!.opponentDisplayName).toBe("Me vs WOLEVATION");
     expect(out[0]!.scoreText).toBe("2-1");
     expect(out[0]!.label).toMatch(/2026-04-16/);
-    expect(out[0]!.label).toMatch(/WOLEVATION/);
+    expect(out[0]!.label).toMatch(/Me vs WOLEVATION/);
     expect(out[0]!.label).toMatch(/2-1/);
   });
 
-  it("flips score for away-side player", async () => {
+  it("score is always home-home, away-away (not submitter-relative)", async () => {
     const sb = mkSb({
       players: { id: PLAYER_ID },
       matches: [
@@ -158,8 +174,9 @@ describe("listMatchesForUser", () => {
       ],
     });
     const out = await listMatchesForUser(sb, USER_ID);
-    expect(out[0]!.scoreText).toBe("1-3");
-    expect(out[0]!.opponentDisplayName).toBe("WOLEVATION");
+    // Home was OTHER (3), away was PLAYER_ID (1) — home-first score text.
+    expect(out[0]!.scoreText).toBe("3-1");
+    expect(out[0]!.opponentDisplayName).toBe("WOLEVATION vs Me");
   });
 
   it("omits score for matches with no confirmed result", async () => {

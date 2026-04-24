@@ -113,17 +113,22 @@ async function resolvePlayerId(
 }
 
 /**
- * Matches the user participated in, most recent first. Limits to 20 to keep
- * the <select> tight — newer seasons first.
+ * All matches in the current/recent slate, most recent first. Used by the
+ * dispute form so a player can raise a dispute about ANY match (e.g.
+ * report cheating in a fixture they didn't play). Label carries BOTH
+ * participants + score so the picker reads cleanly without knowing which
+ * side the submitter is on.
+ *
+ * The `userId` parameter is kept for signature compatibility but is
+ * intentionally not used for filtering — any signed-in user sees every
+ * match.
  */
 export async function listMatchesForUser(
   sb: SupabaseClient,
-  userId: string,
-  limit = 20,
+  _userId: string,
+  limit = 50,
 ): Promise<MatchOption[]> {
-  const playerId = await resolvePlayerId(sb, userId);
-  if (!playerId) return [];
-
+  // Voided / soft-deleted matches stay out of the picker regardless.
   const { data, error } = await sb
     .from("matches")
     .select(
@@ -135,35 +140,32 @@ export async function listMatchesForUser(
       away:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name, email ) )
       `,
     )
-    .or(`home_player_id.eq.${playerId},away_player_id.eq.${playerId}`)
     .is("deleted_at", null)
-    .limit(limit * 2); // overfetch; filtered sort happens in-memory.
+    .limit(limit * 2);
   if (error) throw new Error(`listMatchesForUser: ${error.message}`);
 
   const rows = (data ?? []) as unknown as MatchJoinRow[];
 
   const options: MatchOption[] = rows.map((row) => {
     const md = pickOne(row.match_days);
-    const opponent =
-      row.home_player_id === playerId ? row.away : row.home;
-    const opponentName = displayFor(opponent);
+    const homeName = displayFor(row.home);
+    const awayName = displayFor(row.away);
     const result = pickOne(row.match_results);
     let scoreText: string | null = null;
     if (result && result.confirmed_at) {
-      const homeFirst = row.home_player_id === playerId;
-      const mine = homeFirst ? result.home_score : result.away_score;
-      const theirs = homeFirst ? result.away_score : result.home_score;
-      scoreText = `${mine}-${theirs}`;
+      scoreText = `${result.home_score}-${result.away_score}`;
     }
     const date = md?.match_date ?? "";
     const weekday = date ? weekdayShort(date) : "";
     const scoreBit = scoreText ? ` · ${scoreText}` : "";
-    const label = `${weekday ? weekday + " " : ""}${date} · vs ${opponentName}${scoreBit}`;
+    const label = `${weekday ? weekday + " " : ""}${date} · ${homeName} vs ${awayName}${scoreBit}`;
     return {
       id: row.id,
       matchDayId: row.match_day_id,
       matchDate: date,
-      opponentDisplayName: opponentName,
+      // Historical field kept for call-site compat; now holds the OPPONENT
+      // pair summary so the caller has something to display.
+      opponentDisplayName: `${homeName} vs ${awayName}`,
       scoreText,
       label,
     };
@@ -174,13 +176,13 @@ export async function listMatchesForUser(
 }
 
 /**
- * Match days on which the user has at least one match. Derived from
- * listMatchesForUser so the picker stays consistent.
+ * Every match day that has at least one match — used by the dispute
+ * match-day dropdown. Not user-scoped; any signed-in user sees them all.
  */
 export async function listMatchDaysForUser(
   sb: SupabaseClient,
   userId: string,
-  limit = 20,
+  limit = 50,
 ): Promise<MatchDayOption[]> {
   const matches = await listMatchesForUser(sb, userId, limit);
   const seen = new Map<string, MatchDayOption>();
