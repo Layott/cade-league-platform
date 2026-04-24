@@ -16,6 +16,7 @@ import {
 } from "@/server/matches/match-days";
 import { enterResult, editResult, confirmResult } from "@/server/matches/results";
 import { requirePermAsync } from "@/lib/perms-db";
+import { syncScoreToLiveSessions } from "@/server/broadcast/match_sync";
 
 async function currentPublicUserId(): Promise<string> {
   const sb = await getServerSupabase();
@@ -101,6 +102,50 @@ export async function removeMatchAction(formData: FormData) {
   revalidatePath("/fixtures");
 }
 
+/**
+ * Slice 2 of the leaderboard / broadcast linking audit: after the match
+ * result is persisted, if the same match is currently pinned to a live
+ * stream session slot (primary or secondary), bridge the just-entered
+ * absolute score into the on-air score_bug overlay via Supabase Realtime.
+ * No-op when the match isn't live. Failures are swallowed so a
+ * transient realtime/broadcast issue can't block the core score-entry
+ * write. See `apps/web/src/server/broadcast/match_sync.ts`.
+ */
+async function bridgeScoreToBroadcast(
+  sb: ReturnType<typeof getServiceRoleSupabase>,
+  matchId: string,
+  actorUserId: string,
+  resultType: "normal" | "forfeit" | "void",
+) {
+  if (resultType === "void") {
+    // Voided matches shouldn't overwrite the live bug — the match is
+    // disqualified, not scored. Broadcast operators decide what to show.
+    return;
+  }
+  try {
+    // Read the persisted row so we sync the POST-NORMALIZATION score
+    // (forfeit auto-rewrites to 3-0 in results.ts).
+    const { data, error } = await sb
+      .from("match_results")
+      .select("home_score, away_score")
+      .eq("match_id", matchId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error || !data) return;
+    const row = data as { home_score: number; away_score: number };
+    await syncScoreToLiveSessions(
+      sb,
+      matchId,
+      row.home_score,
+      row.away_score,
+      actorUserId,
+    );
+  } catch (err) {
+    // Best-effort — never block the score-entry action on broadcast sync.
+    console.error("bridgeScoreToBroadcast failed", err);
+  }
+}
+
 export async function enterResultAction(formData: FormData) {
   const matchDayId = String(formData.get("matchDayId") ?? "");
   const matchId = String(formData.get("matchId") ?? "");
@@ -128,6 +173,7 @@ export async function enterResultAction(formData: FormData) {
     },
     actor
   );
+  await bridgeScoreToBroadcast(sb, matchId, actor, resultType);
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
@@ -155,6 +201,9 @@ export async function editResultAction(formData: FormData) {
     resultType,
     notes: formData.get("notes") ? String(formData.get("notes")) : undefined,
   });
+  // editResult doesn't take an actor — currentPublicUserId handles it.
+  const actor = await currentPublicUserId();
+  await bridgeScoreToBroadcast(sb, matchId, actor, resultType);
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
 }
