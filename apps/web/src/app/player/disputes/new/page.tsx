@@ -3,11 +3,16 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
 import { SectionHeader } from "@/components/admin/SectionHeader";
+import {
+  listMatchesForUser,
+  listMatchDaysForUser,
+  listSanctionsForUser,
+} from "@/server/disputes/pickers";
 import { SubmitDisputeForm } from "./SubmitDisputeForm";
 
 export const dynamic = "force-dynamic";
 
-async function resolveGate() {
+async function resolveGate(): Promise<{ userId: string }> {
   const userClient = await getServerSupabase();
   const { data: auth } = await userClient.auth.getUser();
   if (!auth.user) redirect("/login?next=/player/disputes/new");
@@ -30,10 +35,17 @@ async function resolveGate() {
     if (e instanceof PermissionError) throw new Error("Forbidden: disputes.submit");
     throw e;
   }
+  return { userId: pub.id };
 }
 
 export default async function NewDisputePage() {
-  await resolveGate();
+  const { userId } = await resolveGate();
+  const svc = getServiceRoleSupabase();
+  const [matchDays, matches, sanctions] = await Promise.all([
+    listMatchDaysForUser(svc, userId, 20),
+    listMatchesForUser(svc, userId, 20),
+    listSanctionsForUser(svc, userId, 30),
+  ]);
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -41,7 +53,11 @@ export default async function NewDisputePage() {
         title="Raise a dispute"
         description="Describe the issue clearly. IDC/LOC will review and rule. Redact personal info before uploading evidence — reviewers see the files you upload."
       />
-      <SubmitDisputeForm />
+      <SubmitDisputeForm
+        matchDays={matchDays}
+        matches={matches}
+        sanctions={sanctions}
+      />
     </div>
   );
 }

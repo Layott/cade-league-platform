@@ -1,12 +1,23 @@
 import { z } from "zod";
 
-export const submitDisputeSchema = z.object({
-  raisedByUserId: z.string().uuid(),
-  subjectType: z.enum(["match", "sanction", "registration", "other"]),
-  subjectId: z.string().uuid().optional().nullable(),
-  description: z.string().trim().min(1).max(4000),
-  evidenceUrls: z.array(z.string().url()).max(20).default([]),
-});
+export const submitDisputeSchema = z
+  .object({
+    raisedByUserId: z.string().uuid(),
+    subjectType: z.enum(["match", "sanction", "registration", "other"]),
+    subjectId: z.string().uuid().optional().nullable(),
+    title: z.string().trim().min(3).max(200),
+    description: z.string().trim().min(1).max(4000),
+    evidenceUrls: z.array(z.string().url()).max(20).default([]),
+  })
+  .refine(
+    (v) =>
+      (v.subjectType !== "match" && v.subjectType !== "sanction") ||
+      (typeof v.subjectId === "string" && v.subjectId.length > 0),
+    {
+      message: "subjectId is required for match and sanction disputes",
+      path: ["subjectId"],
+    },
+  );
 export type SubmitDisputeInput = z.infer<typeof submitDisputeSchema>;
 
 export const assignDisputeSchema = z.object({

@@ -62,6 +62,7 @@ describe("submit", () => {
       raisedByUserId: UUID_A,
       subjectType: "match",
       subjectId: UUID_B,
+      title: "Bad call",
       description: "foul play",
       evidenceUrls: [],
     });
@@ -75,6 +76,7 @@ describe("submit", () => {
       submit(sb, {
         raisedByUserId: UUID_A,
         subjectType: "other",
+        title: "General issue",
         description: "",
         evidenceUrls: [],
       }),
@@ -87,10 +89,37 @@ describe("submit", () => {
       submit(sb, {
         raisedByUserId: UUID_A,
         subjectType: "other",
+        title: "General issue",
         description: "ok",
         evidenceUrls: [],
       }),
     ).rejects.toBeInstanceOf(DisputeError);
+  });
+
+  it("rejects match dispute without subjectId", async () => {
+    const sb = mkSb({ insertRow: {} });
+    await expect(
+      submit(sb, {
+        raisedByUserId: UUID_A,
+        subjectType: "match",
+        title: "Bad call",
+        description: "foul play",
+        evidenceUrls: [],
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects sanction dispute without subjectId", async () => {
+    const sb = mkSb({ insertRow: {} });
+    await expect(
+      submit(sb, {
+        raisedByUserId: UUID_A,
+        subjectType: "sanction",
+        title: "Unfair warning",
+        description: "disagree with the punishment issued",
+        evidenceUrls: [],
+      }),
+    ).rejects.toThrow();
   });
 });
 

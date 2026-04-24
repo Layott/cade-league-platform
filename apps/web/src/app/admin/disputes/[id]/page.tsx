@@ -127,7 +127,7 @@ export default async function AdminDisputeDetailPage({
     <div className="space-y-8">
       <SectionHeader
         eyebrow={`Dispute · ${dispute.subject_type}`}
-        title={`Dispute ${dispute.id.slice(0, 8)}`}
+        title={dispute.title ?? `Dispute ${dispute.id.slice(0, 8)}`}
         description={
           <span className="flex items-center gap-2">
             <StatusPill status={dispute.status} />
@@ -152,8 +152,22 @@ export default async function AdminDisputeDetailPage({
             <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
               Subject reference
             </dt>
-            <dd className="font-mono text-xs text-[var(--chalk-1)]">
+            <dd
+              className="font-mono text-xs text-[var(--chalk-1)]"
+              data-testid="dispute-subject-id"
+            >
               {dispute.subject_id ?? "—"}
+            </dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+              Title
+            </dt>
+            <dd
+              className="text-[var(--chalk-0)]"
+              data-testid="dispute-title"
+            >
+              {dispute.title ?? "—"}
             </dd>
           </div>
           <div className="md:col-span-2">

@@ -104,6 +104,15 @@ export default async function AdminDisputesListPage({
       ),
     },
     {
+      key: "title",
+      label: "Title",
+      render: (d) => (
+        <span className="text-sm text-[var(--chalk-0)]">
+          {d.title ?? "—"}
+        </span>
+      ),
+    },
+    {
       key: "subject",
       label: "Subject",
       render: (d) => (

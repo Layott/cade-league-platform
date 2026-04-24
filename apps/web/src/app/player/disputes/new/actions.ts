@@ -30,6 +30,7 @@ export async function submitDisputeAction(formData: FormData): Promise<void> {
     raisedByUserId: userId,
     subjectType: input.subjectType,
     subjectId: input.subjectId,
+    title: input.title,
     description: input.description,
     evidenceUrls: input.evidencePaths,
   });

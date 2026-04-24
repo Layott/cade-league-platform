@@ -22,6 +22,7 @@ export type DisputeRow = {
   raised_by_user_id: string;
   subject_type: "match" | "sanction" | "registration" | "other";
   subject_id: string | null;
+  title: string | null;
   description: string;
   evidence_urls: string[];
   status: "submitted" | "under_review" | "resolved" | "withdrawn";
@@ -45,6 +46,7 @@ export async function submit(
       raised_by_user_id: input.raisedByUserId,
       subject_type: input.subjectType,
       subject_id: input.subjectId ?? null,
+      title: input.title,
       description: input.description,
       evidence_urls: input.evidenceUrls,
     })
