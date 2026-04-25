@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { REALTIME } from "@/server/overlays/registry";
 import { v2ToLegacy } from "./template-mapping";
 import type { V2OverlayKey } from "./overlay-keys";
 
@@ -22,6 +23,10 @@ import type { V2OverlayKey } from "./overlay-keys";
  *     the broadcast control panel preview iframes) is forwarded into the
  *     iframe so editorial pickers (h2h players, lower-third slots, timer
  *     duration) drive the live design without rebuilding.
+ *  4. Initial-state seed: on iframe `load`, if the overlayKey has a
+ *     matching `/api/broadcast/...` endpoint, fetches the current payload
+ *     and posts it into the iframe so the design renders the live data
+ *     before any Realtime event lands.
  *
  * The HTML's existing `window.addEventListener('message', ...)` handler is
  * the contract — see e.g. `KNOWLEDGE/brand-assets/elements/v2/02-timer/
@@ -32,11 +37,11 @@ import type { V2OverlayKey } from "./overlay-keys";
  * subscriptions — most v2 overlays are control-panel-driven via the
  * postMessage relay):
  *
- *   07-leaderboard         → standings.changed
+ *   07-leaderboard         → standings.changed + snapshot.captured
  *   09-secondary-score-bug → score.changed
  *   10-up-next-bug         → match.ended (for "next fixture" recompute)
  *   11-match-scores-day    → score.changed + match.ended + standings.changed
- *   14-top-scorers         → match.ended (recompute scorer ladder)
+ *   14-top-scorers         → match.ended + standings.changed
  *   17-penalties           → standings.changed (proxy for disciplinary edits;
  *                            DB recompute fires this on penalty insert)
  *
@@ -65,6 +70,24 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   "17-penalties": ["standings.changed"],
 };
 
+/**
+ * Plan 51 §6 — initial-state fetch on mount.
+ *
+ * For data-driven overlays we hit the matching `/api/broadcast/...` endpoint
+ * (or `/api/broadcast/v2/...` for v2-only stubs) to seed the iframe with the
+ * current payload before any Realtime event lands. Skipped when no
+ * `sessionId` is supplied (standalone OBS smoke previews render empty).
+ */
+const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string) => string>> = {
+  "07-leaderboard": (s) => `/api/broadcast/sessions/${s}/leaderboard`,
+  "11-match-scores-day": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
+  "14-top-scorers": (s) => `/api/broadcast/sessions/${s}/top-scorers`,
+  // v2-only stubs — orgs/coaches/penalties have no legacy counterpart.
+  "15-orgs": (s) => `/api/broadcast/v2/sessions/${s}/orgs`,
+  "16-coaches": (s) => `/api/broadcast/v2/sessions/${s}/coaches`,
+  "17-penalties": (s) => `/api/broadcast/v2/sessions/${s}/penalties`,
+};
+
 export type OverlayDataInjectorProps = {
   overlayKey: string;
   sessionId?: string;
@@ -84,6 +107,50 @@ export default function OverlayDataInjector({
   seasonId,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+
+  /* --------------------------------------------------------------- *
+   * 0. Initial-state fetch — seed iframe with current data on mount  *
+   *                                                                 *
+   * Only fires when both `sessionId` is supplied AND the overlay     *
+   * key is in `INITIAL_FETCH_PATH`. Standalone OBS smoke previews    *
+   * (no session) render empty until a control-panel postMessage      *
+   * arrives. The payload is forwarded as a `{type:'update'}`         *
+   * postMessage matching the Realtime event shape.                   *
+   * --------------------------------------------------------------- */
+  useEffect(() => {
+    if (!sessionId) return;
+    const builder = INITIAL_FETCH_PATH[overlayKey];
+    if (!builder) return;
+    if (!iframeLoaded) return;
+
+    let cancelled = false;
+    const url = builder(sessionId);
+    const fetchUrl = token
+      ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
+      : url;
+
+    fetch(fetchUrl, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const iframe = iframeRef.current;
+        if (!iframe || !iframe.contentWindow) return;
+        // Send the entire response as the initial payload — overlay HTML
+        // can pick `payload`, `rows`, etc. via its own message handler.
+        iframe.contentWindow.postMessage(
+          { type: "update", event: "initial.fetch", payload: data },
+          "*",
+        );
+      })
+      .catch(() => {
+        // best-effort — Realtime events will refresh once data lands
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [overlayKey, sessionId, token, iframeLoaded]);
 
   /* --------------------------------------------------------------- *
    * 1a. Trigger channel — overlay:<sessionId>                        *
@@ -103,7 +170,7 @@ export default function OverlayDataInjector({
   useEffect(() => {
     if (!sessionId) return;
     const sb = getBrowserSupabase();
-    const channel = sb.channel(`overlay:${sessionId}`, {
+    const channel = sb.channel(REALTIME.channel(sessionId), {
       config: { broadcast: { self: true } },
     });
 
@@ -190,7 +257,7 @@ export default function OverlayDataInjector({
     if (!events || events.length === 0) return;
 
     const sb = getBrowserSupabase();
-    const channel = sb.channel(`public:standings:${seasonId}`, {
+    const channel = sb.channel(REALTIME.standingsChannel(seasonId), {
       config: { broadcast: { self: false } },
     });
 
@@ -247,6 +314,7 @@ export default function OverlayDataInjector({
       src={src}
       title={`Overlay v2 · ${overlayKey}`}
       allow="autoplay"
+      onLoad={() => setIframeLoaded(true)}
       style={{
         border: 0,
         width: "100vw",

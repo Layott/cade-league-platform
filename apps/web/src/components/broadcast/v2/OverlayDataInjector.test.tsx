@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { act, render, cleanup } from "@testing-library/react";
 import OverlayDataInjector from "./OverlayDataInjector";
 
 /**
@@ -221,5 +221,103 @@ describe("OverlayDataInjector", () => {
         "standings.changed",
       ]),
     );
+  });
+
+  async function flush() {
+    // React state updates from a non-batched event (DOM dispatchEvent) need
+    // a tick to flush + a second to drain the fetch promise resolution.
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+
+  it("does NOT call fetch when sessionId is missing", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("{}"),
+    );
+    render(<OverlayDataInjector overlayKey="07-leaderboard" />);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("calls initial-fetch endpoint after iframe loads (leaderboard)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ payload: { rows: [] } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    const { container } = render(
+      <OverlayDataInjector
+        overlayKey="07-leaderboard"
+        sessionId="sess-1"
+      />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    expect(fetchSpy).toHaveBeenCalled();
+    const url = fetchSpy.mock.calls[0]![0] as string;
+    expect(url).toContain("/api/broadcast/sessions/sess-1/leaderboard");
+    fetchSpy.mockRestore();
+  });
+
+  it("includes token in initial-fetch URL when supplied", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const { container } = render(
+      <OverlayDataInjector
+        overlayKey="14-top-scorers"
+        sessionId="sess-2"
+        token="tok-9"
+      />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    const url = fetchSpy.mock.calls[0]?.[0] as string | undefined;
+    expect(url).toBeTruthy();
+    expect(url).toContain("/api/broadcast/sessions/sess-2/top-scorers");
+    expect(url).toContain("token=tok-9");
+    fetchSpy.mockRestore();
+  });
+
+  it("uses /api/broadcast/v2 path for orgs/coaches/penalties", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const { container } = render(
+      <OverlayDataInjector overlayKey="15-orgs" sessionId="s-3" />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    const url = fetchSpy.mock.calls[0]?.[0] as string | undefined;
+    expect(url).toContain("/api/broadcast/v2/sessions/s-3/orgs");
+    fetchSpy.mockRestore();
+  });
+
+  it("does NOT call fetch for keys without an initial-fetch endpoint", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}"));
+    const { container } = render(
+      <OverlayDataInjector overlayKey="01-brb" sessionId="s-x" />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

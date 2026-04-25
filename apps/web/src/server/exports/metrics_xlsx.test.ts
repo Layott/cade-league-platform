@@ -26,24 +26,22 @@ function mkSb(opts: {
       })),
     })),
   };
+  // Plan 51 audit fix: both reads dropped the `.eq("<joined>.season_id", ...)`
+  // shorthand and now filter in-memory after a `.is(deleted_at, null)`.
   const matchResults = {
     select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        is: vi.fn().mockResolvedValue({
-          data: opts.results,
-          error: opts.resultsError ?? null,
-        }),
-      })),
+      is: vi.fn().mockResolvedValue({
+        data: opts.results,
+        error: opts.resultsError ?? null,
+      }),
     })),
   };
   const disciplinary = {
     select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        is: vi.fn().mockResolvedValue({
-          data: opts.disciplinary,
-          error: opts.disciplinaryError ?? null,
-        }),
-      })),
+      is: vi.fn().mockResolvedValue({
+        data: opts.disciplinary,
+        error: opts.disciplinaryError ?? null,
+      }),
     })),
   };
   return {
@@ -93,12 +91,13 @@ const results = [
     is_walkover: false,
     walkover_initiated_by: null,
     confirmed_at: "2026-04-21T20:00:00Z",
+    created_at: "2026-04-21T18:00:00Z",
     match: {
       home_player_id: "p1",
       away_player_id: "p2",
-      season_id: "s",
-      scheduled_for: "2026-04-21T18:00:00Z",
-      match_day_id: 1,
+      season_id: "s-1",
+      scheduled_time: "18:00:00",
+      match_day_id: "md-1",
     },
   },
   {
@@ -110,12 +109,13 @@ const results = [
     is_walkover: true,
     walkover_initiated_by: "admin",
     confirmed_at: "2026-04-22T20:00:00Z",
+    created_at: "2026-04-22T18:00:00Z",
     match: {
       home_player_id: "p2",
       away_player_id: "p1",
-      season_id: "s",
-      scheduled_for: "2026-04-22T18:00:00Z",
-      match_day_id: 2,
+      season_id: "s-1",
+      scheduled_time: "18:00:00",
+      match_day_id: "md-2",
     },
   },
 ];
@@ -123,15 +123,13 @@ const results = [
 const disciplinary = [
   {
     id: "d1",
-    player_id: "p1",
-    incident_type: "warning_no_show",
-    step_number: 1,
-    warning_value: 1,
-    match_ban_count: 0,
-    caution_amount: 0,
+    sanction_type: "warning",
+    magnitude: 1,
+    effective_from: "2026-04-21",
+    effective_until: null,
+    imposed_at: "2026-04-21T20:00:00Z",
     notes: "Late",
-    issued_at: "2026-04-21T20:00:00Z",
-    season_id: "s",
+    case: { player_id: "p1", season_id: "s-1" },
   },
 ];
 
@@ -227,8 +225,8 @@ describe("buildMetricsWorkbook()", () => {
       wb.Sheets["Match-Day Results"],
       { header: 1 },
     );
-    expect(aoa[1]?.[0]).toBe(1);
-    expect(aoa[2]?.[0]).toBe(2);
+    expect(aoa[1]?.[0]).toBe("md-1");
+    expect(aoa[2]?.[0]).toBe("md-2");
   });
 
   it("Disciplinary sheet maps player_id to display name", () => {

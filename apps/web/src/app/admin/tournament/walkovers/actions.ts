@@ -88,7 +88,7 @@ export async function confirmPendingWalkoverAction(
   }
 
   try {
-    await confirmRefPendingWalkover(parsed, ctx.svc);
+    await confirmRefPendingWalkover(parsed, ctx.svc, ctx.userId);
   } catch (e) {
     return {
       ok: false,

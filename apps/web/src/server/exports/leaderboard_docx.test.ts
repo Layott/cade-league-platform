@@ -22,15 +22,16 @@ function mkSb(opts: {
       })),
     })),
   };
+  // Plan 51 audit fix: docx form read no longer chains `.eq("match.season_id", ...)`
+  // — the joined-column shorthand was unreliable on cloud, replaced with an
+  // in-memory filter after the fetch.
   const matchResults = {
     select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        is: vi.fn(() => ({
-          not: vi.fn().mockResolvedValue({
-            data: opts.results,
-            error: opts.resultsError ?? null,
-          }),
-        })),
+      is: vi.fn(() => ({
+        not: vi.fn().mockResolvedValue({
+          data: opts.results,
+          error: opts.resultsError ?? null,
+        }),
       })),
     })),
   };
@@ -63,11 +64,11 @@ const resultsFixture = [
     match_id: "m1",
     home_score: 3,
     away_score: 1,
+    created_at: "2026-04-20T18:00:00Z",
     match: {
       home_player_id: "p1",
       away_player_id: "p2",
-      season_id: "s",
-      scheduled_for: "2026-04-20T18:00:00Z",
+      season_id: "s-1",
     },
   },
 ];
@@ -149,10 +150,8 @@ describe("generateLeaderboardDOCX()", () => {
     };
     const matchResults = {
       select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            not: vi.fn().mockResolvedValue({ data: [], error: null }),
-          })),
+        is: vi.fn(() => ({
+          not: vi.fn().mockResolvedValue({ data: [], error: null }),
         })),
       })),
     };

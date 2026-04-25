@@ -42,26 +42,34 @@ type MatchResultJoinedRow = {
   is_walkover?: boolean | null;
   walkover_initiated_by?: string | null;
   confirmed_at: string | null;
+  created_at: string | null;
   match: {
     home_player_id: string;
     away_player_id: string;
     season_id: string;
-    scheduled_for: string | null;
-    match_day_id?: number | null;
+    scheduled_time: string | null;
+    match_day_id?: string | null;
   } | null;
 };
 
 type DisciplinaryRow = {
   id: string;
-  player_id: string;
-  incident_type: string;
-  step_number: number | null;
-  warning_value: number | null;
-  match_ban_count: number | null;
-  caution_amount: number | null;
+  sanction_type: string;
+  magnitude: number;
+  effective_from: string | null;
+  effective_until: string | null;
+  imposed_at: string | null;
   notes: string | null;
-  issued_at: string | null;
-  season_id: string | null;
+  case:
+    | {
+        player_id: string;
+        season_id: string | null;
+      }
+    | {
+        player_id: string;
+        season_id: string | null;
+      }[]
+    | null;
 };
 
 async function readStandings(
@@ -92,36 +100,44 @@ async function readResultsForSeason(
     .from("match_results")
     .select(
       `id, match_id, home_score, away_score, result_type,
-       is_walkover, walkover_initiated_by, confirmed_at,
-       match:match_id ( home_player_id, away_player_id, season_id, scheduled_for, match_day_id )`,
+       is_walkover, walkover_initiated_by, confirmed_at, created_at,
+       match:match_id ( home_player_id, away_player_id, season_id, scheduled_time, match_day_id )`,
     )
-    .eq("match.season_id", seasonId)
     .is("deleted_at", null);
   if (error) {
     console.warn(`metrics results read failed: ${error.message}`);
     return [];
   }
-  return (data ?? []) as unknown as MatchResultJoinedRow[];
+  // Inline season filter — Supabase's `.eq("match.season_id", ...)` shorthand
+  // is unreliable on joined columns.
+  return ((data ?? []) as unknown as MatchResultJoinedRow[]).filter(
+    (r) => r.match?.season_id === seasonId,
+  );
 }
 
 async function readDisciplinary(
   sb: SupabaseClient,
   seasonId: number | string,
 ): Promise<DisciplinaryRow[]> {
+  // disciplinary_actions stores no direct player_id / season_id — both come
+  // from the joined disciplinary_cases row. Pull the join + filter in-memory.
   const { data, error } = await sb
     .from("disciplinary_actions")
     .select(
-      `id, player_id, incident_type, step_number,
-       warning_value, match_ban_count, caution_amount,
-       notes, issued_at, season_id`,
+      `id, sanction_type, magnitude, effective_from, effective_until,
+       imposed_at, notes,
+       case:case_id ( player_id, season_id )`,
     )
-    .eq("season_id", seasonId)
     .is("deleted_at", null);
   if (error) {
     console.warn(`metrics disciplinary read failed: ${error.message}`);
     return [];
   }
-  return (data ?? []) as unknown as DisciplinaryRow[];
+  const rows = (data ?? []) as unknown as DisciplinaryRow[];
+  return rows.filter((r) => {
+    const c = Array.isArray(r.case) ? r.case[0] : r.case;
+    return c?.season_id === seasonId;
+  });
 }
 
 function nameFor(s: StandingsRow): string {
@@ -189,17 +205,17 @@ function buildMatchDaySheet(
     ],
   ];
   const sorted = [...results].sort((a, b) => {
-    const am = a.match?.match_day_id ?? 0;
-    const bm = b.match?.match_day_id ?? 0;
-    if (am !== bm) return am - bm;
-    return (a.match?.scheduled_for ?? "").localeCompare(
-      b.match?.scheduled_for ?? "",
+    const am = a.match?.match_day_id ?? "";
+    const bm = b.match?.match_day_id ?? "";
+    if (am !== bm) return am < bm ? -1 : am > bm ? 1 : 0;
+    return (a.match?.scheduled_time ?? "").localeCompare(
+      b.match?.scheduled_time ?? "",
     );
   });
   for (const r of sorted) {
     aoa.push([
       r.match?.match_day_id ?? "",
-      r.match?.scheduled_for ?? "",
+      r.match?.scheduled_time ?? "",
       nameById.get(r.match?.home_player_id ?? "") ?? "",
       nameById.get(r.match?.away_player_id ?? "") ?? "",
       r.home_score,
@@ -229,7 +245,7 @@ function buildWalkoversSheet(
   for (const r of results.filter((r) => r.is_walkover === true)) {
     aoa.push([
       r.match?.match_day_id ?? "",
-      r.match?.scheduled_for ?? "",
+      r.match?.scheduled_time ?? "",
       nameById.get(r.match?.home_player_id ?? "") ?? "",
       nameById.get(r.match?.away_player_id ?? "") ?? "",
       r.home_score,
@@ -247,24 +263,24 @@ function buildDisciplinarySheet(
   const aoa: Array<Array<string | number>> = [
     [
       "Player",
-      "Incident",
-      "Step",
-      "Warning Value",
-      "Match Ban Count",
-      "Caution Amount",
-      "Issued At",
+      "Sanction Type",
+      "Magnitude",
+      "Effective From",
+      "Effective Until",
+      "Imposed At",
       "Notes",
     ],
   ];
   for (const r of rows) {
+    const c = Array.isArray(r.case) ? r.case[0] : r.case;
+    const playerId = c?.player_id ?? "";
     aoa.push([
-      nameById.get(r.player_id) ?? r.player_id,
-      r.incident_type,
-      r.step_number ?? "",
-      r.warning_value ?? "",
-      r.match_ban_count ?? "",
-      r.caution_amount ?? "",
-      r.issued_at ?? "",
+      nameById.get(playerId) ?? playerId,
+      r.sanction_type,
+      r.magnitude,
+      r.effective_from ?? "",
+      r.effective_until ?? "",
+      r.imposed_at ?? "",
       r.notes ?? "",
     ]);
   }
@@ -325,12 +341,12 @@ export async function generateMetricsXLSX(
       match_id: r.match_id,
       home_score: r.home_score,
       away_score: r.away_score,
+      created_at: r.created_at,
       match: r.match
         ? {
             home_player_id: r.match.home_player_id,
             away_player_id: r.match.away_player_id,
             season_id: r.match.season_id,
-            scheduled_for: r.match.scheduled_for,
           }
         : null,
     })),

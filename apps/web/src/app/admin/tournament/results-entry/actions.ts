@@ -7,7 +7,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync, PermissionError } from "@/lib/perms-db";
 import { getActiveSeason } from "@/server/seasons";
-import { enterResult, editResult } from "@/server/matches/results";
+import { confirmResult, enterResult, editResult } from "@/server/matches/results";
 import { publishStandingsChanged } from "@/server/standings/realtime";
 
 /**
@@ -118,6 +118,11 @@ export async function submitMatchResultAction(
       );
       resultId = out.id;
     }
+    // Tournament admin entry IS the authority — auto-confirm so the
+    // recompute_standings function (which filters confirmed_at IS NOT NULL)
+    // picks up this row immediately. confirmResult is a no-op if already
+    // confirmed.
+    await confirmResult(svc, { matchId: parsed.matchId }, pub.id);
   } catch (e) {
     return {
       status: "error",

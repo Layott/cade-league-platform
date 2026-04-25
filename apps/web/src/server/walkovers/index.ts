@@ -154,6 +154,10 @@ export async function triggerAdminWalkover(
   }
   const { home, away } = scoresForWinner(match, winnerId);
 
+  const nowIso = new Date().toISOString();
+  // Recompute_standings filters on confirmed_at IS NOT NULL — admin walkovers
+  // ARE the authority, stamp both confirmed_at + confirmed_by alongside the
+  // walkover-specific timestamp so the standings rebuild picks the row up.
   const payload = {
     match_id: matchId,
     home_score: home,
@@ -162,9 +166,15 @@ export async function triggerAdminWalkover(
     is_walkover: true,
     walkover_initiated_by: "admin" as const,
     walkover_pending: false,
-    walkover_confirmed_at: new Date().toISOString(),
+    walkover_confirmed_at: nowIso,
     winner_player_id: winnerId,
-    ...(actorUserId ? { entered_by: actorUserId } : {}),
+    ...(actorUserId
+      ? {
+          entered_by: actorUserId,
+          confirmed_by: actorUserId,
+          confirmed_at: nowIso,
+        }
+      : {}),
   };
 
   const { data, error } = await sb
@@ -257,6 +267,7 @@ export async function markRefPendingWalkover(
 export async function confirmRefPendingWalkover(
   matchId: string,
   sb: SupabaseClient,
+  actorUserId?: string,
 ): Promise<MatchResult> {
   const { data: existing, error: lookupErr } = await sb
     .from("match_results")
@@ -286,11 +297,16 @@ export async function confirmRefPendingWalkover(
     return row;
   }
 
+  const nowIso = new Date().toISOString();
+  // Promote the row from draft → confirmed so recompute_standings picks it up.
   const { data, error } = await sb
     .from("match_results")
     .update({
       walkover_pending: false,
-      walkover_confirmed_at: new Date().toISOString(),
+      walkover_confirmed_at: nowIso,
+      ...(actorUserId
+        ? { confirmed_by: actorUserId, confirmed_at: nowIso }
+        : {}),
     })
     .eq("id", row.id)
     .select("*")

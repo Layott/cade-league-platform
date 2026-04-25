@@ -39,12 +39,13 @@ function mkSb(opts: {
       })),
     })),
   };
+  // Plan 51 audit fix: leaderboard_xlsx no longer calls `.eq("match.season_id", ...)`
+  // (Supabase shorthand was unreliable on joined columns) — instead the read
+  // is `select → is → not`, then filters in-memory by season_id.
   const matchResults = {
     select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        is: vi.fn(() => ({
-          not: resultsTerminal,
-        })),
+      is: vi.fn(() => ({
+        not: resultsTerminal,
       })),
     })),
   };
@@ -89,22 +90,22 @@ const resultsFixture = [
     match_id: "m1",
     home_score: 3,
     away_score: 1,
+    created_at: "2026-04-20T18:00:00Z",
     match: {
       home_player_id: "p1",
       away_player_id: "p2",
-      season_id: "s",
-      scheduled_for: "2026-04-20T18:00:00Z",
+      season_id: "s-1",
     },
   },
   {
     match_id: "m2",
     home_score: 0,
     away_score: 2,
+    created_at: "2026-04-21T18:00:00Z",
     match: {
       home_player_id: "p2",
       away_player_id: "p1",
-      season_id: "s",
-      scheduled_for: "2026-04-21T18:00:00Z",
+      season_id: "s-1",
     },
   },
 ];
@@ -125,11 +126,11 @@ describe("buildFormMap()", () => {
       match_id: `m${i}`,
       home_score: 1,
       away_score: 0,
+      created_at: `2026-04-${20 + i}T00:00:00Z`,
       match: {
         home_player_id: "p1",
         away_player_id: "p2",
-        season_id: "s",
-        scheduled_for: `2026-04-${20 + i}T00:00:00Z`,
+        season_id: "s-1",
       },
     }));
     const m = buildFormMap(seven);
@@ -143,11 +144,11 @@ describe("buildFormMap()", () => {
         match_id: "m1",
         home_score: 1,
         away_score: 1,
+        created_at: "2026-04-20T00:00:00Z",
         match: {
           home_player_id: "p1",
           away_player_id: "p2",
-          season_id: "s",
-          scheduled_for: "2026-04-20T00:00:00Z",
+          season_id: "s-1",
         },
       },
     ];
@@ -304,22 +305,22 @@ describe("generateLeaderboardXLSX()", () => {
         match_id: "m1",
         home_score: 5,
         away_score: 0,
+        created_at: "2026-04-20T00:00:00Z",
         match: {
           home_player_id: "p1",
           away_player_id: "p2",
-          season_id: "s",
-          scheduled_for: "2026-04-20T00:00:00Z",
+          season_id: "s-1",
         },
       },
       {
         match_id: "m2",
         home_score: 0,
         away_score: 0,
+        created_at: "2026-04-22T00:00:00Z",
         match: {
           home_player_id: "p1",
           away_player_id: "p2",
-          season_id: "s",
-          scheduled_for: "2026-04-22T00:00:00Z",
+          season_id: "s-1",
         },
       },
     ];
@@ -347,10 +348,8 @@ describe("generateLeaderboardXLSX()", () => {
     };
     const matchResults = {
       select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            not: vi.fn().mockResolvedValue({ data: [], error: null }),
-          })),
+        is: vi.fn(() => ({
+          not: vi.fn().mockResolvedValue({ data: [], error: null }),
         })),
       })),
     };

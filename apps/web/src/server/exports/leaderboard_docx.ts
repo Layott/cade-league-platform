@@ -40,11 +40,11 @@ type MatchResultRow = {
   match_id: string;
   home_score: number;
   away_score: number;
+  created_at: string | null;
   match: {
     home_player_id: string;
     away_player_id: string;
     season_id: string;
-    scheduled_for: string | null;
   } | null;
 };
 
@@ -75,17 +75,20 @@ async function readRecentResults(
   const { data, error } = await sb
     .from("match_results")
     .select(
-      `match_id, home_score, away_score,
-       match:match_id ( home_player_id, away_player_id, season_id, scheduled_for )`,
+      `match_id, home_score, away_score, created_at,
+       match:match_id ( home_player_id, away_player_id, season_id )`,
     )
-    .eq("match.season_id", seasonId)
     .is("deleted_at", null)
     .not("confirmed_at", "is", null);
   if (error) {
     console.warn(`leaderboard form read failed: ${error.message}`);
     return [];
   }
-  return (data ?? []) as unknown as MatchResultRow[];
+  // Inline season filter — Supabase's `.eq("match.season_id", ...)` shorthand
+  // is unreliable on joined columns (silently no-ops on cloud).
+  return ((data ?? []) as unknown as MatchResultRow[]).filter(
+    (r) => r.match?.season_id === seasonId,
+  );
 }
 
 function letterFor(score: number, opponent: number): "W" | "D" | "L" {
@@ -98,8 +101,8 @@ export function buildFormMap(
   results: MatchResultRow[],
 ): Map<string, string> {
   const sorted = [...results].sort((a, b) => {
-    const at = a.match?.scheduled_for ?? "";
-    const bt = b.match?.scheduled_for ?? "";
+    const at = a.created_at ?? "";
+    const bt = b.created_at ?? "";
     return at.localeCompare(bt);
   });
   const perPlayer = new Map<string, string[]>();
