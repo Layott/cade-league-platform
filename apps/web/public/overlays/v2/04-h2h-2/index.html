@@ -1096,30 +1096,158 @@
   </main>
 
   <script>
-    // Demo loop: re-trigger CSS animations every cycle by reflowing animated nodes.
-    // CSS handles all animation phases; JS only restarts them on cycle boundary.
+    /* ------------------------------------------------------------
+       LIVE DATA — postMessage handler (v2 broadcast wiring)
+       ------------------------------------------------------------
+       Contract (set by OverlayDataInjector.tsx):
+         { type: 'show',  data: { players: [{slug,name},{slug,name}] } }
+         { type: 'update', data: { players: [...] } }
+         { type: 'hide' }
+
+       When a parent iframe posts a message, we swap the photos / org
+       logos / name backdrops / nameplates without rebuilding. The
+       static demo loop is suppressed once the first live update lands
+       so the operator's selection sticks. */
     (function () {
-      const stage = document.querySelector('.stage');
-      if (!stage) return;
-      // Match --cycle in CSS exactly (11.6s).
-      const CYCLE_MS = 11600;
-      const SELECTORS = [
-        '.top-band', '.chevrons', '.h2h-kicker-wrap',
-        '.player-col', '.stats-card', '.stat-row',
-        '.winprob', '.winprob-bar-a', '.winprob-bar-b',
-        '.partners'
-      ].join(',');
-      function restart() {
-        const animated = stage.querySelectorAll(SELECTORS);
-        animated.forEach(function (el) {
-          const orig = el.style.animation;
-          el.style.animation = 'none';
-          // force reflow
-          void el.offsetHeight;
-          el.style.animation = orig || '';
-        });
+      // Slug → asset paths (absolute so they resolve in the iframe context).
+      var PLAYER_PHOTO = {
+        adefola:      '/overlays/v2/_assets/players/processed/adefola/fullbody_01_nobg.png',
+        anife:        '/overlays/v2/_assets/players/processed/anife/fullbody_02_nobg.png',
+        baji_jnr:     '/overlays/v2/_assets/players/processed/baji_jnr/fullbody_01_nobg.png',
+        dadaboi:      '/overlays/v2/_assets/players/processed/dadaboi/fullbody_01_nobg.png',
+        faruk:        '/overlays/v2/_assets/players/processed/faruk/fullbody_01_nobg.png',
+        guru:         '/overlays/v2/_assets/players/processed/guru/fullbody_01_nobg.png',
+        kaykay:       '/overlays/v2/_assets/players/processed/kaykay/fullbody_01_nobg.png',
+        killer_freak: '/overlays/v2/_assets/players/processed/killer_freak/fullbody_01_nobg.png',
+        kingnonex:    '/overlays/v2/_assets/players/processed/kingnonex/fullbody_01_nobg.png',
+        mitch:        '/overlays/v2/_assets/players/processed/mitch/fullbody_01_nobg.png',
+        mr_oga:       '/overlays/v2/_assets/players/processed/mr_oga/fullbody_01_nobg.png',
+        tactical:     '/overlays/v2/_assets/players/processed/tactical/fullbody_01_nobg.png',
+        wolevation:   '/overlays/v2/_assets/players/processed/wolevation/fullbody_01_nobg.png'
+      };
+      var PLAYER_ORG = {
+        adefola:      '/overlays/v2/_assets/Orgs/cade%20esport%20-%20ADEFOLA.png',
+        anife:        '/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg',
+        baji_jnr:     '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20BAJI%20JNR.png',
+        dadaboi:      '/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png',
+        faruk:        '/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20PLAIN%20-%20FARUK.png',
+        guru:         '/overlays/v2/_assets/Orgs/YAKABU%20GLOBAL%20ENTERPRISE%20LIMITED%20-%20GURU.jpg',
+        kaykay:       '/overlays/v2/_assets/Orgs/LUMO%20LABS%20%28WHITE%29%20-%20KAYKAY.png',
+        killer_freak: '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20KILLER%20FREAK.png',
+        kingnonex:    '/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png',
+        mitch:        '/overlays/v2/_assets/Orgs/PHOENIX%20ESPORTS%20-%20MITCH.png',
+        mr_oga:       null, /* independent */
+        tactical:     '/overlays/v2/_assets/Orgs/FUNQUEST%20ESPORTS%20-%20TACTICAL.jpeg',
+        wolevation:   '/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg'
+      };
+
+      var stage = document.querySelector('.stage');
+      var liveMode = false;     // becomes true on first incoming postMessage
+
+      function readPlayer(p) {
+        if (!p) return null;
+        var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        var name = p.displayName || p.name || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
+        return { slug: slug, name: name };
       }
-      setInterval(restart, CYCLE_MS);
+
+      function applyToCol(colEl, info) {
+        if (!colEl || !info) return;
+        var nameEl    = colEl.querySelector('.player-name');
+        var backdrop  = colEl.querySelector('.name-backdrop');
+        var photoEl   = colEl.querySelector('.player-photo');
+        var orgEl     = colEl.querySelector('.player-org');
+        var fbEl      = colEl.querySelector('.photo-fallback');
+        if (nameEl)   nameEl.textContent = info.name || '';
+        if (backdrop) backdrop.textContent = info.name || '';
+        if (photoEl) {
+          var src = PLAYER_PHOTO[info.slug];
+          if (src) {
+            photoEl.classList.remove('broken');
+            photoEl.src = src;
+            photoEl.alt = info.name || '';
+          } else {
+            photoEl.classList.add('broken');
+          }
+        }
+        if (orgEl) {
+          var orgSrc = PLAYER_ORG[info.slug];
+          if (orgSrc) {
+            orgEl.style.display = '';
+            orgEl.src = orgSrc;
+          } else {
+            orgEl.style.display = 'none';
+          }
+        }
+        if (fbEl && info.name) fbEl.textContent = info.name.charAt(0).toUpperCase();
+      }
+
+      function applyHeader(info, side) {
+        var hdr = document.querySelector('.stats-header .col-name--' + side);
+        if (hdr) hdr.textContent = (info && info.name) || '';
+      }
+
+      function update(data) {
+        if (!data) return;
+        var players = Array.isArray(data.players) ? data.players : null;
+        if (!players) return;
+        var a = readPlayer(players[0]);
+        var b = readPlayer(players[1]);
+        var colA = document.querySelector('.player-col--a');
+        var colB = document.querySelector('.player-col--b');
+        if (a) { applyToCol(colA, a); applyHeader(a, 'a'); }
+        if (b) { applyToCol(colB, b); applyHeader(b, 'b'); }
+      }
+
+      function show() {
+        if (!stage) return;
+        stage.classList.remove('hidden');
+        stage.classList.remove('exiting');
+        stage.classList.add('entering');
+        stage.style.opacity = '1';
+      }
+
+      function hide() {
+        if (!stage) return;
+        stage.classList.add('exiting');
+        stage.style.transition = 'opacity 0.5s ease';
+        stage.style.opacity = '0';
+      }
+
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        liveMode = true;
+        if (msg.type === 'update' || msg.type === 'show') {
+          update(msg.data || {});
+          if (msg.type === 'show') show();
+        } else if (msg.type === 'hide') {
+          hide();
+        }
+      }, false);
+
+      // Demo loop: re-trigger CSS animations every cycle by reflowing animated nodes.
+      // Suspended once a real postMessage arrives so live data sticks.
+      if (stage) {
+        var CYCLE_MS = 11600;
+        var SELECTORS = [
+          '.top-band', '.chevrons', '.h2h-kicker-wrap',
+          '.player-col', '.stats-card', '.stat-row',
+          '.winprob', '.winprob-bar-a', '.winprob-bar-b',
+          '.partners'
+        ].join(',');
+        function restart() {
+          if (liveMode) return;
+          var animated = stage.querySelectorAll(SELECTORS);
+          animated.forEach(function (el) {
+            var orig = el.style.animation;
+            el.style.animation = 'none';
+            void el.offsetHeight;
+            el.style.animation = orig || '';
+          });
+        }
+        setInterval(restart, CYCLE_MS);
+      }
     })();
   </script>
 </body>

@@ -634,5 +634,18 @@
     </footer>
 
   </main>
+
+  <script>
+    /* OBS show/hide opacity-fade handler. Static screen — no data wires. */
+    (function () {
+      var stage = document.querySelector('.stage') || document.body;
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'show') { stage.style.transition = ''; stage.style.opacity = '1'; }
+        else if (msg.type === 'hide') { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      }, false);
+    })();
+  </script>
 </body>
 </html>

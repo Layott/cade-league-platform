@@ -960,5 +960,21 @@
     </footer>
 
   </main>
+
+  <script>
+    /* LIVE DATA — postMessage listener (data-feed driven; full rerender TODO). */
+    (function () {
+      var stage = document.querySelector('.stage') || document.body;
+      function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
+      function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        console.info('[overlay/15-orgs] message', msg.type || msg.event || '?', msg.payload || msg.data);
+        if (msg.type === 'show') show();
+        else if (msg.type === 'hide') hide();
+      }, false);
+    })();
+  </script>
 </body>
 </html>

@@ -1180,5 +1180,124 @@
     </footer>
 
   </main>
+
+  <script>
+    /* ------------------------------------------------------------
+       LIVE DATA — postMessage handler (v2 broadcast wiring)
+       ------------------------------------------------------------ */
+    (function () {
+      var PLAYER_HEADSHOT = {
+        adefola:      '/overlays/v2/_assets/players/processed/adefola/headshot_01_nobg.png',
+        anife:        '/overlays/v2/_assets/players/processed/anife/headshot_02_nobg.png',
+        baji_jnr:     '/overlays/v2/_assets/players/processed/baji_jnr/headshot_01_nobg.png',
+        dadaboi:      '/overlays/v2/_assets/players/processed/dadaboi/headshot_01_nobg.png',
+        faruk:        '/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png',
+        guru:         '/overlays/v2/_assets/players/processed/guru/headshot_01_nobg.png',
+        kaykay:       '/overlays/v2/_assets/players/processed/kaykay/headshot_01_nobg.png',
+        killer_freak: '/overlays/v2/_assets/players/processed/killer_freak/headshot_01_nobg.png',
+        kingnonex:    '/overlays/v2/_assets/players/processed/kingnonex/headshot_01_nobg.png',
+        mitch:        '/overlays/v2/_assets/players/processed/mitch/headshot_01_nobg.png',
+        mr_oga:       '/overlays/v2/_assets/players/processed/mr_oga/headshot_01_nobg.png',
+        tactical:     '/overlays/v2/_assets/players/processed/tactical/headshot_01_nobg.png',
+        wolevation:   '/overlays/v2/_assets/players/processed/wolevation/headshot_01_nobg.png'
+      };
+      var PLAYER_ORG = {
+        adefola:      '/overlays/v2/_assets/Orgs/cade%20esport%20-%20ADEFOLA.png',
+        anife:        '/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg',
+        baji_jnr:     '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20BAJI%20JNR.png',
+        dadaboi:      '/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png',
+        faruk:        '/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20PLAIN%20-%20FARUK.png',
+        guru:         '/overlays/v2/_assets/Orgs/YAKABU%20GLOBAL%20ENTERPRISE%20LIMITED%20-%20GURU.jpg',
+        kaykay:       '/overlays/v2/_assets/Orgs/LUMO%20LABS%20%28WHITE%29%20-%20KAYKAY.png',
+        killer_freak: '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20KILLER%20FREAK.png',
+        kingnonex:    '/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png',
+        mitch:        '/overlays/v2/_assets/Orgs/PHOENIX%20ESPORTS%20-%20MITCH.png',
+        mr_oga:       null,
+        tactical:     '/overlays/v2/_assets/Orgs/FUNQUEST%20ESPORTS%20-%20TACTICAL.jpeg',
+        wolevation:   '/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg'
+      };
+      var PLAYER_ORG_NAME = {
+        adefola: 'CADE Esports', anife: 'Afropanda', baji_jnr: 'GameEvo',
+        dadaboi: 'Outlaws', faruk: 'OAS Esports', guru: 'Yakabu',
+        kaykay: 'Lumo Labs', killer_freak: 'GameEvo', kingnonex: 'Solar Flare',
+        mitch: 'Phoenix', mr_oga: 'Independent', tactical: 'Funquest',
+        wolevation: 'Breaking Gaming'
+      };
+
+      var stage = document.querySelector('.stage') || document.body;
+
+      function readPlayer(p) {
+        if (!p) return null;
+        var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        var name = p.displayName || p.name || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
+        return { slug: slug, name: name };
+      }
+
+      function applyToCard(cardEl, info) {
+        if (!cardEl || !info) return;
+        var nameBackdrop = cardEl.querySelector('.name-backdrop');
+        var nameBand     = cardEl.querySelector('.name-band .name');
+        var photoEl      = cardEl.querySelector('.photo');
+        var fbEl         = cardEl.querySelector('.photo-fallback');
+        var orgImg       = cardEl.querySelector('.card-footer .org img');
+        var orgName      = cardEl.querySelector('.card-footer .org-name');
+        if (nameBackdrop) nameBackdrop.textContent = info.name || '';
+        if (nameBand)     nameBand.textContent = info.name || '';
+        if (photoEl) {
+          var src = PLAYER_HEADSHOT[info.slug];
+          if (src) {
+            photoEl.style.display = '';
+            photoEl.src = src;
+            photoEl.alt = (info.name || '') + ' headshot';
+          } else {
+            photoEl.style.display = 'none';
+            if (fbEl) fbEl.style.opacity = '1';
+          }
+        }
+        if (orgImg) {
+          var orgSrc = PLAYER_ORG[info.slug];
+          if (orgSrc) { orgImg.style.display = ''; orgImg.src = orgSrc; }
+          else { orgImg.style.display = 'none'; }
+        }
+        if (orgName) orgName.textContent = PLAYER_ORG_NAME[info.slug] || '';
+        if (fbEl && info.name) fbEl.textContent = info.name.charAt(0).toUpperCase();
+      }
+
+      function update(data) {
+        if (!data) return;
+        var players = Array.isArray(data.players) ? data.players : null;
+        if (!players) return;
+        var classes = ['c1', 'c2', 'c3'];
+        for (var i = 0; i < 3; i++) {
+          var info = readPlayer(players[i]);
+          if (!info) continue;
+          var card = document.querySelector('.player-card.' + classes[i]);
+          applyToCard(card, info);
+        }
+      }
+
+      function show() {
+        stage.classList.remove('exiting');
+        stage.style.transition = '';
+        stage.style.opacity = '1';
+      }
+      function hide() {
+        stage.classList.add('exiting');
+        stage.style.transition = 'opacity 0.5s ease';
+        stage.style.opacity = '0';
+      }
+
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'update' || msg.type === 'show') {
+          update(msg.data || {});
+          if (msg.type === 'show') show();
+        } else if (msg.type === 'hide') {
+          hide();
+        }
+      }, false);
+    })();
+  </script>
 </body>
 </html>

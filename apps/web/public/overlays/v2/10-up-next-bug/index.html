@@ -559,15 +559,32 @@
       }, 520);
     }
 
+    function normalizePlayer(p) {
+      if (!p) return null;
+      var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      var name = p.displayName || p.name || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
+      return { slug: slug, name: name };
+    }
+
     function update(data) {
       if (!data) return;
-      if (data.player1) {
-        if (typeof data.player1.name === 'string') state.player1.name = data.player1.name;
-        if (typeof data.player1.slug === 'string') state.player1.slug = data.player1.slug;
+      // Accept three payload shapes:
+      //   { player1, player2 }                    (legacy + control panel)
+      //   { homePlayer, awayPlayer, kickoffAt? }  (broadcast trigger)
+      //   { players: [{slug,name}, ...] }         (generic h2h shape)
+      var p1 = data.player1 || data.homePlayer ||
+               (Array.isArray(data.players) ? data.players[0] : null);
+      var p2 = data.player2 || data.awayPlayer ||
+               (Array.isArray(data.players) ? data.players[1] : null);
+      var n1 = normalizePlayer(p1);
+      var n2 = normalizePlayer(p2);
+      if (n1) {
+        if (n1.name) state.player1.name = n1.name;
+        if (n1.slug) state.player1.slug = n1.slug;
       }
-      if (data.player2) {
-        if (typeof data.player2.name === 'string') state.player2.name = data.player2.name;
-        if (typeof data.player2.slug === 'string') state.player2.slug = data.player2.slug;
+      if (n2) {
+        if (n2.name) state.player2.name = n2.name;
+        if (n2.slug) state.player2.slug = n2.slug;
       }
       applyContent();
       playEntry();
@@ -576,10 +593,9 @@
     window.addEventListener('message', function (ev) {
       var msg = ev && ev.data;
       if (!msg || typeof msg !== 'object') return;
-      if (msg.type === 'update') {
+      if (msg.type === 'update' || msg.type === 'show') {
         update(msg.data || {});
-      } else if (msg.type === 'show') {
-        show();
+        if (msg.type === 'show') show();
       } else if (msg.type === 'hide') {
         hide();
       }

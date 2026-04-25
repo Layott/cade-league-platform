@@ -1394,5 +1394,45 @@
       setInterval(runCycle, cycleMs);
     })();
   </script>
+
+  <script>
+    /* ------------------------------------------------------------
+       LIVE DATA — postMessage handler (data-feed driven)
+       Accepts: { type:'update', data: { scorers:[{slug,name,goals},...] } } */
+    (function () {
+      var stage = document.querySelector('.stage') || document.body;
+      function update(data) {
+        if (!data) return;
+        if (Array.isArray(data.scorers)) {
+          console.info('[overlay/14-top-scorers] received scorers[]', data.scorers.length, 'entries — full rerender pending');
+          var pods = ['p1', 'p2', 'p3'];
+          for (var i = 0; i < Math.min(3, data.scorers.length); i++) {
+            var entry = data.scorers[i];
+            if (!entry) continue;
+            var goalsEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-goals');
+            if (goalsEl && typeof entry.goals === 'number') {
+              goalsEl.dataset.target = String(entry.goals);
+              goalsEl.textContent = String(entry.goals);
+            }
+            var nameEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-name');
+            if (nameEl && entry.name) nameEl.textContent = entry.name;
+          }
+        }
+      }
+      function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
+      function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        console.info('[overlay/14-top-scorers] message', msg.type || msg.event || '?');
+        if (msg.type === 'update' || msg.type === 'show') {
+          update(msg.data || msg.payload || {});
+          if (msg.type === 'show') show();
+        } else if (msg.type === 'hide') {
+          hide();
+        }
+      }, false);
+    })();
+  </script>
 </body>
 </html>

@@ -957,5 +957,23 @@
 
   runReorderBatches();
 </script>
+
+<script>
+  /* LIVE DATA — postMessage listener (data-feed driven; full rerender TODO).
+     Logs incoming standings.changed / snapshot.captured payloads so operators
+     can confirm wiring while the full 13-row swap shape is finalised. */
+  (function () {
+    var stage = document.querySelector('.stage') || document.body;
+    function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
+    function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+    window.addEventListener('message', function (ev) {
+      var msg = ev && ev.data;
+      if (!msg || typeof msg !== 'object') return;
+      console.info('[overlay/07-leaderboard] message', msg.type || msg.event || '?', msg.payload || msg.data);
+      if (msg.type === 'show') show();
+      else if (msg.type === 'hide') hide();
+    }, false);
+  })();
+</script>
 </body>
 </html>
