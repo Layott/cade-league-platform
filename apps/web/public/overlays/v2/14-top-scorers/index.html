@@ -118,11 +118,18 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;
+    background: transparent !important;
     color: var(--ink);
     font-family: var(--accent);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+  }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
   }
 
   /* ── STAGE (1920×1080 fixed canvas, transparent root) ───────── */
@@ -1351,13 +1358,10 @@
 
   <script>
     /* ── DIGIT-ROLL on goal numbers (podium top 3) ───────────────
-       Lightweight tween: counts 0 → target over 0.9s after the
-       card lands. Pure JS, no audio, no network calls. Re-runs on
-       loop end so the demo restart looks fresh. */
+       Tween counts 0 → target over 0.9s. Triggered ONCE per
+       {type:'show'} message — no auto-cycle, no setInterval. */
     (function () {
-      const cycleMs   = 15000;     // matches --dur-cycle
-      const startBase = 1550;      // #1 lands then digit-roll begins
-      const offsets   = { p1: 1550, p2: 1300, p3: 950 };
+      const offsets = { p1: 1550, p2: 1300, p3: 950 };
 
       function rollOne(el, target, durMs) {
         const t0 = performance.now();
@@ -1372,13 +1376,12 @@
         requestAnimationFrame(step);
       }
 
-      function runCycle() {
+      window.__cadeRunDigitRoll = function runCycle() {
         const p1 = document.querySelector('.pod-card--p1 .pod-goals');
         const p2 = document.querySelector('.pod-card--p2 .pod-goals');
         const p3 = document.querySelector('.pod-card--p3 .pod-goals');
         if (!p1 || !p2 || !p3) return;
 
-        // Reset to 0 visually, hold, then roll up to target after entry
         [p1, p2, p3].forEach(el => { el.textContent = '0'; });
 
         const t1 = parseInt(p1.dataset.target || p1.textContent, 10) || 22;
@@ -1388,10 +1391,8 @@
         setTimeout(() => rollOne(p3, t3, 900), offsets.p3);
         setTimeout(() => rollOne(p2, t2, 900), offsets.p2);
         setTimeout(() => rollOne(p1, t1, 900), offsets.p1);
-      }
-
-      runCycle();
-      setInterval(runCycle, cycleMs);
+      };
+      // No initial run; no setInterval. Live handler triggers it on show.
     })();
   </script>
 
@@ -1456,15 +1457,36 @@
           if (data.scorers.length > 3) rebuildTail(data.scorers);
         }
       }
-      function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
-      function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      function show() {
+        document.body.classList.remove('cade-exiting');
+        document.body.classList.add('cade-visible');
+        if (stage) {
+          var animated = stage.querySelectorAll(
+            '.top-band, .pod-card, .tail-strip, .tail-cell, .partners, .pod-photo-wrap'
+          );
+          animated.forEach(function (el) {
+            var orig = el.style.animation;
+            el.style.animation = 'none';
+            void el.offsetHeight;
+            el.style.animation = orig || '';
+          });
+        }
+        if (typeof window.__cadeRunDigitRoll === 'function') {
+          // delay until card-entry animations land
+          setTimeout(window.__cadeRunDigitRoll, 100);
+        }
+      }
+      function hide() {
+        document.body.classList.remove('cade-visible');
+        document.body.classList.add('cade-exiting');
+      }
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
         console.info('[overlay/14-top-scorers] message', msg.type || msg.event || '?');
         if (msg.type === 'update' || msg.type === 'show') {
           update(msg.data || msg.payload || {});
-          if (msg.type === 'show') show();
+          show();
         } else if (msg.type === 'hide') {
           hide();
         }

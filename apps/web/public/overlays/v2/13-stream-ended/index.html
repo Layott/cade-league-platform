@@ -119,6 +119,13 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
   }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
+  }
 
   /* ── STAGE (1920×1080 fixed canvas, OPAQUE) ─────────────────── */
   .stage {
@@ -636,14 +643,22 @@
   </main>
 
   <script>
-    /* OBS show/hide opacity-fade handler. Static screen — no data wires. */
-    (function () {
-      var stage = document.querySelector('.stage') || document.body;
+    /* === STRICT GATE: master visibility, controlled ONLY by parent postMessage. === */
+    (function cadeGate() {
+      'use strict';
+      function show() {
+        document.body.classList.remove('cade-exiting');
+        document.body.classList.add('cade-visible');
+      }
+      function hide() {
+        document.body.classList.remove('cade-visible');
+        document.body.classList.add('cade-exiting');
+      }
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
-        if (msg.type === 'show') { stage.style.transition = ''; stage.style.opacity = '1'; }
-        else if (msg.type === 'hide') { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+        if (msg.type === 'show' || msg.type === 'update') show();
+        else if (msg.type === 'hide') hide();
       }, false);
     })();
   </script>

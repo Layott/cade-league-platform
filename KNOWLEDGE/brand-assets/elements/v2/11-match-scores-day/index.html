@@ -90,11 +90,35 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;
+    background: transparent !important;
     color: var(--ink);
     font-family: var(--accent);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+  }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
+  }
+  /* Once shown, design holds steady. Replace the infinite loop animations
+     with simple fade-in-only versions so content never auto-cycles out. */
+  body.cade-visible .top-band,
+  body.cade-visible .matchday-title,
+  body.cade-visible .match-row,
+  body.cade-visible .partners,
+  body.cade-visible .row-card {
+    animation-name: cade-fade-in !important;
+    animation-duration: 0.6s !important;
+    animation-iteration-count: 1 !important;
+    animation-fill-mode: forwards !important;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+  @keyframes cade-fade-in {
+    0%   { opacity: 0; transform: translateY(-12px); }
+    100% { opacity: 1; transform: translateY(0); }
   }
 
   .stage {
@@ -1092,8 +1116,25 @@
         }
       }
 
-      function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
-      function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      function show() {
+        document.body.classList.remove('cade-exiting');
+        document.body.classList.add('cade-visible');
+        if (stage) {
+          var animated = stage.querySelectorAll(
+            '.top-band, .header-row, .match-row, .matches-grid, .partners, .matchday-title, .row-card'
+          );
+          animated.forEach(function (el) {
+            var orig = el.style.animation;
+            el.style.animation = 'none';
+            void el.offsetHeight;
+            el.style.animation = orig || '';
+          });
+        }
+      }
+      function hide() {
+        document.body.classList.remove('cade-visible');
+        document.body.classList.add('cade-exiting');
+      }
 
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
@@ -1101,7 +1142,7 @@
         console.info('[overlay/11-match-scores-day] message', msg.type || msg.event || '?');
         if (msg.type === 'update' || msg.type === 'show') {
           update(msg.data || msg.payload || {});
-          if (msg.type === 'show') show();
+          show();
         } else if (msg.type === 'hide') {
           hide();
         }

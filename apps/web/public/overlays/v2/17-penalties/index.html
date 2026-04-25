@@ -95,11 +95,18 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;       /* TRANSPARENT for OBS/vMix browser source */
+    background: transparent !important;  /* TRANSPARENT for OBS/vMix browser source */
     color: var(--ink);
     font-family: var(--accent);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+  }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
   }
 
   /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */
@@ -910,28 +917,9 @@
     // Capture the original stage HTML once so we can re-mount it cleanly.
     const initialHTML = document.getElementById('stage').outerHTML;
 
-    function scheduleCycle() {
-      // Hold + then trigger exit.
-      setTimeout(() => {
-        const s = document.getElementById('stage');
-        if (!s) return;
-        s.classList.add('stage--exit');
-
-        // After exit completes, re-mount fresh stage.
-        setTimeout(() => {
-          const wrap = document.createElement('div');
-          wrap.innerHTML = initialHTML;
-          const fresh = wrap.firstElementChild;
-          const old = document.getElementById('stage');
-          old.parentNode.replaceChild(fresh, old);
-
-          // After the brief gap, schedule the next cycle.
-          setTimeout(scheduleCycle, RESET_MS);
-        }, EXIT_MS);
-      }, ENTRY_MS + HOLD_MS);
-    }
-
-    scheduleCycle();
+    // Demo cycle DISABLED — strict gate means stage is hidden until trigger.
+    // Once shown, design holds steady. Operator hits Update to refresh content.
+    // (Original cyclic re-mount logic removed.)
   })();
 </script>
 
@@ -986,15 +974,32 @@
       if (Array.isArray(data.penalties)) rerender(data.penalties);
     }
 
-    function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
-    function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+    function show() {
+      document.body.classList.remove('cade-exiting');
+      document.body.classList.add('cade-visible');
+      if (stage) {
+        var animated = stage.querySelectorAll(
+          '.top-band, .penalty-row, .penalties-table, .partners, .h2h-kicker-wrap, .header-row'
+        );
+        animated.forEach(function (el) {
+          var orig = el.style.animation;
+          el.style.animation = 'none';
+          void el.offsetHeight;
+          el.style.animation = orig || '';
+        });
+      }
+    }
+    function hide() {
+      document.body.classList.remove('cade-visible');
+      document.body.classList.add('cade-exiting');
+    }
     window.addEventListener('message', function (ev) {
       var msg = ev && ev.data;
       if (!msg || typeof msg !== 'object') return;
       console.info('[overlay/17-penalties] message', msg.type || msg.event || '?', msg.payload || msg.data);
       if (msg.type === 'update' || msg.type === 'show') {
         update(msg.data || msg.payload || {});
-        if (msg.type === 'show') show();
+        show();
       } else if (msg.type === 'hide') {
         hide();
       }

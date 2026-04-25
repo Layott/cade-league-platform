@@ -25,8 +25,15 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;
+    background: transparent !important;
     font-family: "Quedora", "Inter", sans-serif;
+  }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
   }
 
   /* ---- REAL BRAND FONTS (woff2 from PILOT BRB paths) ---- */
@@ -629,20 +636,26 @@
 </script>
 
 <script>
-/* Standalone preview auto-demo. Production embed (iframe) gets real
-   postMessage from operator and skips this branch. */
-(function autoDemo() {
-  var inIframe = window.top !== window.self;
-  if (!inIframe) {
-    document.documentElement.style.background = '#0d1117';
-    document.body.style.background = '#0d1117';
+/* === STRICT GATE: master visibility, controlled ONLY by parent postMessage. ===
+   Operator drives via Update & Show / Hide. No auto-demo, no fallback timers. */
+(function cadeGate() {
+  'use strict';
+  var inIframe = true;
+  try { inIframe = window.top !== window.self; } catch (e) { inIframe = true; }
+  function show() {
+    document.body.classList.remove('cade-exiting');
+    document.body.classList.add('cade-visible');
   }
-  var messageReceived = false;
-  window.addEventListener('message', function () { messageReceived = true; }, { once: true });
-  setTimeout(function () {
-    if (messageReceived) return;
-    window.postMessage({ type: 'update', data: { name: 'JOSH', role: 'HEAD CASTER' } }, '*');
-  }, 250);
+  function hide() {
+    document.body.classList.remove('cade-visible');
+    document.body.classList.add('cade-exiting');
+  }
+  window.addEventListener('message', function (ev) {
+    var msg = ev && ev.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'show' || msg.type === 'update') show();
+    else if (msg.type === 'hide') hide();
+  }, false);
 })();
 </script>
 </body>

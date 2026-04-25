@@ -112,11 +112,18 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;
+    background: transparent !important;
     color: var(--ink);
     font-family: var(--accent);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+  }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
   }
 
   /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */
@@ -1002,15 +1009,32 @@
         if (Array.isArray(data.orgs)) rerender(data.orgs);
       }
 
-      function show() { stage.style.transition = ''; stage.style.opacity = '1'; }
-      function hide() { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      function show() {
+        document.body.classList.remove('cade-exiting');
+        document.body.classList.add('cade-visible');
+        if (stage) {
+          var animated = stage.querySelectorAll(
+            '.top-band, .org-card, .org-grid, .partners, .h2h-kicker-wrap, .header-row'
+          );
+          animated.forEach(function (el) {
+            var orig = el.style.animation;
+            el.style.animation = 'none';
+            void el.offsetHeight;
+            el.style.animation = orig || '';
+          });
+        }
+      }
+      function hide() {
+        document.body.classList.remove('cade-visible');
+        document.body.classList.add('cade-exiting');
+      }
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
         console.info('[overlay/15-orgs] message', msg.type || msg.event || '?', msg.payload || msg.data);
         if (msg.type === 'update' || msg.type === 'show') {
           update(msg.data || msg.payload || {});
-          if (msg.type === 'show') show();
+          show();
         } else if (msg.type === 'hide') {
           hide();
         }

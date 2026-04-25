@@ -105,8 +105,10 @@
     --display:      'Agharti', 'Impact', sans-serif;
     --accent:       'Quedora', 'Inter', sans-serif;
 
-    /* full demo cycle: entry 1.6s + hold 8s + exit 1.0s + gap 1.0s = 11.6s */
-    --cycle: 11.6s;
+    /* Cycle is set extremely high so the auto-OUT animations effectively
+       never trigger. Strict-gate model: design holds steady once shown,
+       operator drives Update / Hide via postMessage. */
+    --cycle: 99999s;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,11 +117,18 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;
+    background: transparent !important;
     color: var(--ink);
     font-family: var(--accent);
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+  }
+  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
+  body { opacity: 0; transition: opacity 0.4s ease; }
+  body.cade-visible { opacity: 1; }
+  body.cade-exiting { opacity: 0; }
+  body:not(.cade-visible):not(.cade-exiting) * {
+    animation-play-state: paused !important;
   }
 
   /* ── STAGE (1920×1080 transparent canvas) ──────────────────── */
@@ -1216,17 +1225,23 @@
 
       function show() {
         if (!stage) return;
-        stage.classList.remove('hidden');
-        stage.classList.remove('exiting');
-        stage.classList.add('entering');
-        stage.style.opacity = '1';
+        document.body.classList.remove('cade-exiting');
+        document.body.classList.add('cade-visible');
+        // restart entry animations on every show by reflowing animated nodes
+        var animated = stage.querySelectorAll(
+          '.top-band, .chevrons, .h2h-kicker-wrap, .player-col, .stats-card, .stat-row, .winprob, .winprob-bar-a, .winprob-bar-b, .partners'
+        );
+        animated.forEach(function (el) {
+          var orig = el.style.animation;
+          el.style.animation = 'none';
+          void el.offsetHeight;
+          el.style.animation = orig || '';
+        });
       }
 
       function hide() {
-        if (!stage) return;
-        stage.classList.add('exiting');
-        stage.style.transition = 'opacity 0.5s ease';
-        stage.style.opacity = '0';
+        document.body.classList.remove('cade-visible');
+        document.body.classList.add('cade-exiting');
       }
 
       window.addEventListener('message', function (ev) {
@@ -1235,34 +1250,14 @@
         liveMode = true;
         if (msg.type === 'update' || msg.type === 'show') {
           update(msg.data || {});
-          if (msg.type === 'show') show();
+          show();
         } else if (msg.type === 'hide') {
           hide();
         }
       }, false);
 
-      // Demo loop: re-trigger CSS animations every cycle by reflowing animated nodes.
-      // Suspended once a real postMessage arrives so live data sticks.
-      if (stage) {
-        var CYCLE_MS = 11600;
-        var SELECTORS = [
-          '.top-band', '.chevrons', '.h2h-kicker-wrap',
-          '.player-col', '.stats-card', '.stat-row',
-          '.winprob', '.winprob-bar-a', '.winprob-bar-b',
-          '.partners'
-        ].join(',');
-        function restart() {
-          if (liveMode) return;
-          var animated = stage.querySelectorAll(SELECTORS);
-          animated.forEach(function (el) {
-            var orig = el.style.animation;
-            el.style.animation = 'none';
-            void el.offsetHeight;
-            el.style.animation = orig || '';
-          });
-        }
-        setInterval(restart, CYCLE_MS);
-      }
+      // Demo loop REMOVED — strict gate means stage is hidden until trigger.
+      // Once shown, design holds steady. Operator hits Update to refresh.
     })();
   </script>
 </body>
