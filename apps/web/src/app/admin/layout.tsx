@@ -30,7 +30,10 @@ const TAB_PERMS: Array<{ href: string; perm: string }> = [
   { href: "/admin/disputes", perm: "disputes.read" },
   { href: "/admin/appeals", perm: "appeals.read" },
   { href: "/admin/announcements", perm: "announcements.read" },
+  // Plan 51 — Tournament + Broadcast v2 entries.
+  { href: "/admin/tournament", perm: "tournament.read" },
   { href: "/admin/broadcast", perm: "broadcast.manage" },
+  { href: "/admin/broadcast/v2", perm: "broadcast.v2.read" },
   { href: "/admin/youtube-channels", perm: "branding.manage" },
   { href: "/admin/roles", perm: "roles.manage" },
   { href: "/admin/users", perm: "users.manage" },

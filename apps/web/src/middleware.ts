@@ -6,6 +6,9 @@ import { createServerClient } from "@supabase/ssr";
 // requirePermAsync) still gate every individual surface, so this is purely
 // "may you cross the /admin/* threshold." `viewer`, `coach`, `team_manager`,
 // `player`, `design`, `technical` stay out.
+// Plan 51 — design + technical added so they can reach the new
+// /admin/tournament + /admin/broadcast/v2 surfaces. Per-page perm checks
+// still gate the actual sub-routes.
 const ADMIN_ROLES = new Set([
   "admin",
   "loc",
@@ -13,6 +16,24 @@ const ADMIN_ROLES = new Set([
   "referee",
   "production",
   "moderator",
+  "design",
+  "technical",
+]);
+// Plan 51 — sub-area role gates inside /admin. The outer ADMIN_ROLES set
+// is the threshold check; these narrower sets reject early when a user
+// crossed the threshold via some other tab but cannot enter this surface.
+// Per-action perm checks (requirePermAsync) still re-validate.
+const ADMIN_TOURNAMENT_ROLES = new Set([
+  "admin",
+  "loc",
+  "idc",
+  "technical",
+]);
+const ADMIN_BROADCAST_V2_ROLES = new Set([
+  "admin",
+  "technical",
+  "production",
+  "design",
 ]);
 const PLAYER_AREA_ROLES = new Set([
   "admin",
@@ -32,7 +53,15 @@ export async function middleware(req: NextRequest) {
   const isAdmin = pathname.startsWith("/admin");
   const isPlayerArea = pathname.startsWith("/player");
   const isRefereeArea = pathname.startsWith("/referee");
+  const isOverlayV2 = pathname.startsWith("/overlay/v2");
   const isRoot = pathname === "/";
+
+  // Plan 51 — /overlay/v2/* is public (browser-source pull, no auth) but
+  // is gated by per-overlay view_token validation inside each page. The
+  // matcher includes it so future view_token enforcement can hook in
+  // here without re-touching middleware.config.matcher.
+  if (isOverlayV2) return NextResponse.next();
+
   if (!isAdmin && !isPlayerArea && !isRefereeArea && !isRoot)
     return NextResponse.next();
 
@@ -97,6 +126,18 @@ export async function middleware(req: NextRequest) {
     if (!allowed) {
       return new NextResponse("Forbidden", { status: 403 });
     }
+    // Plan 51 — sub-area gates. Per-page requirePermAsync still re-checks
+    // the actual perm; this is the cheap "may you even see the route"
+    // threshold check so wrong-role staff get a 403 instead of a server
+    // error from a missing perm.
+    if (pathname.startsWith("/admin/tournament")) {
+      const ok = roles.some((r) => ADMIN_TOURNAMENT_ROLES.has(r));
+      if (!ok) return new NextResponse("Forbidden", { status: 403 });
+    }
+    if (pathname.startsWith("/admin/broadcast/v2")) {
+      const ok = roles.some((r) => ADMIN_BROADCAST_V2_ROLES.has(r));
+      if (!ok) return new NextResponse("Forbidden", { status: 403 });
+    }
     return res;
   }
 
@@ -119,5 +160,13 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/admin/:path*", "/player/:path*", "/referee/:path*"],
+  matcher: [
+    "/",
+    "/admin/:path*",
+    "/player/:path*",
+    "/referee/:path*",
+    // Plan 51 — overlay v2 routes added so future view_token validation
+    // can hook into middleware. Today the body just NextResponse.next()'s.
+    "/overlay/v2/:path*",
+  ],
 };

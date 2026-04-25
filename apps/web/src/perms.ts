@@ -31,11 +31,41 @@ export const ROLE_NAMES = [
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMS: Record<RoleName, readonly string[]> = {
-  admin: ["*", "squads.reopen", "broadcast.match_control", "branding.manage", "squads.window.manage", "squads.player_override.manage"],
-  loc: ["squads.validate", "squads.change_authorize", "squads.window.manage", "squads.player_override.manage"],
-  idc: [],
+  admin: [
+    "*",
+    "squads.reopen",
+    "broadcast.match_control",
+    "branding.manage",
+    "squads.window.manage",
+    "squads.player_override.manage",
+    // Plan 51 — explicit seed entries for self-documenting role_permissions.
+    // Wildcard '*' already grants these; we list them so /admin/roles shows
+    // the surface clearly.
+    "tournament.read",
+    "tournament.score_entry",
+    "tournament.walkover_confirm",
+    "tournament.tiebreaker_config",
+    "tournament.export",
+    "broadcast.v2.read",
+    "broadcast.v2.trigger",
+  ],
+  loc: [
+    "squads.validate",
+    "squads.change_authorize",
+    "squads.window.manage",
+    "squads.player_override.manage",
+    // Plan 51 — read-only tournament view + report exports.
+    "tournament.read",
+    "tournament.export",
+  ],
+  idc: [
+    // Plan 51 — read-only tournament view + report exports.
+    "tournament.read",
+    "tournament.export",
+  ],
   // Plan 46 — refs mark attendance from /referee/attendance (migration
   // 20260510000200). attendance.edit lets them correct a prior mark.
+  // Plan 51 — refs counter-confirm admin-initiated walkovers.
   referee: [
     "squads.validate",
     "squads.change_authorize",
@@ -43,15 +73,27 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "squads.player_override.manage",
     "attendance.mark",
     "attendance.edit",
+    "tournament.walkover_confirm",
   ],
-  technical: [],
+  technical: [
+    // Plan 51 — read tournament data + drive broadcast v2 overlays.
+    "tournament.read",
+    "broadcast.v2.read",
+    "broadcast.v2.trigger",
+  ],
   production: [
     "broadcast.trigger",
     "match_clock.manage",
     // Plan 42 — match-aware overlays (select/start/end match + score controls)
     "broadcast.match_control",
+    // Plan 51 — broadcast v2 overlay control room.
+    "broadcast.v2.read",
+    "broadcast.v2.trigger",
   ],
-  design: [],
+  design: [
+    // Plan 51 — read-only access to broadcast v2 for review/QA.
+    "broadcast.v2.read",
+  ],
   moderator: [
     "announcements.*",
     "punishments.issue",

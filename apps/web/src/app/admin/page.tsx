@@ -92,6 +92,11 @@ const I = {
     "M3 6h18|M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2|M6 6l1 14a2 2 0 002 2h6a2 2 0 002-2l1-14",
   stats: "M4 4v16h16|M7 16l4-4 4 3 5-7",
   refs: "M7 21l5-4 5 4V5l-5-2-5 2v16z",
+  // Plan 51 — trophy (tournament) + monitor-with-overlay (broadcast v2).
+  trophy:
+    "M8 21h8|M12 17v4|M7 4h10v5a5 5 0 01-10 0V4z|M17 6h2a2 2 0 012 2v1a4 4 0 01-4 4|M7 6H5a2 2 0 00-2 2v1a4 4 0 004 4",
+  broadcastV2:
+    "M3 5h18v12H3z|M3 17l4 3h10l4-3|M7 9h6|M7 12h4|M14 8l4 4-4 4",
 };
 
 async function loadHero(
@@ -282,6 +287,20 @@ export default async function AdminHome() {
       perm: "broadcast.manage",
       icon: <Icon d={I.broadcast} />,
       tone: hero.activeSessionId ? "signal" : undefined,
+    },
+    {
+      href: "/admin/tournament",
+      label: "Tournament",
+      description: "Standings, fixtures, results, walkovers.",
+      perm: "tournament.read",
+      icon: <Icon d={I.trophy} />,
+    },
+    {
+      href: "/admin/broadcast/v2",
+      label: "Broadcast v2",
+      description: "Next-gen overlay control room.",
+      perm: "broadcast.v2.read",
+      icon: <Icon d={I.broadcastV2} />,
     },
     {
       href: "/admin/youtube-channels",

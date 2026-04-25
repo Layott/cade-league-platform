@@ -79,15 +79,10 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     ]);
   });
 
-  it("most new roles (idc/technical/design/coach/team_manager/viewer) seed to empty", () => {
-    const empties: RoleName[] = [
-      "idc",
-      "technical",
-      "design",
-      "coach",
-      "team_manager",
-      "viewer",
-    ];
+  it("coach + team_manager + viewer still seed to empty", () => {
+    // Plan 51 promoted idc/technical/design out of the empty set; they
+    // each now hold a small slice of tournament/broadcast.v2 perms.
+    const empties: RoleName[] = ["coach", "team_manager", "viewer"];
     for (const r of empties) {
       expect(PERMS[r].length).toBe(0);
     }
@@ -115,11 +110,13 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(PERMS.player).toContain("squads.submit.own");
   });
 
-  it("production seed holds broadcast.trigger + match_clock.manage + broadcast.match_control (Plan 12 + 37 + 42)", () => {
+  it("production seed holds broadcast.trigger + match_clock.manage + broadcast.match_control (Plan 12 + 37 + 42) plus broadcast.v2 (Plan 51)", () => {
     expect(PERMS.production).toEqual([
       "broadcast.trigger",
       "match_clock.manage",
       "broadcast.match_control",
+      "broadcast.v2.read",
+      "broadcast.v2.trigger",
     ]);
   });
 
@@ -238,6 +235,84 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
       "appeals.rule",
     ]) {
       expect(hasPerm({ userId: null, roles }, p)).toBe(true);
+    }
+  });
+
+  // Plan 51 — Tournament + Broadcast v2 perm seeds.
+  it("admin seeds every Plan 51 perm explicitly (self-documenting beyond '*')", () => {
+    const tournament = [
+      "tournament.read",
+      "tournament.score_entry",
+      "tournament.walkover_confirm",
+      "tournament.tiebreaker_config",
+      "tournament.export",
+    ];
+    const broadcastV2 = ["broadcast.v2.read", "broadcast.v2.trigger"];
+    for (const p of [...tournament, ...broadcastV2]) {
+      expect(PERMS.admin).toContain(p);
+    }
+  });
+
+  it("loc + idc seed only tournament.read + tournament.export from Plan 51", () => {
+    for (const r of ["loc", "idc"] as const) {
+      expect(PERMS[r]).toContain("tournament.read");
+      expect(PERMS[r]).toContain("tournament.export");
+      expect(PERMS[r]).not.toContain("tournament.score_entry");
+      expect(PERMS[r]).not.toContain("tournament.walkover_confirm");
+      expect(PERMS[r]).not.toContain("tournament.tiebreaker_config");
+      expect(PERMS[r]).not.toContain("broadcast.v2.read");
+      expect(PERMS[r]).not.toContain("broadcast.v2.trigger");
+    }
+  });
+
+  it("technical seeds tournament.read + broadcast.v2.{read,trigger} from Plan 51", () => {
+    expect(PERMS.technical).toContain("tournament.read");
+    expect(PERMS.technical).toContain("broadcast.v2.read");
+    expect(PERMS.technical).toContain("broadcast.v2.trigger");
+    expect(PERMS.technical).not.toContain("tournament.score_entry");
+    expect(PERMS.technical).not.toContain("tournament.export");
+  });
+
+  it("design seeds broadcast.v2.read only from Plan 51 (no trigger, no tournament)", () => {
+    expect(PERMS.design).toContain("broadcast.v2.read");
+    expect(PERMS.design).not.toContain("broadcast.v2.trigger");
+    expect(PERMS.design).not.toContain("tournament.read");
+  });
+
+  it("referee gains tournament.walkover_confirm from Plan 51", () => {
+    expect(PERMS.referee).toContain("tournament.walkover_confirm");
+    expect(
+      hasPerm({ userId: null, roles: ["referee"] }, "tournament.walkover_confirm"),
+    ).toBe(true);
+  });
+
+  it("admin matches every Plan 51 perm via wildcard", () => {
+    for (const p of [
+      "tournament.read",
+      "tournament.score_entry",
+      "tournament.walkover_confirm",
+      "tournament.tiebreaker_config",
+      "tournament.export",
+      "broadcast.v2.read",
+      "broadcast.v2.trigger",
+    ]) {
+      expect(hasPerm({ userId: null, roles: ["admin"] }, p)).toBe(true);
+    }
+  });
+
+  it("player + viewer hold no Plan 51 perms", () => {
+    for (const r of ["player", "viewer"] as const) {
+      for (const p of [
+        "tournament.read",
+        "tournament.score_entry",
+        "tournament.walkover_confirm",
+        "tournament.tiebreaker_config",
+        "tournament.export",
+        "broadcast.v2.read",
+        "broadcast.v2.trigger",
+      ]) {
+        expect(hasPerm({ userId: null, roles: [r] }, p)).toBe(false);
+      }
     }
   });
 
