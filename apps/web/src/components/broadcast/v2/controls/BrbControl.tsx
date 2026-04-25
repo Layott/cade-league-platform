@@ -1,31 +1,35 @@
 "use client";
 
 import { ControlCard } from "../ControlCard";
-import { TriggerEnterForm, TriggerOffForm } from "../TriggerButtons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 
-/** Plan 51 — BRB / intermission control. No edits, just ENTER + OUT. */
+/** Plan 51 — BRB / intermission control. No edits, just a toggle button. */
 export type SimpleControlProps = {
   sessionId: string;
   viewToken: string | null;
+  /** Whether the overlay is currently active (drives button label/color). */
+  active?: boolean;
 };
 
-export function BrbControl({ sessionId, viewToken }: SimpleControlProps) {
+export function BrbControl({
+  sessionId,
+  viewToken,
+  active = false,
+}: SimpleControlProps) {
   return (
     <ControlCard
       overlayKey="01-brb"
       sessionId={sessionId}
       viewToken={viewToken}
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <TriggerEnterForm
-            overlayKey="01-brb"
-            sessionId={sessionId}
-            payloadFields={
-              <input type="hidden" name="payload" value="{}" />
-            }
-          />
-          <TriggerOffForm overlayKey="01-brb" sessionId={sessionId} />
-        </div>
+        <ToggleTriggerButton
+          overlayKey="01-brb"
+          sessionId={sessionId}
+          active={active}
+          payloadFields={
+            <input type="hidden" name="payload" value="{}" />
+          }
+        />
       }
     />
   );

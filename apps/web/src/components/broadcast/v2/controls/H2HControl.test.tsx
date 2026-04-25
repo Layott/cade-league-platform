@@ -4,6 +4,7 @@ import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { H2H2Control } from "./H2H2Control";
@@ -74,15 +75,20 @@ describe("H2H controls", () => {
         ).value,
       );
 
-    // First change → first "ENTER" reads this payload
+    // First change → first toggle press reads this payload
     fireEvent.change(select0, { target: { value: "faruk" } });
     expect(getPayload().players[0].displayName).toBe("FARUK");
 
-    // Second change → second "ENTER" must read the NEW payload, not stale
+    // Second change → second toggle press must read the NEW payload, not stale
     fireEvent.change(select0, { target: { value: "anife" } });
     fireEvent.change(select1, { target: { value: "mitch" } });
     const after = getPayload();
     expect(after.players[0].displayName).toBe("ANIFE");
     expect(after.players[1].displayName).toBe("MITCH");
+  });
+
+  it("active=true flips the H2H toggle to OFF label", () => {
+    render(<H2H2Control sessionId="S" viewToken="T" active={true} />);
+    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
   });
 });

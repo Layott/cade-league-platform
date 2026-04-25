@@ -4,6 +4,7 @@ import { render, cleanup, screen } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { MatchScoresDayControl } from "./MatchScoresDayControl";
@@ -13,12 +14,15 @@ beforeEach(() => {
 });
 
 describe("MatchScoresDayControl", () => {
-  it("renders 4 part buttons (1, 2, 3, all)", () => {
+  it("renders 4 part buttons (1, 2, 3, all) + a footer toggle", () => {
     render(<MatchScoresDayControl sessionId="S" viewToken="T" />);
     expect(screen.getByTestId("v2-msd-part-1")).toBeTruthy();
     expect(screen.getByTestId("v2-msd-part-2")).toBeTruthy();
     expect(screen.getByTestId("v2-msd-part-3")).toBeTruthy();
     expect(screen.getByTestId("v2-msd-part-all")).toBeTruthy();
+    expect(
+      screen.getByTestId("v2-toggle-form-11-match-scores-day"),
+    ).toBeTruthy();
   });
 
   it("each part button form includes the matching partRange in the payload", () => {
@@ -38,5 +42,12 @@ describe("MatchScoresDayControl", () => {
       // matchDayLabel must satisfy the legacy Zod min(1) requirement.
       expect(parsed.matchDayLabel.length).toBeGreaterThan(0);
     }
+  });
+
+  it("footer toggle flips to OFF when active=true", () => {
+    render(
+      <MatchScoresDayControl sessionId="S" viewToken="T" active={true} />,
+    );
+    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
   });
 });

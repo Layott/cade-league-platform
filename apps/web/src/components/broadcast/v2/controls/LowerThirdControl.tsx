@@ -2,15 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import {
-  triggerOverlayEnterAction,
-  triggerOverlayOffAction,
-} from "@/app/admin/broadcast/v2/[sessionId]/actions";
-import {
-  PrimaryButton,
-  DangerButton,
-  SecondaryButton,
-} from "@/components/admin/buttons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
+import { SecondaryButton } from "@/components/admin/buttons";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -20,17 +13,14 @@ import type { SimpleControlProps } from "./BrbControl";
  * (per `server/broadcast/v2/off_routing.ts`). Each of the 3 slots maps
  * to `instance_slot` 1..3 in `overlay_active_instances`.
  *
- * Presets persist in `localStorage['cade-lt-presets']` per spec §8.2 +
- * mockup `KNOWLEDGE/brand-assets/elements/v2/index.html`. Save = stash
- * current name+role under a user-supplied label. Load = pop into the
- * inputs (does NOT auto-trigger; operator still clicks Update & Show).
+ * Each slot now gets its own toggle button — green ON when slot is
+ * inactive, pink OFF when slot is currently live. Slot active state is
+ * passed in via the `slotsActive` prop (length 3) computed server-side
+ * by the page from `overlay_active_instances`.
  *
- * The legacy lower_third schema requires `playerId` (uuid), `displayName`,
- * `gamerTag`, `jerseyNumber`. The v2 control panel inputs only carry
- * name+role — we synthesize stable placeholder UUIDs derived from the
- * slot number so the schema parses without forcing the operator to pick
- * a real player. The overlay HTML reads `displayName` + `gamerTag` for
- * the visible text, so the placeholder uuid is invisible on stream.
+ * Presets persist in `localStorage['cade-lt-presets']`. Save = stash
+ * current name+role under a user-supplied label. Load = pop into the
+ * inputs (does NOT auto-trigger; operator still clicks the toggle).
  */
 
 type LtPreset = {
@@ -77,10 +67,19 @@ function writePresets(arr: LtPreset[]): void {
   }
 }
 
+export type LowerThirdControlProps = SimpleControlProps & {
+  /**
+   * Per-slot active flags from the server. Index 0 = slot 1, 1 = slot 2,
+   * 2 = slot 3. Defaults to all-inactive when not supplied (e.g. tests).
+   */
+  slotsActive?: [boolean, boolean, boolean];
+};
+
 export function LowerThirdControl({
   sessionId,
   viewToken,
-}: SimpleControlProps) {
+  slotsActive = [false, false, false],
+}: LowerThirdControlProps) {
   const [slots, setSlots] = useState<Record<1 | 2 | 3, SlotState>>(
     DEFAULT_SLOTS,
   );
@@ -214,59 +213,23 @@ export function LowerThirdControl({
                 </div>
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <form
-                  action={triggerOverlayEnterAction}
-                  className="flex-1"
-                  data-testid={`v2-lt-enter-form-${n}`}
-                >
-                  <input type="hidden" name="sessionId" value={sessionId} />
-                  <input
-                    type="hidden"
-                    name="overlayKey"
-                    value="08-lower-third"
-                  />
-                  <input
-                    type="hidden"
-                    name="instanceSlot"
-                    value={String(n)}
-                  />
-                  <input
-                    type="hidden"
-                    name="payload"
-                    value={payloadForSlot(n)}
-                  />
-                  <PrimaryButton
-                    type="submit"
-                    size="sm"
-                    className="w-full"
-                    data-testid={`v2-lt-enter-${n}`}
-                  >
-                    Update &amp; Show
-                  </PrimaryButton>
-                </form>
-                <form
-                  action={triggerOverlayOffAction}
-                  data-testid={`v2-lt-off-form-${n}`}
-                >
-                  <input type="hidden" name="sessionId" value={sessionId} />
-                  <input
-                    type="hidden"
-                    name="overlayKey"
-                    value="08-lower-third"
-                  />
-                  <input
-                    type="hidden"
-                    name="instanceSlot"
-                    value={String(n)}
-                  />
-                  <DangerButton
-                    type="submit"
-                    size="sm"
-                    data-testid={`v2-lt-off-${n}`}
-                  >
-                    Hide
-                  </DangerButton>
-                </form>
+                <ToggleTriggerButton
+                  overlayKey="08-lower-third"
+                  sessionId={sessionId}
+                  active={slotsActive[n - 1]}
+                  instanceSlot={n}
+                  testIdSuffix="08-lower-third"
+                  buttonTestId={`v2-lt-toggle-${n}`}
+                  onLabel="Update & Show"
+                  offLabel="Hide"
+                  payloadFields={
+                    <input
+                      type="hidden"
+                      name="payload"
+                      value={payloadForSlot(n)}
+                    />
+                  }
+                />
               </div>
             </div>
           ))}
@@ -274,7 +237,7 @@ export function LowerThirdControl({
       }
       triggerSlot={
         <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--chalk-3)]">
-          Use per-slot Update / Hide buttons above.
+          Use per-slot toggle buttons above.
         </p>
       }
     />

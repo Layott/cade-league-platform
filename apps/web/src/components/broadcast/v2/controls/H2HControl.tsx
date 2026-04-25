@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { TriggerEnterForm, TriggerOffForm } from "../TriggerButtons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import { PlayerSelect } from "../PlayerSelect";
 import { V2_PLAYER_NAMES, type V2PlayerSlug } from "../players";
 import type { V2OverlayKey } from "../overlay-keys";
@@ -10,11 +10,10 @@ import type { V2OverlayKey } from "../overlay-keys";
 /**
  * Plan 51 — generic H2H control (2 / 3 / 5 player variants).
  *
- * The 13-player roster powers each dropdown. ENTER posts a `players`
- * array of `{ displayName }` objects matching the legacy h2h_*Schema
- * shape from server/overlays/schemas.ts. Live preview uses the v2-
- * mockup-compatible payload (slug + name) so the iframe HTML can render
- * the right photo without a round-trip.
+ * The 13-player roster powers each dropdown. Toggle button posts a
+ * `players` array of `{ displayName }` objects matching the legacy
+ * h2h_*Schema shape from server/overlays/schemas.ts. Live preview uses
+ * the v2-mockup-compatible payload (slug + name).
  */
 export type H2HControlProps = {
   sessionId: string;
@@ -22,6 +21,7 @@ export type H2HControlProps = {
   overlayKey: V2OverlayKey;
   count: 2 | 3 | 5;
   defaultSlugs: V2PlayerSlug[];
+  active?: boolean;
 };
 
 export function H2HControl({
@@ -30,6 +30,7 @@ export function H2HControl({
   overlayKey,
   count,
   defaultSlugs,
+  active = false,
 }: H2HControlProps) {
   const [slugs, setSlugs] = useState<V2PlayerSlug[]>(() =>
     defaultSlugs.slice(0, count),
@@ -79,16 +80,14 @@ export function H2HControl({
         </div>
       }
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <TriggerEnterForm
-            overlayKey={overlayKey}
-            sessionId={sessionId}
-            payloadFields={
-              <input type="hidden" name="payload" value={payloadJson} />
-            }
-          />
-          <TriggerOffForm overlayKey={overlayKey} sessionId={sessionId} />
-        </div>
+        <ToggleTriggerButton
+          overlayKey={overlayKey}
+          sessionId={sessionId}
+          active={active}
+          payloadFields={
+            <input type="hidden" name="payload" value={payloadJson} />
+          }
+        />
       }
     />
   );

@@ -4,6 +4,7 @@ import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { TimerControl } from "./TimerControl";
@@ -63,7 +64,7 @@ describe("TimerControl", () => {
     fireEvent.change(minutes, { target: { value: "3" } });
 
     const form = container.querySelector(
-      '[data-testid="v2-enter-form-02-timer"]',
+      '[data-testid="v2-toggle-form-02-timer"]',
     ) as HTMLFormElement;
     const payloadInput = form.querySelector(
       'input[name="payload"]',
@@ -90,5 +91,10 @@ describe("TimerControl", () => {
     } finally {
       Date.now = realNow;
     }
+  });
+
+  it("active=true flips toggle button to OFF state", () => {
+    render(<TimerControl sessionId="S" viewToken="T" active={true} />);
+    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
   });
 });

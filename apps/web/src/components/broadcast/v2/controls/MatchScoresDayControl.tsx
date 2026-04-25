@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { TriggerOffForm } from "../TriggerButtons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import { triggerOverlayEnterAction } from "@/app/admin/broadcast/v2/[sessionId]/actions";
 import {
   PrimaryButton,
@@ -13,10 +13,15 @@ import type { SimpleControlProps } from "./BrbControl";
 /**
  * Plan 51 — Match Scores (today) control with 3-part split buttons.
  *
- * Three pre-defined ranges (1-4, 5-8, 9-12) + Show All. Each button
+ * Three pre-defined ranges (1-4, 5-8, 9-12) + Show All. Each part button
  * fires its own ENTER form so the persistent payload carries the right
  * `partRange`. Live preview gets the same shape via postMessage so the
  * iframe scrolls to the relevant part instantly.
+ *
+ * The footer toggle only fires when the overlay is currently active —
+ * one-button OFF for the operator regardless of which part is showing.
+ * When inactive, the toggle is a "Trigger ON (Show all)" shortcut that
+ * mirrors the Show All part button.
  *
  * Persistent payload mirrors the legacy `match_scores_day` schema —
  * `matchDayLabel`+`rows` are computed server-side by the overlay route
@@ -34,6 +39,7 @@ const PARTS: Array<{ id: 1 | 2 | 3 | "all"; label: string; hint: string }> =
 export function MatchScoresDayControl({
   sessionId,
   viewToken,
+  active = false,
 }: SimpleControlProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -108,15 +114,23 @@ export function MatchScoresDayControl({
         </div>
       }
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <p className="flex-1 text-[10px] uppercase tracking-[0.16em] text-[var(--chalk-3)]">
-            Trigger via part buttons above.
-          </p>
-          <TriggerOffForm
-            overlayKey="11-match-scores-day"
-            sessionId={sessionId}
-          />
-        </div>
+        <ToggleTriggerButton
+          overlayKey="11-match-scores-day"
+          sessionId={sessionId}
+          active={active}
+          onLabel="Trigger ON (Show all)"
+          payloadFields={
+            <input
+              type="hidden"
+              name="payload"
+              value={JSON.stringify({
+                partRange: "all",
+                matchDayLabel: "MATCH DAY",
+                rows: [],
+              })}
+            />
+          }
+        />
       }
     />
   );

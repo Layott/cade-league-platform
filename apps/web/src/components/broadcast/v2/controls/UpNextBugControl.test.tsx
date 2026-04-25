@@ -4,6 +4,7 @@ import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { UpNextBugControl } from "./UpNextBugControl";
@@ -48,14 +49,14 @@ describe("UpNextBugControl", () => {
     expect(screen.getByText(/No upcoming matches/i)).toBeTruthy();
   });
 
-  it("ENTER button is disabled when no upcoming matches", () => {
+  it("toggle button is disabled when no upcoming matches", () => {
     render(
       <UpNextBugControl sessionId="S" viewToken="T" upcoming={[]} />,
     );
-    const enterBtn = screen.getByTestId(
-      "v2-enter-btn-10-up-next-bug",
+    const toggleBtn = screen.getByTestId(
+      "v2-toggle-btn-10-up-next-bug",
     ) as HTMLButtonElement;
-    expect(enterBtn.disabled).toBe(true);
+    expect(toggleBtn.disabled).toBe(true);
   });
 
   it("payload carries home/away/kickoffAt from the selected match", () => {
@@ -115,5 +116,17 @@ describe("UpNextBugControl", () => {
     expect(after.home.displayName).toBe("FARUK");
     expect(after.away.displayName).toBe("ANIFE");
     expect(after.kickoffAt).toBe("2026-04-25T19:00:00Z");
+  });
+
+  it("active=true flips toggle button to OFF state", () => {
+    render(
+      <UpNextBugControl
+        sessionId="S"
+        viewToken="T"
+        upcoming={UPCOMING}
+        active={true}
+      />,
+    );
+    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
   });
 });

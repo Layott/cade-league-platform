@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/admin/StatusPill";
 import { SecondaryButton } from "@/components/admin/buttons";
 import { formatWat } from "@/lib/time";
 import { listSelectableMatches } from "@/server/broadcast/match_flow";
+import { probeAllActiveStates } from "@/server/broadcast/v2/overlay_active_state";
 import { CopyTokenButton } from "./CopyTokenButton";
 import { ControlGrid } from "./ControlGrid";
 import type { UpcomingMatch } from "@/components/broadcast/v2/controls/UpNextBugControl";
@@ -155,6 +156,11 @@ export default async function BroadcastV2SessionPage({
           : new Date(Date.now() + 10 * 60_000).toISOString(),
     }));
 
+  // Probe per-overlay active state so each ControlCard renders the toggle
+  // button in the right ON / OFF position. Cheap fan-out — every key
+  // resolves to one indexed lookup on overlay_events / overlay_active_instances.
+  const activeState = await probeAllActiveStates(sb, session.id);
+
   const isLive = session.ended_at === null;
   const titleText = matchDay
     ? `${formatWat(`${matchDay.match_date}T00:00:00Z`, "EEE MMM d yyyy")} · ${matchDay.venue_name}`
@@ -211,6 +217,10 @@ export default async function BroadcastV2SessionPage({
         viewToken={session.view_token}
         upcoming={upcoming}
         canTrigger={canTrigger}
+        active={activeState.single}
+        lowerThirdSlots={
+          activeState.multi["08-lower-third"] ?? [false, false, false]
+        }
       />
     </div>
   );

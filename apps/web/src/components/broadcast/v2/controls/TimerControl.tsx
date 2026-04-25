@@ -2,11 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import {
-  triggerOverlayEnterAction,
-  triggerOverlayOffAction,
-} from "@/app/admin/broadcast/v2/[sessionId]/actions";
-import { PrimaryButton, DangerButton } from "@/components/admin/buttons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -17,20 +13,21 @@ import type { SimpleControlProps } from "./BrbControl";
  *  - clock     (HH:MM 24h WAT — overlay computes secondsRemaining itself)
  *
  * The control sends an immediate postMessage into the preview iframe so
- * the operator sees the countdown before committing the trigger. ENTER
- * persists the row by computing an `expiresAt` ISO string from the
- * current input values and embedding it in the trigger payload (the
- * `layout_timer` schema at server/overlays/schemas.ts requires
- * `expiresAt: ISO datetime`).
+ * the operator sees the countdown before committing the trigger. The
+ * single toggle button persists the row by computing an `expiresAt` ISO
+ * string from the current input values and embedding it in the trigger
+ * payload (the `layout_timer` schema at server/overlays/schemas.ts
+ * requires `expiresAt: ISO datetime`).
  *
  * IMPORTANT: `expiresAt` is recomputed AT SUBMIT TIME (not render time)
- * so re-clicking ENTER with the same min:sec values resets the timer
- * relative to the click moment, not the last render. Without this,
- * second-click ENTER would post a stale timestamp anchored to the
- * previous render — operator sees the timer "skip ahead" by however
- * long they waited between clicks.
+ * so re-clicking the toggle with the same min:sec values resets the
+ * timer relative to the click moment, not the last render.
  */
-export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
+export function TimerControl({
+  sessionId,
+  viewToken,
+  active = false,
+}: SimpleControlProps) {
   const [minutes, setMinutes] = useState<number>(3);
   const [seconds, setSeconds] = useState<number>(0);
   const [endClock, setEndClock] = useState<string>("");
@@ -150,45 +147,20 @@ export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
         </div>
       }
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <form
-            action={triggerOverlayEnterAction}
-            className="flex w-full"
-            data-testid="v2-enter-form-02-timer"
-            onSubmit={refreshPayloadOnSubmit}
-          >
-            <input type="hidden" name="sessionId" value={sessionId} />
-            <input type="hidden" name="overlayKey" value="02-timer" />
+        <ToggleTriggerButton
+          overlayKey="02-timer"
+          sessionId={sessionId}
+          active={active}
+          onSubmit={refreshPayloadOnSubmit}
+          payloadFields={
             <input
               ref={payloadInputRef}
               type="hidden"
               name="payload"
               defaultValue={payloadJson}
             />
-            <PrimaryButton
-              type="submit"
-              size="sm"
-              data-testid="v2-enter-btn-02-timer"
-              className="w-full"
-            >
-              Trigger ENTER
-            </PrimaryButton>
-          </form>
-          <form
-            action={triggerOverlayOffAction}
-            data-testid="v2-off-form-02-timer"
-          >
-            <input type="hidden" name="sessionId" value={sessionId} />
-            <input type="hidden" name="overlayKey" value="02-timer" />
-            <DangerButton
-              type="submit"
-              size="sm"
-              data-testid="v2-off-btn-02-timer"
-            >
-              Trigger OUT
-            </DangerButton>
-          </form>
-        </div>
+          }
+        />
       }
     />
   );

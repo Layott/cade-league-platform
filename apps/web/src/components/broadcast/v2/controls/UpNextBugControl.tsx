@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { TriggerEnterForm, TriggerOffForm } from "../TriggerButtons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -10,8 +10,8 @@ import type { SimpleControlProps } from "./BrbControl";
  *
  * Renders a dropdown of upcoming matches from the current match-day. The
  * match list is fetched server-side by the page and passed in via the
- * `upcoming` prop. ENTER fires the legacy `up_next_bug` payload with
- * `home` + `away` + `kickoffAt` ISO datetime.
+ * `upcoming` prop. Toggle button fires the legacy `up_next_bug` payload
+ * with `home` + `away` + `kickoffAt` ISO datetime.
  */
 export type UpcomingMatch = {
   matchId: string;
@@ -29,6 +29,7 @@ export function UpNextBugControl({
   sessionId,
   viewToken,
   upcoming,
+  active = false,
 }: UpNextBugControlProps) {
   const [matchId, setMatchId] = useState<string>(
     upcoming[0]?.matchId ?? "",
@@ -107,20 +108,15 @@ export function UpNextBugControl({
         )
       }
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <TriggerEnterForm
-            overlayKey="10-up-next-bug"
-            sessionId={sessionId}
-            canEnter={upcoming.length > 0}
-            payloadFields={
-              <input type="hidden" name="payload" value={payloadJson} />
-            }
-          />
-          <TriggerOffForm
-            overlayKey="10-up-next-bug"
-            sessionId={sessionId}
-          />
-        </div>
+        <ToggleTriggerButton
+          overlayKey="10-up-next-bug"
+          sessionId={sessionId}
+          active={active}
+          canEnter={upcoming.length > 0}
+          payloadFields={
+            <input type="hidden" name="payload" value={payloadJson} />
+          }
+        />
       }
     />
   );

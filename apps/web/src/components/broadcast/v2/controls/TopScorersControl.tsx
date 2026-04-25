@@ -1,12 +1,13 @@
 "use client";
 
 import { ControlCard } from "../ControlCard";
-import { TriggerEnterForm, TriggerOffForm } from "../TriggerButtons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import type { SimpleControlProps } from "./BrbControl";
 
 export function TopScorersControl({
   sessionId,
   viewToken,
+  active = false,
 }: SimpleControlProps) {
   return (
     <ControlCard
@@ -14,19 +15,14 @@ export function TopScorersControl({
       sessionId={sessionId}
       viewToken={viewToken}
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <TriggerEnterForm
-            overlayKey="14-top-scorers"
-            sessionId={sessionId}
-            payloadFields={
-              <input type="hidden" name="payload" value="{}" />
-            }
-          />
-          <TriggerOffForm
-            overlayKey="14-top-scorers"
-            sessionId={sessionId}
-          />
-        </div>
+        <ToggleTriggerButton
+          overlayKey="14-top-scorers"
+          sessionId={sessionId}
+          active={active}
+          payloadFields={
+            <input type="hidden" name="payload" value="{}" />
+          }
+        />
       }
     />
   );

@@ -186,3 +186,67 @@ export async function triggerOverlayOffAction(formData: FormData) {
 
   revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
+
+/**
+ * TOGGLE trigger — single action used by the new toggle-switch button on
+ * each control card. Probes the current active state of the overlay key
+ * (slot-specific for multi-instance) then routes to ENTER (no row) or OFF
+ * (row found). The page revalidates after each call so the next render
+ * flips the button label / color.
+ *
+ * FormData fields:
+ *  - sessionId       (required)
+ *  - overlayKey      (required, V2OverlayKey)
+ *  - payload         (JSON string; required for ENTER, ignored for OFF)
+ *  - instanceSlot    (1..3; required for multi-instance keys)
+ */
+export async function toggleOverlayAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const overlayKey = String(formData.get("overlayKey") ?? "");
+  const payloadRaw = String(formData.get("payload") ?? "{}");
+  const slotRaw = String(formData.get("instanceSlot") ?? "");
+
+  if (!sessionId) throw new Error("sessionId required");
+  if (!isV2Key(overlayKey)) {
+    throw new Error(`unknown v2 overlay key: ${overlayKey}`);
+  }
+
+  const legacyKey: TemplateKey = v2ToLegacy(overlayKey);
+  const { sb, publicUserId } = await gateTrigger();
+
+  if (isMultiInstance(legacyKey)) {
+    const slot = slotRaw ? Number(slotRaw) : 1;
+    if (!Number.isFinite(slot) || slot < 1 || slot > 3) {
+      throw new Error("instanceSlot must be 1..3 for multi-instance overlays");
+    }
+    const active = await listActiveInstances(sb, sessionId, legacyKey);
+    const existing = active.find((row) => row.instanceSlot === slot) ?? null;
+    if (existing) {
+      await clearInstance(sb, existing.id, publicUserId);
+    } else {
+      const payload = parsePayload(payloadRaw);
+      await triggerInstance(sb, {
+        sessionId,
+        templateKey: legacyKey,
+        instanceSlot: slot,
+        payload,
+        userId: publicUserId,
+      });
+    }
+  } else {
+    const existing = await getActiveForTemplate(sb, sessionId, legacyKey);
+    if (existing) {
+      await clearOverlay(sb, existing.id, publicUserId);
+    } else {
+      const payload = parsePayload(payloadRaw);
+      await triggerOverlay(sb, {
+        sessionId,
+        templateKey: legacyKey,
+        payload,
+        userId: publicUserId,
+      });
+    }
+  }
+
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
+}

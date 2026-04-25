@@ -7,6 +7,7 @@ import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { LowerThirdControl } from "./LowerThirdControl";
@@ -45,7 +46,7 @@ beforeEach(() => {
 });
 
 describe("LowerThirdControl", () => {
-  it("renders 3 slots + 3 enter forms + 3 hide forms", () => {
+  it("renders 3 slots + 3 toggle buttons", () => {
     render(
       <LowerThirdControl
         sessionId={SESSION_ID}
@@ -55,11 +56,12 @@ describe("LowerThirdControl", () => {
     expect(screen.getByTestId("v2-lt-slot-1")).toBeTruthy();
     expect(screen.getByTestId("v2-lt-slot-2")).toBeTruthy();
     expect(screen.getByTestId("v2-lt-slot-3")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-enter-1")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-off-1")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-toggle-1")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-toggle-2")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-toggle-3")).toBeTruthy();
   });
 
-  it("each slot's enter form carries the correct instanceSlot field", () => {
+  it("each slot's toggle form carries the correct instanceSlot field", () => {
     const { container } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
@@ -67,10 +69,10 @@ describe("LowerThirdControl", () => {
       />,
     );
     const form1 = container.querySelector(
-      '[data-testid="v2-lt-enter-form-1"]',
+      '[data-testid="v2-toggle-form-08-lower-third-1"]',
     ) as HTMLFormElement;
     const form2 = container.querySelector(
-      '[data-testid="v2-lt-enter-form-2"]',
+      '[data-testid="v2-toggle-form-08-lower-third-2"]',
     ) as HTMLFormElement;
     expect(
       (form1.querySelector('input[name="instanceSlot"]') as HTMLInputElement)
@@ -90,7 +92,7 @@ describe("LowerThirdControl", () => {
       />,
     );
     const form1 = container.querySelector(
-      '[data-testid="v2-lt-enter-form-1"]',
+      '[data-testid="v2-toggle-form-08-lower-third-1"]',
     ) as HTMLFormElement;
     const payloadInput = form1.querySelector(
       'input[name="payload"]',
@@ -115,7 +117,7 @@ describe("LowerThirdControl", () => {
     fireEvent.change(nameInput, { target: { value: "ZARA" } });
 
     const form1 = container.querySelector(
-      '[data-testid="v2-lt-enter-form-1"]',
+      '[data-testid="v2-toggle-form-08-lower-third-1"]',
     ) as HTMLFormElement;
     const payloadInput = form1.querySelector(
       'input[name="payload"]',
@@ -135,7 +137,7 @@ describe("LowerThirdControl", () => {
     const roleInput = screen.getByTestId("v2-lt-role-1") as HTMLInputElement;
     const getPayload = () => {
       const form1 = container.querySelector(
-        '[data-testid="v2-lt-enter-form-1"]',
+        '[data-testid="v2-toggle-form-08-lower-third-1"]',
       ) as HTMLFormElement;
       return JSON.parse(
         (
@@ -215,5 +217,30 @@ describe("LowerThirdControl", () => {
     expect(nameInput.value).toBe("MILEY");
     const roleInput = screen.getByTestId("v2-lt-role-1") as HTMLInputElement;
     expect(roleInput.value).toBe("GUEST");
+  });
+
+  it("slotsActive flips toggle button per-slot to OFF state", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slotsActive={[true, false, true]}
+      />,
+    );
+    // slot 1 active → "Hide"
+    const f1 = document.querySelector(
+      '[data-testid="v2-toggle-form-08-lower-third-1"]',
+    ) as HTMLFormElement;
+    expect(f1.getAttribute("data-active")).toBe("true");
+    // slot 2 inactive → "Update & Show"
+    const f2 = document.querySelector(
+      '[data-testid="v2-toggle-form-08-lower-third-2"]',
+    ) as HTMLFormElement;
+    expect(f2.getAttribute("data-active")).toBe("false");
+    // slot 3 active
+    const f3 = document.querySelector(
+      '[data-testid="v2-toggle-form-08-lower-third-3"]',
+    ) as HTMLFormElement;
+    expect(f3.getAttribute("data-active")).toBe("true");
   });
 });

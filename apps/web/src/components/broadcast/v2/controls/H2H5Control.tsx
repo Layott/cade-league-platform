@@ -3,7 +3,11 @@
 import { H2HControl } from "./H2HControl";
 import type { SimpleControlProps } from "./BrbControl";
 
-export function H2H5Control({ sessionId, viewToken }: SimpleControlProps) {
+export function H2H5Control({
+  sessionId,
+  viewToken,
+  active = false,
+}: SimpleControlProps) {
   return (
     <H2HControl
       sessionId={sessionId}
@@ -17,6 +21,7 @@ export function H2H5Control({ sessionId, viewToken }: SimpleControlProps) {
         "kaykay",
         "guru",
       ]}
+      active={active}
     />
   );
 }

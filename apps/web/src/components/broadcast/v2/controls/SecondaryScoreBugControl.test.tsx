@@ -4,6 +4,7 @@ import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { SecondaryScoreBugControl } from "./SecondaryScoreBugControl";
@@ -73,7 +74,7 @@ describe("SecondaryScoreBugControl", () => {
         ).value,
       );
 
-    // Initial → ENTER → score 0-0
+    // Initial → toggle ON → score 0-0
     expect(getPayload().players[0].score).toBe(0);
 
     // First change
@@ -89,5 +90,16 @@ describe("SecondaryScoreBugControl", () => {
     expect(after.players[0].displayName).toBe("FARUK");
     expect(after.players[0].score).toBe(2);
     expect(after.players[1].score).toBe(3);
+  });
+
+  it("active=true flips toggle button to OFF state", () => {
+    render(
+      <SecondaryScoreBugControl
+        sessionId="S"
+        viewToken="T"
+        active={true}
+      />,
+    );
+    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
   });
 });

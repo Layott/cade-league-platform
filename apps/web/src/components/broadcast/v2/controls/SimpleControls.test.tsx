@@ -4,6 +4,7 @@ import { render, cleanup, screen } from "@testing-library/react";
 vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
+  toggleOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { BrbControl } from "./BrbControl";
@@ -21,7 +22,11 @@ beforeEach(() => {
 
 const SIMPLE_CONTROLS: Array<{
   name: string;
-  Component: React.FC<{ sessionId: string; viewToken: string | null }>;
+  Component: React.FC<{
+    sessionId: string;
+    viewToken: string | null;
+    active?: boolean;
+  }>;
   overlayKey: string;
 }> = [
   { name: "BRB", Component: BrbControl, overlayKey: "01-brb" },
@@ -55,26 +60,55 @@ const SIMPLE_CONTROLS: Array<{
 ];
 
 describe.each(SIMPLE_CONTROLS)("$name", ({ Component, overlayKey }) => {
-  it("renders an ENTER form + OUT form for the overlay key", () => {
+  it("renders a single toggle form for the overlay key", () => {
     render(<Component sessionId="S" viewToken="T" />);
-    expect(screen.getByTestId(`v2-enter-form-${overlayKey}`)).toBeTruthy();
-    expect(screen.getByTestId(`v2-off-form-${overlayKey}`)).toBeTruthy();
+    expect(screen.getByTestId(`v2-toggle-form-${overlayKey}`)).toBeTruthy();
   });
 
-  it("ENTER form posts to triggerOverlayEnterAction with overlayKey + payload", () => {
+  it("toggle form posts overlayKey + payload + sessionId", () => {
     const { container } = render(<Component sessionId="S" viewToken="T" />);
     const form = container.querySelector(
-      `[data-testid="v2-enter-form-${overlayKey}"]`,
+      `[data-testid="v2-toggle-form-${overlayKey}"]`,
     ) as HTMLFormElement;
     const overlayInput = form.querySelector(
       'input[name="overlayKey"]',
     ) as HTMLInputElement;
     expect(overlayInput.value).toBe(overlayKey);
+    const sessionInput = form.querySelector(
+      'input[name="sessionId"]',
+    ) as HTMLInputElement;
+    expect(sessionInput.value).toBe("S");
     const payloadInput = form.querySelector(
       'input[name="payload"]',
     ) as HTMLInputElement;
     expect(payloadInput).toBeTruthy();
     // Payload must be valid JSON (server action JSON.parses it).
     expect(() => JSON.parse(payloadInput.value)).not.toThrow();
+  });
+
+  it("active=false renders Trigger ON label", () => {
+    render(<Component sessionId="S" viewToken="T" active={false} />);
+    expect(screen.getByText(/Trigger ON/i)).toBeTruthy();
+  });
+
+  it("active=true renders Trigger OFF label", () => {
+    render(<Component sessionId="S" viewToken="T" active={true} />);
+    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
+  });
+
+  it("toggle form data-active flag mirrors the prop", () => {
+    const { container, rerender } = render(
+      <Component sessionId="S" viewToken="T" active={false} />,
+    );
+    let form = container.querySelector(
+      `[data-testid="v2-toggle-form-${overlayKey}"]`,
+    ) as HTMLFormElement;
+    expect(form.getAttribute("data-active")).toBe("false");
+
+    rerender(<Component sessionId="S" viewToken="T" active={true} />);
+    form = container.querySelector(
+      `[data-testid="v2-toggle-form-${overlayKey}"]`,
+    ) as HTMLFormElement;
+    expect(form.getAttribute("data-active")).toBe("true");
   });
 });

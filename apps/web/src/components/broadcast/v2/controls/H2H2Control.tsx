@@ -3,7 +3,11 @@
 import { H2HControl } from "./H2HControl";
 import type { SimpleControlProps } from "./BrbControl";
 
-export function H2H2Control({ sessionId, viewToken }: SimpleControlProps) {
+export function H2H2Control({
+  sessionId,
+  viewToken,
+  active = false,
+}: SimpleControlProps) {
   return (
     <H2HControl
       sessionId={sessionId}
@@ -11,6 +15,7 @@ export function H2H2Control({ sessionId, viewToken }: SimpleControlProps) {
       overlayKey="04-h2h-2"
       count={2}
       defaultSlugs={["baji_jnr", "king_nonex"]}
+      active={active}
     />
   );
 }

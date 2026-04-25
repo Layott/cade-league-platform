@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { TriggerEnterForm, TriggerOffForm } from "../TriggerButtons";
+import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import { PlayerSelect } from "../PlayerSelect";
 import { V2_PLAYER_NAMES, type V2PlayerSlug } from "../players";
 import type { SimpleControlProps } from "./BrbControl";
@@ -10,15 +10,14 @@ import type { SimpleControlProps } from "./BrbControl";
 /**
  * Plan 51 — secondary score bug control.
  *
- * Two-player face-off. Score inputs default to 0 — the operator types
- * the live score. Mirrors the static mockup `editable: 'scoreBug'`
- * inputs at v2/index.html. Live preview gets the slug + name + score
- * shape; persistent payload uses the legacy `score_bug` schema's
- * `players[]` array of `{ displayName, score }` (length 2).
+ * Two-player face-off. Score inputs default to 0 — operator types live
+ * score. Toggle button posts the legacy `score_bug` schema's `players[]`
+ * array of `{ displayName, score }` (length 2).
  */
 export function SecondaryScoreBugControl({
   sessionId,
   viewToken,
+  active = false,
 }: SimpleControlProps) {
   const [aSlug, setASlug] = useState<V2PlayerSlug>("baji_jnr");
   const [bSlug, setBSlug] = useState<V2PlayerSlug>("king_nonex");
@@ -109,19 +108,14 @@ export function SecondaryScoreBugControl({
         </div>
       }
       triggerSlot={
-        <div className="flex w-full items-center gap-2">
-          <TriggerEnterForm
-            overlayKey="09-secondary-score-bug"
-            sessionId={sessionId}
-            payloadFields={
-              <input type="hidden" name="payload" value={payloadJson} />
-            }
-          />
-          <TriggerOffForm
-            overlayKey="09-secondary-score-bug"
-            sessionId={sessionId}
-          />
-        </div>
+        <ToggleTriggerButton
+          overlayKey="09-secondary-score-bug"
+          sessionId={sessionId}
+          active={active}
+          payloadFields={
+            <input type="hidden" name="payload" value={payloadJson} />
+          }
+        />
       }
     />
   );
