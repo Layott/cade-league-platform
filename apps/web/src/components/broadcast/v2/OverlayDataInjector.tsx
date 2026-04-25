@@ -3,6 +3,8 @@
 import type { ReactElement } from "react";
 import { useEffect, useRef } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { v2ToLegacy } from "./template-mapping";
+import type { V2OverlayKey } from "./overlay-keys";
 
 /**
  * Plan 51 — v2 overlay data injector.
@@ -84,7 +86,103 @@ export default function OverlayDataInjector({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   /* --------------------------------------------------------------- *
-   * 1. Realtime → iframe forwarder                                  *
+   * 1a. Trigger channel — overlay:<sessionId>                        *
+   *                                                                 *
+   * ENTER on the broadcast control panel writes an overlay_events    *
+   * row + publishes `overlay.triggered` on `overlay:<sessionId>`.    *
+   * OUT publishes `overlay.cleared`. Multi-instance overlays         *
+   * (lower_third) use `instance.triggered` / `instance.cleared`.     *
+   *                                                                 *
+   * Forward each as a postMessage the static HTML can consume:       *
+   *   triggered → { type: 'show', data: payload }                    *
+   *   cleared   → { type: 'hide' }                                   *
+   *   updated   → { type: 'update', data: payload }                  *
+   * The static HTML's existing handler shape is honoured so          *
+   * designers can keep editing CSS/HTML without touching .tsx.       *
+   * --------------------------------------------------------------- */
+  useEffect(() => {
+    if (!sessionId) return;
+    const sb = getBrowserSupabase();
+    const channel = sb.channel(`overlay:${sessionId}`, {
+      config: { broadcast: { self: true } },
+    });
+
+    let legacyKey: string | null = null;
+    try {
+      legacyKey = v2ToLegacy(overlayKey as V2OverlayKey);
+    } catch {
+      legacyKey = null;
+    }
+
+    function postToInner(msg: Record<string, unknown>): void {
+      const iframe = iframeRef.current;
+      if (!iframe || !iframe.contentWindow) return;
+      try {
+        iframe.contentWindow.postMessage(msg, "*");
+      } catch {
+        /* swallow cross-origin/closed-window */
+      }
+    }
+
+    function isForThisOverlay(payload: unknown): boolean {
+      if (!payload || typeof payload !== "object") return false;
+      const p = payload as Record<string, unknown>;
+      // Match by templateKey (legacy) or overlayKey (v2) — defensive.
+      if (legacyKey && p.templateKey === legacyKey) return true;
+      if (p.overlayKey === overlayKey) return true;
+      return false;
+    }
+
+    channel.on("broadcast", { event: "overlay.triggered" }, (msg) => {
+      if (!isForThisOverlay(msg.payload)) return;
+      const payload = (msg.payload as { payload?: Record<string, unknown> })
+        ?.payload;
+      postToInner({ type: "show", data: payload ?? null });
+      postToInner({ type: "update", data: payload ?? null });
+    });
+
+    channel.on("broadcast", { event: "overlay.cleared" }, (msg) => {
+      if (!isForThisOverlay(msg.payload)) return;
+      postToInner({ type: "hide" });
+    });
+
+    channel.on("broadcast", { event: "instance.triggered" }, (msg) => {
+      if (!isForThisOverlay(msg.payload)) return;
+      const m = msg.payload as {
+        payload?: Record<string, unknown>;
+        instanceSlot?: number;
+      };
+      postToInner({
+        type: "show",
+        slot: m.instanceSlot ?? null,
+        data: m.payload ?? null,
+      });
+      postToInner({
+        type: "update",
+        slot: m.instanceSlot ?? null,
+        data: m.payload ?? null,
+      });
+    });
+
+    channel.on("broadcast", { event: "instance.cleared" }, (msg) => {
+      if (!isForThisOverlay(msg.payload)) return;
+      const m = msg.payload as { instanceSlot?: number };
+      postToInner({ type: "hide", slot: m.instanceSlot ?? null });
+    });
+
+    channel.subscribe();
+
+    return () => {
+      try {
+        sb.removeChannel(channel);
+      } catch {
+        /* best-effort */
+      }
+    };
+  }, [overlayKey, sessionId]);
+
+  /* --------------------------------------------------------------- *
+   * 1b. Data feed — public:standings:<seasonId> (existing behaviour) *
    * --------------------------------------------------------------- */
   useEffect(() => {
     if (!seasonId) return;

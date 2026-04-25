@@ -1,6 +1,32 @@
 import type { ReactElement } from "react";
 import { redirect } from "next/navigation";
 import OverlayDataInjector from "@/components/broadcast/v2/OverlayDataInjector";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
+
+/**
+ * Resolve the active season for a given broadcast session via
+ * stream_sessions → match_days. Returns null if session is gone /
+ * deleted or doesn't have a match-day attached.
+ */
+async function resolveSeasonId(sessionId: string): Promise<string | null> {
+  if (!sessionId) return null;
+  try {
+    const sb = getServiceRoleSupabase();
+    const { data } = await sb
+      .from("stream_sessions")
+      .select("match_day_id, match_days:match_day_id ( season_id )")
+      .eq("id", sessionId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!data) return null;
+    const md = (data as { match_days?: { season_id?: string } | { season_id?: string }[] | null }).match_days;
+    if (!md) return null;
+    if (Array.isArray(md)) return md[0]?.season_id ?? null;
+    return md.season_id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Plan 51 — `/overlay/v2/<key>` browser-source route.
@@ -55,12 +81,18 @@ export default async function OverlayV2Page({
   const { key } = await params;
   const { session, token, season } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) redirect("/overlay/v2/01-brb");
+
+  // Derive season server-side when only session is supplied (OBS URLs
+  // typically only carry `?session=...&token=...`). Explicit `?season=`
+  // in the URL still wins.
+  const resolvedSeason = season ?? (session ? await resolveSeasonId(session) : null);
+
   return (
     <OverlayDataInjector
       overlayKey={key}
       sessionId={session}
       token={token}
-      seasonId={season}
+      seasonId={resolvedSeason ?? undefined}
     />
   );
 }
