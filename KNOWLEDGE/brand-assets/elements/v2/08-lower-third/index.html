@@ -542,13 +542,20 @@
   }
 
   // ====== Render data into DOM (no animation triggering) ======
+  // Accepts either {name, role} (legacy demo) or {displayName, gamerTag}
+  // (Plan 51 lowerThirdSchema from broadcast v2 control panel).
   function render(data) {
-    if (data && typeof data.name === 'string') {
-      current.name = data.name;
+    if (!data) return;
+    var nm = (typeof data.name === 'string' && data.name) ||
+             (typeof data.displayName === 'string' && data.displayName) || '';
+    var rl = (typeof data.role === 'string' && data.role) ||
+             (typeof data.gamerTag === 'string' && data.gamerTag) || '';
+    if (nm) {
+      current.name = nm;
       splitIntoLetters(nameEl, current.name);
     }
-    if (data && typeof data.role === 'string') {
-      current.role = data.role;
+    if (rl) {
+      current.role = rl;
       roleEl.textContent = String(current.role).toUpperCase();
     }
   }
