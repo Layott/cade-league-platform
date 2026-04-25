@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #11 — MATCH SCORES OF THE DAY
+  Adaptive 2-column grid (6 left, 6 right) — fits 1 to 12 matches without overlap.
+  Reuses v2 pilot template: halftone bg, top CADE+Pro League header, side chevrons,
+  bottom partner marquee. Transparent 1920×1080 stage. Silent.
+  Demo loop: entry (rows cascade in, 50ms stagger) → 10s hold
+             → exit cascade → 1s gap → repeat.
+
+  TBD pill = pulsing breathe (subtle).
+  Title = "MATCH DAY N RESULTS" only — no decorative subtitle.
+
+  Top logos enlarged ~40% per shared-rule #1.
+  ≥80px gap maintained between rows-grid and partner strip per shared-rule #2.
+
+  DATA WIRES: matchDay (number), matches[] = {p1Slug, p1Name, p2Slug, p2Name,
+              status ('finished'|'tbd'|'walkover'), score1, score2, walkoverWinnerSide}
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — Match Day Results</title>
+
+<style>
+  /* ── REAL BRAND FONTS (carried from pilot) ──────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: block;
+  }
+
+  /* ── DESIGN TOKENS ──────────────────────────────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --pink-faint:   rgba(254, 3, 109, 0.18);
+    --gold:         #e6c832;
+    --gold-glow:    rgba(230, 200, 50, 0.55);
+    --gold-faint:   rgba(230, 200, 50, 0.18);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+
+    --cycle:        13s;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    isolation: isolate;
+  }
+
+  /* ── BG ─────────────────────────────────────────────────────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) — enlarged ~40% ────── */
+  .top-band {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    right: 0;
+    height: 132px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 38px;
+    z-index: 10;
+    animation: header-loop var(--cycle) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  .top-band .logo {
+    height: 116px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 104px; }
+  .top-band .logo--pro  { height: 124px; }
+  .top-band .divider {
+    width: 2px;
+    height: 92px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+  @keyframes header-loop {
+    0%   { opacity: 0; transform: translateY(-30px); }
+    5%   { opacity: 1; transform: translateY(0); }
+    77%  { opacity: 1; transform: translateY(0); }
+    85%  { opacity: 0; transform: translateY(-30px); }
+    100% { opacity: 0; transform: translateY(-30px); }
+  }
+
+  /* ── SIDE CHEVRONS ─────────────────────────────────────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .chevrons--left  { left: 32px; }
+  .chevrons--right { right: 32px; }
+  .chevron {
+    width: 56px;
+    height: 42px;
+    color: var(--green);
+    opacity: 0.35;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.20; transform: translateX(0); }
+    50%      { opacity: 0.65; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron { animation-name: chev-pulse-right; }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.20; transform: translateX(0); }
+    50%      { opacity: 0.65; transform: translateX(-6px); }
+  }
+
+  /* ── SEASON WATERMARK ───────────────────────────────────────── */
+  .season-mark {
+    position: absolute;
+    top: 26px;
+    right: 38px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+
+  /* ── TITLE — ONLY "MATCH DAY N RESULTS" ─────────────────────── */
+  .title-bar {
+    position: absolute;
+    top: 188px;
+    left: 50%;
+    text-align: center;
+    z-index: 11;
+    animation: title-loop var(--cycle) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  .title-bar__main {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 78px;
+    line-height: 0.92;
+    letter-spacing: 0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 18px rgba(0,0,0,0.65),
+      0 0 28px rgba(107,205,6,0.18);
+    white-space: nowrap;
+  }
+  .title-bar__main .accent {
+    color: var(--green);
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.6),
+      0 0 18px var(--green-glow),
+      0 0 36px rgba(107,205,6,0.30);
+  }
+  .title-bar__rule {
+    width: 220px;
+    height: 4px;
+    margin: 14px auto 0;
+    background: var(--pink);
+    border-radius: 2px;
+    box-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+  }
+  @keyframes title-loop {
+    0%   { opacity: 0; transform: translate(-50%, -16px); }
+    7%   { opacity: 1; transform: translate(-50%, 0); }
+    77%  { opacity: 1; transform: translate(-50%, 0); }
+    85%  { opacity: 0; transform: translate(-50%, -16px); }
+    100% { opacity: 0; transform: translate(-50%, -16px); }
+  }
+
+  /* ── ROWS GRID ─────────────────────────────────────────────────
+     2-column adaptive grid. Up to 12 matches (6 left + 6 right).
+     Top of grid = 320px. Bottom budget = 1080 - partner strip 184px
+     ≈ 896px. Available height ≈ 576px / 6 rows = 96px per row + 6px gap.
+     Rows are compact 76px each so 6×76 + 5×16gap = 536px (cleared).
+     ─────────────────────────────────────────────────────────────── */
+  .rows-wrap {
+    position: absolute;
+    top: 320px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1820px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 28px;
+    row-gap: 12px;
+    z-index: 8;
+  }
+
+  .row {
+    position: relative;
+    height: 80px;
+    padding: 0;
+    background: transparent;
+    animation: row-enter var(--cycle) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    opacity: 0;
+  }
+
+  .row__panel {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 12, 8, 0.62);
+    -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+    clip-path: polygon(
+      14px 0,
+      calc(100% - 14px) 0,
+      100% 14px,
+      100% calc(100% - 14px),
+      calc(100% - 14px) 100%,
+      14px 100%,
+      0 calc(100% - 14px),
+      0 14px
+    );
+    z-index: 1;
+  }
+  .row__border {
+    position: absolute;
+    inset: 0;
+    background: var(--row-border, var(--green));
+    clip-path: polygon(
+      14px 0,
+      calc(100% - 14px) 0,
+      100% 14px,
+      100% calc(100% - 14px),
+      calc(100% - 14px) 100%,
+      14px 100%,
+      0 calc(100% - 14px),
+      0 14px
+    );
+    filter: drop-shadow(0 0 14px var(--row-glow, var(--green-glow)));
+    z-index: 0;
+  }
+  .row__panel::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    background: inherit;
+    clip-path: inherit;
+    z-index: -1;
+  }
+  .row__body {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    padding: 0 18px;
+    display: grid;
+    grid-template-columns: 1fr 200px 1fr;
+    align-items: center;
+    column-gap: 10px;
+  }
+
+  .row--finished { --row-border: var(--green); --row-glow: var(--green-glow); }
+  .row--tbd      { --row-border: var(--pink);  --row-glow: var(--pink-glow);  }
+  .row--tbd      .row__panel { background: rgba(20, 8, 14, 0.62); }
+  .row--walkover { --row-border: var(--gold);  --row-glow: var(--gold-glow); }
+  .row--walkover .row__panel { background: rgba(20, 16, 6, 0.62); }
+
+  /* Per-row entry stagger — 50ms between rows for a fast top-down cascade.
+     Layout fills column-major-ish so we stagger by DOM order. */
+  .row:nth-child(1)  { animation-delay: 0.00s; }
+  .row:nth-child(2)  { animation-delay: 0.05s; }
+  .row:nth-child(3)  { animation-delay: 0.10s; }
+  .row:nth-child(4)  { animation-delay: 0.15s; }
+  .row:nth-child(5)  { animation-delay: 0.20s; }
+  .row:nth-child(6)  { animation-delay: 0.25s; }
+  .row:nth-child(7)  { animation-delay: 0.30s; }
+  .row:nth-child(8)  { animation-delay: 0.35s; }
+  .row:nth-child(9)  { animation-delay: 0.40s; }
+  .row:nth-child(10) { animation-delay: 0.45s; }
+  .row:nth-child(11) { animation-delay: 0.50s; }
+  .row:nth-child(12) { animation-delay: 0.55s; }
+
+  @keyframes row-enter {
+    0%   { opacity: 0; transform: translateX(-30px); }
+    7%   { opacity: 1; transform: translateX(0); }
+    77%  { opacity: 1; transform: translateX(0); }
+    85%  { opacity: 0; transform: translateX(-30px); }
+    100% { opacity: 0; transform: translateX(-30px); }
+  }
+
+  /* ── ROW SIDE: PLAYER A / B ────────────────────────────────── */
+  .row-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .row-side--right {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+  }
+
+  .player-photo {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(107,205,6,0.32) 0%, rgba(107,205,6,0) 60%),
+      rgba(0,0,0,0.55);
+    border: 2px solid rgba(255,255,255,0.18);
+    overflow: hidden;
+    box-shadow:
+      0 4px 12px rgba(0,0,0,0.55),
+      inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .row--tbd      .player-photo { border-color: rgba(254,3,109,0.55); }
+  .row--walkover .player-photo { border-color: rgba(230,200,50,0.55); }
+  .player-photo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 18%;
+  }
+
+  .player-name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 28px;
+    line-height: 0.95;
+    letter-spacing: 0.012em;
+    color: var(--ink);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+    min-width: 0;
+  }
+  .row-side--right .player-name { text-align: right; }
+
+  /* ── ROW CENTER ────────────────────────────────────────────── */
+  .row-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .score-final {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 100%;
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: 0.005em;
+    color: var(--ink);
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.7),
+      0 4px 14px rgba(0,0,0,0.65),
+      0 0 18px rgba(107,205,6,0.25);
+  }
+  .score-final__digit {
+    display: inline-block;
+    min-width: 48px;
+    text-align: center;
+  }
+  .score-final__sep {
+    width: 22px;
+    height: 4px;
+    background: var(--green);
+    border-radius: 2px;
+    box-shadow: 0 0 14px var(--green-glow);
+    transform: translateY(2px);
+  }
+
+  /* TBD pill: pink, with subtle PULSING BREATHE (no shimmer sweep — softer) */
+  .pill-tbd {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 26px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 32px;
+    letter-spacing: 0.18em;
+    color: var(--ink);
+    text-transform: uppercase;
+    background: rgba(254, 3, 109, 0.18);
+    border: 2px solid var(--pink);
+    border-radius: 6px;
+    box-shadow:
+      0 0 22px rgba(254,3,109,0.35),
+      inset 0 0 18px rgba(254,3,109,0.18);
+    animation: tbd-breathe 2.8s ease-in-out infinite;
+  }
+  @keyframes tbd-breathe {
+    0%, 100% {
+      transform: scale(1.00);
+      box-shadow:
+        0 0 14px rgba(254,3,109,0.28),
+        inset 0 0 12px rgba(254,3,109,0.16);
+      opacity: 0.88;
+    }
+    50% {
+      transform: scale(1.04);
+      box-shadow:
+        0 0 30px rgba(254,3,109,0.55),
+        inset 0 0 22px rgba(254,3,109,0.30);
+      opacity: 1;
+    }
+  }
+
+  /* Walkover pill: gold */
+  .pill-walkover {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 22px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    color: var(--gold);
+    text-transform: uppercase;
+    background: rgba(230, 200, 50, 0.14);
+    border: 2px solid var(--gold);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow:
+      0 0 22px rgba(230,200,50,0.35),
+      inset 0 0 18px rgba(230,200,50,0.18);
+    animation: wo-breathe 3s ease-in-out infinite;
+  }
+  .pill-walkover__label {
+    font-size: 16px;
+    letter-spacing: 0.30em;
+    line-height: 1;
+  }
+  .pill-walkover__score {
+    font-size: 32px;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    margin-top: 2px;
+    color: var(--ink);
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.7),
+      0 0 14px rgba(230,200,50,0.55);
+  }
+  @keyframes wo-breathe {
+    0%, 100% { box-shadow: 0 0 16px rgba(230,200,50,0.30), inset 0 0 12px rgba(230,200,50,0.18); }
+    50%      { box-shadow: 0 0 30px rgba(230,200,50,0.55), inset 0 0 22px rgba(230,200,50,0.28); }
+  }
+
+  /* ── BOTTOM PARTNER STRIP (≥80px gap from rows enforced via top:320 + max grid 536px = ends at 856px; partners begin near 944px) ── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 12;
+    animation: footer-loop var(--cycle) cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+  }
+  .marquee {
+    position: relative;
+    width: 980px;
+    max-width: 90%;
+    overflow: hidden;
+    padding: 10px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+    padding: 0 28px;
+    flex-shrink: 0;
+  }
+  .marquee-group .partner {
+    height: 46px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .marquee-group .partner--gameevo  { height: 42px; }
+  .marquee-group .partner--pride    { height: 38px; }
+  .marquee-group .partner--africa   { height: 42px; }
+  .marquee-group .partner--trace    { height: 48px; }
+  @keyframes footer-loop {
+    0%   { opacity: 0; transform: translateY(20px); }
+    7%   { opacity: 1; transform: translateY(0); }
+    77%  { opacity: 1; transform: translateY(0); }
+    85%  { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 0; transform: translateY(20px); }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain (loops continuously) -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Side chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Top header -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Title (ONLY "MATCH DAY N RESULTS") -->
+    <div class="title-bar">
+      <div class="title-bar__main">
+        <span class="accent">MATCH DAY 5</span> RESULTS
+      </div>
+      <div class="title-bar__rule" aria-hidden="true"></div>
+    </div>
+
+    <!-- Up to 12 match rows in a 2-column grid (6 left + 6 right) -->
+    <section class="rows-wrap" aria-label="Match scores of the day">
+
+      <!-- 1. FARUK 4-2 ANIFE -->
+      <div class="row row--finished">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png" alt="FARUK" /></div>
+            <div class="player-name">FARUK</div>
+          </div>
+          <div class="row-center">
+            <div class="score-final">
+              <span class="score-final__digit">4</span>
+              <span class="score-final__sep" aria-hidden="true"></span>
+              <span class="score-final__digit">2</span>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/anife/headshot_02_nobg.png" alt="ANIFE" /></div>
+            <div class="player-name">ANIFE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. KAYKAY 3-3 MR OGA -->
+      <div class="row row--finished">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kaykay/headshot_01_nobg.png" alt="KAYKAY" /></div>
+            <div class="player-name">KAYKAY</div>
+          </div>
+          <div class="row-center">
+            <div class="score-final">
+              <span class="score-final__digit">3</span>
+              <span class="score-final__sep" aria-hidden="true"></span>
+              <span class="score-final__digit">3</span>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/mr_oga/headshot_01_nobg.png" alt="MR OGA" /></div>
+            <div class="player-name">MR OGA</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. KILLER FREAK 1-0 DADABOI -->
+      <div class="row row--finished">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/killer_freak/headshot_01_nobg.png" alt="KILLER FREAK" /></div>
+            <div class="player-name">KILLER FREAK</div>
+          </div>
+          <div class="row-center">
+            <div class="score-final">
+              <span class="score-final__digit">1</span>
+              <span class="score-final__sep" aria-hidden="true"></span>
+              <span class="score-final__digit">0</span>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI" /></div>
+            <div class="player-name">DADABOI</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. ADEFOLA 2-1 GURU -->
+      <div class="row row--finished">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/adefola/headshot_01_nobg.png" alt="ADEFOLA" /></div>
+            <div class="player-name">ADEFOLA</div>
+          </div>
+          <div class="row-center">
+            <div class="score-final">
+              <span class="score-final__digit">2</span>
+              <span class="score-final__sep" aria-hidden="true"></span>
+              <span class="score-final__digit">1</span>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/guru/headshot_01_nobg.png" alt="GURU" /></div>
+            <div class="player-name">GURU</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. MITCH 5-2 TACTICAL -->
+      <div class="row row--finished">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/mitch/headshot_01_nobg.png" alt="MITCH" /></div>
+            <div class="player-name">MITCH</div>
+          </div>
+          <div class="row-center">
+            <div class="score-final">
+              <span class="score-final__digit">5</span>
+              <span class="score-final__sep" aria-hidden="true"></span>
+              <span class="score-final__digit">2</span>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/tactical/headshot_01_nobg.png" alt="TACTICAL" /></div>
+            <div class="player-name">TACTICAL</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. WOLEVATION 0-2 KING NONEX -->
+      <div class="row row--finished">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/wolevation/headshot_01_nobg.png" alt="WOLEVATION" /></div>
+            <div class="player-name">WOLEVATION</div>
+          </div>
+          <div class="row-center">
+            <div class="score-final">
+              <span class="score-final__digit">0</span>
+              <span class="score-final__sep" aria-hidden="true"></span>
+              <span class="score-final__digit">2</span>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kingnonex/headshot_01_nobg.png" alt="KING NONEX" /></div>
+            <div class="player-name">KING NONEX</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. BAJI JNR vs KING NONEX — TBD -->
+      <div class="row row--tbd">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/baji_jnr/headshot_01_nobg.png" alt="BAJI JNR" /></div>
+            <div class="player-name">BAJI JNR</div>
+          </div>
+          <div class="row-center">
+            <div class="pill-tbd">TBD</div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kingnonex/headshot_01_nobg.png" alt="KING NONEX" /></div>
+            <div class="player-name">KING NONEX</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. GURU vs MITCH — TBD -->
+      <div class="row row--tbd">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/guru/headshot_01_nobg.png" alt="GURU" /></div>
+            <div class="player-name">GURU</div>
+          </div>
+          <div class="row-center">
+            <div class="pill-tbd">TBD</div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/mitch/headshot_01_nobg.png" alt="MITCH" /></div>
+            <div class="player-name">MITCH</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. TACTICAL vs WOLEVATION — TBD -->
+      <div class="row row--tbd">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/tactical/headshot_01_nobg.png" alt="TACTICAL" /></div>
+            <div class="player-name">TACTICAL</div>
+          </div>
+          <div class="row-center">
+            <div class="pill-tbd">TBD</div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/wolevation/headshot_01_nobg.png" alt="WOLEVATION" /></div>
+            <div class="player-name">WOLEVATION</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10. ADEFOLA W/O 3-0 ANIFE — walkover -->
+      <div class="row row--walkover">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/adefola/headshot_01_nobg.png" alt="ADEFOLA" /></div>
+            <div class="player-name">ADEFOLA</div>
+          </div>
+          <div class="row-center">
+            <div class="pill-walkover">
+              <div class="pill-walkover__label">W / O</div>
+              <div class="pill-walkover__score">3 — 0</div>
+            </div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/anife/headshot_02_nobg.png" alt="ANIFE" /></div>
+            <div class="player-name">ANIFE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 11. FARUK vs DADABOI — TBD -->
+      <div class="row row--tbd">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png" alt="FARUK" /></div>
+            <div class="player-name">FARUK</div>
+          </div>
+          <div class="row-center">
+            <div class="pill-tbd">TBD</div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI" /></div>
+            <div class="player-name">DADABOI</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 12. KAYKAY vs KILLER FREAK — TBD -->
+      <div class="row row--tbd">
+        <div class="row__border" aria-hidden="true"></div>
+        <div class="row__panel"  aria-hidden="true"></div>
+        <div class="row__body">
+          <div class="row-side row-side--left">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kaykay/headshot_01_nobg.png" alt="KAYKAY" /></div>
+            <div class="player-name">KAYKAY</div>
+          </div>
+          <div class="row-center">
+            <div class="pill-tbd">TBD</div>
+          </div>
+          <div class="row-side row-side--right">
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/killer_freak/headshot_01_nobg.png" alt="KILLER FREAK" /></div>
+            <div class="player-name">KILLER FREAK</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Bottom partner strip -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

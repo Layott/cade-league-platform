@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #06 — HEAD-TO-HEAD 5-PLAYER
+  Five-way comparison panel for narrative segments (NOT group-stage form).
+  Built on the v2 pilot design system (../01-brb/index.html):
+    • Real @font-face Agharti + Quedora
+    • Halftone-green stadium BG + vignette + grain
+    • Top CADE | Pro League header band
+    • Side chevrons (mirrored)
+    • Bottom partner marquee (3× duplicated, infinite scroll)
+    • Season corner watermark
+
+  Layout choice for "5 cards without choking density":
+    Staircase / arc — odd-index cards (1, 3, 5) sit at standard height,
+    even-index cards (2, 4) drop ~40px so the eye scans in a wave.
+    Generous 28px gaps + thin vertical dividers between every card.
+
+  Each card  :  340px wide  · angled-corner-cut frame · 180px circular
+                photo on top · name + org-logo (or INDEPENDENT badge) ·
+                8-stat compact block (Pos · P · W-D-L · GF · GA · GD ·
+                Pts · Win Prob %).
+
+  Bottom     :  5-segment Win Probability bar (single horizontal track,
+                segments proportionate to each player's WP, fills on entry).
+
+  Motion     :  Header + chevrons fade ·
+                Cards cascade L→R (150ms stagger) ·
+                Stats cascade row-by-row simultaneously across all 5 ·
+                Bar segments fill after cards land ·
+                Hold 8s ·
+                Mirrored exit cascade.
+
+  DATA WIRES: players[] (5 entries) = {name, slug, photoUrl, orgLogoUrl, orgName, pos, p, w, d, l, gf, ga, gd, pts, winProb}
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — H2H 5-Player</title>
+
+<style>
+  /* ── REAL BRAND FONTS (mirror pilot) ─────────────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-display: block;
+  }
+
+  /* ── DESIGN TOKENS ──────────────────────────────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-soft:   #8eff14;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-soft:    #ff3b91;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --pink-faint:   rgba(254, 3, 109, 0.18);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --muted:        rgba(255,255,255,0.62);
+    --hairline:     rgba(255,255,255,0.10);
+    --panel:        rgba(8,10,12,0.78);
+    --panel-deep:   rgba(3,5,7,0.92);
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;            /* TRANSPARENT canvas per brief */
+    color: var(--ink);
+    font-family: var(--accent);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080, transparent root) ────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    isolation: isolate;
+  }
+
+  /* ── BG: halftone-green stadium texture (from pilot) ────────── */
+  /*  Sits behind everything; transparent root means anything outside
+      the stage is still see-through, but inside-stage we still get
+      the brand halftone so the cards have a place to live.        */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.32) 55%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 78%, rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.012) 0 1px,
+      transparent 1px 3px
+    );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) — enlarged ~40% per brief ── */
+  .top-band {
+    position: absolute;
+    top: 24px;
+    left: 0; right: 0;
+    height: 144px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 44px;
+    z-index: 10;
+    opacity: 0;
+    animation: top-fade 0.7s ease-out 0.10s forwards;
+  }
+  @keyframes top-fade {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .top-band .logo {
+    height: 120px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 110px; }
+  .top-band .logo--pro  { height: 128px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 96px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── SIDE CHEVRONS ──────────────────────────────────────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    animation: chev-fade 0.9s ease-out 0.20s forwards;
+  }
+  @keyframes chev-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .chevrons--left  { left: 50px; }
+  .chevrons--right { right: 50px; }
+
+  .chevron {
+    width: 72px;
+    height: 54px;
+    color: var(--green);
+    opacity: 0.55;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron { animation-name: chev-pulse-right; }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(-6px); }
+  }
+
+  /* ── KICKER + TITLE — round-2: moved up 60px (was top:230px) ── */
+  .title-row {
+    position: absolute;
+    top: 170px;
+    left: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 12;
+    opacity: 0;
+    animation: title-fade 0.7s ease-out 0.30s forwards;
+  }
+  @keyframes title-fade {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .kicker {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.42em;
+    color: var(--ink);
+    text-transform: uppercase;
+    padding: 8px 22px;
+    border: 1.5px solid rgba(255,255,255,0.22);
+    border-radius: 4px;
+    background: rgba(0,0,0,0.32);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .kicker .dot {
+    width: 7px; height: 7px;
+    background: var(--pink);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--pink-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.25); }
+  }
+
+  .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 88px;
+    line-height: 0.86;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 18px rgba(0,0,0,0.65),
+      0 0 32px rgba(107,205,6,0.16);
+    display: flex;
+    align-items: center;
+    gap: 22px;
+  }
+  .title .vs-bullet {
+    color: var(--pink);
+    font-size: 0.64em;
+    transform: translateY(-4px);
+    text-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+  }
+
+  .title-rule {
+    width: 220px;
+    height: 4px;
+    background: var(--pink);
+    border-radius: 3px;
+    box-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+    margin-top: 6px;
+  }
+
+  /* ── CARD GRID (5 columns, staircase) — round-2: shifted up to follow title ── */
+  /*  Slimmer 300px cards × 5 + 4 × 24 gap = 1596 px wide.
+      Cards now start at 320 (was 396, -76 to follow title up by 60).
+      Lower-staircase cards (2 & 4) translateY +28. */
+  .grid {
+    position: absolute;
+    top: 320px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1596px;
+    display: grid;
+    grid-template-columns: repeat(5, 300px);
+    column-gap: 24px;
+    z-index: 14;
+  }
+
+  /* Subtle vertical dividers between cards (decorative). Drawn as
+     pseudo-elements anchored to the gap to the LEFT of each card
+     except the first. Vertical hairline w/ soft fade. */
+  .card { position: relative; }
+  .card + .card::before {
+    content: '';
+    position: absolute;
+    top: 18%;
+    bottom: 18%;
+    left: -15px;       /* mid-gap */
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(255,255,255,0.18) 18%,
+      rgba(255,255,255,0.32) 50%,
+      rgba(255,255,255,0.18) 82%,
+      transparent 100%
+    );
+  }
+
+  /* Staircase offset: 2nd & 4th cards drop down (reduced for tighter clearance). */
+  .card--lower { transform: translateY(28px); }
+
+  /* Card frame: angled-corner-cut shape via clip-path. The cut is
+     ~22px on the top-left and bottom-right corners, giving the
+     diagonal-trim look without going into shape-flag territory. */
+  .card-frame {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(8,10,12,0.92) 0%, rgba(3,5,7,0.96) 100%);
+    border: 1.5px solid rgba(255,255,255,0.14);
+    clip-path: polygon(
+      22px 0,
+      100% 0,
+      100% calc(100% - 22px),
+      calc(100% - 22px) 100%,
+      0 100%,
+      0 22px
+    );
+    padding: 22px 22px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    /* default accent (overridden by --accent-color from the card itself) */
+    --accent-color: var(--green);
+    --accent-glow:  var(--green-glow);
+    --accent-faint: var(--green-faint);
+  }
+  .card--green .card-frame {
+    --accent-color: var(--green);
+    --accent-glow:  var(--green-glow);
+    --accent-faint: var(--green-faint);
+  }
+  .card--pink .card-frame {
+    --accent-color: var(--pink);
+    --accent-glow:  var(--pink-glow);
+    --accent-faint: var(--pink-faint);
+  }
+
+  /* Inner glow strip at top — uses the card's accent color. */
+  .card-frame::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 22px; right: 22px;
+    height: 3px;
+    background: var(--accent-color);
+    box-shadow: 0 0 14px var(--accent-glow);
+  }
+  /* Inner accent stripe at bottom (subtle bottom anchor). */
+  .card-frame::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 22px; right: 22px;
+    height: 2px;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      var(--accent-color) 50%,
+      transparent 100%
+    );
+    opacity: 0.55;
+  }
+
+  /* Photo halo (circular plate behind the headshot) — slightly smaller */
+  .photo-wrap {
+    position: relative;
+    width: 170px;
+    height: 170px;
+    margin-top: 2px;
+    flex: 0 0 auto;
+  }
+  .photo-halo {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 35%, var(--accent-faint) 0%, transparent 70%),
+      conic-gradient(from 220deg, transparent 0deg, var(--accent-color) 30deg, transparent 110deg, transparent 240deg, var(--accent-color) 290deg, transparent 360deg);
+    filter: blur(0.5px);
+    opacity: 0.85;
+    animation: halo-spin 14s linear infinite;
+  }
+  @keyframes halo-spin { to { transform: rotate(360deg); } }
+
+  .photo-disc {
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.55) 70%);
+    border: 2px solid var(--accent-color);
+    box-shadow:
+      inset 0 0 30px rgba(0,0,0,0.55),
+      0 0 24px var(--accent-faint);
+    overflow: hidden;
+  }
+  .photo-disc img {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 188px;
+    height: auto;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.65));
+  }
+
+  /* Position rank chip (top-left of card, above photo edge) */
+  .pos-chip {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    min-width: 44px;
+    padding: 4px 10px;
+    background: var(--accent-color);
+    color: var(--black);
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1;
+    clip-path: polygon(
+      6px 0,
+      100% 0,
+      calc(100% - 6px) 100%,
+      0 100%
+    );
+    box-shadow: 0 0 14px var(--accent-glow);
+    z-index: 4;
+  }
+  .pos-chip .pos-label {
+    display: block;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 8px;
+    letter-spacing: 0.20em;
+    margin-bottom: 1px;
+    opacity: 0.85;
+  }
+
+  /* Name + org row */
+  .name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 36px;
+    line-height: 0.88;
+    letter-spacing: 0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-align: center;
+    margin-top: 6px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.55);
+    /* clamp very long names — ANIFE/FARUK fit fine but defensive */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .org-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 32px;
+    margin-top: 2px;
+  }
+  .org-logo {
+    height: 26px;
+    width: auto;
+    max-width: 80px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
+  }
+  .org-name {
+    font-family: var(--accent);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  .indep-badge {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.32em;
+    color: var(--accent-color);
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border: 1px dashed var(--accent-color);
+    border-radius: 2px;
+    line-height: 1;
+  }
+
+  /* ── 8-STAT BLOCK ───────────────────────────────────────────── */
+  /*  Layout: 4 rows × 2 cols, but the W-D-L row spans both columns.
+      Effective grid:
+        Row 1:  P    |  W-D-L (spans 2)  → wait, that's 3 visual cells.
+      Cleaner: 5 rows total of paired stats:
+        ┌──────────┬──────────┐
+        │  P       │  Pts     │
+        │  W-D-L (full row)   │
+        │  GF      │  GA      │
+        │  GD      │  WP %    │
+        └──────────┴──────────┘
+      That's 8 stats (Pos shown in chip + P/Pts/W/D/L/GF/GA/GD/WP = 8 in body
+      not counting Pos which is the rank chip). Adjusted to spec.       */
+  .stats {
+    width: 100%;
+    margin-top: 6px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 8px;
+  }
+  .stat {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--hairline);
+    padding: 6px 10px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    opacity: 0;                    /* cascade-target */
+    transform: translateY(8px);
+  }
+  .stat--full { grid-column: 1 / -1; justify-content: center; gap: 14px; }
+
+  .stat-label {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .stat-value {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+  }
+  .stat--wdl .stat-value {
+    font-size: 24px;
+    color: var(--accent-color);
+    text-shadow: 0 0 12px var(--accent-faint);
+  }
+  .stat-value .gd-pos { color: var(--green-soft); }
+  .stat-value .gd-neg { color: var(--pink-soft); }
+
+  /* The Win Prob line is always the last stat row — accent color. */
+  .stat--wp { grid-column: 1 / -1; }
+  .stat--wp .stat-value {
+    font-size: 26px;
+    color: var(--accent-color);
+    text-shadow: 0 0 14px var(--accent-faint);
+  }
+  .stat--wp .stat-label { color: var(--ink); opacity: 0.8; }
+
+  /* ── BOTTOM WIN-PROB BAR (5-segment proportional) — round-2: lowered ── */
+  /* Lower-staircase card height ≈ 456 → bottom = 320+456+28 = 804.
+     wp-block height ≈ 83px (title 13 + 10 + labels 18 + 6 + bar 36).
+     bottom:150 → block top = 1080-150-83 ≈ 847. Gap to cards ≈ 43 ✓.
+     Partner strip bottom 36 + height ~80 → partner top ≈ 964.
+     wp-block bottom = 1080-150 = 930. Gap below wp ≈ 34 ✓. */
+  .wp-bar-block {
+    position: absolute;
+    left: 50%;
+    bottom: 150px;
+    transform: translateX(-50%);
+    width: 1596px;
+    z-index: 14;
+    opacity: 0;
+    animation: wp-block-fade 0.6s ease-out 1.6s forwards;
+  }
+  @keyframes wp-block-fade {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .wp-title {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.40em;
+    color: var(--muted);
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .wp-bar {
+    position: relative;
+    width: 100%;
+    height: 36px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 2px;
+    display: flex;
+    overflow: hidden;
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.6);
+  }
+  .wp-seg {
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 22px;
+    color: var(--black);
+    letter-spacing: 0.02em;
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: wp-fill 0.9s cubic-bezier(.22,1,.36,1) 1.8s forwards;
+  }
+  /* Stagger fills slightly so they don't all arrive in lock-step. */
+  .wp-seg:nth-child(1) { animation-delay: 1.80s; }
+  .wp-seg:nth-child(2) { animation-delay: 1.95s; }
+  .wp-seg:nth-child(3) { animation-delay: 2.10s; }
+  .wp-seg:nth-child(4) { animation-delay: 2.25s; }
+  .wp-seg:nth-child(5) { animation-delay: 2.40s; }
+
+  @keyframes wp-fill {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+
+  .wp-seg--green { background: var(--green); box-shadow: inset 0 0 18px rgba(0,0,0,0.30); }
+  .wp-seg--pink  { background: var(--pink);  box-shadow: inset 0 0 18px rgba(0,0,0,0.30); color: #fff; }
+
+  .wp-seg .seg-num {
+    position: relative;
+    z-index: 2;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.20);
+  }
+  .wp-seg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255,255,255,0.18) 50%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: seg-shimmer 3.2s ease-in-out infinite;
+    animation-delay: 2.7s;
+  }
+  @keyframes seg-shimmer {
+    0%   { transform: translateX(-100%); }
+    60%  { transform: translateX(100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* Labels above each segment (player names) */
+  .wp-labels {
+    width: 100%;
+    display: flex;
+    margin-bottom: 6px;
+    height: 18px;
+  }
+  .wp-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── BOTTOM PARTNER MARQUEE (from pilot, slimmer height) ────── */
+  .partners {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 12;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.62);
+    text-transform: uppercase;
+  }
+  .marquee {
+    position: relative;
+    width: 980px;
+    max-width: 80%;
+    overflow: hidden;
+    padding: 12px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 64px;
+    padding: 0 32px;
+    flex-shrink: 0;
+  }
+  .marquee-group .partner {
+    height: 56px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .marquee-group .partner--gameevo  { height: 50px; }
+  .marquee-group .partner--pride    { height: 46px; }
+  .marquee-group .partner--africa   { height: 50px; }
+  .marquee-group .partner--trace    { height: 58px; }
+
+  /* ── SEASON CORNER WATERMARK ────────────────────────────────── */
+  .season-mark {
+    position: absolute;
+    top: 22px;
+    right: 32px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.38em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 9px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+
+  /* ── MASTER ANIMATION TIMELINE ──────────────────────────────── */
+  /*  Cards cascade L→R with 150ms stagger, each entering from below
+      with a slight scale punch. Stats cascade row-by-row across all
+      five players simultaneously — i.e. row 1 of card 1..5 lights at
+      the same time, then row 2 across all five, etc.                  */
+  .card {
+    opacity: 0;
+    transform: translateY(48px) scale(0.96);
+    animation: card-in 0.7s cubic-bezier(.22,1,.36,1) forwards;
+  }
+  .card--lower {
+    /* keep the staircase drop on entry too (reduced for tighter clearance) */
+    transform: translateY(76px) scale(0.96);
+  }
+  .card:nth-child(1) { animation-delay: 0.50s; }
+  .card:nth-child(2) { animation-delay: 0.65s; }
+  .card:nth-child(3) { animation-delay: 0.80s; }
+  .card:nth-child(4) { animation-delay: 0.95s; }
+  .card:nth-child(5) { animation-delay: 1.10s; }
+
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(48px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  }
+  /* Lower-staircase cards finish at +28px so the wave shape is preserved. */
+  .card--lower {
+    animation-name: card-in-lower;
+  }
+  @keyframes card-in-lower {
+    from { opacity: 0; transform: translateY(76px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(28px) scale(1);    }
+  }
+
+  /* Stats row cascade: row 1 = .stat-row-1 across all five cards lights
+     at t = 1.30s, row 2 at 1.40s, row 3 at 1.50s, row 4 at 1.60s. */
+  .stat.stat-row-1 { animation: stat-in 0.5s cubic-bezier(.22,1,.36,1) 1.30s forwards; }
+  .stat.stat-row-2 { animation: stat-in 0.5s cubic-bezier(.22,1,.36,1) 1.40s forwards; }
+  .stat.stat-row-3 { animation: stat-in 0.5s cubic-bezier(.22,1,.36,1) 1.50s forwards; }
+  .stat.stat-row-4 { animation: stat-in 0.5s cubic-bezier(.22,1,.36,1) 1.60s forwards; }
+
+  @keyframes stat-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0);   }
+  }
+
+  /* ── EXIT (mirrored cascade) — overrides at the .stage.exiting ─ */
+  /*  Triggered after a hold. We use 8s hold from end of card-cascade
+      (1.10 + 0.7 = 1.80s last card landed; bars finish ~3.4s; hold
+      8s from there → exit starts at ~11.4s on the timeline).        */
+  .stage {
+    animation: stage-life 19.5s linear forwards;
+  }
+  @keyframes stage-life {
+    /* 0 - 11.4s = entry + hold (everything visible) */
+    /* 11.4 - 12.4s = exit cascade */
+    /* 12.4 - 19.5s = held off-screen (overlay can be removed by host) */
+    0%, 58.5% { opacity: 1; }
+    62%       { opacity: 1; }
+    100%      { opacity: 1; }       /* don't fade the stage itself */
+  }
+
+  /* Per-element exit: reverse staircase (right→left), 120ms stagger. */
+  .card             { animation-fill-mode: forwards; }
+  .card.exiting     { animation: card-out 0.6s cubic-bezier(.4,0,.7,0) forwards; }
+  .card--lower.exiting { animation: card-out-lower 0.6s cubic-bezier(.4,0,.7,0) forwards; }
+  @keyframes card-out {
+    from { opacity: 1; transform: translateY(0)    scale(1);    }
+    to   { opacity: 0; transform: translateY(40px) scale(0.96); }
+  }
+  @keyframes card-out-lower {
+    from { opacity: 1; transform: translateY(28px) scale(1);    }
+    to   { opacity: 0; transform: translateY(76px) scale(0.96); }
+  }
+
+  /* ── EXIT TRIGGER (pure CSS, single timeline) ────────────────── */
+  /*  Drive the exit via per-card individual animations on a delayed
+      offset rather than a JS toggle, so this stays a single static
+      HTML file. Each card gets a SECOND keyframe pass that exits it
+      at staggered times AFTER the 8s hold.                          */
+  .grid .card { animation: card-in 0.7s cubic-bezier(.22,1,.36,1) forwards,
+                           card-out 0.7s cubic-bezier(.4,0,.7,0) forwards; }
+  .grid .card--lower { animation: card-in-lower 0.7s cubic-bezier(.22,1,.36,1) forwards,
+                                   card-out-lower 0.7s cubic-bezier(.4,0,.7,0) forwards; }
+
+  /* Card 5 exits first (right→left), card 1 exits last. Hold = 8s
+     measured from when card 5 finished entering (1.10 + 0.7 = 1.80s).
+     Exit start of card 5 = 1.80 + 8.0 = 9.80s.  */
+  .grid .card:nth-child(5) { animation-delay: 1.10s, 9.80s;  }
+  .grid .card:nth-child(4) { animation-delay: 0.95s, 9.95s;  }
+  .grid .card:nth-child(3) { animation-delay: 0.80s, 10.10s; }
+  .grid .card:nth-child(2) { animation-delay: 0.65s, 10.25s; }
+  .grid .card:nth-child(1) { animation-delay: 0.50s, 10.40s; }
+
+  /* WP bar exit: scale back to 0 after the cards have all left. */
+  .wp-bar-block {
+    animation: wp-block-fade 0.6s ease-out 1.6s forwards,
+               wp-block-out  0.5s ease-in  11.0s forwards;
+  }
+  @keyframes wp-block-out {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  }
+
+  /* Title + chevrons + header + season-mark + marquee fade out together */
+  .top-band {
+    animation: top-fade 0.7s ease-out 0.10s forwards,
+               top-out  0.6s ease-in  11.2s forwards;
+  }
+  @keyframes top-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-12px); }
+  }
+  .title-row {
+    animation: title-fade 0.7s ease-out 0.30s forwards,
+               title-out  0.6s ease-in  11.2s forwards;
+  }
+  @keyframes title-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-8px); }
+  }
+  .chevrons {
+    animation: chev-fade 0.9s ease-out 0.20s forwards,
+               chev-out  0.6s ease-in  11.2s forwards;
+  }
+  @keyframes chev-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+  .partners {
+    opacity: 0;
+    animation: partners-fade 0.7s ease-out 0.40s forwards,
+               partners-out  0.6s ease-in  11.2s forwards;
+  }
+  @keyframes partners-fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes partners-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(8px); }
+  }
+  .season-mark {
+    opacity: 0;
+    animation: season-fade 0.7s ease-out 0.40s forwards,
+               season-out  0.5s ease-in  11.2s forwards;
+  }
+  @keyframes season-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes season-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain (inside-stage only; outside is transparent) -->
+    <div class="bg-image"   aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain"    aria-hidden="true"></div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">Elite League · Season 2</div>
+
+    <!-- Top header band -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro"  src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Title row (kicker "Form Comparison" removed per brief) -->
+    <section class="title-row">
+      <h1 class="title">
+        <span>Five</span>
+        <span class="vs-bullet">×</span>
+        <span>Way</span>
+      </h1>
+      <div class="title-rule" aria-hidden="true"></div>
+    </section>
+
+    <!-- Side chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- ============================================================
+         CARD GRID — 5 columns, alternating green/pink accents,
+         staircase offset on cards 2 & 4.
+         Mock data per brief:
+           1 FARUK   · OAS ESPORTS   · Pos 2  · 4-1-0 · GD +11 · WP 25%
+           2 ANIFE   · AFROPANDA     · Pos 5  · 2-2-1 · GD +2  · WP 18%
+           3 KAYKAY  · LUMO LABS     · Pos 3  · 3-1-1 · GD +6  · WP 22%
+           4 MR OGA  · INDEPENDENT   · Pos 1  · 5-0-0 · GD +17 · WP 28%
+           5 DADABOI · OUTLAWS       · Pos 8  · 1-1-3 · GD -8  · WP  7%
+         ============================================================ -->
+    <section class="grid" role="list">
+
+      <!-- ───── CARD 1 · FARUK · GREEN ───── -->
+      <article class="card card--green" role="listitem">
+        <div class="card-frame">
+          <div class="pos-chip"><span class="pos-label">Pos</span>2</div>
+          <div class="photo-wrap">
+            <div class="photo-halo" aria-hidden="true"></div>
+            <div class="photo-disc">
+              <img src="/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png" alt="FARUK" />
+            </div>
+          </div>
+          <h2 class="name">FARUK</h2>
+          <div class="org-row">
+            <img class="org-logo" src="/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png" alt="OAS Esports" />
+            <span class="org-name">OAS Esports</span>
+          </div>
+          <div class="stats">
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">5</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">13</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">4&nbsp;-&nbsp;1&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">18</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">7</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD <span class="gd-pos">+11</span></span><span class="stat-value">25%</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ───── CARD 2 · ANIFE · PINK · LOWER ───── -->
+      <article class="card card--pink card--lower" role="listitem">
+        <div class="card-frame">
+          <div class="pos-chip"><span class="pos-label">Pos</span>5</div>
+          <div class="photo-wrap">
+            <div class="photo-halo" aria-hidden="true"></div>
+            <div class="photo-disc">
+              <img src="/overlays/v2/_assets/players/processed/anife/headshot_02_nobg.png" alt="ANIFE" />
+            </div>
+          </div>
+          <h2 class="name">ANIFE</h2>
+          <div class="org-row">
+            <img class="org-logo" src="/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg" alt="AfroPanda Esports" />
+            <span class="org-name">AfroPanda</span>
+          </div>
+          <div class="stats">
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">5</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">8</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">2&nbsp;-&nbsp;2&nbsp;-&nbsp;1</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">12</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">10</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD <span class="gd-pos">+2</span></span><span class="stat-value">18%</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ───── CARD 3 · KAYKAY · GREEN ───── -->
+      <article class="card card--green" role="listitem">
+        <div class="card-frame">
+          <div class="pos-chip"><span class="pos-label">Pos</span>3</div>
+          <div class="photo-wrap">
+            <div class="photo-halo" aria-hidden="true"></div>
+            <div class="photo-disc">
+              <img src="/overlays/v2/_assets/players/processed/kaykay/headshot_01_nobg.png" alt="KAYKAY" />
+            </div>
+          </div>
+          <h2 class="name">KAYKAY</h2>
+          <div class="org-row">
+            <img class="org-logo" src="/overlays/v2/_assets/Orgs/LUMO%20LABS%20-%20KAYKAY.png" alt="Lumo Labs" />
+            <span class="org-name">Lumo Labs</span>
+          </div>
+          <div class="stats">
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">5</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">10</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">3&nbsp;-&nbsp;1&nbsp;-&nbsp;1</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">15</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">9</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD <span class="gd-pos">+6</span></span><span class="stat-value">22%</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ───── CARD 4 · MR OGA · PINK · LOWER · INDEPENDENT ───── -->
+      <article class="card card--pink card--lower" role="listitem">
+        <div class="card-frame">
+          <div class="pos-chip"><span class="pos-label">Pos</span>1</div>
+          <div class="photo-wrap">
+            <div class="photo-halo" aria-hidden="true"></div>
+            <div class="photo-disc">
+              <img src="/overlays/v2/_assets/players/processed/mr_oga/headshot_01_nobg.png" alt="MR OGA" />
+            </div>
+          </div>
+          <h2 class="name">MR OGA</h2>
+          <div class="org-row">
+            <span class="indep-badge">Independent</span>
+          </div>
+          <div class="stats">
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">5</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">15</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">5&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">22</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">5</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD <span class="gd-pos">+17</span></span><span class="stat-value">28%</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ───── CARD 5 · DADABOI · GREEN ───── -->
+      <article class="card card--green" role="listitem">
+        <div class="card-frame">
+          <div class="pos-chip"><span class="pos-label">Pos</span>8</div>
+          <div class="photo-wrap">
+            <div class="photo-halo" aria-hidden="true"></div>
+            <div class="photo-disc">
+              <img src="/overlays/v2/_assets/players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI" />
+            </div>
+          </div>
+          <h2 class="name">DADABOI</h2>
+          <div class="org-row">
+            <img class="org-logo" src="/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png" alt="Outlaws" />
+            <span class="org-name">Outlaws</span>
+          </div>
+          <div class="stats">
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">5</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">4</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">1&nbsp;-&nbsp;1&nbsp;-&nbsp;3</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">6</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">14</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD <span class="gd-neg">-8</span></span><span class="stat-value">7%</span></div>
+          </div>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- ============================================================
+         WIN PROBABILITY — 5-segment proportional bar
+         Sum of WPs = 25 + 18 + 22 + 28 + 7 = 100 → segments are
+         direct percentage widths.
+         ============================================================ -->
+    <section class="wp-bar-block" aria-label="Win probability split">
+      <div class="wp-title">Match Win Probability</div>
+      <div class="wp-labels" aria-hidden="true">
+        <div class="wp-label" style="width:25%;">Faruk · 25%</div>
+        <div class="wp-label" style="width:18%;">Anife · 18%</div>
+        <div class="wp-label" style="width:22%;">Kaykay · 22%</div>
+        <div class="wp-label" style="width:28%;">Mr Oga · 28%</div>
+        <div class="wp-label" style="width:7%;">Dada · 7%</div>
+      </div>
+      <div class="wp-bar" role="img" aria-label="Win probability proportional bar">
+        <div class="wp-seg wp-seg--green" style="width:25%;"><span class="seg-num">25%</span></div>
+        <div class="wp-seg wp-seg--pink"  style="width:18%;"><span class="seg-num">18%</span></div>
+        <div class="wp-seg wp-seg--green" style="width:22%;"><span class="seg-num">22%</span></div>
+        <div class="wp-seg wp-seg--pink"  style="width:28%;"><span class="seg-num">28%</span></div>
+        <div class="wp-seg wp-seg--green" style="width:7%;"><span class="seg-num">7%</span></div>
+      </div>
+    </section>
+
+    <!-- Bottom partner marquee -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png"   alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png"        alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png"         alt="Trace" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png"   alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png"        alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png"         alt="" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png"   alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png"        alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png"         alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

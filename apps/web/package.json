@@ -10,7 +10,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "sync:overlays": "node scripts/sync-v2-overlays.mjs",
+    "sync:overlays:watch": "node scripts/sync-v2-overlays.mjs --watch",
+    "prebuild": "npm run sync:overlays"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -41,6 +44,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/ui": "^4.1.4",
+    "chokidar": "^4.0.3",
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
     "jsdom": "^29.0.2",

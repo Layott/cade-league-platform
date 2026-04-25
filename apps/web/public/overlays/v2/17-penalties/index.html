@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #17 — DISCIPLINARY ACTIONS / PLAYER PENALTIES
+  v2 pilot redesign. Transparent 1920×1080 broadcast overlay.
+  Renders ONLY active penalties (4 mock rows). Brand-heavy, condensed Agharti
+  title, angled-corner-cut card frames, severity-tinted borders, side chevrons,
+  bottom marquee partner strip. Demo-loops (entry → 10s hold → exit → repeat).
+
+  Reuses pilot design system from ../01-brb/index.html.
+
+  DATA WIRES: penalties[] = {playerName, playerSlug, playerPhotoUrl, penaltyType, severity, reason, date}
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — Disciplinary Actions</title>
+
+<style>
+  /* ── REAL BRAND FONTS ───────────────────────────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-display: block;
+  }
+
+  /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --black:        #050505;
+    --ink:          #ffffff;
+
+    /* Severity palette */
+    --sev-deduct:    #fe036d;            /* POINT DEDUCTION — pink */
+    --sev-deduct-glow: rgba(254, 3, 109, 0.55);
+    --sev-suspend:   #c92d4a;            /* SUSPENSION — dark red */
+    --sev-suspend-glow: rgba(201, 45, 74, 0.60);
+    --sev-warn:      #f4b400;            /* WARNING — amber */
+    --sev-warn-glow: rgba(244, 180, 0, 0.50);
+    --sev-fine:      #ff7a00;            /* FINE — orange */
+    --sev-fine-glow: rgba(255, 122, 0, 0.50);
+
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;       /* TRANSPARENT for OBS/vMix browser source */
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    isolation: isolate;
+  }
+
+  /* ── BG: halftone-green stadium texture ─────────────────────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+
+  /* dark gradient overlay so card list reads cleanly */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(5,5,5,0.58) 0%, rgba(5,5,5,0.42) 45%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.20) 0%, rgba(5,5,5,0.30) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.80) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* subtle scanline grain */
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) ────────────────────── */
+  .top-band {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    right: 0;
+    height: 130px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 38px;
+    z-index: 10;
+    opacity: 0;
+    animation: header-fade 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s forwards;
+  }
+  .top-band .logo {
+    height: 114px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 102px; }
+  .top-band .logo--pro  { height: 124px; }
+  .top-band .divider {
+    width: 2px;
+    height: 92px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+  @keyframes header-fade {
+    0%   { opacity: 0; transform: translateY(-12px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SIDE CHEVRONS ──────────────────────────────────────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 38px;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    animation: chev-fade 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s forwards;
+  }
+  .chevrons--left  { left: 70px; }
+  .chevrons--right { right: 70px; }
+  .chevron {
+    width: 78px;
+    height: 56px;
+    color: var(--green);
+    opacity: 0.55;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron { animation-name: chev-pulse-right; }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(-6px); }
+  }
+  @keyframes chev-fade {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  /* ── TITLE BLOCK ────────────────────────────────────────────── */
+  .title-block {
+    position: absolute;
+    top: 186px;
+    left: 50%;
+    width: 1500px;
+    text-align: center;
+    z-index: 20;
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+    animation: title-fade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s forwards;
+  }
+  .kicker {
+    display: inline-block;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.85);
+    text-transform: uppercase;
+    padding: 7px 20px;
+    border: 2px solid rgba(254, 3, 109, 0.45);
+    border-radius: 4px;
+    margin-bottom: 14px;
+    background: rgba(20, 4, 11, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .kicker .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--pink);
+    border-radius: 50%;
+    margin-right: 10px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--pink-glow);
+    animation: dot-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.6; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;   transform: translateY(-1px) scale(1.25); }
+  }
+  .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 72px;
+    line-height: 0.92;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin: 0;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 16px rgba(0,0,0,0.65),
+      0 0 32px rgba(254,3,109,0.18);
+  }
+  .title .accent { color: var(--pink); text-shadow: 0 0 22px var(--pink-glow), 0 0 1px rgba(255,255,255,0.6); }
+  .title-rule {
+    width: 220px;
+    height: 4px;
+    margin: 14px auto 8px;
+    background: var(--pink);
+    border-radius: 3px;
+    box-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+  }
+  .subtitle {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 18px;
+    letter-spacing: 0.34em;
+    color: rgba(255,255,255,0.78);
+    text-transform: uppercase;
+  }
+  @keyframes title-fade {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  /* ── PENALTY CARD LIST (2-column grid, fits up to 13) ─────── */
+  .list {
+    position: absolute;
+    top: 392px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1660px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
+    row-gap: 10px;
+    z-index: 22;
+  }
+  /* 13th orphan card spans both columns */
+  .card:nth-child(13):last-child {
+    grid-column: 1 / span 2;
+    max-width: 820px;
+    justify-self: center;
+    width: 100%;
+  }
+
+  /* Each card uses a clip-path to cut off two opposite corners
+     (top-left + bottom-right) — gives the angled tactical-card feel.
+     The severity color drives the left rail, photo ring, badge bg,
+     and (for heavy hitters) a pulsing rim glow. */
+  .card {
+    position: relative;
+    height: 70px;
+    display: grid;
+    grid-template-columns: 50px 1fr auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 0 16px 0 16px;
+    background:
+      linear-gradient(135deg, rgba(15,15,15,0.92) 0%, rgba(8,8,8,0.92) 100%);
+    border-left: 4px solid var(--sev-color, var(--pink));
+    clip-path: polygon(
+      18px 0,
+      100% 0,
+      100% calc(100% - 18px),
+      calc(100% - 18px) 100%,
+      0 100%,
+      0 18px
+    );
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06) inset,
+      0 12px 32px rgba(0,0,0,0.55);
+    opacity: 0;
+    transform: translateX(-30px) scale(0.98);
+    animation: card-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+  /* Cascade — top to bottom, 80ms stagger, after title settles. */
+  .card:nth-child(1)  { animation-delay: 0.85s; }
+  .card:nth-child(2)  { animation-delay: 0.93s; }
+  .card:nth-child(3)  { animation-delay: 1.01s; }
+  .card:nth-child(4)  { animation-delay: 1.09s; }
+  .card:nth-child(5)  { animation-delay: 1.17s; }
+  .card:nth-child(6)  { animation-delay: 1.25s; }
+  .card:nth-child(7)  { animation-delay: 1.33s; }
+  .card:nth-child(8)  { animation-delay: 1.41s; }
+  .card:nth-child(9)  { animation-delay: 1.49s; }
+  .card:nth-child(10) { animation-delay: 1.57s; }
+  .card:nth-child(11) { animation-delay: 1.65s; }
+  .card:nth-child(12) { animation-delay: 1.73s; }
+  .card:nth-child(13) { animation-delay: 1.81s; }
+
+  @keyframes card-in {
+    0%   { opacity: 0; transform: translateX(-30px) scale(0.98); }
+    60%  { opacity: 1; transform: translateX(4px) scale(1.005); }
+    100% { opacity: 1; transform: translateX(0) scale(1); }
+  }
+
+  /* Severity rim glow — only suspension + point-deduction get the
+     red rim pulse (the heavy hitters). Layered as a sibling shadow so
+     it doesn't fight with the card-in transform. */
+  .card--rim::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 0;
+    pointer-events: none;
+    box-shadow: 0 0 0 transparent;
+    clip-path: polygon(
+      18px 0, 100% 0, 100% calc(100% - 18px),
+      calc(100% - 18px) 100%, 0 100%, 0 18px
+    );
+    animation: rim-pulse 2.6s ease-in-out infinite 1.4s;
+  }
+  @keyframes rim-pulse {
+    0%, 100% {
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.04),
+        inset 0 0 18px rgba(0,0,0,0);
+    }
+    50% {
+      box-shadow:
+        inset 0 0 0 1px var(--sev-color, var(--pink)),
+        inset 0 0 26px var(--sev-glow);
+    }
+  }
+
+  /* PHOTO CIRCLE */
+  .card-photo {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 38%, rgba(107,205,6,0.18) 0%, rgba(8,8,8,0.95) 70%);
+    border: 2px solid var(--sev-color, var(--pink));
+    box-shadow:
+      0 0 0 2px rgba(0,0,0,0.6),
+      0 4px 12px rgba(0,0,0,0.55),
+      0 0 18px var(--sev-glow);
+    flex-shrink: 0;
+  }
+  .card-photo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 18%;
+    transform: scale(1.18);
+  }
+
+  /* PLAYER + REASON COLUMN */
+  .card-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .card-name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: 0.005em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-reason {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.06em;
+    color: rgba(255,255,255,0.78);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* SEVERITY BADGE */
+  .card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 4px;
+    background: var(--sev-color, var(--pink));
+    color: #fff;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.18) inset,
+      0 4px 14px rgba(0,0,0,0.45),
+      0 0 18px var(--sev-glow);
+    white-space: nowrap;
+    transform: scale(0.6);
+    opacity: 0;
+    animation: badge-pulse 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation-delay: var(--badge-delay, 1.25s);
+  }
+  @keyframes badge-pulse {
+    0%   { opacity: 0;   transform: scale(0.6); }
+    50%  { opacity: 1;   transform: scale(1.15); }
+    100% { opacity: 1;   transform: scale(1); }
+  }
+  .card:nth-child(1) .card-badge { --badge-delay: 1.20s; }
+  .card:nth-child(2) .card-badge { --badge-delay: 1.30s; }
+  .card:nth-child(3) .card-badge { --badge-delay: 1.40s; }
+  .card:nth-child(4) .card-badge { --badge-delay: 1.50s; }
+
+  .card-badge .ban-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .card-badge .qty {
+    font-family: var(--accent);
+    font-weight: 900;
+    font-size: 10px;
+    margin-left: 3px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.32);
+    letter-spacing: 0.04em;
+  }
+
+  /* DATE */
+  .card-date {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    margin-left: 6px;
+  }
+  .card-date .label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.32em;
+    color: rgba(255,255,255,0.50);
+    text-transform: uppercase;
+  }
+  .card-date .value {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.10em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ── EXIT STATE ─────────────────────────────────────────────── */
+  /* Reverse cascade driven by .stage--exit class. */
+  .stage--exit .top-band,
+  .stage--exit .chevrons,
+  .stage--exit .title-block,
+  .stage--exit .partners,
+  .stage--exit .season-mark {
+    animation: ui-out 0.55s cubic-bezier(0.5, 0, 0.7, 0.2) forwards !important;
+  }
+  @keyframes ui-out {
+    0%   { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-10px); }
+  }
+  .stage--exit .card {
+    animation: card-out 0.45s cubic-bezier(0.5, 0, 0.7, 0.2) forwards !important;
+  }
+  /* Reverse: bottom-most first, top-most last. */
+  .stage--exit .card:nth-child(13) { animation-delay: 0s;    }
+  .stage--exit .card:nth-child(12) { animation-delay: 0.05s; }
+  .stage--exit .card:nth-child(11) { animation-delay: 0.10s; }
+  .stage--exit .card:nth-child(10) { animation-delay: 0.15s; }
+  .stage--exit .card:nth-child(9)  { animation-delay: 0.20s; }
+  .stage--exit .card:nth-child(8)  { animation-delay: 0.25s; }
+  .stage--exit .card:nth-child(7)  { animation-delay: 0.30s; }
+  .stage--exit .card:nth-child(6)  { animation-delay: 0.35s; }
+  .stage--exit .card:nth-child(5)  { animation-delay: 0.40s; }
+  .stage--exit .card:nth-child(4)  { animation-delay: 0.45s; }
+  .stage--exit .card:nth-child(3)  { animation-delay: 0.50s; }
+  .stage--exit .card:nth-child(2)  { animation-delay: 0.55s; }
+  .stage--exit .card:nth-child(1)  { animation-delay: 0.60s; }
+  @keyframes card-out {
+    0%   { opacity: 1; transform: translateX(0) scale(1); }
+    100% { opacity: 0; transform: translateX(-40px) scale(0.97); }
+  }
+
+  /* ── BOTTOM PARTNER STRIP (MARQUEE VARIANT) ─────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 12;
+    opacity: 0;
+    animation: header-fade 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s forwards;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+  .marquee {
+    position: relative;
+    width: 980px;
+    max-width: 90%;
+    overflow: hidden;
+    padding: 8px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    padding: 0 30px;
+    flex-shrink: 0;
+  }
+  .marquee-group .partner {
+    height: 42px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .marquee-group .partner--gameevo  { height: 38px; }
+  .marquee-group .partner--pride    { height: 34px; }
+  .marquee-group .partner--africa   { height: 38px; }
+  .marquee-group .partner--trace    { height: 44px; }
+
+  /* ── CORNER WATERMARK ───────────────────────────────────────── */
+  .season-mark {
+    position: absolute;
+    top: 30px;
+    right: 38px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+    opacity: 0;
+    animation: header-fade 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s forwards;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--pink);
+    border-radius: 50%;
+    margin-right: 10px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--pink-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+  <main class="stage" id="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Top header: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Left chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+    </div>
+
+    <!-- Right chevrons (mirrored) -->
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg></div>
+    </div>
+
+    <!-- Title block -->
+    <section class="title-block">
+      <span class="kicker"><span class="dot"></span>Live Reporting</span>
+      <h1 class="title">Disciplinary <span class="accent">Actions</span></h1>
+      <div class="title-rule" aria-hidden="true"></div>
+      <p class="subtitle">Elite League · Season 2</p>
+    </section>
+
+    <!-- PENALTY LIST — only players with active penalties -->
+    <section class="list" id="penalty-list">
+
+      <!-- 1: WOLEVATION — POINT DEDUCTION (-3 pts) -->
+      <article class="card card--rim" style="--sev-color: var(--sev-deduct); --sev-glow: var(--sev-deduct-glow);">
+        <div class="card-photo">
+          <img src="/overlays/v2/_assets/players/processed/wolevation/headshot_01_nobg.png" alt="WOLEVATION" />
+        </div>
+        <div class="card-info">
+          <div class="card-name">WOLEVATION</div>
+          <div class="card-reason">Left Match Mid-Way</div>
+        </div>
+        <div class="card-badge">
+          Point Deduction
+          <span class="qty">-3 PTS</span>
+        </div>
+        <div class="card-date">
+          <span class="label">Issued</span>
+          <span class="value">18 JAN 2026</span>
+        </div>
+      </article>
+
+      <!-- 2: DADABOI — WARNING -->
+      <article class="card" style="--sev-color: var(--sev-warn); --sev-glow: var(--sev-warn-glow);">
+        <div class="card-photo">
+          <img src="/overlays/v2/_assets/players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI" />
+        </div>
+        <div class="card-info">
+          <div class="card-name">DADABOI</div>
+          <div class="card-reason">Late Arrival to Studio</div>
+        </div>
+        <div class="card-badge">
+          Warning
+        </div>
+        <div class="card-date">
+          <span class="label">Issued</span>
+          <span class="value">17 JAN 2026</span>
+        </div>
+      </article>
+
+      <!-- 3: KILLER FREAK — SUSPENSION (1 match) -->
+      <article class="card card--rim" style="--sev-color: var(--sev-suspend); --sev-glow: var(--sev-suspend-glow);">
+        <div class="card-photo">
+          <img src="/overlays/v2/_assets/players/processed/killer_freak/headshot_01_nobg.png" alt="KILLER FREAK" />
+        </div>
+        <div class="card-info">
+          <div class="card-name">KILLER FREAK</div>
+          <div class="card-reason">Unsportsmanlike Conduct</div>
+        </div>
+        <div class="card-badge">
+          <svg class="ban-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.4"/>
+            <line x1="5" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          </svg>
+          Suspension
+          <span class="qty">1 MATCH</span>
+        </div>
+        <div class="card-date">
+          <span class="label">Issued</span>
+          <span class="value">15 JAN 2026</span>
+        </div>
+      </article>
+
+      <!-- 4: MITCH — WARNING -->
+      <article class="card" style="--sev-color: var(--sev-warn); --sev-glow: var(--sev-warn-glow);">
+        <div class="card-photo">
+          <img src="/overlays/v2/_assets/players/processed/mitch/headshot_01_nobg.png" alt="MITCH" />
+        </div>
+        <div class="card-info">
+          <div class="card-name">MITCH</div>
+          <div class="card-reason">Failed Squad Submission Deadline</div>
+        </div>
+        <div class="card-badge">
+          Warning
+        </div>
+        <div class="card-date">
+          <span class="label">Issued</span>
+          <span class="value">12 JAN 2026</span>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- Bottom partner strip — MARQUEE -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+<script>
+  /*  Demo loop:
+      - Initial entry runs from t=0 → ~1.7s (CSS animation-delays).
+      - Hold 10s.
+      - Exit ~0.75s (reverse cascade).
+      - Brief gap ~0.4s.
+      - Reset by replacing #stage with a fresh clone — re-triggers all CSS
+        keyframes cleanly. Silent loop, no audio.
+  */
+  (function () {
+    const HOLD_MS  = 10000;
+    const ENTRY_MS = 1700;
+    const EXIT_MS  = 750;
+    const RESET_MS = 400;
+
+    // Capture the original stage HTML once so we can re-mount it cleanly.
+    const initialHTML = document.getElementById('stage').outerHTML;
+
+    function scheduleCycle() {
+      // Hold + then trigger exit.
+      setTimeout(() => {
+        const s = document.getElementById('stage');
+        if (!s) return;
+        s.classList.add('stage--exit');
+
+        // After exit completes, re-mount fresh stage.
+        setTimeout(() => {
+          const wrap = document.createElement('div');
+          wrap.innerHTML = initialHTML;
+          const fresh = wrap.firstElementChild;
+          const old = document.getElementById('stage');
+          old.parentNode.replaceChild(fresh, old);
+
+          // After the brief gap, schedule the next cycle.
+          setTimeout(scheduleCycle, RESET_MS);
+        }, EXIT_MS);
+      }, ENTRY_MS + HOLD_MS);
+    }
+
+    scheduleCycle();
+  })();
+</script>
+</body>
+</html>

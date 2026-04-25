@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #07-LEADERBOARD — "ANIMATED STANDINGS" (V2 PILOT SYSTEM)
+  Full league table for 13 elite players, animated FLIP swap from Snapshot A → Snapshot B.
+  Pilot system inherited: halftone bg + top CADE/ProLeague logos + side chevrons + bottom partner marquee.
+  Center: 13-row gamer-UI HUD-frame table (Pos | Photo | Org | Name | P | W-D-L | GF-GA | GD | Sanctions | Pts).
+
+  Animation orchestration:
+    Phase 1 (0-1.5s)   table renders Snapshot A (OLD positions) — fade-in
+    Phase 2 (1.5-2s)   "POSITIONS UPDATING" tag flashes
+    Phase 3 (2-7s)     rows reorder to Snapshot B in BATCHES OF 2 with 500ms pauses between batches
+                       (7 batches: pairs 1-2, 3-4, 5-6, 7-8, 9-10, 11-12, then row 13; transform: translateY)
+    Phase 4 (7-10s)    final state holds; movement arrows up-N (green) / down-N (pink) flash next to moved
+                       rows, fading out after 3000ms
+
+  Sanctions column treatment: dedicated 11th column between GD and Pts. Empty by default; when populated
+  with a string like "-3 PTS" or "-2 GD" it renders inside a small pink-outlined HUD chip. Currently:
+  KILLER FREAK has "-1 GD", WOLEVATION has "-3 PTS", everyone else empty (the chip slot is reserved width
+  even when empty so column alignment never shifts).
+
+  DATA WIRES: snapshotA, snapshotB (each = players[] with sanctions field), batchSize=2, batchPauseMs=500, arrowFadeMs=3000
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — Animated Leaderboard</title>
+
+<style>
+  /* REAL BRAND FONTS (inherited from pilot) */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-display: block;
+  }
+
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --pink-faint:   rgba(254, 3, 109, 0.18);
+    --gold:         #e6c832;
+    --gold-glow:    rgba(230, 200, 50, 0.55);
+    --black:        #050505;
+    --row-bg:       rgba(8, 12, 8, 0.78);
+    --row-border:   rgba(107, 205, 6, 0.30);
+    --ink:          #ffffff;
+    --ink-muted:    rgba(255,255,255,0.72);
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+    --row-h:        46px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px; height: 1080px; overflow: hidden;
+    background: transparent; color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  }
+
+  /* TRANSPARENT canvas */
+  .stage {
+    position: relative;
+    width: 1920px; height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    isolation: isolate;
+  }
+
+  /* halftone-green stadium texture */
+  .bg-image {
+    position: absolute; inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover; background-position: center; background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+  .bg-vignette {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+    z-index: 1; pointer-events: none;
+  }
+  .bg-grain {
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.012) 0 1px,
+      transparent 1px 3px
+    );
+    z-index: 2; pointer-events: none; mix-blend-mode: overlay;
+  }
+
+  /* TOP HEADER BAND (CADE | PRO LEAGUE) */
+  .top-band {
+    position: absolute; top: 14px; left: 0; right: 0; height: 110px;
+    display: flex; align-items: center; justify-content: center; gap: 38px;
+    z-index: 10;
+  }
+  .top-band .logo {
+    height: 92px; width: auto; display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 84px; }
+  .top-band .logo--pro  { height: 100px; }
+  .top-band .divider {
+    width: 2px; height: 88px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%, rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* SIDE CHEVRONS */
+  .chevrons {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 38px;
+    z-index: 5; pointer-events: none;
+  }
+  .chevrons--left  { left: 30px; }
+  .chevrons--right { right: 30px; }
+  .chevron {
+    width: 60px; height: 44px;
+    color: var(--green); opacity: 0.45;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.25; transform: translateX(0); }
+    50%      { opacity: 0.75; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron { animation-name: chev-pulse-right; }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.25; transform: translateX(0); }
+    50%      { opacity: 0.75; transform: translateX(-6px); }
+  }
+
+  /* HEADLINE BLOCK */
+  .headline {
+    position: absolute;
+    top: 130px;
+    left: 50%; transform: translateX(-50%);
+    width: 1480px;
+    text-align: center;
+    z-index: 15;
+  }
+  .title {
+    font-family: var(--display);
+    font-weight: 900; font-stretch: 75%;
+    font-size: 70px; line-height: 0.92;
+    letter-spacing: -0.005em; color: var(--ink);
+    text-transform: uppercase;
+    margin: 0 0 4px;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 16px rgba(0,0,0,0.65),
+      0 0 28px rgba(107,205,6,0.16);
+  }
+  .title em {
+    font-style: normal;
+    color: var(--green);
+    text-shadow:
+      0 0 1px rgba(107,205,6,0.85),
+      0 4px 16px rgba(0,0,0,0.65),
+      0 0 38px var(--green-glow);
+  }
+  .title-rule {
+    width: 180px; height: 4px;
+    margin: 6px auto 0;
+    background: var(--pink);
+    border-radius: 3px;
+    box-shadow: 0 0 14px var(--pink-glow), 0 0 28px rgba(254,3,109,0.30);
+  }
+
+  /* updating tag — phase 2 flash */
+  .updating-tag {
+    position: absolute;
+    top: 218px;
+    left: 50%; transform: translateX(-50%);
+    font-family: var(--accent);
+    font-weight: 700; font-size: 16px;
+    letter-spacing: 0.32em; color: var(--green);
+    text-transform: uppercase;
+    padding: 6px 18px;
+    border: 1.5px solid var(--green);
+    border-radius: 3px;
+    background: rgba(8,16,4,0.78);
+    box-shadow: 0 0 20px var(--green-glow), inset 0 0 12px rgba(107,205,6,0.18);
+    opacity: 0;
+    z-index: 30;
+  }
+  .updating-tag::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px; transform: translateY(-1px);
+    box-shadow: 0 0 8px var(--green-glow);
+    animation: tag-dot 0.8s ease-in-out infinite;
+  }
+  @keyframes tag-dot {
+    0%, 100% { opacity: 0.5; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1.0; transform: translateY(-1px) scale(1.4); }
+  }
+  .updating-tag.flash {
+    animation: tag-flash 1.2s ease-out forwards;
+  }
+  @keyframes tag-flash {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    18%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    82%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  }
+
+  /* TABLE BLOCK */
+  .table-wrap {
+    position: absolute;
+    top: 222px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1480px;
+    z-index: 14;
+  }
+
+  /* column header strip */
+  .col-headers {
+    display: grid;
+    grid-template-columns:
+      54px           /* Pos */
+      54px           /* Photo */
+      48px           /* Org */
+      1fr            /* Name */
+      52px           /* P */
+      110px          /* W-D-L */
+      108px          /* GF-GA */
+      72px           /* GD */
+      120px          /* Sanctions */
+      78px;          /* Pts */
+    gap: 10px;
+    align-items: center;
+    padding: 0 22px;
+    height: 32px;
+    margin-bottom: 6px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(107,205,6,0.20);
+  }
+  .col-headers .h--name { text-align: left; padding-left: 4px; }
+  .col-headers .h--center { text-align: center; }
+  .col-headers .h--pts { text-align: center; color: var(--green); letter-spacing: 0.36em; }
+
+  /* table track — relative positioning context for absolute rows */
+  .rows {
+    position: relative;
+    height: calc(13 * (var(--row-h) + 3px));
+  }
+
+  /* ROW: gamer-UI HUD frame */
+  .row {
+    position: absolute;
+    left: 0; right: 0;
+    height: var(--row-h);
+    display: grid;
+    grid-template-columns:
+      54px 54px 48px 1fr 52px 110px 108px 72px 120px 78px;
+    gap: 10px;
+    align-items: center;
+    padding: 0 22px;
+    /* angled corner cuts via clip-path (left + right notches) */
+    clip-path: polygon(
+      14px 0,
+      calc(100% - 14px) 0,
+      100% 14px,
+      100% calc(100% - 14px),
+      calc(100% - 14px) 100%,
+      14px 100%,
+      0 calc(100% - 14px),
+      0 14px
+    );
+    background: var(--row-bg);
+    box-shadow:
+      inset 0 0 0 1.5px var(--row-border),
+      inset 0 0 24px rgba(107,205,6,0.06);
+    transition: transform 0.55s cubic-bezier(0.7, 0.0, 0.2, 1);
+    will-change: transform;
+    opacity: 0;
+    animation: row-fade-in 0.7s ease-out forwards;
+  }
+  .row:nth-child(1)  { animation-delay: 0.10s; }
+  .row:nth-child(2)  { animation-delay: 0.16s; }
+  .row:nth-child(3)  { animation-delay: 0.22s; }
+  .row:nth-child(4)  { animation-delay: 0.28s; }
+  .row:nth-child(5)  { animation-delay: 0.34s; }
+  .row:nth-child(6)  { animation-delay: 0.40s; }
+  .row:nth-child(7)  { animation-delay: 0.46s; }
+  .row:nth-child(8)  { animation-delay: 0.52s; }
+  .row:nth-child(9)  { animation-delay: 0.58s; }
+  .row:nth-child(10) { animation-delay: 0.64s; }
+  .row:nth-child(11) { animation-delay: 0.70s; }
+  .row:nth-child(12) { animation-delay: 0.76s; }
+  .row:nth-child(13) { animation-delay: 0.82s; }
+  @keyframes row-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* leader (pos 1) — heavier glow + gold mark */
+  .row.is-leader {
+    box-shadow:
+      inset 0 0 0 2px var(--green),
+      inset 0 0 36px rgba(107,205,6,0.20),
+      0 0 26px rgba(107,205,6,0.30);
+    background: linear-gradient(
+      90deg,
+      rgba(107,205,6,0.18) 0%,
+      rgba(8,12,8,0.85) 36%,
+      rgba(8,12,8,0.85) 100%
+    );
+  }
+  .row.is-leader .pos-num { color: var(--gold); text-shadow: 0 0 12px var(--gold-glow); }
+
+  /* gold corner mark — top-left tiny triangle */
+  .gold-mark {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: 16px; height: 16px;
+    pointer-events: none;
+  }
+  .gold-mark::before {
+    content: '';
+    position: absolute; top: 0; left: 0;
+    width: 0; height: 0;
+    border-top: 14px solid var(--gold);
+    border-right: 14px solid transparent;
+    filter: drop-shadow(0 0 6px var(--gold-glow));
+  }
+
+  /* tail (pos 13) — pink accent */
+  .row.is-tail {
+    box-shadow:
+      inset 0 0 0 1.5px var(--pink),
+      inset 0 0 24px rgba(254,3,109,0.16);
+    background: linear-gradient(
+      90deg,
+      rgba(254,3,109,0.18) 0%,
+      rgba(8,12,8,0.85) 36%,
+      rgba(8,12,8,0.85) 100%
+    );
+  }
+  .row.is-tail .pos-num { color: var(--pink); text-shadow: 0 0 12px var(--pink-glow); }
+
+  /* ROW INTERNALS */
+  .pos-num {
+    font-family: var(--display);
+    font-weight: 900; font-stretch: 75%;
+    font-size: 28px; line-height: 1;
+    color: var(--ink);
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+
+  .photo-wrap {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1.5px solid rgba(107,205,6,0.55);
+    background: rgba(15, 22, 12, 0.85);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 0 8px rgba(107,205,6,0.20);
+  }
+  .row.is-leader .photo-wrap {
+    border-color: var(--gold);
+    box-shadow: 0 0 12px var(--gold-glow);
+  }
+  .row.is-tail .photo-wrap {
+    border-color: var(--pink);
+    box-shadow: 0 0 8px rgba(254,3,109,0.40);
+  }
+  .photo-wrap img {
+    width: 100%; height: 100%; object-fit: cover; object-position: center 18%;
+    display: block;
+  }
+
+  .org-wrap {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto;
+  }
+  .org-wrap img {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain; display: block;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55));
+  }
+  .org-empty {
+    color: rgba(255,255,255,0.32);
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .player-name {
+    font-family: var(--display);
+    font-weight: 900; font-stretch: 75%;
+    font-size: 20px; line-height: 1;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.005em;
+    text-align: left;
+    padding-left: 4px;
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* movement arrow chip — appears in phase 4 */
+  .move-chip {
+    display: inline-block;
+    margin-left: 12px;
+    font-family: var(--accent);
+    font-weight: 700; font-size: 14px;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    vertical-align: 4px;
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  .move-chip.up   {
+    color: var(--green);
+    background: rgba(107,205,6,0.14);
+    border: 1px solid rgba(107,205,6,0.55);
+    box-shadow: 0 0 10px rgba(107,205,6,0.30);
+  }
+  .move-chip.down {
+    color: var(--pink);
+    background: rgba(254,3,109,0.14);
+    border: 1px solid rgba(254,3,109,0.55);
+    box-shadow: 0 0 10px rgba(254,3,109,0.30);
+  }
+  .move-chip.show {
+    animation: chip-flash 3.3s ease-out forwards;
+  }
+  @keyframes chip-flash {
+    0%   { opacity: 0; transform: translateY(-2px) scale(0.85); }
+    8%   { opacity: 1; transform: translateY(0) scale(1.08); }
+    14%  { transform: translateY(0) scale(1); }
+    78%  { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-3px) scale(0.95); }
+  }
+
+  /* numeric stat cells */
+  .stat {
+    font-family: var(--display);
+    font-weight: 700; font-stretch: 100%;
+    font-size: 18px;
+    color: var(--ink);
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  .stat-wdl {
+    font-family: var(--display);
+    font-weight: 700; font-stretch: 100%;
+    font-size: 17px;
+    color: var(--ink);
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+  .stat-wdl em { font-style: normal; color: var(--ink-muted); padding: 0 2px; font-weight: 400; }
+  .stat-gd.pos { color: var(--green); }
+  .stat-gd.neg { color: var(--pink); }
+
+  /* sanctions chip */
+  .sanction {
+    display: inline-block;
+    font-family: var(--accent);
+    font-weight: 700; font-size: 11px;
+    letter-spacing: 0.10em;
+    color: var(--pink);
+    padding: 3px 8px;
+    border: 1px solid rgba(254,3,109,0.65);
+    border-radius: 3px;
+    background: rgba(254,3,109,0.10);
+    box-shadow: inset 0 0 8px rgba(254,3,109,0.10);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .sanction-empty {
+    color: rgba(255,255,255,0.20);
+    font-family: var(--accent);
+    font-weight: 400;
+    font-size: 16px;
+  }
+  .sanctions-cell { text-align: center; }
+
+  .pts {
+    font-family: var(--display);
+    font-weight: 900; font-stretch: 100%;
+    font-size: 28px; line-height: 1;
+    color: var(--green);
+    text-align: center;
+    text-shadow: 0 0 14px rgba(107,205,6,0.30);
+    letter-spacing: -0.01em;
+  }
+  .row.is-leader .pts { color: var(--gold); text-shadow: 0 0 14px var(--gold-glow); }
+  .row.is-tail   .pts { color: var(--pink); text-shadow: 0 0 14px var(--pink-glow); }
+
+  /* BOTTOM PARTNER STRIP (MARQUEE) */
+  .partners {
+    position: absolute;
+    left: 0; right: 0; bottom: 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    z-index: 12;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500; font-size: 10px;
+    letter-spacing: 0.42em; color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+  }
+  .marquee {
+    position: relative;
+    width: 980px; max-width: 90%;
+    overflow: hidden;
+    padding: 8px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
+  }
+  .marquee-track {
+    display: flex; width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+  .marquee-group {
+    display: flex; align-items: center; justify-content: center;
+    gap: 60px; padding: 0 30px; flex-shrink: 0;
+  }
+  .marquee-group .partner {
+    height: 42px; width: auto; display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .marquee-group .partner--gameevo  { height: 38px; }
+  .marquee-group .partner--pride    { height: 34px; }
+  .marquee-group .partner--africa   { height: 38px; }
+  .marquee-group .partner--trace    { height: 44px; }
+
+  /* CORNER WATERMARK */
+  .season-mark {
+    position: absolute;
+    top: 24px; right: 32px;
+    font-family: var(--accent);
+    font-weight: 700; font-size: 11px;
+    letter-spacing: 0.40em; color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px; transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+
+  /* match-day pill — left top */
+  .matchday-mark {
+    position: absolute;
+    top: 24px; left: 32px;
+    font-family: var(--accent);
+    font-weight: 700; font-size: 11px;
+    letter-spacing: 0.40em; color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Corner marks -->
+    <div class="matchday-mark">Matchday 5 &middot; Live Update</div>
+    <div class="season-mark">Elite League &middot; Season 2</div>
+
+    <!-- Top header: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Left chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Right chevrons (mirrored) -->
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Headline -->
+    <section class="headline">
+      <h1 class="title">LEAGUE <em>STANDINGS</em></h1>
+      <div class="title-rule" aria-hidden="true"></div>
+    </section>
+
+    <!-- Updating tag -->
+    <div id="updating-tag" class="updating-tag">Positions Updating</div>
+
+    <!-- TABLE -->
+    <section class="table-wrap">
+      <div class="col-headers" aria-hidden="true">
+        <div class="h--center">Pos</div>
+        <div class="h--center"></div>
+        <div class="h--center">Org</div>
+        <div class="h--name">Player</div>
+        <div class="h--center">P</div>
+        <div class="h--center">W-D-L</div>
+        <div class="h--center">GF-GA</div>
+        <div class="h--center">GD</div>
+        <div class="h--center">Sanctions</div>
+        <div class="h--pts">Pts</div>
+      </div>
+      <div id="rows" class="rows"></div>
+    </section>
+
+    <!-- Partner marquee -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+<script>
+  // DATA WIRES
+  // batchSize=2, batchPauseMs=500, arrowFadeMs=3000
+  const ROW_HEIGHT  = 46;   // matches CSS --row-h
+  const ROW_GAP     = 3;    // visual gap between rows
+  const STEP        = ROW_HEIGHT + ROW_GAP;
+  const BATCH_SIZE      = 2;
+  const BATCH_PAUSE_MS  = 500;
+  const ARROW_FADE_MS   = 3000;
+
+  // Phase timings (ms from t=0)
+  const T_PHASE2_START   = 1500;  // updating tag flashes
+  const T_PHASE3_START   = 2000;  // begin row reorder batches
+
+  // Player + org assets
+  const PLAYERS = {
+    adefola:        { name: 'ADEFOLA',       slug: 'adefola',       org: '/overlays/v2/_assets/Orgs/cade%20esport%20-%20ADEFOLA.png' },
+    anife:          { name: 'ANIFE',         slug: 'anife',         org: '/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg' },
+    baji_jnr:       { name: 'BAJI JNR',      slug: 'baji_jnr',      org: '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20BAJI%20JNR.png' },
+    dadaboi:        { name: 'DADABOI',       slug: 'dadaboi',       org: '/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png' },
+    faruk:          { name: 'FARUK',         slug: 'faruk',         org: '/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png' },
+    guru:           { name: 'GURU',          slug: 'guru',          org: '/overlays/v2/_assets/Orgs/YAKABU%20GLOBAL%20ENTERPRISE%20LIMITED%20-%20GURU.jpg' },
+    kaykay:         { name: 'KAYKAY',        slug: 'kaykay',        org: '/overlays/v2/_assets/Orgs/LUMO%20LABS%20-%20KAYKAY.png' },
+    killer_freak:   { name: 'KILLER FREAK',  slug: 'killer_freak',  org: '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20KILLER%20FREAK.png' },
+    kingnonex:      { name: 'KING NONEX',    slug: 'kingnonex',     org: '/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png' },
+    mitch:          { name: 'MITCH',         slug: 'mitch',         org: '/overlays/v2/_assets/Orgs/PHOENIX%20ESPORTS%20-%20MITCH.png' },
+    mr_oga:         { name: 'MR OGA',        slug: 'mr_oga',        org: null },
+    tactical:       { name: 'TACTICAL',      slug: 'tactical',      org: '/overlays/v2/_assets/Orgs/FUNQUEST%20ESPORTS%20-%20TACTICAL.jpeg' },
+    wolevation:     { name: 'WOLEVATION',    slug: 'wolevation',    org: '/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg' }
+  };
+
+  // Snapshot A — OLD positions (1..13)
+  const snapshotA = [
+    'mr_oga', 'faruk', 'kaykay', 'adefola', 'anife',
+    'tactical', 'baji_jnr', 'guru', 'mitch', 'killer_freak',
+    'dadaboi', 'kingnonex', 'wolevation'
+  ];
+
+  // Snapshot B — NEW positions (1..13)
+  const snapshotB = [
+    'faruk', 'mr_oga', 'adefola', 'kaykay', 'anife',
+    'tactical', 'mitch', 'baji_jnr', 'guru', 'killer_freak',
+    'wolevation', 'dadaboi', 'kingnonex'
+  ];
+
+  // Stats keyed by player id (Snapshot B values)
+  const STATS = {
+    faruk:        { p: 5, w: 4, d: 1, l: 0, gf: 19, ga: 6,  gd:  13, pts: 13, sanctions: '' },
+    mr_oga:       { p: 5, w: 4, d: 0, l: 1, gf: 22, ga: 5,  gd:  17, pts: 12, sanctions: '' },
+    adefola:      { p: 5, w: 3, d: 2, l: 0, gf: 15, ga: 8,  gd:   7, pts: 11, sanctions: '' },
+    kaykay:       { p: 5, w: 3, d: 1, l: 1, gf: 14, ga: 9,  gd:   5, pts: 10, sanctions: '' },
+    anife:        { p: 5, w: 3, d: 0, l: 2, gf: 12, ga: 10, gd:   2, pts:  9, sanctions: '' },
+    tactical:     { p: 5, w: 2, d: 2, l: 1, gf: 11, ga: 10, gd:   1, pts:  8, sanctions: '' },
+    mitch:        { p: 5, w: 2, d: 1, l: 2, gf: 10, ga: 11, gd:  -1, pts:  7, sanctions: '' },
+    baji_jnr:     { p: 5, w: 2, d: 0, l: 3, gf:  9, ga: 11, gd:  -2, pts:  6, sanctions: '' },
+    guru:         { p: 5, w: 1, d: 2, l: 2, gf:  8, ga: 11, gd:  -3, pts:  5, sanctions: '' },
+    killer_freak: { p: 5, w: 1, d: 1, l: 3, gf:  7, ga: 13, gd:  -6, pts:  4, sanctions: '-1 GD' },
+    wolevation:   { p: 5, w: 1, d: 0, l: 4, gf:  6, ga: 14, gd:  -8, pts:  3, sanctions: '-3 PTS' },
+    dadaboi:      { p: 5, w: 0, d: 2, l: 3, gf:  4, ga: 12, gd:  -8, pts:  2, sanctions: '' },
+    kingnonex:    { p: 5, w: 0, d: 1, l: 4, gf:  3, ga: 15, gd: -12, pts:  1, sanctions: '' }
+  };
+
+  // ROW BUILDER
+  function fmtSigned(n) {
+    if (n > 0) return '+' + n;
+    if (n < 0) return String(n);
+    return '0';
+  }
+
+  function buildRow(pid, posIdx) {
+    const player = PLAYERS[pid];
+    const s = STATS[pid];
+    const pos = posIdx + 1;
+    const isLeader = pos === 1;
+    const isTail   = pos === 13;
+
+    const photoSrc = '/overlays/v2/_assets/players/processed/' + player.slug + '/headshot_01_nobg.png';
+
+    const orgHtml = player.org
+      ? '<img src="' + player.org + '" alt="" />'
+      : '<span class="org-empty">&mdash;</span>';
+
+    const sanctionHtml = s.sanctions
+      ? '<span class="sanction">' + s.sanctions + '</span>'
+      : '<span class="sanction-empty">&mdash;</span>';
+
+    const gdClass = s.gd > 0 ? 'pos' : (s.gd < 0 ? 'neg' : '');
+
+    const goldMark = isLeader ? '<div class="gold-mark" aria-hidden="true"></div>' : '';
+
+    const klass = ['row'];
+    if (isLeader) klass.push('is-leader');
+    if (isTail)   klass.push('is-tail');
+
+    const row = document.createElement('div');
+    row.className = klass.join(' ');
+    row.id = 'pid-' + pid;
+    row.style.transform = 'translateY(' + (posIdx * STEP) + 'px)';
+    row.innerHTML =
+      goldMark +
+      '<div class="pos-num">' + pos + '</div>' +
+      '<div class="photo-wrap"><img src="' + photoSrc + '" alt="" /></div>' +
+      '<div class="org-wrap">' + orgHtml + '</div>' +
+      '<div class="player-name">' +
+        '<span class="player-name-text">' + player.name + '</span>' +
+        '<span class="move-chip" data-chip-for="' + pid + '"></span>' +
+      '</div>' +
+      '<div class="stat">' + s.p + '</div>' +
+      '<div class="stat-wdl">' + s.w + '<em>-</em>' + s.d + '<em>-</em>' + s.l + '</div>' +
+      '<div class="stat-wdl">' + s.gf + '<em>:</em>' + s.ga + '</div>' +
+      '<div class="stat stat-gd ' + gdClass + '">' + fmtSigned(s.gd) + '</div>' +
+      '<div class="sanctions-cell">' + sanctionHtml + '</div>' +
+      '<div class="pts">' + s.pts + '</div>';
+    return row;
+  }
+
+  // INITIAL RENDER (Snapshot A)
+  const rowsContainer = document.getElementById('rows');
+  const rowEls = {};
+  snapshotA.forEach(function (pid, i) {
+    const row = buildRow(pid, i);
+    rowsContainer.appendChild(row);
+    rowEls[pid] = row;
+  });
+
+  // PHASE ORCHESTRATION
+
+  // Phase 2: flash "POSITIONS UPDATING"
+  setTimeout(function () {
+    const tag = document.getElementById('updating-tag');
+    tag.classList.add('flash');
+  }, T_PHASE2_START);
+
+  // Phase 3: batched FLIP swap. We swap rows pair-by-pair to their final B positions,
+  // displacing the player currently sitting at the target Y back to the swapping player's old Y.
+  function runReorderBatches() {
+    const aIndex = {};  // pid -> A index
+    const bIndex = {};  // pid -> B index
+    snapshotA.forEach(function (pid, i) { aIndex[pid] = i; });
+    snapshotB.forEach(function (pid, i) { bIndex[pid] = i; });
+
+    // Build batches of FINAL position indices (size 2) → batches of [0,1], [2,3], ..., [12]
+    const batches = [];
+    for (let i = 0; i < 13; i += BATCH_SIZE) {
+      const slice = [];
+      for (let k = 0; k < BATCH_SIZE && (i + k) < 13; k++) {
+        slice.push(i + k);
+      }
+      batches.push(slice);
+    }
+
+    // Track current visual order so we know who sits where as we go
+    const currentVisualOrder = snapshotA.slice();
+
+    function animateBatch(batchIdx) {
+      const slice = batches[batchIdx];
+
+      // For each final pos p in this batch, swap target pid into place,
+      // pushing whoever's there now to target's previous Y.
+      slice.forEach(function (p) {
+        const targetPid = snapshotB[p];
+        const currentPos = currentVisualOrder.indexOf(targetPid);
+        if (currentPos === p) return;  // already in place
+
+        const displacedPid = currentVisualOrder[p];
+
+        // swap in the visual order array
+        currentVisualOrder[p] = targetPid;
+        currentVisualOrder[currentPos] = displacedPid;
+
+        // animate transforms
+        rowEls[targetPid].style.transform    = 'translateY(' + (p * STEP) + 'px)';
+        rowEls[displacedPid].style.transform = 'translateY(' + (currentPos * STEP) + 'px)';
+      });
+    }
+
+    // Schedule batches
+    let cursorMs = T_PHASE3_START;
+    const SWAP_MS = 600;  // CSS transition is 0.55s; pad to 0.6s
+    batches.forEach(function (slice, bi) {
+      setTimeout(function () { animateBatch(bi); }, cursorMs);
+      cursorMs += SWAP_MS + BATCH_PAUSE_MS;
+    });
+
+    // After the last batch lands, fire arrow chips
+    const lastBatchEnd = T_PHASE3_START + (batches.length * SWAP_MS) + ((batches.length - 1) * BATCH_PAUSE_MS);
+    setTimeout(function () { fireArrowChips(aIndex, bIndex); }, lastBatchEnd);
+  }
+
+  function fireArrowChips(aIndex, bIndex) {
+    Object.keys(PLAYERS).forEach(function (pid) {
+      const delta = aIndex[pid] - bIndex[pid];   // +N = moved up N positions, -N = moved down N
+      if (delta === 0) return;
+      const chip = document.querySelector('[data-chip-for="' + pid + '"]');
+      if (!chip) return;
+      const isUp = delta > 0;
+      chip.textContent = isUp ? ('↑' + delta) : ('↓' + Math.abs(delta));
+      chip.classList.add(isUp ? 'up' : 'down');
+      void chip.offsetWidth;
+      chip.classList.add('show');
+    });
+  }
+
+  runReorderBatches();
+</script>
+</body>
+</html>

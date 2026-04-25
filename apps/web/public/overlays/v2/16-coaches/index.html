@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #16-COACHES — "COACH INTRODUCTIONS"
+  Full-screen 1920×1080 transparent grid showcasing 11 placeholder coach cards
+  for the Elite League and the players they coach. Coaches are not yet decided
+  by the league — every card uses a generic silhouette placeholder + "COACH TBD"
+  for the coach name. Each card is anchored to a real player + their org logo.
+
+  Grid layout: 4-3-4 staggered grid (4 top row, 3 middle centered, 4 bottom).
+  Card target size: 432×290. Total grid width ≈ 1840 → fits 1920 with margins.
+
+  Reuses pilot template: halftone-green stadium BG, top CADE+Pro League logos,
+  side chevron motifs, watermark, marquee partner strip. Top logos enlarged ~40%
+  per shared-rule #1. ≥80px gap between grid + partner strip per shared-rule #2.
+
+  DATA WIRES: coaches[] = {coachName, coachPhotoUrl, playerName, playerSlug,
+              playerPhotoUrl, orgName, orgLogoUrl}
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — COACH INTRODUCTIONS</title>
+
+<style>
+  /* ── REAL BRAND FONTS ───────────────────────────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: block;
+  }
+
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /* ── BG ─────────────────────────────────────────────────────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) — enlarged ~40% ───── */
+  .top-band {
+    position: absolute;
+    top: 32px;
+    left: 0;
+    right: 0;
+    height: 132px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 38px;
+    z-index: 10;
+    animation: head-fade-in 600ms ease-out both,
+               head-fade-out 800ms ease-in both;
+    animation-delay: 0ms, 9200ms;
+  }
+  .top-band .logo {
+    height: 116px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 104px; }
+  .top-band .logo--pro  { height: 124px; }
+  .top-band .divider {
+    width: 2px;
+    height: 92px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+  @keyframes head-fade-in {
+    0%   { opacity: 0; transform: translateY(-18px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes head-fade-out {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-12px); }
+  }
+
+  /* ── SIDE CHEVRONS ──────────────────────────────────────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    z-index: 5;
+    pointer-events: none;
+    animation: chev-fade-in 700ms ease-out both,
+               chev-fade-out 700ms ease-in both;
+    animation-delay: 200ms, 9200ms;
+  }
+  .chevrons--left  { left: 28px; }
+  .chevrons--right { right: 28px; }
+  .chevron {
+    width: 56px;
+    height: 42px;
+    color: var(--green);
+    opacity: 0.45;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.25; transform: translateX(0); }
+    50%      { opacity: 0.70; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron { animation-name: chev-pulse-right; }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.25; transform: translateX(0); }
+    50%      { opacity: 0.70; transform: translateX(-6px); }
+  }
+  @keyframes chev-fade-in  { 0% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes chev-fade-out { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* ── TITLE BAND ─────────────────────────────────────────────── */
+  .title-band {
+    position: absolute;
+    top: 192px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1700px;
+    text-align: center;
+    z-index: 12;
+    animation: title-in 700ms cubic-bezier(.2,.8,.2,1) both,
+               title-out 700ms ease-in both;
+    animation-delay: 600ms, 9200ms;
+  }
+  .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 84px;
+    line-height: 1.0;
+    letter-spacing: 0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 6px 22px rgba(0,0,0,0.65),
+      0 0 38px rgba(107,205,6,0.18);
+    animation: title-pulse 3.4s ease-in-out infinite;
+  }
+  .title .em-pink { color: var(--pink); text-shadow: 0 0 18px var(--pink-glow); }
+  .title-rule {
+    width: 220px;
+    height: 4px;
+    margin: 12px auto 0;
+    background: var(--pink);
+    border-radius: 2px;
+    box-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+    transform-origin: 50% 50%;
+    animation: rule-slide-in 700ms ease-out 1100ms both;
+  }
+  @keyframes title-in {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(-22px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  @keyframes title-out {
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-14px); }
+  }
+  @keyframes title-pulse {
+    0%, 100% { text-shadow: 0 0 1px rgba(255,255,255,0.85), 0 6px 22px rgba(0,0,0,0.65), 0 0 22px rgba(107,205,6,0.10); }
+    50%      { text-shadow: 0 0 1px rgba(255,255,255,1), 0 6px 22px rgba(0,0,0,0.65), 0 0 64px rgba(107,205,6,0.34); }
+  }
+  @keyframes rule-slide-in {
+    0%   { transform: scaleX(0); opacity: 0; }
+    100% { transform: scaleX(1); opacity: 1; }
+  }
+
+  /* ── COACH GRID — 4-3-4 staggered (11 cards) ────────────────────
+     Card 432×236. Row gap 14. Col gap 18.
+     Top row: 4 cards. Middle: 3 cards centered. Bottom: 4 cards.
+     Total grid block height: 236*3 + 14*2 = 736 → starts at 320, ends 1056.
+     Partner strip ends at ~1080-22 = 1058 for label band; ≥80 gap requires
+     grid bottom <= ~870. We use compact 224 cards: 224*3 + 14*2 = 700 → ends 1020.
+     Actually we need clearance — push start to 318 and use card height 200.
+     Partner strip starts ~bottom:30 with marquee height ~78 → top ~972.
+     Grid ends 318 + 200*3 + 14*2 = 946. Gap = 26. Need 80.
+     => use 3-row with smaller cards. height 192: 192*3 + 14*2 = 604 → ends 922.
+     Gap = 50. Still short of 80. Use 192 cards + tighter row gap 10:
+     192*3 + 10*2 = 596 → ends 914. Gap = 58. Push partners up to bottom 80,
+     compress marquee. 1080 - 80 - 78 = 922. Grid ends at 914 → 8px gap.
+     Compromise: title at 192 + 100 = 292, grid starts 320, cards 168 tall:
+     168*3 + 14*2 = 532 → ends 852. Partners bottom 32 + height 90 → top 958.
+     Gap = 106. ≥80 ✓.
+     ──────────────────────────────────────────────────────────────────── */
+  .grid-wrap {
+    position: absolute;
+    top: 320px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1860px;
+    z-index: 14;
+  }
+  .grid-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+  .grid-row:last-child { margin-bottom: 0; }
+
+  .card {
+    position: relative;
+    width: 432px;
+    height: 168px;
+    border-radius: 12px;
+    background: linear-gradient(
+      155deg,
+      rgba(15, 22, 10, 0.92) 0%,
+      rgba(8, 12, 6, 0.88) 60%,
+      rgba(5, 8, 4, 0.92) 100%
+    );
+    border: 1px solid rgba(107, 205, 6, 0.22);
+    overflow: hidden;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    box-shadow:
+      0 8px 24px rgba(0,0,0,0.55),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    opacity: 0;
+    animation:
+      card-in 600ms cubic-bezier(.2,.8,.2,1) both,
+      card-out 600ms ease-in both;
+  }
+
+  /* row-by-row stagger (4-3-4): 100ms within row, 200ms inter-row gap. */
+  .card:nth-child(1) { animation-delay:  900ms, 9300ms; }
+  .card:nth-child(2) { animation-delay: 1000ms, 9300ms; }
+  .card:nth-child(3) { animation-delay: 1100ms, 9300ms; }
+  .card:nth-child(4) { animation-delay: 1200ms, 9300ms; }
+
+  .grid-row:nth-child(2) .card:nth-child(1) { animation-delay: 1400ms, 9400ms; }
+  .grid-row:nth-child(2) .card:nth-child(2) { animation-delay: 1500ms, 9400ms; }
+  .grid-row:nth-child(2) .card:nth-child(3) { animation-delay: 1600ms, 9400ms; }
+
+  .grid-row:nth-child(3) .card:nth-child(1) { animation-delay: 1800ms, 9500ms; }
+  .grid-row:nth-child(3) .card:nth-child(2) { animation-delay: 1900ms, 9500ms; }
+  .grid-row:nth-child(3) .card:nth-child(3) { animation-delay: 2000ms, 9500ms; }
+  .grid-row:nth-child(3) .card:nth-child(4) { animation-delay: 2100ms, 9500ms; }
+
+  @keyframes card-in {
+    0%   { opacity: 0; transform: translateY(28px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0)    scale(1);    }
+  }
+  @keyframes card-out {
+    0%   { opacity: 1; transform: translateY(0)    scale(1);    }
+    100% { opacity: 0; transform: translateY(-18px) scale(0.985); }
+  }
+
+  /* shimmer border accent */
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    padding: 1px;
+    background: linear-gradient(
+      130deg,
+      rgba(107,205,6,0)   0%,
+      rgba(107,205,6,0)   30%,
+      rgba(107,205,6,0.6) 50%,
+      rgba(254,3,109,0.4) 60%,
+      rgba(107,205,6,0)   80%,
+      rgba(107,205,6,0)   100%
+    );
+    background-size: 280% 280%;
+    background-position: 0% 50%;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    animation: shimmer-loop 5.2s ease-in-out infinite;
+  }
+  .card:nth-child(2)::before { animation-delay: 0.4s; }
+  .card:nth-child(3)::before { animation-delay: 0.8s; }
+  .card:nth-child(4)::before { animation-delay: 1.2s; }
+  @keyframes shimmer-loop {
+    0%   { background-position:   0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position:   0% 50%; }
+  }
+
+  .card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 76px;
+    height: 76px;
+    background: linear-gradient(225deg, rgba(107,205,6,0.18) 0%, rgba(107,205,6,0) 60%);
+    pointer-events: none;
+  }
+
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 16px 18px 14px 18px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ── COACH HEADER (top row of card) — silhouette + COACH TBD ── */
+  .coach-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* Silhouette placeholder — generic person SVG-like via CSS shapes,
+     gray-on-dark, NO initials, NO color gradient. Same for every card. */
+  .coach-photo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 38%, #2a2f24 0%, #15180f 70%, #0a0c07 100%);
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,0.10),
+      0 0 0 3px rgba(107,205,6,0.45),
+      0 4px 12px rgba(0,0,0,0.55);
+  }
+  /* head circle */
+  .coach-photo::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(180,190,170,0.45);
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.4);
+  }
+  /* shoulders/torso arc */
+  .coach-photo::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 56px;
+    height: 36px;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    background: rgba(180,190,170,0.42);
+  }
+
+  .coach-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .coach-label {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.30em;
+    color: var(--green);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    text-shadow: 0 0 12px rgba(107,205,6,0.40);
+  }
+  .coach-name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 32px;
+    line-height: 0.92;
+    letter-spacing: 0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.65), 0 0 16px rgba(107,205,6,0.10);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.6;
+  }
+
+  /* divider line */
+  .divider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px;
+  }
+  .divider-row .line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      rgba(255,255,255,0) 0%,
+      rgba(107,205,6,0.40) 50%,
+      rgba(255,255,255,0) 100%
+    );
+  }
+  .divider-row .label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.34em;
+    color: rgba(255,255,255,0.50);
+    text-transform: uppercase;
+  }
+
+  /* ── PLAYER ROW ─────────────────────────────────────────────── */
+  .player-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+  }
+  .player-photo-wrap {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: radial-gradient(circle at 50% 60%, rgba(254,3,109,0.55) 0%, rgba(254,3,109,0.05) 70%, rgba(0,0,0,0) 100%);
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,0.08),
+      0 0 0 3px rgba(254,3,109,0.55),
+      0 4px 10px rgba(0,0,0,0.55);
+    overflow: visible;
+  }
+  .player-photo {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 25%;
+    border-radius: 50%;
+  }
+  .player-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .player-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.34em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .player-name {
+    font-family: var(--display);
+    font-weight: 700;
+    font-stretch: 75%;
+    font-size: 22px;
+    line-height: 1.0;
+    letter-spacing: 0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── ORG MARK BOTTOM-RIGHT ──────────────────────────────────── */
+  .org-mark {
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 6px;
+    padding: 3px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    z-index: 3;
+  }
+  .org-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+  }
+
+  /* ── BOTTOM PARTNER STRIP — compressed for clearance ────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 12;
+    animation: head-fade-in 600ms ease-out 400ms both,
+               head-fade-out 700ms ease-in 9300ms both;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+  }
+  .marquee {
+    position: relative;
+    width: 980px;
+    max-width: 90%;
+    overflow: hidden;
+    padding: 10px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 50px,
+      #000 calc(100% - 50px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 50px,
+      #000 calc(100% - 50px),
+      transparent 100%
+    );
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+    padding: 0 28px;
+    flex-shrink: 0;
+  }
+  .marquee-group .partner {
+    height: 46px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .marquee-group .partner--gameevo  { height: 42px; }
+  .marquee-group .partner--pride    { height: 38px; }
+  .marquee-group .partner--africa   { height: 42px; }
+  .marquee-group .partner--trace    { height: 48px; }
+
+  /* ── CORNER WATERMARK ───────────────────────────────────────── */
+  .season-mark {
+    position: absolute;
+    top: 24px;
+    right: 30px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+    animation: head-fade-in 600ms ease-out 200ms both,
+               head-fade-out 700ms ease-in 9300ms both;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Top header -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Side chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Title -->
+    <section class="title-band">
+      <h1 class="title">Coaches &mdash; <span class="em-pink">Elite League S2</span></h1>
+      <div class="title-rule" aria-hidden="true"></div>
+    </section>
+
+    <!-- 11 coach cards in a 4-3-4 staggered grid -->
+    <section class="grid-wrap" aria-label="Coach introductions (11 placeholder coaches)">
+
+      <!-- Row 1 (4 cards): ADEFOLA, ANIFE, BAJI JNR, DADABOI -->
+      <div class="grid-row">
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/adefola/headshot_01_nobg.png" alt="ADEFOLA headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Adefola</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="CADE Esports">
+            <img src="/overlays/v2/_assets/Orgs/cade%20esport%20-%20ADEFOLA.png" alt="CADE Esports" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/anife/headshot_02_nobg.png" alt="ANIFE headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Anife</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Afropanda Esports">
+            <img src="/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg" alt="Afropanda Esports" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/baji_jnr/headshot_01_nobg.png" alt="BAJI JNR headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Baji Jnr</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="GameEvo Esports">
+            <img src="/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20BAJI%20JNR.png" alt="GameEvo Esports" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Dadaboi</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Outlaws">
+            <img src="/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png" alt="Outlaws" />
+          </div>
+        </article>
+
+      </div>
+
+      <!-- Row 2 (3 cards centered): FARUK, GURU, KAYKAY -->
+      <div class="grid-row">
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png" alt="FARUK headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Faruk</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="OAS Esports">
+            <img src="/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png" alt="OAS Esports" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/guru/headshot_01_nobg.png" alt="GURU headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Guru</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Yakabu Global">
+            <img src="/overlays/v2/_assets/Orgs/YAKABU%20GLOBAL%20ENTERPRISE%20LIMITED%20-%20GURU.jpg" alt="Yakabu Global" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/kaykay/headshot_01_nobg.png" alt="KAYKAY headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Kaykay</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Lumo Labs">
+            <img src="/overlays/v2/_assets/Orgs/LUMO%20LABS%20-%20KAYKAY.png" alt="Lumo Labs" />
+          </div>
+        </article>
+
+      </div>
+
+      <!-- Row 3 (4 cards): KING NONEX, MITCH, TACTICAL, WOLEVATION -->
+      <div class="grid-row">
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/kingnonex/headshot_01_nobg.png" alt="KING NONEX headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">King Nonex</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Solar Flare">
+            <img src="/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png" alt="Solar Flare" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/mitch/headshot_01_nobg.png" alt="MITCH headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Mitch</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Phoenix Esports">
+            <img src="/overlays/v2/_assets/Orgs/PHOENIX%20ESPORTS%20-%20MITCH.png" alt="Phoenix Esports" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/tactical/headshot_01_nobg.png" alt="TACTICAL headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Tactical</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="FunQuest Esports">
+            <img src="/overlays/v2/_assets/Orgs/FUNQUEST%20ESPORTS%20-%20TACTICAL.jpeg" alt="FunQuest Esports" />
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-inner">
+            <div class="coach-header">
+              <div class="coach-photo" aria-hidden="true"></div>
+              <div class="coach-meta">
+                <span class="coach-label">Coach</span>
+                <span class="coach-name">TBD</span>
+              </div>
+            </div>
+            <div class="divider-row" aria-hidden="true">
+              <span class="line"></span><span class="label">Coaches</span><span class="line"></span>
+            </div>
+            <div class="player-row">
+              <div class="player-photo-wrap">
+                <img class="player-photo" src="/overlays/v2/_assets/players/processed/wolevation/headshot_01_nobg.png" alt="WOLEVATION headshot" />
+              </div>
+              <div class="player-meta">
+                <span class="player-label">Player</span>
+                <span class="player-name">Wolevation</span>
+              </div>
+            </div>
+          </div>
+          <div class="org-mark" title="Breaking Gaming Barriers">
+            <img src="/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg" alt="Breaking Gaming Barriers" />
+          </div>
+        </article>
+
+      </div>
+
+    </section>
+
+    <!-- Bottom partner strip — MARQUEE -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

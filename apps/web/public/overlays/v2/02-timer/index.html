@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, initial-scale=1" />
+<title>CADE Overlay · 02 Timer</title>
+
+<!-- DATA WIRES: seconds (int), displayMode ('duration'|'until_clock'), endClock (HH:MM) -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------- BRAND TOKENS ---------- */
+  :root{
+    --green:       #6bcd06;
+    --green-hot:   #8fff1a;
+    --pink:        #fe036d;
+    --pink-hot:    #ff3d8a;
+    --black:       #0a0a0a;
+    --white:       #ffffff;
+    --ink-dim:     rgba(255,255,255,.72);
+    --shadow-green: 0 0 36px rgba(107,205,6,.55), 0 6px 24px rgba(0,0,0,.45);
+    --shadow-pink:  0 0 36px rgba(254,3,109,.65), 0 6px 24px rgba(0,0,0,.45);
+  }
+
+  /* ── REAL BRAND FONTS (woff2 from PILOT BRB paths) ─────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    width:1920px; height:1080px;
+    overflow:hidden;
+    background: transparent;           /* OVERLAY — transparent canvas */
+    font-family: "Quedora","Rajdhani",system-ui,sans-serif;
+    color: var(--white);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- STAGE ---------- */
+  .stage{
+    position: relative;
+    width:1920px; height:1080px;
+  }
+
+  /* ---------- TIMER BOX ---------- */
+  /* Lower-third, bottom-left, 40px margins, 300×120 (shrunk to fit Pro League logo + timer numbers only) */
+  .timer{
+    position:absolute;
+    left: 40px;
+    bottom: 40px;
+    width: 300px;
+    height: 120px;
+    display:flex;
+    align-items:stretch;
+    transform-origin: left bottom;
+    will-change: transform, opacity, filter;
+    filter: drop-shadow(0 10px 28px rgba(0,0,0,.55));
+  }
+
+  /* Animation orchestration — entry / hold / exit cycle */
+  .timer.entering{ animation: enterSlide .6s cubic-bezier(.22,1,.36,1) both; }
+  .timer.exiting{  animation: exitSlide  .6s cubic-bezier(.64,0,.78,0) both; }
+
+  @keyframes enterSlide{
+    0%  { transform: translateX(-120%) scale(.92); opacity: 0; }
+    60% { transform: translateX(8px)  scale(1.02); opacity: 1; }
+    100%{ transform: translateX(0)    scale(1);    opacity: 1; }
+  }
+  @keyframes exitSlide{
+    0%  { transform: translateX(0)    scale(1);    opacity: 1; filter: drop-shadow(0 10px 28px rgba(0,0,0,.55)); }
+    35% { transform: translateX(0)    scale(1.08); opacity: 1; filter: drop-shadow(0 0 40px var(--white)); }
+    100%{ transform: translateX(-120%) scale(.9);  opacity: 0; }
+  }
+
+  /* Left pink "flag" — hard angled, the CADE brand wedge */
+  .timer__flag{
+    position:relative;
+    width: 88px;
+    background: linear-gradient(160deg, var(--pink) 0%, #c70257 100%);
+    clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.08);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .timer__flag::before{
+    /* subtle diagonal scanline */
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      repeating-linear-gradient(
+        135deg,
+        rgba(255,255,255,.06) 0 2px,
+        transparent 2px 10px
+      );
+    mix-blend-mode: overlay;
+  }
+  .timer__flag-label{
+    font-family:"Agharti","Oswald",sans-serif;
+    font-weight:700;
+    font-size: 22px;
+    letter-spacing: .22em;
+    color: var(--white);
+    transform: rotate(-90deg) translateX(2px);
+    white-space: nowrap;
+    text-shadow: 0 2px 6px rgba(0,0,0,.45);
+  }
+  .timer__flag-logo{
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.55));
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Main body — green panel, angled right edge */
+  .timer__body{
+    position: relative;
+    flex: 1;
+    background: linear-gradient(180deg, #0e0e0e 0%, #050505 100%);
+    border-top: 3px solid var(--green);
+    border-bottom: 3px solid var(--green);
+    border-right: 3px solid var(--green);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0);
+    margin-left: -18px;     /* bleed into flag */
+    padding: 12px 16px 12px 24px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .timer__body::before{
+    /* glow wash */
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(120% 160% at 100% 100%, rgba(107,205,6,.18) 0%, transparent 55%),
+      radial-gradient(80% 120% at 0% 0%,    rgba(254,3,109,.12) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .timer__body::after{
+    /* thin corner tick in top-right for polish */
+    content:"";
+    position:absolute;
+    top: 10px; right: 14px;
+    width: 28px; height: 3px;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  .timer__kicker{
+    position: relative;
+    font-family:"Agharti","Oswald",sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: .28em;
+    color: var(--green);
+    text-transform: uppercase;
+    line-height: 1;
+    margin-bottom: 8px;
+    text-shadow: 0 0 12px rgba(107,205,6,.55);
+    display:flex;
+    align-items:center;
+    gap: 10px;
+  }
+  .timer__kicker .dot{
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--green);
+    animation: blip 1s steps(2,end) infinite;
+  }
+  @keyframes blip{
+    0%,49%   { opacity:1; transform:scale(1);   }
+    50%,100% { opacity:.35; transform:scale(.7); }
+  }
+
+  .timer__display{
+    position: relative;
+    font-family: "Agharti","Oswald","JetBrains Mono",monospace;
+    font-weight: 700;
+    font-size: 60px;
+    line-height: .95;
+    letter-spacing: .01em;
+    color: var(--white);
+    text-shadow:
+      0 0 16px rgba(255,255,255,.25),
+      0 2px 0 rgba(0,0,0,.6);
+    font-variant-numeric: tabular-nums;
+    display:flex;
+    align-items:baseline;
+    gap: 2px;
+  }
+  .timer__display .colon{
+    color: var(--green);
+    animation: colonBlink 1s steps(2,end) infinite;
+    margin: 0 2px;
+  }
+  @keyframes colonBlink{
+    0%,49%   { opacity:1; }
+    50%,100% { opacity:.25; }
+  }
+
+  /* Per-second tick pulse — applied briefly on each tick */
+  .timer__display.tick{
+    animation: tickPulse .25s ease-out;
+  }
+  @keyframes tickPulse{
+    0%  { transform: translateZ(0) scale(1);    text-shadow: 0 0 16px rgba(255,255,255,.25), 0 2px 0 rgba(0,0,0,.6); }
+    40% { transform: translateZ(0) scale(1.04); text-shadow: 0 0 28px rgba(107,205,6,.85), 0 2px 0 rgba(0,0,0,.6); }
+    100%{ transform: translateZ(0) scale(1);    text-shadow: 0 0 16px rgba(255,255,255,.25), 0 2px 0 rgba(0,0,0,.6); }
+  }
+
+  /* Last-10s critical state — pink flip + pulse */
+  .timer.critical .timer__kicker{ color: var(--pink); text-shadow: 0 0 14px rgba(254,3,109,.75); }
+  .timer.critical .timer__kicker .dot{ background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+  .timer.critical .timer__body{
+    border-color: var(--pink);
+    animation: criticalEdge 1s ease-in-out infinite;
+  }
+  .timer.critical .timer__body::after{ background: var(--pink); box-shadow: 0 0 10px var(--pink); }
+  .timer.critical .timer__display{
+    color: var(--pink-hot);
+    animation: criticalPulse 1s ease-in-out infinite;
+    text-shadow:
+      0 0 24px rgba(254,3,109,.9),
+      0 2px 0 rgba(0,0,0,.7);
+  }
+  .timer.critical .timer__display .colon{ color: var(--pink); }
+  .timer.critical .timer__bar-fill{ background: var(--pink); box-shadow: 0 0 12px var(--pink); }
+
+  @keyframes criticalEdge{
+    0%,100% { box-shadow: inset 0 0 0 0 rgba(254,3,109,0); }
+    50%     { box-shadow: inset 0 0 24px rgba(254,3,109,.35); }
+  }
+  @keyframes criticalPulse{
+    0%,100% { transform: scale(1);    filter: drop-shadow(0 0 0 rgba(254,3,109,0)); }
+    50%     { transform: scale(1.06); filter: drop-shadow(0 0 16px rgba(254,3,109,.7)); }
+  }
+
+  /* Progress bar */
+  .timer__bar{
+    position: relative;
+    height: 4px;
+    margin-top: 10px;
+    background: rgba(255,255,255,.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .timer__bar-fill{
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 100%;
+    background: var(--green);
+    box-shadow: 0 0 12px var(--green);
+    transform-origin: left center;
+    transition: transform .9s linear;
+  }
+
+  /* Zero-flash — when timer hits 0:00 */
+  .timer.zero-flash .timer__body{
+    animation: zeroFlash .45s ease-out;
+  }
+  @keyframes zeroFlash{
+    0%  { background: linear-gradient(180deg, #0e0e0e 0%, #050505 100%); }
+    15% { background: var(--white); }
+    40% { background: var(--pink); }
+    100%{ background: linear-gradient(180deg, #0e0e0e 0%, #050505 100%); }
+  }
+
+  /* Hidden when offstage */
+  .timer.gone{ opacity: 0; pointer-events:none; }
+
+  /* ---------- PREVIEW HELPERS (non-broadcast) ---------- */
+  /* Checker so transparency is visible when opening the file standalone */
+  body.preview-bg{
+    background:
+      linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+      linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+      linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+    background-size: 40px 40px;
+    background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
+    background-color: #0e0e0e;
+  }
+</style>
+</head>
+
+<body class="preview-bg">
+  <div class="stage">
+    <div id="timer" class="timer gone" aria-live="polite" role="timer">
+      <div class="timer__flag">
+        <img class="timer__flag-logo" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="Pro League" />
+      </div>
+      <div class="timer__body">
+        <div class="timer__kicker">
+          <span class="dot"></span>
+          <span id="timer-label">MATCH STARTS IN</span>
+        </div>
+        <div class="timer__display" id="timer-display">
+          <span id="mm">03</span><span class="colon">:</span><span id="ss">00</span>
+        </div>
+        <div class="timer__bar"><div class="timer__bar-fill" id="timer-bar"></div></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  DATA WIRES:
+    seconds      -> int, total seconds for the countdown
+    displayMode  -> 'duration' | 'until_clock'
+    endClock     -> 'HH:MM' (used when displayMode === 'until_clock')
+
+  Silent by design. No <audio>, no Audio(), no Web Audio, no sound.
+
+  postMessage protocol (parent -> iframe):
+    { type: 'update', data: { minutes: int, seconds: int } }      // duration mode
+    { type: 'update', data: { mode: 'clock', endClock: 'HH:MM' } } // until-clock mode
+    { type: 'reset' }                                              // stop + hide
+*/
+
+// ---- CONFIG ------------------------------------------------------------
+const CONFIG = {
+  criticalThresholdSeconds: 10,   // last-10s pink/pulse state
+};
+
+// ---- DOM REFS ----------------------------------------------------------
+const elTimer   = document.getElementById('timer');
+const elDisplay = document.getElementById('timer-display');
+const elMM      = document.getElementById('mm');
+const elSS      = document.getElementById('ss');
+const elBar     = document.getElementById('timer-bar');
+
+// ---- HELPERS -----------------------------------------------------------
+function resolveSecondsFromClock(endClock){
+  const [hh, mm] = String(endClock).split(':').map(n => parseInt(n, 10));
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(hh, mm, 0, 0);
+  if (end.getTime() <= now.getTime()) end.setDate(end.getDate() + 1); // next day
+  return Math.max(0, Math.round((end.getTime() - now.getTime()) / 1000));
+}
+
+function fmt(total){
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return {
+    mm: String(m).padStart(2,'0'),
+    ss: String(s).padStart(2,'0'),
+  };
+}
+
+function setDisplay(total){
+  const {mm, ss} = fmt(total);
+  elMM.textContent = mm;
+  elSS.textContent = ss;
+}
+
+// ---- LIFECYCLE ---------------------------------------------------------
+let tickHandle = null;
+
+function clearTick(){
+  if (tickHandle){
+    clearInterval(tickHandle);
+    tickHandle = null;
+  }
+}
+
+function playEntry(){
+  elTimer.classList.remove('gone','exiting','critical','zero-flash');
+  // reflow to restart animation
+  void elTimer.offsetWidth;
+  elTimer.classList.add('entering');
+  elTimer.addEventListener('animationend', function handler(){
+    elTimer.classList.remove('entering');
+    elTimer.removeEventListener('animationend', handler);
+  });
+}
+
+function playExit(onDone){
+  elTimer.classList.remove('entering');
+  void elTimer.offsetWidth;
+  elTimer.classList.add('exiting');
+  elTimer.addEventListener('animationend', function handler(){
+    elTimer.classList.remove('exiting');
+    elTimer.classList.add('gone');
+    elTimer.removeEventListener('animationend', handler);
+    if (typeof onDone === 'function') onDone();
+  });
+}
+
+function flashZero(cb){
+  elTimer.classList.add('zero-flash');
+  setTimeout(() => {
+    elTimer.classList.remove('zero-flash');
+    if (cb) cb();
+  }, 450);
+}
+
+function pulseTick(){
+  elDisplay.classList.remove('tick');
+  void elDisplay.offsetWidth;
+  elDisplay.classList.add('tick');
+}
+
+function updateBar(remaining, total){
+  const pct = total > 0 ? (remaining / total) : 0;
+  elBar.style.transform = `scaleX(${Math.max(0, Math.min(1, pct))})`;
+}
+
+function runCountdown(totalSeconds){
+  clearTick();
+
+  const total = Math.max(0, totalSeconds | 0);
+  let remaining = total;
+
+  setDisplay(remaining);
+  updateBar(remaining, total);
+
+  playEntry();
+
+  if (total === 0){
+    // Edge case: 00:00 set — flash + exit immediately, no loop.
+    flashZero(() => playExit());
+    return;
+  }
+
+  // First "real" tick begins after 1s
+  tickHandle = setInterval(() => {
+    remaining -= 1;
+
+    if (remaining < 0){
+      clearTick();
+      return;
+    }
+
+    setDisplay(remaining);
+    updateBar(remaining, total);
+    pulseTick();
+
+    if (remaining <= CONFIG.criticalThresholdSeconds && remaining > 0){
+      elTimer.classList.add('critical');
+    }
+
+    if (remaining === 0){
+      clearTick();
+      flashZero(() => {
+        playExit();
+        // No auto-loop. Operator drives the next cycle via postMessage.
+      });
+    }
+  }, 1000);
+}
+
+function resetAndHide(){
+  clearTick();
+  elTimer.classList.remove('entering','exiting','critical','zero-flash');
+  elTimer.classList.add('gone');
+  // Restore static placeholder so a later message starts cleanly.
+  setDisplay(180);
+  updateBar(180, 180);
+}
+
+// ---- postMessage HOOK --------------------------------------------------
+window.addEventListener('message', (ev) => {
+  const msg = ev && ev.data;
+  if (!msg || typeof msg !== 'object') return;
+
+  if (msg.type === 'reset'){
+    resetAndHide();
+    return;
+  }
+
+  if (msg.type === 'update' && msg.data && typeof msg.data === 'object'){
+    const d = msg.data;
+
+    if (d.mode === 'clock' && d.endClock){
+      runCountdown(resolveSecondsFromClock(d.endClock));
+      return;
+    }
+
+    const minutes = Number.isFinite(d.minutes) ? d.minutes : 0;
+    const seconds = Number.isFinite(d.seconds) ? d.seconds : 0;
+    runCountdown(minutes * 60 + seconds);
+  }
+});
+
+// ---- START -------------------------------------------------------------
+// Initial render: 03:00 static, no animation, hidden box.
+// Index iframe stays cold until first 'update' message arrives.
+window.addEventListener('load', () => {
+  setDisplay(180);
+  updateBar(180, 180);
+  // .gone is already set in the markup; keep it that way.
+});
+
+// Safety: clear interval on unload so we don't leak.
+window.addEventListener('beforeunload', () => {
+  clearTick();
+});
+</script>
+
+<script>
+/* Standalone preview auto-demo. Production embed (iframe) gets real
+   postMessage from operator and skips this branch. */
+(function autoDemo() {
+  var inIframe = window.top !== window.self;
+  if (!inIframe) {
+    document.documentElement.style.background = '#0d1117';
+    document.body.style.background = '#0d1117';
+  }
+  var messageReceived = false;
+  window.addEventListener('message', function () { messageReceived = true; }, { once: true });
+  setTimeout(function () {
+    if (messageReceived) return;
+    window.postMessage({ type: 'update', data: { minutes: 3, seconds: 0 } }, '*');
+  }, 250);
+})();
+</script>
+</body>
+</html>

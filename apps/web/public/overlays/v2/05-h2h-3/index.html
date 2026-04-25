@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #05 — H2H 3-PLAYER MATCHUP CARD
+  1920×1080 transparent canvas, 60fps, silent. Reuses pilot v2 template
+  (halftone bg + top CADE/Pro League logos + side chevrons + bottom
+  partner marquee). Center stage is a fan-out row of three vertical
+  player cards with angled-corner-cut frames, each carrying a headshot,
+  org logo, eight stats and a win-probability pill. Below the cards a
+  three-segment win-probability bar fills from zero on entry.
+
+  DATA WIRES: players[] (3 entries) = {name, slug, photoUrl, orgLogoUrl, orgName, pos, p, w, d, l, gf, ga, gd, pts, winProb}
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — H2H 3-PLAYER</title>
+
+<style>
+  /* ── REAL BRAND FONTS (mirrors pilot) ─────────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS ─────────────────────────────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-bright: #8aff15;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --pink-faint:   rgba(254, 3, 109, 0.18);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+    --cycle:        13.4s;        /* full demo loop */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    /* TRANSPARENT canvas — broadcast over live feed */
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    isolation: isolate;
+  }
+
+  /* ── BG: halftone-green stadium texture (matches pilot) ─────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) — enlarged ~40% per brief ── */
+  .top-band {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    right: 0;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 42px;
+    z-index: 10;
+    opacity: 0;
+    transform: translateY(-18px);
+    animation: top-in 0.6s cubic-bezier(.21,1.02,.73,1) 0.05s forwards,
+               top-out 0.5s cubic-bezier(.55,.05,.7,.2) 12.0s forwards;
+  }
+
+  @keyframes top-in  { to { opacity: 1; transform: translateY(0); } }
+  @keyframes top-out { to { opacity: 0; transform: translateY(-18px); } }
+
+  .top-band .logo {
+    height: 110px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 100px; }
+  .top-band .logo--pro  { height: 120px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 92px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── SIDE CHEVRONS ───────────────────────────────────────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 38px;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    animation: chev-fade-in 0.7s ease-out 0.25s forwards,
+               chev-fade-out 0.5s ease-in 12.0s forwards;
+  }
+  @keyframes chev-fade-in  { to { opacity: 1; } }
+  @keyframes chev-fade-out { to { opacity: 0; } }
+
+  .chevrons--left  { left: 56px; }
+  .chevrons--right { right: 56px; }
+
+  .chevron {
+    width: 76px;
+    height: 56px;
+    color: var(--green);
+    opacity: 0.55;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron { animation-name: chev-pulse-right; }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(-6px); }
+  }
+
+  /* ── HEADLINE BAND — round-2: moved up 50px (was top:226px) ── */
+  .headline {
+    position: absolute;
+    top: 176px;
+    left: 50%;
+    transform: translate(-50%, -10px);
+    z-index: 12;
+    text-align: center;
+    opacity: 0;
+    animation: head-in 0.65s cubic-bezier(.21,1.02,.73,1) 0.30s forwards,
+               head-out 0.5s ease-in 12.0s forwards;
+  }
+  @keyframes head-in  { to { opacity: 1; transform: translate(-50%, 0); } }
+  @keyframes head-out { to { opacity: 0; transform: translate(-50%, -10px); } }
+
+  .headline .kicker {
+    display: inline-block;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.85);
+    text-transform: uppercase;
+    padding: 6px 18px;
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 3px;
+    margin-bottom: 12px;
+    background: rgba(0,0,0,0.32);
+  }
+  .headline .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 78px;
+    line-height: 0.92;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 16px rgba(0,0,0,0.65),
+      0 0 30px rgba(107,205,6,0.18);
+  }
+  .headline .title .accent { color: var(--green); }
+  .headline .title-rule {
+    width: 180px;
+    height: 4px;
+    margin: 10px auto 0;
+    background: var(--pink);
+    border-radius: 2px;
+    box-shadow:
+      0 0 12px var(--pink-glow),
+      0 0 24px rgba(254,3,109,0.30);
+  }
+
+  /* ── CARD ROW (3 player cards) — round-2: moved up + shorter to clear winprob-bar ── */
+  /* top 326 (was 388, -62 to follow headline up) · height 460 (was 504, -44
+     so card-row bottom = 786 leaves ≥30px clear of winprob-bar top). */
+  .card-row {
+    position: absolute;
+    top: 326px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1620px;
+    height: 460px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 36px;
+    z-index: 20;
+  }
+
+  /* vertical thin green dividers between cards */
+  .card-row::before,
+  .card-row::after {
+    content: '';
+    position: absolute;
+    top: 60px;
+    bottom: 60px;
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      rgba(107,205,6,0) 0%,
+      rgba(107,205,6,0.55) 18%,
+      rgba(107,205,6,0.85) 50%,
+      rgba(107,205,6,0.55) 82%,
+      rgba(107,205,6,0) 100%
+    );
+    box-shadow: 0 0 8px rgba(107,205,6,0.45);
+    pointer-events: none;
+    opacity: 0;
+    animation: divider-in 0.5s ease-out 1.40s forwards,
+               divider-out 0.4s ease-in 11.9s forwards;
+  }
+  .card-row::before { left: calc(33.333% - 18px); }
+  .card-row::after  { left: calc(66.666% - 18px); }
+  @keyframes divider-in  { to { opacity: 1; } }
+  @keyframes divider-out { to { opacity: 0; } }
+
+  /* angled-corner-cut card frame (clip-path) */
+  .player-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      180deg,
+      rgba(8,12,8,0.78) 0%,
+      rgba(5,8,5,0.92) 100%
+    );
+    clip-path: polygon(
+      0 22px,
+      22px 0,
+      calc(100% - 22px) 0,
+      100% 22px,
+      100% calc(100% - 22px),
+      calc(100% - 22px) 100%,
+      22px 100%,
+      0 calc(100% - 22px)
+    );
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0;
+    transform: translateY(60px) scale(0.92);
+    animation: card-in 0.7s cubic-bezier(.16,1.0,.4,1.0) forwards,
+               card-out 0.45s cubic-bezier(.55,.05,.7,.2) 12.05s forwards;
+  }
+  @keyframes card-in {
+    0%   { opacity: 0; transform: translateY(60px) scale(0.92); }
+    60%  { opacity: 1; transform: translateY(-6px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes card-out {
+    to { opacity: 0; transform: translateY(40px) scale(0.94); }
+  }
+  .player-card.c1 { animation-delay: 0.55s, 12.05s; }
+  .player-card.c2 { animation-delay: 0.75s, 12.15s; }
+  .player-card.c3 { animation-delay: 0.95s, 12.25s; }
+
+  /* outline frame — drawn on top via inline SVG, same shape as clip */
+  .player-card .frame {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .player-card .frame svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .player-card .frame path {
+    fill: none;
+    stroke: var(--green);
+    stroke-width: 3;
+    filter: drop-shadow(0 0 12px rgba(107,205,6,0.55));
+  }
+  .player-card.accent-pink .frame path {
+    stroke: var(--pink);
+    filter: drop-shadow(0 0 12px rgba(254,3,109,0.55));
+  }
+
+  /* ── photo zone — slightly shorter so card height fits new layout ── */
+  .photo-zone {
+    position: relative;
+    height: 230px;
+    overflow: hidden;
+    z-index: 1;
+  }
+  /* semi-transparent name backdrop behind headshot */
+  .photo-zone .name-backdrop {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 132px;
+    line-height: 1;
+    letter-spacing: -0.012em;
+    color: rgba(255,255,255,0.07);
+    text-transform: uppercase;
+    white-space: nowrap;
+    z-index: 0;
+    transform: translateX(-40px);
+    opacity: 0;
+    animation: backdrop-drift 0.8s cubic-bezier(.21,1.02,.73,1) forwards,
+               backdrop-out 0.4s ease-in 12.10s forwards;
+  }
+  .player-card.c1 .name-backdrop { animation-delay: 0.85s, 12.10s; }
+  .player-card.c2 .name-backdrop { animation-delay: 1.05s, 12.20s; }
+  .player-card.c3 .name-backdrop { animation-delay: 1.25s, 12.30s; }
+
+  @keyframes backdrop-drift {
+    0%   { opacity: 0; transform: translateX(-40px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes backdrop-out { to { opacity: 0; transform: translateX(20px); } }
+
+  .photo-zone .photo-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 2;
+  }
+  .photo-zone .photo {
+    height: 230px;
+    width: auto;
+    object-fit: contain;
+    object-position: bottom center;
+    filter: drop-shadow(0 16px 28px rgba(0,0,0,0.55));
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+    animation: photo-in 0.7s cubic-bezier(.16,1.0,.4,1.0) forwards,
+               photo-out 0.45s ease-in 12.05s forwards;
+  }
+  .player-card.c1 .photo { animation-delay: 0.80s, 12.05s; }
+  .player-card.c2 .photo { animation-delay: 1.00s, 12.15s; }
+  .player-card.c3 .photo { animation-delay: 1.20s, 12.25s; }
+  @keyframes photo-in  { to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes photo-out { to { opacity: 0; transform: translateY(10px) scale(0.97); } }
+
+  /* photo fallback: colored circle with initial */
+  .photo-zone .photo-fallback {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 30%, var(--green) 0%, rgba(107,205,6,0.25) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 140px;
+    color: var(--ink);
+    z-index: 1;
+    opacity: 0;
+  }
+  .player-card.accent-pink .photo-fallback {
+    background: radial-gradient(circle at 40% 30%, var(--pink) 0%, rgba(254,3,109,0.25) 100%);
+  }
+
+  /* ── name label band ──────────────────────────────────────── */
+  .name-band {
+    position: relative;
+    margin: 0 18px;
+    padding: 6px 0 8px;
+    text-align: center;
+    border-top: 1px solid rgba(107,205,6,0.45);
+    border-bottom: 1px solid rgba(107,205,6,0.45);
+    background: linear-gradient(
+      90deg,
+      rgba(107,205,6,0) 0%,
+      rgba(107,205,6,0.18) 50%,
+      rgba(107,205,6,0) 100%
+    );
+    z-index: 3;
+  }
+  .player-card.accent-pink .name-band {
+    border-top: 1px solid rgba(254,3,109,0.55);
+    border-bottom: 1px solid rgba(254,3,109,0.55);
+    background: linear-gradient(
+      90deg,
+      rgba(254,3,109,0) 0%,
+      rgba(254,3,109,0.20) 50%,
+      rgba(254,3,109,0) 100%
+    );
+  }
+  .name-band .name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 44px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+  }
+
+  /* ── stat block (7 stats — Win% removed; 4×2 grid with last cell omitted) ──── */
+  .stat-block {
+    margin: 10px 22px 60px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px 8px;
+    z-index: 3;
+    position: relative;
+  }
+  .stat {
+    text-align: center;
+    padding: 6px 4px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: stat-in 0.4s cubic-bezier(.21,1.02,.73,1) forwards,
+               stat-out 0.3s ease-in 12.0s forwards;
+  }
+  @keyframes stat-in  { to { opacity: 1; transform: translateY(0); } }
+  @keyframes stat-out { to { opacity: 0; transform: translateY(-6px); } }
+
+  /* row-by-row cascade across all 3 cards: 4 cells row 1, 4 cells row 2 */
+  .player-card.c1 .stat:nth-child(1) { animation-delay: 1.05s, 12.05s; }
+  .player-card.c1 .stat:nth-child(2) { animation-delay: 1.10s, 12.05s; }
+  .player-card.c1 .stat:nth-child(3) { animation-delay: 1.15s, 12.05s; }
+  .player-card.c1 .stat:nth-child(4) { animation-delay: 1.20s, 12.05s; }
+  .player-card.c1 .stat:nth-child(5) { animation-delay: 1.30s, 12.05s; }
+  .player-card.c1 .stat:nth-child(6) { animation-delay: 1.35s, 12.05s; }
+  .player-card.c1 .stat:nth-child(7) { animation-delay: 1.40s, 12.05s; }
+  .player-card.c1 .stat:nth-child(8) { animation-delay: 1.45s, 12.05s; }
+  .player-card.c2 .stat:nth-child(1) { animation-delay: 1.10s, 12.10s; }
+  .player-card.c2 .stat:nth-child(2) { animation-delay: 1.15s, 12.10s; }
+  .player-card.c2 .stat:nth-child(3) { animation-delay: 1.20s, 12.10s; }
+  .player-card.c2 .stat:nth-child(4) { animation-delay: 1.25s, 12.10s; }
+  .player-card.c2 .stat:nth-child(5) { animation-delay: 1.35s, 12.10s; }
+  .player-card.c2 .stat:nth-child(6) { animation-delay: 1.40s, 12.10s; }
+  .player-card.c2 .stat:nth-child(7) { animation-delay: 1.45s, 12.10s; }
+  .player-card.c2 .stat:nth-child(8) { animation-delay: 1.50s, 12.10s; }
+  .player-card.c3 .stat:nth-child(1) { animation-delay: 1.15s, 12.15s; }
+  .player-card.c3 .stat:nth-child(2) { animation-delay: 1.20s, 12.15s; }
+  .player-card.c3 .stat:nth-child(3) { animation-delay: 1.25s, 12.15s; }
+  .player-card.c3 .stat:nth-child(4) { animation-delay: 1.30s, 12.15s; }
+  .player-card.c3 .stat:nth-child(5) { animation-delay: 1.40s, 12.15s; }
+  .player-card.c3 .stat:nth-child(6) { animation-delay: 1.45s, 12.15s; }
+  .player-card.c3 .stat:nth-child(7) { animation-delay: 1.50s, 12.15s; }
+  .player-card.c3 .stat:nth-child(8) { animation-delay: 1.55s, 12.15s; }
+
+  .stat .label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .stat .value {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 32px;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .stat.stat--gd .value { color: var(--green-bright); }
+  .player-card.accent-pink .stat.stat--gd .value { color: var(--pink); }
+  .stat.stat--pts .value { color: var(--green); }
+  .player-card.accent-pink .stat.stat--pts .value { color: var(--pink); }
+
+  /* ── footer of card: org logo + win-prob pill ────────────── */
+  .card-footer {
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    bottom: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    z-index: 3;
+    opacity: 0;
+    animation: footer-in 0.5s ease-out forwards,
+               footer-out 0.4s ease-in 12.0s forwards;
+  }
+  .player-card.c1 .card-footer { animation-delay: 1.55s, 12.05s; }
+  .player-card.c2 .card-footer { animation-delay: 1.65s, 12.10s; }
+  .player-card.c3 .card-footer { animation-delay: 1.75s, 12.15s; }
+  @keyframes footer-in  { to { opacity: 1; } }
+  @keyframes footer-out { to { opacity: 0; } }
+
+  .org {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .org img {
+    height: 36px;
+    width: auto;
+    max-width: 64px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.65));
+  }
+  .org .org-name {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: rgba(255,255,255,0.78);
+    text-transform: uppercase;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .win-pill {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    padding: 6px 12px;
+    background: linear-gradient(
+      90deg,
+      rgba(107,205,6,0.30) 0%,
+      rgba(107,205,6,0.55) 100%
+    );
+    border: 1px solid var(--green);
+    border-radius: 14px;
+    box-shadow: 0 0 10px rgba(107,205,6,0.35);
+  }
+  .player-card.accent-pink .win-pill {
+    background: linear-gradient(
+      90deg,
+      rgba(254,3,109,0.30) 0%,
+      rgba(254,3,109,0.55) 100%
+    );
+    border: 1px solid var(--pink);
+    box-shadow: 0 0 10px rgba(254,3,109,0.35);
+  }
+  .win-pill .lbl {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: rgba(255,255,255,0.85);
+    text-transform: uppercase;
+  }
+  .win-pill .val {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 24px;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  /* ── 3-segment WIN PROBABILITY bar — round-2: lowered to bottom:160 ── */
+  /* bottom:160 → winprob-bar block top ≈ 1080-160-100(heading+bar+labels) ≈ 820.
+     Card-row bottom = 326+460 = 786. Gap ≈ 34px (≥30 target satisfied). */
+  .winprob-bar {
+    position: absolute;
+    left: 50%;
+    bottom: 160px;
+    transform: translateX(-50%);
+    width: 1620px;
+    z-index: 18;
+  }
+  .winprob-bar .heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.32em;
+    color: rgba(255,255,255,0.78);
+    text-transform: uppercase;
+    opacity: 0;
+    animation: bar-head-in 0.4s ease-out 1.85s forwards,
+               bar-head-out 0.4s ease-in 12.0s forwards;
+  }
+  @keyframes bar-head-in  { to { opacity: 1; } }
+  @keyframes bar-head-out { to { opacity: 0; } }
+  .winprob-bar .heading .left::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px;
+    box-shadow: 0 0 8px var(--green-glow);
+    transform: translateY(-1px);
+  }
+  .winprob-bar .heading .right { color: rgba(255,255,255,0.55); letter-spacing: 0.24em; }
+
+  .bar-track {
+    position: relative;
+    height: 18px;
+    width: 100%;
+    background: rgba(8,8,8,0.65);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 4px;
+    overflow: hidden;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: bar-fill 0.9s cubic-bezier(.21,1.02,.73,1) 1.95s forwards,
+               bar-fill-out 0.4s ease-in 12.0s forwards;
+  }
+  @keyframes bar-fill     { to { transform: scaleX(1); } }
+  @keyframes bar-fill-out { to { opacity: 0; } }
+
+  .bar-fill.s1 {
+    left: 0;
+    width: 40%;
+    background: linear-gradient(90deg, var(--green) 0%, var(--green-bright) 100%);
+    box-shadow: inset 0 0 12px rgba(255,255,255,0.18);
+    animation-delay: 1.95s, 12.0s;
+  }
+  .bar-fill.s2 {
+    left: 40%;
+    width: 35%;
+    background: linear-gradient(90deg, var(--pink) 0%, #ff5b9b 100%);
+    box-shadow: inset 0 0 12px rgba(255,255,255,0.18);
+    animation-delay: 2.10s, 12.0s;
+  }
+  .bar-fill.s3 {
+    left: 75%;
+    width: 25%;
+    background: linear-gradient(90deg, var(--green) 0%, #4cb000 100%);
+    box-shadow: inset 0 0 12px rgba(255,255,255,0.18);
+    animation-delay: 2.25s, 12.0s;
+  }
+  /* divider notches between segments */
+  .bar-track::before,
+  .bar-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    width: 2px;
+    background: rgba(0,0,0,0.55);
+    z-index: 3;
+  }
+  .bar-track::before { left: 40%; }
+  .bar-track::after  { left: 75%; }
+
+  .bar-labels {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: 40fr 35fr 25fr;
+    gap: 0;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .bar-labels span {
+    color: rgba(255,255,255,0.85);
+    text-align: center;
+    opacity: 0;
+    animation: lbl-in 0.4s ease-out forwards,
+               lbl-out 0.4s ease-in 12.0s forwards;
+  }
+  .bar-labels span:nth-child(1) { animation-delay: 2.55s, 12.0s; color: var(--green-bright); }
+  .bar-labels span:nth-child(2) { animation-delay: 2.65s, 12.0s; color: var(--pink); }
+  .bar-labels span:nth-child(3) { animation-delay: 2.75s, 12.0s; color: var(--green); }
+  @keyframes lbl-in  { to { opacity: 1; } }
+  @keyframes lbl-out { to { opacity: 0; } }
+
+  /* ── BOTTOM PARTNER MARQUEE (matches pilot) ──────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 38px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 12;
+    opacity: 0;
+    animation: partners-in 0.6s ease-out 0.55s forwards,
+               partners-out 0.5s ease-in 12.0s forwards;
+  }
+  @keyframes partners-in  { to { opacity: 1; } }
+  @keyframes partners-out { to { opacity: 0; } }
+
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+
+  .marquee {
+    position: relative;
+    width: 1080px;
+    max-width: 90%;
+    overflow: hidden;
+    padding: 12px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    padding: 0 30px;
+    flex-shrink: 0;
+  }
+  .marquee-group .partner {
+    height: 56px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .marquee-group .partner--gameevo  { height: 50px; }
+  .marquee-group .partner--pride    { height: 46px; }
+  .marquee-group .partner--africa   { height: 50px; }
+  .marquee-group .partner--trace    { height: 58px; }
+
+  /* ── season watermark ─────────────────────────────────────── */
+  .season-mark {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+    opacity: 0;
+    animation: mark-in 0.5s ease-out 0.35s forwards,
+               mark-out 0.4s ease-in 12.0s forwards;
+  }
+  @keyframes mark-in  { to { opacity: 1; } }
+  @keyframes mark-out { to { opacity: 0; } }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 9px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+
+  /* ── DEMO LOOP: full re-cycle every 13.4s ─── */
+  .stage {
+    animation: stage-loop var(--cycle) linear infinite;
+  }
+  @keyframes stage-loop {
+    0%   { opacity: 1; }
+    93%  { opacity: 1; }
+    97%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Top header: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Side chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Headline (kicker removed per user brief) -->
+    <section class="headline">
+      <h1 class="title">3-WAY <span class="accent">SHOWDOWN</span></h1>
+      <div class="title-rule" aria-hidden="true"></div>
+    </section>
+
+    <!-- Three-card row (FARUK / ANIFE / KAYKAY) -->
+    <section class="card-row" aria-label="Three player matchup">
+
+      <!-- ─── CARD 1 — FARUK (green accent) ─── -->
+      <article class="player-card c1 accent-green">
+        <div class="frame" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path d="M 0 4 L 4 0 L 96 0 L 100 4 L 100 96 L 96 100 L 4 100 L 0 96 Z"
+                  vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+        <div class="photo-zone">
+          <div class="name-backdrop" aria-hidden="true">FARUK</div>
+          <div class="photo-wrap">
+            <img class="photo"
+                 src="/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png"
+                 alt="FARUK headshot"
+                 onerror="this.style.display='none';this.parentElement.parentElement.querySelector('.photo-fallback').style.opacity='1';"/>
+          </div>
+          <div class="photo-fallback" aria-hidden="true">F</div>
+        </div>
+        <div class="name-band">
+          <span class="name">FARUK</span>
+        </div>
+        <div class="stat-block">
+          <div class="stat"><div class="label">Pos</div><div class="value">2</div></div>
+          <div class="stat"><div class="label">P</div><div class="value">5</div></div>
+          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;">4-1-0</div></div>
+          <div class="stat stat--pts"><div class="label">Pts</div><div class="value">13</div></div>
+          <div class="stat"><div class="label">GF</div><div class="value">18</div></div>
+          <div class="stat"><div class="label">GA</div><div class="value">7</div></div>
+          <div class="stat stat--gd"><div class="label">GD</div><div class="value">+11</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="org">
+            <img src="/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png" alt="OAS ESPORTS"
+                 onerror="this.style.display='none';"/>
+            <span class="org-name">OAS Esports</span>
+          </div>
+          <div class="win-pill">
+            <span class="lbl">Win</span><span class="val">40%</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ─── CARD 2 — ANIFE (pink accent) ─── -->
+      <article class="player-card c2 accent-pink">
+        <div class="frame" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path d="M 0 4 L 4 0 L 96 0 L 100 4 L 100 96 L 96 100 L 4 100 L 0 96 Z"
+                  vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+        <div class="photo-zone">
+          <div class="name-backdrop" aria-hidden="true">ANIFE</div>
+          <div class="photo-wrap">
+            <img class="photo"
+                 src="/overlays/v2/_assets/players/processed/anife/headshot_02_nobg.png"
+                 alt="ANIFE headshot"
+                 onerror="this.style.display='none';this.parentElement.parentElement.querySelector('.photo-fallback').style.opacity='1';"/>
+          </div>
+          <div class="photo-fallback" aria-hidden="true">A</div>
+        </div>
+        <div class="name-band">
+          <span class="name">ANIFE</span>
+        </div>
+        <div class="stat-block">
+          <div class="stat"><div class="label">Pos</div><div class="value">5</div></div>
+          <div class="stat"><div class="label">P</div><div class="value">5</div></div>
+          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;">2-2-1</div></div>
+          <div class="stat stat--pts"><div class="label">Pts</div><div class="value">8</div></div>
+          <div class="stat"><div class="label">GF</div><div class="value">12</div></div>
+          <div class="stat"><div class="label">GA</div><div class="value">10</div></div>
+          <div class="stat stat--gd"><div class="label">GD</div><div class="value">+2</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="org">
+            <img src="/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg" alt="AFROPANDA"
+                 onerror="this.style.display='none';"/>
+            <span class="org-name">Afropanda</span>
+          </div>
+          <div class="win-pill">
+            <span class="lbl">Win</span><span class="val">35%</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- ─── CARD 3 — KAYKAY (green accent) ─── -->
+      <article class="player-card c3 accent-green">
+        <div class="frame" aria-hidden="true">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path d="M 0 4 L 4 0 L 96 0 L 100 4 L 100 96 L 96 100 L 4 100 L 0 96 Z"
+                  vector-effect="non-scaling-stroke"/>
+          </svg>
+        </div>
+        <div class="photo-zone">
+          <div class="name-backdrop" aria-hidden="true">KAYKAY</div>
+          <div class="photo-wrap">
+            <img class="photo"
+                 src="/overlays/v2/_assets/players/processed/kaykay/headshot_01_nobg.png"
+                 alt="KAYKAY headshot"
+                 onerror="this.style.display='none';this.parentElement.parentElement.querySelector('.photo-fallback').style.opacity='1';"/>
+          </div>
+          <div class="photo-fallback" aria-hidden="true">K</div>
+        </div>
+        <div class="name-band">
+          <span class="name">KAYKAY</span>
+        </div>
+        <div class="stat-block">
+          <div class="stat"><div class="label">Pos</div><div class="value">3</div></div>
+          <div class="stat"><div class="label">P</div><div class="value">5</div></div>
+          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;">3-1-1</div></div>
+          <div class="stat stat--pts"><div class="label">Pts</div><div class="value">10</div></div>
+          <div class="stat"><div class="label">GF</div><div class="value">15</div></div>
+          <div class="stat"><div class="label">GA</div><div class="value">9</div></div>
+          <div class="stat stat--gd"><div class="label">GD</div><div class="value">+6</div></div>
+        </div>
+        <div class="card-footer">
+          <div class="org">
+            <img src="/overlays/v2/_assets/Orgs/LUMO%20LABS%20-%20KAYKAY.png" alt="LUMO LABS"
+                 onerror="this.style.display='none';"/>
+            <span class="org-name">Lumo Labs</span>
+          </div>
+          <div class="win-pill">
+            <span class="lbl">Win</span><span class="val">25%</span>
+          </div>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- 3-segment win-probability bar -->
+    <section class="winprob-bar" aria-label="Win probability split">
+      <div class="heading">
+        <span class="left">Win Probability</span>
+        <span class="right">Pre-Match Forecast</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill s1"></div>
+        <div class="bar-fill s2"></div>
+        <div class="bar-fill s3"></div>
+      </div>
+      <div class="bar-labels">
+        <span>FARUK · 40%</span>
+        <span>ANIFE · 35%</span>
+        <span>KAYKAY · 25%</span>
+      </div>
+    </section>
+
+    <!-- Bottom partner marquee -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

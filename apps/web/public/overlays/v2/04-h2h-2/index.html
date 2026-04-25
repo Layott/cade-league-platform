@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #04 — H2H 2-PLAYER (V2 PILOT SYSTEM REBUILD)
+  Full-screen 1920×1080 head-to-head matchup card.
+  Built on the v2 pilot design system from ../01-brb/index.html:
+    - Same @font-face block (Agharti + Quedora local woff2)
+    - Same vertical halftone-green stadium BG + vignette + scanline grain
+    - Same top CADE+Pro League logo pair w/ vertical separator
+    - Same side chevron motifs (left + right edges)
+    - Same bottom marquee partner strip (4 partners, 3× duplicated track)
+  Distinct centerpiece: dramatic dual fullbody photos anchored to L/R edges,
+  oversized condensed name backdrops behind each player (green / pink),
+  HUD-frame stats card center with 9 cascading rows + win-probability bar.
+
+  DATA WIRES: playerA = {name, photoUrl, orgLogoUrl, pos, p, w, d, l, gf, ga, gd, pts, winProb}, playerB same
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — H2H 2-Player</title>
+
+<style>
+  /* ── REAL BRAND FONTS (copied from pilot 01-brb) ───────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS ─────────────────────────────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --pink-faint:   rgba(254, 3, 109, 0.18);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+
+    /* full demo cycle: entry 1.6s + hold 8s + exit 1.0s + gap 1.0s = 11.6s */
+    --cycle: 11.6s;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080 transparent canvas) ──────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0a0e07;     /* mostly opaque since this is a full-screen H2H card */
+    isolation: isolate;
+    --winA-pct: 58%;
+    --winB-pct: 42%;
+  }
+
+  /* ── BG: halftone-green stadium texture (from pilot) ───────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+
+  /* darker vignette so center stats card reads cleanly + photos pop */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.55) 60%, rgba(5,5,5,0.90) 100%),
+      linear-gradient(to right,
+        rgba(107,205,6,0.10) 0%,
+        rgba(5,5,5,0.10) 30%,
+        rgba(5,5,5,0.10) 70%,
+        rgba(254,3,109,0.10) 100%
+      );
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) — enlarged 40% per brief ── */
+  .top-band {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 44px;
+    z-index: 30;
+    animation: top-fade 1.0s 0s ease-out both,
+               top-out 1.0s calc(var(--cycle) - 1.6s) ease-in both;
+  }
+
+  .top-band .logo {
+    height: 120px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 110px; }
+  .top-band .logo--pro  { height: 128px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 96px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  @keyframes top-fade {
+    0%   { opacity: 0; transform: translateY(-24px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes top-out {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-24px); }
+  }
+
+  /* ── SIDE CHEVRONS (decorative) — same as pilot, positioned tighter ── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    z-index: 4;
+    pointer-events: none;
+    animation: chev-fade 1.4s 0.1s ease-out both,
+               chev-out 0.8s calc(var(--cycle) - 1.4s) ease-in both;
+  }
+  .chevrons--left  { left: 30px; }
+  .chevrons--right { right: 30px; }
+
+  .chevron {
+    width: 70px;
+    height: 50px;
+    color: var(--green);
+    opacity: 0.45;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron { color: var(--pink); }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.25; transform: translateX(0); }
+    50%      { opacity: 0.75; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron {
+    animation-name: chev-pulse-right;
+  }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.25; transform: translateX(0); }
+    50%      { opacity: 0.75; transform: translateX(-6px); }
+  }
+  @keyframes chev-fade {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes chev-out {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ── KICKER PILL ABOVE STATS — centered under top logos ────── */
+  /* Wrapper guarantees centering: full-width parent + text-align center,
+     pill itself is inline-block so margin auto + content-fit width work. */
+  .h2h-kicker-wrap {
+    position: absolute;
+    top: 200px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    text-align: center;
+    z-index: 30;
+    animation: top-fade 1.0s 0.15s ease-out both,
+               top-out 1.0s calc(var(--cycle) - 1.45s) ease-in both;
+  }
+  .h2h-kicker {
+    display: inline-block;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 0.32em;
+    /* compensate for letter-spacing pushing text rightward inside box:
+       trailing space in the spacing pattern creates a perceptual offset.
+       padding-left adds the matching amount on the left so glyph-content
+       reads as truly centered to the eye. */
+    padding: 9px 28px 9px 36px;
+    color: var(--ink);
+    text-transform: uppercase;
+    border: 2px solid rgba(255,255,255,0.22);
+    border-radius: 4px;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    text-align: center;
+  }
+  .h2h-kicker .vs {
+    color: var(--green);
+    margin: 0 12px;
+    font-weight: 900;
+    text-shadow: 0 0 12px var(--green-glow);
+  }
+
+  /* ── PLAYER COLUMNS (LEFT + RIGHT) — narrowed + pulled toward center ── */
+  .player-col {
+    position: absolute;
+    top: 270px;
+    height: 640px;
+    width: 540px;
+    z-index: 8;
+    overflow: visible;
+  }
+  .player-col--a {
+    left: 110px;
+    animation: player-a-in 1.0s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+               player-a-out 0.9s calc(var(--cycle) - 1.1s) cubic-bezier(0.55, 0, 0.78, 0) both;
+  }
+  .player-col--b {
+    right: 110px;
+    animation: player-b-in 1.0s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
+               player-b-out 0.9s calc(var(--cycle) - 1.1s) cubic-bezier(0.55, 0, 0.78, 0) both;
+  }
+
+  @keyframes player-a-in {
+    0%   { opacity: 0; transform: translateX(-180px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes player-a-out {
+    0%   { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(-180px); }
+  }
+  @keyframes player-b-in {
+    0%   { opacity: 0; transform: translateX(180px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes player-b-out {
+    0%   { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(180px); }
+  }
+
+  /* HUGE Agharti condensed name backdrop behind each photo */
+  .name-backdrop {
+    position: absolute;
+    top: 30px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 280px;
+    line-height: 0.82;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+    animation: backdrop-drift 14s ease-in-out infinite alternate;
+  }
+  .player-col--a .name-backdrop {
+    left: -40px;
+    color: rgba(107, 205, 6, 0.22);
+    text-shadow:
+      0 0 38px rgba(107,205,6,0.28),
+      0 0 80px rgba(107,205,6,0.14);
+  }
+  .player-col--b .name-backdrop {
+    right: -40px;
+    text-align: right;
+    color: rgba(254, 3, 109, 0.22);
+    text-shadow:
+      0 0 38px rgba(254,3,109,0.28),
+      0 0 80px rgba(254,3,109,0.14);
+  }
+  @keyframes backdrop-drift {
+    0%   { transform: translateX(0)   scale(1);    opacity: 0.85; }
+    50%  { opacity: 1; }
+    100% { transform: translateX(-12px) scale(1.02); opacity: 0.85; }
+  }
+  .player-col--b .name-backdrop {
+    animation-name: backdrop-drift-b;
+  }
+  @keyframes backdrop-drift-b {
+    0%   { transform: translateX(0)   scale(1);    opacity: 0.85; }
+    50%  { opacity: 1; }
+    100% { transform: translateX(12px) scale(1.02);  opacity: 0.85; }
+  }
+
+  /* Player fullbody photo — sized to leave gap above partner strip */
+  .player-photo-wrap {
+    position: absolute;
+    bottom: 0;
+    width: 480px;
+    height: 600px;
+    z-index: 3;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .player-col--a .player-photo-wrap { left: 30px; }
+  .player-col--b .player-photo-wrap { right: 30px; }
+
+  .player-photo {
+    width: auto;
+    height: 580px;
+    display: block;
+    object-fit: contain;
+    object-position: bottom center;
+    filter: drop-shadow(0 28px 50px rgba(0,0,0,0.85)) drop-shadow(0 -8px 24px rgba(0,0,0,0.45));
+  }
+
+  /* fallback initial circle when photo 404s */
+  .player-photo.broken { display: none; }
+  .player-photo.broken + .photo-fallback { display: flex; }
+  .photo-fallback {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 360px;
+    height: 480px;
+    border-radius: 14px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: 240px;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    border: 3px solid rgba(255,255,255,0.18);
+  }
+  .player-col--a .photo-fallback {
+    background: linear-gradient(135deg, rgba(107,205,6,0.55), rgba(107,205,6,0.15));
+    box-shadow: 0 0 40px var(--green-glow), inset 0 0 60px rgba(107,205,6,0.20);
+  }
+  .player-col--b .photo-fallback {
+    background: linear-gradient(135deg, rgba(254,3,109,0.55), rgba(254,3,109,0.15));
+    box-shadow: 0 0 40px var(--pink-glow), inset 0 0 60px rgba(254,3,109,0.20);
+  }
+
+  /* Player nameplate (smaller, in front of backdrop, near top) */
+  .player-nameplate {
+    position: absolute;
+    top: 20px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .player-col--a .player-nameplate { left: 50px;  align-items: flex-start; }
+  .player-col--b .player-nameplate { right: 50px; align-items: flex-end;   }
+
+  .player-tag {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.34em;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 3px;
+    background: rgba(0,0,0,0.40);
+  }
+  .player-col--a .player-tag { border-color: rgba(107,205,6,0.45); color: var(--green); }
+  .player-col--b .player-tag { border-color: rgba(254,3,109,0.45); color: var(--pink);  }
+
+  .player-name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 96px;
+    line-height: 0.86;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow: 0 4px 14px rgba(0,0,0,0.85), 0 0 22px rgba(0,0,0,0.55);
+  }
+
+  .player-org {
+    margin-top: 8px;
+    height: 56px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.65));
+    border-radius: 6px;
+  }
+  .player-col--b .player-org { margin-left: auto; }
+
+  /* ── CENTER STATS HUD CARD — repositioned to leave ≥80px gap to partner strip ── */
+  .stats-card {
+    position: absolute;
+    top: 270px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 660px;
+    height: 600px;
+    z-index: 15;
+    background: linear-gradient(180deg,
+      rgba(8, 12, 6, 0.94) 0%,
+      rgba(5, 8, 4, 0.97) 50%,
+      rgba(8, 12, 6, 0.94) 100%
+    );
+    border: 2px solid var(--green);
+    /* angled corner cuts (gamer-UI HUD frame) */
+    clip-path: polygon(
+      0 22px, 22px 0,
+      calc(100% - 22px) 0, 100% 22px,
+      100% calc(100% - 22px), calc(100% - 22px) 100%,
+      22px 100%, 0 calc(100% - 22px)
+    );
+    box-shadow:
+      0 0 0 1px rgba(107,205,6,0.30),
+      0 0 60px rgba(107,205,6,0.18),
+      inset 0 0 80px rgba(0,0,0,0.55);
+    animation: card-in 0.9s 0.6s cubic-bezier(0.22, 1, 0.36, 1) both,
+               card-out 0.8s calc(var(--cycle) - 1.0s) cubic-bezier(0.55, 0, 0.78, 0) both;
+  }
+
+  @keyframes card-in {
+    0%   { opacity: 0; transform: translateX(-50%) scale(0.86); }
+    100% { opacity: 1; transform: translateX(-50%) scale(1); }
+  }
+  @keyframes card-out {
+    0%   { opacity: 1; transform: translateX(-50%) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) scale(0.92); }
+  }
+
+  /* corner accents on the HUD frame */
+  .stats-card::before,
+  .stats-card::after {
+    content: '';
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--green);
+    pointer-events: none;
+  }
+  .stats-card::before {
+    top: 12px;
+    left: 12px;
+    border-right: none;
+    border-bottom: none;
+  }
+  .stats-card::after {
+    bottom: 12px;
+    right: 12px;
+    border-left: none;
+    border-top: none;
+  }
+
+  .stats-inner {
+    width: 100%;
+    height: 100%;
+    padding: 32px 28px 28px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stats-header {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(107,205,6,0.30);
+    margin-bottom: 6px;
+  }
+  .stats-header .col-name {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 44px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .stats-header .col-name--a { color: var(--green); text-align: left;  }
+  .stats-header .col-name--b { color: var(--pink);  text-align: right; }
+  .stats-header .col-vs {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 100%;
+    font-size: 26px;
+    letter-spacing: 0.32em;
+    color: rgba(255,255,255,0.58);
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* stat rows */
+  .stats-rows {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 6px 0 0;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    align-items: center;
+    padding: 9px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .stat-row:last-of-type { border-bottom: none; }
+
+  .stat-row .stat-label {
+    grid-column: 2;
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.30em;
+    color: rgba(255,255,255,0.62);
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .stat-row .stat-val {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 100%;
+    font-size: 38px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .stat-row .stat-val--a { text-align: left;  padding-left:  8px; }
+  .stat-row .stat-val--b { text-align: right; padding-right: 8px; }
+
+  /* highlight better/worse per row */
+  .stat-row .stat-val.better {
+    color: var(--green);
+    text-shadow: 0 0 18px rgba(107,205,6,0.55);
+  }
+  .stat-row .stat-val.worse  {
+    color: var(--pink);
+    text-shadow: 0 0 14px rgba(254,3,109,0.42);
+  }
+  .stat-row .stat-val.tie    {
+    color: rgba(255,255,255,0.85);
+  }
+
+  /* idle pulse on values during the hold phase */
+  .stat-row .stat-val.better { animation: val-pulse-green 2.6s 2.0s ease-in-out infinite; }
+  .stat-row .stat-val.worse  { animation: val-pulse-pink  2.6s 2.0s ease-in-out infinite; }
+
+  @keyframes val-pulse-green {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.20) saturate(1.25); }
+  }
+  @keyframes val-pulse-pink {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.12) saturate(1.10); }
+  }
+
+  /* row cascade entry/exit — staggered via per-row delay vars */
+  .stat-row {
+    opacity: 0;
+    animation:
+      row-in   0.5s ease-out forwards,
+      row-out  0.4s ease-in  forwards;
+    animation-delay: var(--in-delay), var(--out-delay);
+  }
+  @keyframes row-in {
+    0%   { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes row-out {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-8px); }
+  }
+
+  /* base entry start = 0.95s, +60ms per row.
+     exit reverse cascade — last row exits first, top row last.
+     exit base = (cycle - 1.5s) — matches stats-card scale-out window. */
+  .stat-row.r1 { --in-delay: 0.95s; --out-delay: calc(var(--cycle) - 0.60s); }
+  .stat-row.r2 { --in-delay: 1.01s; --out-delay: calc(var(--cycle) - 0.66s); }
+  .stat-row.r3 { --in-delay: 1.07s; --out-delay: calc(var(--cycle) - 0.72s); }
+  .stat-row.r4 { --in-delay: 1.13s; --out-delay: calc(var(--cycle) - 0.78s); }
+  .stat-row.r5 { --in-delay: 1.19s; --out-delay: calc(var(--cycle) - 0.84s); }
+  .stat-row.r6 { --in-delay: 1.25s; --out-delay: calc(var(--cycle) - 0.90s); }
+  .stat-row.r7 { --in-delay: 1.31s; --out-delay: calc(var(--cycle) - 0.96s); }
+  .stat-row.r8 { --in-delay: 1.37s; --out-delay: calc(var(--cycle) - 1.02s); }
+  .stat-row.r9 { --in-delay: 1.43s; --out-delay: calc(var(--cycle) - 1.08s); }
+
+  /* Win Probability bottom block (separate, larger emphasis row) */
+  .winprob {
+    margin-top: 14px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(107,205,6,0.30);
+    opacity: 0;
+    animation:
+      row-in  0.6s 1.55s ease-out forwards,
+      row-out 0.4s calc(var(--cycle) - 1.10s) ease-in forwards;
+  }
+  .winprob-label {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.36em;
+    color: rgba(255,255,255,0.72);
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .winprob-values {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    padding: 0 6px;
+  }
+  .winprob-val {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 100%;
+    font-size: 46px;
+    line-height: 1;
+  }
+  .winprob-val--a { color: var(--green); text-shadow: 0 0 22px var(--green-glow); }
+  .winprob-val--b { color: var(--pink);  text-shadow: 0 0 22px var(--pink-glow);  }
+
+  /* segmented bar */
+  .winprob-bar {
+    position: relative;
+    width: 100%;
+    height: 18px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 9px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .winprob-bar-a, .winprob-bar-b {
+    position: absolute;
+    top: 0;
+    height: 100%;
+  }
+  .winprob-bar-a {
+    left: 0;
+    background: linear-gradient(90deg, rgba(107,205,6,0.55), var(--green));
+    box-shadow: 0 0 20px var(--green-glow);
+    width: 0%;
+    animation:
+      barA-fill  1.2s 1.85s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+      barA-empty 0.5s calc(var(--cycle) - 1.05s) ease-in forwards;
+  }
+  .winprob-bar-b {
+    right: 0;
+    background: linear-gradient(270deg, rgba(254,3,109,0.55), var(--pink));
+    box-shadow: 0 0 20px var(--pink-glow);
+    width: 0%;
+    animation:
+      barB-fill  1.2s 1.85s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+      barB-empty 0.5s calc(var(--cycle) - 1.05s) ease-in forwards;
+  }
+  @keyframes barA-fill  { from { width: 0%; }                  to { width: var(--winA-pct, 58%); } }
+  @keyframes barB-fill  { from { width: 0%; }                  to { width: var(--winB-pct, 42%); } }
+  @keyframes barA-empty { from { width: var(--winA-pct, 58%); } to { width: 0%; } }
+  @keyframes barB-empty { from { width: var(--winB-pct, 42%); } to { width: 0%; } }
+
+  /* ── BOTTOM PARTNER STRIP (MARQUEE — same as pilot) ──────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 12;
+    animation: top-fade 1.0s 0.2s ease-out both,
+               top-out 1.0s calc(var(--cycle) - 1.4s) ease-in both;
+  }
+
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.62);
+    text-transform: uppercase;
+  }
+
+  .marquee {
+    position: relative;
+    width: 980px;
+    max-width: 90%;
+    overflow: hidden;
+    padding: 12px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+  }
+
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    padding: 0 32px;
+    flex-shrink: 0;
+  }
+
+  .marquee-group .partner {
+    height: 56px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+
+  .marquee-group .partner--gameevo  { height: 50px; }
+  .marquee-group .partner--pride    { height: 44px; }
+  .marquee-group .partner--africa   { height: 50px; }
+  .marquee-group .partner--trace    { height: 58px; }
+
+  /* season watermark */
+  .season-mark {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 9px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Top header: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Left chevrons (green) -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Right chevrons (pink, mirrored) -->
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+
+    <!-- Kicker pill: HEAD TO HEAD (wrapped for guaranteed centering) -->
+    <div class="h2h-kicker-wrap">
+      <div class="h2h-kicker">HEAD <span class="vs">TO</span> HEAD</div>
+    </div>
+
+    <!-- LEFT player column: FARUK -->
+    <section class="player-col player-col--a">
+      <div class="name-backdrop" aria-hidden="true">FARUK</div>
+
+      <div class="player-nameplate">
+        <h2 class="player-name">FARUK</h2>
+        <img class="player-org"
+             src="/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png"
+             alt="OAS Esports"
+             onerror="this.style.display='none'" />
+      </div>
+
+      <div class="player-photo-wrap">
+        <img class="player-photo"
+             src="/overlays/v2/_assets/players/processed/faruk/fullbody_01_nobg.png"
+             alt="FARUK"
+             onerror="this.classList.add('broken')" />
+        <div class="photo-fallback" aria-hidden="true">F</div>
+      </div>
+    </section>
+
+    <!-- RIGHT player column: ANIFE -->
+    <section class="player-col player-col--b">
+      <div class="name-backdrop" aria-hidden="true">ANIFE</div>
+
+      <div class="player-nameplate">
+        <h2 class="player-name">ANIFE</h2>
+        <img class="player-org"
+             src="/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg"
+             alt="Afropanda Esports"
+             onerror="this.style.display='none'" />
+      </div>
+
+      <div class="player-photo-wrap">
+        <img class="player-photo"
+             src="/overlays/v2/_assets/players/processed/anife/fullbody_02_nobg.png"
+             alt="ANIFE"
+             onerror="this.classList.add('broken')" />
+        <div class="photo-fallback" aria-hidden="true">A</div>
+      </div>
+    </section>
+
+    <!-- CENTER STATS HUD CARD -->
+    <section class="stats-card" aria-label="Head-to-head stats">
+      <div class="stats-inner">
+        <header class="stats-header">
+          <span class="col-name col-name--a">FARUK</span>
+          <span class="col-vs">VS</span>
+          <span class="col-name col-name--b">ANIFE</span>
+        </header>
+
+        <div class="stats-rows">
+          <!-- Row 1: Position (lower = better) -->
+          <div class="stat-row r1">
+            <span class="stat-val stat-val--a better">2</span>
+            <span class="stat-label">Position</span>
+            <span class="stat-val stat-val--b worse">5</span>
+          </div>
+          <!-- Row 2: P (tie) -->
+          <div class="stat-row r2">
+            <span class="stat-val stat-val--a tie">5</span>
+            <span class="stat-label">Played</span>
+            <span class="stat-val stat-val--b tie">5</span>
+          </div>
+          <!-- Row 3: W -->
+          <div class="stat-row r3">
+            <span class="stat-val stat-val--a better">4</span>
+            <span class="stat-label">Wins</span>
+            <span class="stat-val stat-val--b worse">2</span>
+          </div>
+          <!-- Row 4: D -->
+          <div class="stat-row r4">
+            <span class="stat-val stat-val--a tie">1</span>
+            <span class="stat-label">Draws</span>
+            <span class="stat-val stat-val--b tie">2</span>
+          </div>
+          <!-- Row 5: L (lower = better) -->
+          <div class="stat-row r5">
+            <span class="stat-val stat-val--a better">0</span>
+            <span class="stat-label">Losses</span>
+            <span class="stat-val stat-val--b worse">1</span>
+          </div>
+          <!-- Row 6: GF -->
+          <div class="stat-row r6">
+            <span class="stat-val stat-val--a better">18</span>
+            <span class="stat-label">Goals For</span>
+            <span class="stat-val stat-val--b worse">12</span>
+          </div>
+          <!-- Row 7: GA (lower = better) -->
+          <div class="stat-row r7">
+            <span class="stat-val stat-val--a better">7</span>
+            <span class="stat-label">Goals Against</span>
+            <span class="stat-val stat-val--b worse">10</span>
+          </div>
+          <!-- Row 8: GD -->
+          <div class="stat-row r8">
+            <span class="stat-val stat-val--a better">+11</span>
+            <span class="stat-label">Goal Diff</span>
+            <span class="stat-val stat-val--b worse">+2</span>
+          </div>
+          <!-- Row 9: Total Pts -->
+          <div class="stat-row r9">
+            <span class="stat-val stat-val--a better">13</span>
+            <span class="stat-label">Total Pts</span>
+            <span class="stat-val stat-val--b worse">8</span>
+          </div>
+        </div>
+
+        <!-- Win Probability emphasis block -->
+        <div class="winprob">
+          <div class="winprob-label">Win Probability</div>
+          <div class="winprob-values">
+            <span class="winprob-val winprob-val--a">58%</span>
+            <span class="winprob-val winprob-val--b">42%</span>
+          </div>
+          <div class="winprob-bar" aria-hidden="true">
+            <span class="winprob-bar-a"></span>
+            <span class="winprob-bar-b"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom partner marquee strip -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+          <!-- Group 1 (source) -->
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+          <!-- Group 2 (duplicate, decorative) -->
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+          <!-- Group 3 (duplicate, seamless loop buffer) -->
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    // Demo loop: re-trigger CSS animations every cycle by reflowing animated nodes.
+    // CSS handles all animation phases; JS only restarts them on cycle boundary.
+    (function () {
+      const stage = document.querySelector('.stage');
+      if (!stage) return;
+      // Match --cycle in CSS exactly (11.6s).
+      const CYCLE_MS = 11600;
+      const SELECTORS = [
+        '.top-band', '.chevrons', '.h2h-kicker-wrap',
+        '.player-col', '.stats-card', '.stat-row',
+        '.winprob', '.winprob-bar-a', '.winprob-bar-b',
+        '.partners'
+      ].join(',');
+      function restart() {
+        const animated = stage.querySelectorAll(SELECTORS);
+        animated.forEach(function (el) {
+          const orig = el.style.animation;
+          el.style.animation = 'none';
+          // force reflow
+          void el.offsetHeight;
+          el.style.animation = orig || '';
+        });
+      }
+      setInterval(restart, CYCLE_MS);
+    })();
+  </script>
+</body>
+</html>
