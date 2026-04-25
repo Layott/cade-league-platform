@@ -113,12 +113,33 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
   }
-  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
-  body { opacity: 0; }
-  body.cade-visible { opacity: 1 !important; }
-  body.cade-exiting { opacity: 0 !important; }
-  body:not(.cade-visible):not(.cade-exiting) * {
-    animation-play-state: paused !important;
+  /* === SPLIT GATE (Category B full-canvas):
+     Body always visible (halftone-green bg shows continuously).
+     Only INNER content (top-band, body, partners, chevrons, season-mark)
+     starts opacity 0 and animates in on body.cade-visible. === */
+  body { opacity: 1 !important; }
+  .top-band, .body, .partners, .chevrons, .season-mark {
+    opacity: 0;
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    transform: translateY(12px);
+  }
+  body.cade-visible .top-band,
+  body.cade-visible .body,
+  body.cade-visible .partners,
+  body.cade-visible .chevrons,
+  body.cade-visible .season-mark {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  body.cade-exiting .top-band,
+  body.cade-exiting .body,
+  body.cade-exiting .partners,
+  body.cade-exiting .chevrons,
+  body.cade-exiting .season-mark {
+    opacity: 0;
+    transform: translateY(-12px);
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0), transform 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
 
   /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */
@@ -598,18 +619,18 @@
   </main>
 
   <script>
-    /* === STRICT GATE: master visibility, controlled ONLY by parent postMessage. === */
+    /* === SPLIT GATE: master visibility ===
+       Body always opacity 1 — bg-image stays visible.
+       Body class cade-visible/cade-exiting drives inner-content opacity. */
     (function cadeGate() {
       'use strict';
       function show() {
         document.body.classList.remove('cade-exiting');
         document.body.classList.add('cade-visible');
-        document.body.style.opacity = '1';
       }
       function hide() {
         document.body.classList.remove('cade-visible');
         document.body.classList.add('cade-exiting');
-        document.body.style.opacity = '0';
       }
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;

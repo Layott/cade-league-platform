@@ -105,13 +105,11 @@
     color: var(--white);
     -webkit-font-smoothing: antialiased;
   }
-  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
-  body { opacity: 0; }
-  body.cade-visible { opacity: 1 !important; }
-  body.cade-exiting { opacity: 0 !important; }
-  body:not(.cade-visible):not(.cade-exiting) * {
-    animation-play-state: paused !important;
-  }
+  /* === SPLIT GATE (Category A small anchored bug):
+     Body always opacity 1 (transparent canvas, nothing visible without bug).
+     Only the .timer element is gated — visible only when body has cade-visible. === */
+  body { opacity: 1 !important; background: transparent !important; }
+  .stage { background: transparent !important; }
 
   /* ---------- STAGE ---------- */
   .stage{
@@ -352,6 +350,13 @@
   /* Hidden when offstage */
   .timer.gone{ opacity: 0; pointer-events:none; }
 
+  /* === SPLIT GATE: timer hides when body lacks cade-visible/exiting ===
+     This complements the JS .gone class for double-safe gating. */
+  body:not(.cade-visible):not(.cade-exiting) .timer{
+    opacity: 0 !important;
+    pointer-events: none;
+  }
+
   /* ---------- PREVIEW HELPERS (non-broadcast) ---------- */
   /* Checker so transparency is visible when opening the file standalone */
   body.preview-bg{
@@ -502,8 +507,8 @@ function runCountdown(totalSeconds){
   playEntry();
 
   if (total === 0){
-    // Edge case: 00:00 set — flash + exit immediately, no loop.
-    flashZero(() => playExit());
+    // Edge case: 00:00 set — flash + STAY (no auto-exit). Operator drives hide.
+    flashZero();
     return;
   }
 
@@ -526,10 +531,9 @@ function runCountdown(totalSeconds){
 
     if (remaining === 0){
       clearTick();
-      flashZero(() => {
-        playExit();
-        // No auto-loop. Operator drives the next cycle via postMessage.
-      });
+      // Flash 0:00 once, then STAY visible — no auto-exit.
+      // Operator drives exit via postMessage {type:'hide'}.
+      flashZero();
     }
   }, 1000);
 }
@@ -553,8 +557,16 @@ window.addEventListener('message', (ev) => {
     return;
   }
 
-  if (msg.type === 'update' && msg.data && typeof msg.data === 'object'){
+  if ((msg.type === 'update' || msg.type === 'show') && msg.data && typeof msg.data === 'object'){
     const d = msg.data;
+
+    // Plan 51 layout_timer schema: {expiresAt: ISO}
+    if (typeof d.expiresAt === 'string' && d.expiresAt){
+      const ms = new Date(d.expiresAt).getTime() - Date.now();
+      const secs = Math.max(0, Math.round(ms / 1000));
+      runCountdown(secs);
+      return;
+    }
 
     if (d.mode === 'clock' && d.endClock){
       runCountdown(resolveSecondsFromClock(d.endClock));
@@ -564,6 +576,29 @@ window.addEventListener('message', (ev) => {
     const minutes = Number.isFinite(d.minutes) ? d.minutes : 0;
     const seconds = Number.isFinite(d.seconds) ? d.seconds : 0;
     runCountdown(minutes * 60 + seconds);
+    return;
+  }
+
+  // Bare {type:'show'} with no data — kick the timer to entry anim from current display
+  if (msg.type === 'show'){
+    elTimer.classList.remove('gone');
+    void elTimer.offsetWidth;
+    elTimer.classList.add('entering');
+    setTimeout(() => elTimer.classList.remove('entering'), 800);
+    return;
+  }
+
+  if (msg.type === 'hide'){
+    clearTick();
+    elTimer.classList.remove('entering','critical','zero-flash');
+    void elTimer.offsetWidth;
+    elTimer.classList.add('exiting');
+    elTimer.addEventListener('animationend', function once(){
+      elTimer.removeEventListener('animationend', once);
+      elTimer.classList.remove('exiting');
+      elTimer.classList.add('gone');
+    });
+    return;
   }
 });
 
@@ -583,13 +618,11 @@ window.addEventListener('beforeunload', () => {
 </script>
 
 <script>
-/* === STRICT GATE: master visibility, controlled ONLY by parent postMessage. ===
-   Standalone preview shows nothing until operator drives it via Update & Show.
-   In iframe (production), {type:'show'} reveals, {type:'hide'} fades out. */
+/* === SPLIT GATE: master visibility ===
+   Body stays opacity 1 (transparent canvas — only the timer bug is visible).
+   Body class cade-visible/cade-exiting is set by postMessage. */
 (function cadeGate() {
   'use strict';
-  var inIframe = true;
-  try { inIframe = window.top !== window.self; } catch (e) { inIframe = true; }
   function show() {
     document.body.classList.remove('cade-exiting');
     document.body.classList.add('cade-visible');
@@ -604,23 +637,6 @@ window.addEventListener('beforeunload', () => {
     if (msg.type === 'show' || msg.type === 'update') show();
     else if (msg.type === 'hide') hide();
   }, false);
-  // No auto-show. No auto-demo. Operator drives via postMessage.
-})();
-</script>
-<script>
-/* Plan 51 cade-gate observer — keeps body inline opacity in sync with
-   cade-visible / cade-exiting classes so the gate works even when CSS
-   transitions/animations are paused (e.g. background-tab iframes). */
-(function(){
-  function applyOpacity(){
-    var b = document.body;
-    if (!b) return;
-    if (b.classList.contains('cade-visible')) b.style.opacity = '1';
-    else if (b.classList.contains('cade-exiting')) b.style.opacity = '0';
-    else b.style.opacity = '0';
-  }
-  applyOpacity();
-  if (document.body) new MutationObserver(applyOpacity).observe(document.body, {attributes:true, attributeFilter:['class']});
 })();
 </script>
 </body>

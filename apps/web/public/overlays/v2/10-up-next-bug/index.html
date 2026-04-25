@@ -64,13 +64,11 @@
     font-family: "Agharti", "Oswald", "Bebas Neue", "Impact", sans-serif;
     color: #fff;
   }
-  /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
-  body { opacity: 0; }
-  body.cade-visible { opacity: 1 !important; }
-  body.cade-exiting { opacity: 0 !important; }
-  body:not(.cade-visible):not(.cade-exiting) * {
-    animation-play-state: paused !important;
-  }
+  /* === SPLIT GATE (Category A small anchored bug):
+     Body always opacity 1 (transparent canvas, only .bug visible).
+     The .bug itself starts opacity 0 and only shows on .visible class. === */
+  body { opacity: 1 !important; background: transparent !important; }
+  .stage { background: transparent !important; }
 
   .stage {
     position: relative;
@@ -498,8 +496,8 @@
     var measureEl = document.getElementById('measure');
 
     var state = {
-      player1: { name: 'FARUK',  slug: 'faruk'  },
-      player2: { name: 'KAYKAY', slug: 'kaykay' }
+      player1: { name: 'FARUK',  slug: 'faruk',  photoUrl: null },
+      player2: { name: 'KAYKAY', slug: 'kaykay', photoUrl: null }
     };
 
     function photoUrl(slug) {
@@ -534,8 +532,11 @@
     function applyContent() {
       name1El.textContent = state.player1.name;
       name2El.textContent = state.player2.name;
-      photo1El.src = photoUrl(state.player1.slug);
-      photo2El.src = photoUrl(state.player2.slug);
+      // Force browser to refetch by appending cache-buster on slug swap
+      var u1 = state.player1.photoUrl || photoUrl(state.player1.slug);
+      var u2 = state.player2.photoUrl || photoUrl(state.player2.slug);
+      if (photo1El.src !== u1) photo1El.src = u1;
+      if (photo2El.src !== u2) photo2El.src = u2;
       photo1El.alt = state.player1.name;
       photo2El.alt = state.player2.name;
       applyWidth();
@@ -568,9 +569,12 @@
 
     function normalizePlayer(p) {
       if (!p) return null;
-      var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      // Plan 51 schema sends gamerTag (canonical slug), legacy sends slug.
+      var rawSlug = p.slug || p.gamerTag || '';
+      var slug = rawSlug.toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
       var name = p.displayName || p.name || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
-      return { slug: slug, name: name };
+      var photoUrl = p.photoUrl || null;
+      return { slug: slug, name: name, photoUrl: photoUrl };
     }
 
     function update(data) {
@@ -589,10 +593,12 @@
       if (n1) {
         if (n1.name) state.player1.name = n1.name;
         if (n1.slug) state.player1.slug = n1.slug;
+        state.player1.photoUrl = n1.photoUrl;
       }
       if (n2) {
         if (n2.name) state.player2.name = n2.name;
         if (n2.slug) state.player2.slug = n2.slug;
+        state.player2.photoUrl = n2.photoUrl;
       }
       applyContent();
       playEntry();
@@ -640,21 +646,5 @@
 })();
 </script>
 
-<script>
-/* Plan 51 cade-gate observer — keeps body inline opacity in sync with
-   cade-visible / cade-exiting classes so the gate works even when CSS
-   transitions/animations are paused (e.g. background-tab iframes). */
-(function(){
-  function applyOpacity(){
-    var b = document.body;
-    if (!b) return;
-    if (b.classList.contains('cade-visible')) b.style.opacity = '1';
-    else if (b.classList.contains('cade-exiting')) b.style.opacity = '0';
-    else b.style.opacity = '0';
-  }
-  applyOpacity();
-  if (document.body) new MutationObserver(applyOpacity).observe(document.body, {attributes:true, attributeFilter:['class']});
-})();
-</script>
 </body>
 </html>

@@ -57,6 +57,11 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
   }
+  /* === SPLIT GATE (Category B full-canvas, pure bg) === */
+  body { opacity: 1 !important; }
+  .stage { opacity: 0; transition: opacity 0.6s ease-out; }
+  body.cade-visible .stage { opacity: 1; }
+  body.cade-exiting .stage { opacity: 0; transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0); }
 
   /* ── STAGE (1920×1080 fixed, OPAQUE) ────────────────────────── */
   .stage {
@@ -482,5 +487,26 @@
     </footer>
 
   </main>
+
+<script>
+/* === SPLIT GATE: master visibility === */
+(function cadeGate() {
+  'use strict';
+  function show() {
+    document.body.classList.remove('cade-exiting');
+    document.body.classList.add('cade-visible');
+  }
+  function hide() {
+    document.body.classList.remove('cade-visible');
+    document.body.classList.add('cade-exiting');
+  }
+  window.addEventListener('message', function (ev) {
+    var msg = ev && ev.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'show' || msg.type === 'update') show();
+    else if (msg.type === 'hide') hide();
+  }, false);
+})();
+</script>
 </body>
 </html>
