@@ -4,7 +4,8 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync, requirePermAsync } from "@/lib/perms-db";
 import { SectionHeader } from "@/components/admin/SectionHeader";
-import { TournamentTabs, TOURNAMENT_TABS } from "./TournamentTabs";
+import { TournamentTabs } from "./TournamentTabs";
+import { TOURNAMENT_TABS } from "./tabs.config";
 
 /**
  * Plan 51 — /admin/tournament/* layout.

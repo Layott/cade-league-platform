@@ -64,7 +64,8 @@ export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
   };
 
   const expiresAt = computeExpiresAt();
-  const payloadJson = JSON.stringify({ expiresAt, label: null });
+  // Schema: label is optional but rejects explicit null. Omit when empty.
+  const payloadJson = JSON.stringify({ expiresAt });
 
   return (
     <ControlCard
