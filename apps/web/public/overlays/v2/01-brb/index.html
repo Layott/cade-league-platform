@@ -120,7 +120,6 @@
   body { opacity: 1 !important; }
   .top-band, .body, .partners, .chevrons, .season-mark {
     opacity: 0;
-    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
     transform: translateY(12px);
   }
   body.cade-visible .top-band,
@@ -130,7 +129,6 @@
   body.cade-visible .season-mark {
     opacity: 1;
     transform: translateY(0);
-    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   }
   body.cade-exiting .top-band,
   body.cade-exiting .body,
@@ -139,7 +137,6 @@
   body.cade-exiting .season-mark {
     opacity: 0;
     transform: translateY(-12px);
-    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0), transform 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
 
   /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */

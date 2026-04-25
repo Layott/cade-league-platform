@@ -33,7 +33,7 @@
      Only the .strip is gated. === */
   body { opacity: 1 !important; background: transparent !important; }
   .stage { background: transparent !important; }
-  .strip { opacity: 0; transition: opacity 0.45s ease, transform 0.5s ease; transform: translateY(20px); pointer-events: none; }
+  .strip { opacity: 0; transform: translateY(20px); pointer-events: none; }
   body.cade-visible .strip { opacity: 1; transform: translateY(0); }
   body.cade-exiting .strip { opacity: 0; transform: translateY(20px); }
 
