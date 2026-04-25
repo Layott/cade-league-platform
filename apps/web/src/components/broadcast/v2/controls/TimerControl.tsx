@@ -2,7 +2,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { TriggerEnterForm, TriggerOffForm } from "../TriggerButtons";
+import {
+  triggerOverlayEnterAction,
+  triggerOverlayOffAction,
+} from "@/app/admin/broadcast/v2/[sessionId]/actions";
+import { PrimaryButton, DangerButton } from "@/components/admin/buttons";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -18,6 +22,13 @@ import type { SimpleControlProps } from "./BrbControl";
  * current input values and embedding it in the trigger payload (the
  * `layout_timer` schema at server/overlays/schemas.ts requires
  * `expiresAt: ISO datetime`).
+ *
+ * IMPORTANT: `expiresAt` is recomputed AT SUBMIT TIME (not render time)
+ * so re-clicking ENTER with the same min:sec values resets the timer
+ * relative to the click moment, not the last render. Without this,
+ * second-click ENTER would post a stale timestamp anchored to the
+ * previous render — operator sees the timer "skip ahead" by however
+ * long they waited between clicks.
  */
 export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
   const [minutes, setMinutes] = useState<number>(3);
@@ -25,6 +36,7 @@ export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
   const [endClock, setEndClock] = useState<string>("");
   const [mode, setMode] = useState<"duration" | "clock">("duration");
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const payloadInputRef = useRef<HTMLInputElement | null>(null);
 
   const onIframeReady = useCallback((el: HTMLIFrameElement | null) => {
     iframeRef.current = el;
@@ -45,7 +57,7 @@ export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
   }, [mode, minutes, seconds, endClock]);
 
   /** Compute the expiresAt ISO string the persistent payload needs. */
-  const computeExpiresAt = (): string => {
+  const computeExpiresAt = useCallback((): string => {
     if (mode === "duration") {
       const total = Math.max(0, minutes * 60 + seconds);
       return new Date(Date.now() + total * 1000).toISOString();
@@ -61,11 +73,20 @@ export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
       target.setDate(target.getDate() + 1);
     }
     return target.toISOString();
-  };
+  }, [mode, minutes, seconds, endClock]);
 
-  const expiresAt = computeExpiresAt();
-  // Schema: label is optional but rejects explicit null. Omit when empty.
-  const payloadJson = JSON.stringify({ expiresAt });
+  // Render-time payload is the initial value. Form `onSubmit` refreshes
+  // the hidden input via ref so each click computes a fresh `expiresAt`
+  // anchored to click-time, not last-render-time.
+  const payloadJson = JSON.stringify({ expiresAt: computeExpiresAt() });
+
+  const refreshPayloadOnSubmit = useCallback(() => {
+    if (payloadInputRef.current) {
+      payloadInputRef.current.value = JSON.stringify({
+        expiresAt: computeExpiresAt(),
+      });
+    }
+  }, [computeExpiresAt]);
 
   return (
     <ControlCard
@@ -130,14 +151,43 @@ export function TimerControl({ sessionId, viewToken }: SimpleControlProps) {
       }
       triggerSlot={
         <div className="flex w-full items-center gap-2">
-          <TriggerEnterForm
-            overlayKey="02-timer"
-            sessionId={sessionId}
-            payloadFields={
-              <input type="hidden" name="payload" value={payloadJson} />
-            }
-          />
-          <TriggerOffForm overlayKey="02-timer" sessionId={sessionId} />
+          <form
+            action={triggerOverlayEnterAction}
+            className="flex w-full"
+            data-testid="v2-enter-form-02-timer"
+            onSubmit={refreshPayloadOnSubmit}
+          >
+            <input type="hidden" name="sessionId" value={sessionId} />
+            <input type="hidden" name="overlayKey" value="02-timer" />
+            <input
+              ref={payloadInputRef}
+              type="hidden"
+              name="payload"
+              defaultValue={payloadJson}
+            />
+            <PrimaryButton
+              type="submit"
+              size="sm"
+              data-testid="v2-enter-btn-02-timer"
+              className="w-full"
+            >
+              Trigger ENTER
+            </PrimaryButton>
+          </form>
+          <form
+            action={triggerOverlayOffAction}
+            data-testid="v2-off-form-02-timer"
+          >
+            <input type="hidden" name="sessionId" value={sessionId} />
+            <input type="hidden" name="overlayKey" value="02-timer" />
+            <DangerButton
+              type="submit"
+              size="sm"
+              data-testid="v2-off-btn-02-timer"
+            >
+              Trigger OUT
+            </DangerButton>
+          </form>
         </div>
       }
     />

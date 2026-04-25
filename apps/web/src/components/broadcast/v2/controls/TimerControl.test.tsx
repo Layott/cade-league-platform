@@ -55,4 +55,40 @@ describe("TimerControl", () => {
     // ISO datetime sanity — Date.parse should yield a finite timestamp.
     expect(Number.isFinite(Date.parse(parsed.expiresAt))).toBe(true);
   });
+
+  it("recomputes expiresAt at submit time, not render time (re-trigger refresh)", () => {
+    const { container } = render(<TimerControl sessionId="S" viewToken="T" />);
+    // Set a known duration: 3:00 (180s)
+    const minutes = screen.getByTestId("v2-timer-minutes") as HTMLInputElement;
+    fireEvent.change(minutes, { target: { value: "3" } });
+
+    const form = container.querySelector(
+      '[data-testid="v2-enter-form-02-timer"]',
+    ) as HTMLFormElement;
+    const payloadInput = form.querySelector(
+      'input[name="payload"]',
+    ) as HTMLInputElement;
+
+    // Capture render-time expiresAt
+    const renderTimeMs = Date.parse(JSON.parse(payloadInput.value).expiresAt);
+
+    // Advance Date.now() by simulating a delay before submit.
+    const realNow = Date.now;
+    const offsetMs = 60_000; // 60s wait between render and click
+    Date.now = () => realNow.call(Date) + offsetMs;
+    try {
+      // Fire submit — onSubmit handler should refresh the payload input.
+      fireEvent.submit(form);
+      const submitTimeMs = Date.parse(
+        JSON.parse(payloadInput.value).expiresAt,
+      );
+      // Submit-time expiresAt must be ~offsetMs later than render-time.
+      // (Tolerance accounts for JS execution lag.)
+      expect(submitTimeMs - renderTimeMs).toBeGreaterThanOrEqual(
+        offsetMs - 1000,
+      );
+    } finally {
+      Date.now = realNow;
+    }
+  });
 });

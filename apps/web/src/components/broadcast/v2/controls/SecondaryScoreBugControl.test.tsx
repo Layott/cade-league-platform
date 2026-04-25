@@ -50,4 +50,44 @@ describe("SecondaryScoreBugControl", () => {
     const parsed = JSON.parse(payload);
     expect(parsed.players[0].score).toBe(3);
   });
+
+  it("re-trigger refresh — payload reflects latest score + slug across changes", () => {
+    const { container } = render(
+      <SecondaryScoreBugControl sessionId="S" viewToken="T" />,
+    );
+    const scoreA = screen.getByTestId(
+      "v2-scorebug-score-a",
+    ) as HTMLInputElement;
+    const scoreB = screen.getByTestId(
+      "v2-scorebug-score-b",
+    ) as HTMLInputElement;
+    const playerA = screen.getByTestId(
+      "v2-scorebug-player-a",
+    ) as HTMLSelectElement;
+    const getPayload = () =>
+      JSON.parse(
+        (
+          container.querySelector(
+            'input[name="payload"]',
+          ) as HTMLInputElement
+        ).value,
+      );
+
+    // Initial → ENTER → score 0-0
+    expect(getPayload().players[0].score).toBe(0);
+
+    // First change
+    fireEvent.change(scoreA, { target: { value: "1" } });
+    fireEvent.change(scoreB, { target: { value: "0" } });
+    expect(getPayload().players[0].score).toBe(1);
+
+    // Second change — re-trigger must reflect new values, not stale 1-0
+    fireEvent.change(scoreA, { target: { value: "2" } });
+    fireEvent.change(scoreB, { target: { value: "3" } });
+    fireEvent.change(playerA, { target: { value: "faruk" } });
+    const after = getPayload();
+    expect(after.players[0].displayName).toBe("FARUK");
+    expect(after.players[0].score).toBe(2);
+    expect(after.players[1].score).toBe(3);
+  });
 });

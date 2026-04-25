@@ -124,6 +124,45 @@ describe("LowerThirdControl", () => {
     expect(parsed.displayName).toBe("ZARA");
   });
 
+  it("re-trigger refresh — multi-edit slot reflects latest name+role each time", () => {
+    const { container } = render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+      />,
+    );
+    const nameInput = screen.getByTestId("v2-lt-name-1") as HTMLInputElement;
+    const roleInput = screen.getByTestId("v2-lt-role-1") as HTMLInputElement;
+    const getPayload = () => {
+      const form1 = container.querySelector(
+        '[data-testid="v2-lt-enter-form-1"]',
+      ) as HTMLFormElement;
+      return JSON.parse(
+        (
+          form1.querySelector('input[name="payload"]') as HTMLInputElement
+        ).value,
+      );
+    };
+
+    // Initial → JOSH / HEAD CASTER
+    expect(getPayload().displayName).toBe("JOSH");
+
+    // First edit
+    fireEvent.change(nameInput, { target: { value: "ZARA" } });
+    fireEvent.change(roleInput, { target: { value: "PIT REPORTER" } });
+    expect(getPayload().displayName).toBe("ZARA");
+    expect(getPayload().gamerTag).toBe("PIT REPORTER");
+
+    // Second edit — re-trigger MUST send fresh payload, not stale ZARA/PIT
+    fireEvent.change(nameInput, { target: { value: "MILEY" } });
+    fireEvent.change(roleInput, { target: { value: "GUEST" } });
+    const after = getPayload();
+    expect(after.displayName).toBe("MILEY");
+    expect(after.gamerTag).toBe("GUEST");
+    // playerId + jerseyNumber stay anchored to slot 1
+    expect(after.jerseyNumber).toBe(1);
+  });
+
   it("preset save persists to localStorage[cade-lt-presets]", () => {
     const promptSpy = vi
       .spyOn(window, "prompt")

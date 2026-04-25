@@ -54,4 +54,35 @@ describe("H2H controls", () => {
     // 2nd default unchanged
     expect(parsed.players[1].displayName).toBe("KING NONEX");
   });
+
+  it("re-trigger refresh — payload reflects latest state across multiple changes", () => {
+    const { container } = render(
+      <H2H2Control sessionId="S" viewToken="T" />,
+    );
+    const select0 = screen.getByTestId(
+      "v2-h2h-2-player-0",
+    ) as HTMLSelectElement;
+    const select1 = screen.getByTestId(
+      "v2-h2h-2-player-1",
+    ) as HTMLSelectElement;
+    const getPayload = () =>
+      JSON.parse(
+        (
+          container.querySelector(
+            'input[name="payload"]',
+          ) as HTMLInputElement
+        ).value,
+      );
+
+    // First change → first "ENTER" reads this payload
+    fireEvent.change(select0, { target: { value: "faruk" } });
+    expect(getPayload().players[0].displayName).toBe("FARUK");
+
+    // Second change → second "ENTER" must read the NEW payload, not stale
+    fireEvent.change(select0, { target: { value: "anife" } });
+    fireEvent.change(select1, { target: { value: "mitch" } });
+    const after = getPayload();
+    expect(after.players[0].displayName).toBe("ANIFE");
+    expect(after.players[1].displayName).toBe("MITCH");
+  });
 });

@@ -81,4 +81,39 @@ describe("UpNextBugControl", () => {
     expect(parsed.away.displayName).toBe("KING NONEX");
     expect(parsed.kickoffAt).toBe("2026-04-25T20:00:00Z");
   });
+
+  it("re-trigger refresh — switching back and forth updates payload each time", () => {
+    const { container } = render(
+      <UpNextBugControl
+        sessionId="S"
+        viewToken="T"
+        upcoming={UPCOMING}
+      />,
+    );
+    const select = screen.getByTestId(
+      "v2-upnext-match",
+    ) as HTMLSelectElement;
+    const getPayload = () =>
+      JSON.parse(
+        (
+          container.querySelector(
+            'input[name="payload"]',
+          ) as HTMLInputElement
+        ).value,
+      );
+
+    // Initial = m1 (FARUK vs ANIFE)
+    expect(getPayload().home.displayName).toBe("FARUK");
+
+    // Switch to m2 (BAJI JNR vs KING NONEX)
+    fireEvent.change(select, { target: { value: "m2" } });
+    expect(getPayload().home.displayName).toBe("BAJI JNR");
+
+    // Switch BACK to m1 — payload must reflect m1 again, not stale m2
+    fireEvent.change(select, { target: { value: "m1" } });
+    const after = getPayload();
+    expect(after.home.displayName).toBe("FARUK");
+    expect(after.away.displayName).toBe("ANIFE");
+    expect(after.kickoffAt).toBe("2026-04-25T19:00:00Z");
+  });
 });
