@@ -3,20 +3,24 @@
 <head>
 <meta charset="UTF-8" />
 <title>CADE Lower Third — Name Intro</title>
-<!-- DATA WIRES: name (string), role (string) -->
+<!-- DATA WIRES: name (string), role (string), slot (1|2|3) -->
 <style>
   /* ============================================================
      CADE Esports League — Overlay #08 : Lower Third (Name Intro)
      Canvas : 1920x1080, transparent
-     Anchor : bottom-left, 80px margin from left + bottom
+     Slots  : 3 simultaneous instances at distinct anchors
+              slot 1 -> bottom-left  (left: 80px, bottom: 80px)
+              slot 2 -> bottom-center (centered horizontally, bottom: 80px)
+              slot 3 -> bottom-right (right: 80px, bottom: 80px)
      Size   : auto-fit content width, ~150px tall
      Entry  : pre-tip accent stroke -> bar slide from left
               -> name letters scale-in -> role slide up   (~0.9s)
      Exit   : name + role fade (0.25s) -> bar slide out left
-     Control: postMessage driven (no auto-loop)
-              window.postMessage({ type:'update', data:{ name, role } }, '*')
-              window.postMessage({ type:'show' }, '*')
-              window.postMessage({ type:'hide' }, '*')
+     Control: postMessage driven (no auto-loop), routed by slot
+              window.postMessage({ type:'update', slot:1, data:{ displayName, gamerTag } }, '*')
+              window.postMessage({ type:'show',   slot:1 }, '*')
+              window.postMessage({ type:'hide',   slot:1 }, '*')
+              (slot omitted -> defaults to slot 1 for legacy callers)
      ============================================================ */
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -30,7 +34,7 @@
   }
   /* === SPLIT GATE (Category A small anchored bar):
      Body always opacity 1 (transparent canvas, only .lt visible).
-     The .lt itself is opacity 0 by default and gets shown via .entering. === */
+     Each .lt is opacity 0 by default, shown via .entering on its own slot. === */
   body { opacity: 1 !important; background: transparent !important; }
   .stage { background: transparent !important; }
 
@@ -116,7 +120,6 @@
      Auto-fits content width (no fixed 860px). */
   .lt {
     position: absolute;
-    left: 80px;
     bottom: 80px;
     width: fit-content;
     min-height: 130px;
@@ -126,6 +129,11 @@
     pointer-events: none;
     will-change: opacity, transform;
   }
+
+  /* Slot positioning */
+  .lt[data-slot="1"] { left: 80px; }
+  .lt[data-slot="2"] { left: 50%; transform: translateX(-50%); }
+  .lt[data-slot="3"] { right: 80px; }
 
   /* When entering: visible + animations play forward */
   .lt.entering { opacity: 1; }
@@ -464,67 +472,122 @@
 </head>
 <body>
   <div class="stage">
-    <div class="lt" data-overlay="08-lower-third" id="lt">
-      <!-- pre-tip accent stroke (arrives before the bar) -->
-      <span class="pretip" aria-hidden="true"></span>
 
-      <!-- main bar -->
+    <!-- ============ SLOT 1 (bottom-left) ============ -->
+    <div class="lt" data-overlay="08-lower-third" data-slot="1">
+      <span class="pretip" aria-hidden="true"></span>
       <div class="bar">
         <div class="content">
-          <!-- Pro League logo slot (left of green accent) -->
-          <div class="logo-slot" id="logoSlot">
-            <img id="logoImg" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="Pro League" />
+          <div class="logo-slot">
+            <img class="logo-img" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="Pro League" />
             <span class="chevron" aria-hidden="true"></span>
           </div>
-
-          <!-- Stacked name + role -->
           <div class="text-block">
-            <!-- NAME (wire: name) - letters split for per-letter stagger -->
-            <div class="name" id="nameEl" data-wire="name">
+            <div class="name" data-wire="name">
               <span class="letter">J</span><span class="letter">O</span><span class="letter">S</span><span class="letter">H</span>
             </div>
-
-            <!-- ROLE (wire: role) -->
             <div class="role-wrap">
-              <div class="role" id="roleEl" data-wire="role">HEAD CASTER</div>
+              <div class="role" data-wire="role">HEAD CASTER</div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
+
+    <!-- ============ SLOT 2 (bottom-center) ============ -->
+    <div class="lt" data-overlay="08-lower-third" data-slot="2">
+      <span class="pretip" aria-hidden="true"></span>
+      <div class="bar">
+        <div class="content">
+          <div class="logo-slot">
+            <img class="logo-img" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="Pro League" />
+            <span class="chevron" aria-hidden="true"></span>
+          </div>
+          <div class="text-block">
+            <div class="name" data-wire="name">
+              <span class="letter">J</span><span class="letter">O</span><span class="letter">S</span><span class="letter">H</span>
+            </div>
+            <div class="role-wrap">
+              <div class="role" data-wire="role">HEAD CASTER</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SLOT 3 (bottom-right) ============ -->
+    <div class="lt" data-overlay="08-lower-third" data-slot="3">
+      <span class="pretip" aria-hidden="true"></span>
+      <div class="bar">
+        <div class="content">
+          <div class="logo-slot">
+            <img class="logo-img" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="Pro League" />
+            <span class="chevron" aria-hidden="true"></span>
+          </div>
+          <div class="text-block">
+            <div class="name" data-wire="name">
+              <span class="letter">J</span><span class="letter">O</span><span class="letter">S</span><span class="letter">H</span>
+            </div>
+            <div class="role-wrap">
+              <div class="role" data-wire="role">HEAD CASTER</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 <script>
 (function () {
   'use strict';
 
-  // ====== Element refs ======
-  var lt        = document.getElementById('lt');
-  var nameEl    = document.getElementById('nameEl');
-  var roleEl    = document.getElementById('roleEl');
-  var logoSlot  = document.getElementById('logoSlot');
-  var logoImg   = document.getElementById('logoImg');
+  // ====== Per-slot state (1, 2, 3) ======
+  var slots = {};
+  var SLOT_IDS = [1, 2, 3];
+  var EXIT_MS = 1100; // longest combined exit duration
 
-  // ====== Current data state ======
-  var current = {
-    name: nameEl.textContent.trim() || 'JOSH',
-    role: (roleEl.textContent || '').trim() || 'HEAD CASTER'
-  };
+  // ====== Initialize each slot ======
+  SLOT_IDS.forEach(function (id) {
+    var lt = document.querySelector('.lt[data-slot="' + id + '"]');
+    if (!lt) return;
+    var nameEl = lt.querySelector('.name');
+    var roleEl = lt.querySelector('.role');
+    var logoSlot = lt.querySelector('.logo-slot');
+    var logoImg = lt.querySelector('.logo-img');
 
-  // ====== Logo: graceful fallback to chevron on 404 ======
-  if (logoImg) {
-    logoImg.addEventListener('error', function () {
-      logoSlot.classList.add('fallback');
-    });
-    // If already cached and broken
-    if (logoImg.complete && logoImg.naturalWidth === 0) {
-      logoSlot.classList.add('fallback');
+    var state = {
+      lt: lt,
+      nameEl: nameEl,
+      roleEl: roleEl,
+      logoSlot: logoSlot,
+      logoImg: logoImg,
+      current: {
+        name: (nameEl && nameEl.textContent.trim()) || 'JOSH',
+        role: (roleEl && roleEl.textContent.trim()) || 'HEAD CASTER'
+      }
+    };
+    slots[id] = state;
+
+    // Logo: graceful fallback to chevron on 404 (per slot)
+    if (logoImg) {
+      logoImg.addEventListener('error', function () {
+        logoSlot.classList.add('fallback');
+      });
+      if (logoImg.complete && logoImg.naturalWidth === 0) {
+        logoSlot.classList.add('fallback');
+      }
     }
-  }
+
+    // Pre-render letters from default copy so first 'show' has something to animate
+    splitIntoLetters(nameEl, state.current.name);
+    if (roleEl) roleEl.textContent = state.current.role.toUpperCase();
+    // (no class on .lt -> opacity:0 baseline, off-canvas visually)
+  });
 
   // ====== Helper: split a string into per-letter spans with staggered delays ======
   function splitIntoLetters(target, text) {
+    if (!target) return;
     target.innerHTML = '';
     var clean = String(text == null ? '' : text).toUpperCase();
     var letters = Array.from(clean);
@@ -546,22 +609,21 @@
     }
   }
 
-  // ====== Render data into DOM (no animation triggering) ======
-  // Accepts either {name, role} (legacy demo) or {displayName, gamerTag}
-  // (Plan 51 lowerThirdSchema from broadcast v2 control panel).
-  function render(data) {
-    if (!data) return;
+  // ====== Render data into a slot's DOM (no animation triggering) ======
+  // Accepts {name, role} (legacy) OR {displayName, gamerTag, jerseyNumber, playerId}
+  function renderInto(state, data) {
+    if (!state || !data) return;
     var nm = (typeof data.name === 'string' && data.name) ||
              (typeof data.displayName === 'string' && data.displayName) || '';
     var rl = (typeof data.role === 'string' && data.role) ||
              (typeof data.gamerTag === 'string' && data.gamerTag) || '';
     if (nm) {
-      current.name = nm;
-      splitIntoLetters(nameEl, current.name);
+      state.current.name = nm;
+      splitIntoLetters(state.nameEl, state.current.name);
     }
     if (rl) {
-      current.role = rl;
-      roleEl.textContent = String(current.role).toUpperCase();
+      state.current.role = rl;
+      if (state.roleEl) state.roleEl.textContent = String(state.current.role).toUpperCase();
     }
   }
 
@@ -571,71 +633,94 @@
     el.offsetWidth;
   }
 
-  // ====== Animation control ======
-  function playEntry() {
+  // ====== Animation control (scoped to a slot's .lt element) ======
+  function playEntry(state) {
+    if (!state) return;
+    var lt = state.lt;
     lt.classList.remove('exiting');
     lt.classList.remove('entering');
     reflow(lt);
     lt.classList.add('entering');
   }
 
-  function playExit() {
+  function playExit(state) {
+    if (!state) return;
+    var lt = state.lt;
     lt.classList.remove('entering');
     lt.classList.remove('exiting');
     reflow(lt);
     lt.classList.add('exiting');
-    // After exit completes, hide fully so it's off the canvas
-    var EXIT_MS = 1100; // longest combined exit duration
     setTimeout(function () {
-      // Only hide if still in exiting state (no new show() during the exit)
+      // Only clear if still exiting (no new show during the exit window)
       if (lt.classList.contains('exiting')) {
         lt.classList.remove('exiting');
-        // back to baseline opacity:0 (set on .lt) — no class active
+        // back to baseline opacity:0
       }
     }, EXIT_MS);
   }
 
-  // Initial state: hidden, no animation. Pre-render letters from default copy
-  // so first 'show' has something to animate even without an 'update'.
-  splitIntoLetters(nameEl, current.name);
-  roleEl.textContent = current.role.toUpperCase();
-  // (no class on .lt -> opacity:0 baseline, off-screen visually)
+  // ====== Resolve a slot from incoming message (default = 1) ======
+  function resolveSlot(msg) {
+    var raw = msg && msg.slot;
+    var n = Number(raw);
+    if (n === 1 || n === 2 || n === 3) return n;
+    return 1;
+  }
 
   // ====== postMessage listener ======
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
+    if (msg.type !== 'show' && msg.type !== 'update' && msg.type !== 'hide') return;
+
+    var slotId = resolveSlot(msg);
+    var state = slots[slotId];
+    if (!state) return;
 
     switch (msg.type) {
       case 'update':
-        render(msg.data || {});
-        playEntry();
+        renderInto(state, msg.data || {});
+        playEntry(state);
         break;
       case 'show':
-        playEntry();
+        if (msg.data) renderInto(state, msg.data);
+        playEntry(state);
         break;
       case 'hide':
-        playExit();
-        break;
-      default:
-        // ignore unknown types
+        playExit(state);
         break;
     }
   });
 
-  // Expose a tiny debug hook (handy when opened directly in a browser)
+  // Expose a debug hook (handy when opened directly in a browser)
   window.__lowerThird = {
-    update: function (data) { render(data || {}); playEntry(); },
-    show: playEntry,
-    hide: playExit,
-    state: function () { return Object.assign({}, current); }
+    update: function (data, slot) {
+      var s = slots[resolveSlot({ slot: slot })];
+      if (!s) return;
+      renderInto(s, data || {});
+      playEntry(s);
+    },
+    show: function (slot) {
+      var s = slots[resolveSlot({ slot: slot })];
+      if (s) playEntry(s);
+    },
+    hide: function (slot) {
+      var s = slots[resolveSlot({ slot: slot })];
+      if (s) playExit(s);
+    },
+    state: function (slot) {
+      var s = slots[resolveSlot({ slot: slot })];
+      return s ? Object.assign({}, s.current) : null;
+    }
   };
 })();
 </script>
 
 <script>
 /* === STRICT GATE: master visibility, controlled ONLY by parent postMessage. ===
-   Operator drives via Update & Show / Hide. No auto-demo, no fallback timers. */
+   Operator drives via Update & Show / Hide. No auto-demo, no fallback timers.
+   Per-slot opacity is handled by the slot-routed handler above; this gate just
+   keeps the canvas-level baseline correct. SEL matches all .lt instances. */
 (function cadeGate() {
   'use strict';
   var inIframe = true;
