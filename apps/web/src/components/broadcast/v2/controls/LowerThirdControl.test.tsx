@@ -8,6 +8,7 @@ vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
   toggleOverlayAction: vi.fn(async () => undefined),
+  retriggerOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { LowerThirdControl } from "./LowerThirdControl";
@@ -46,7 +47,7 @@ beforeEach(() => {
 });
 
 describe("LowerThirdControl", () => {
-  it("renders 3 slots + 3 toggle buttons", () => {
+  it("renders 3 slots + 3 Trigger + 3 Hide buttons (one pair per slot)", () => {
     render(
       <LowerThirdControl
         sessionId={SESSION_ID}
@@ -56,12 +57,15 @@ describe("LowerThirdControl", () => {
     expect(screen.getByTestId("v2-lt-slot-1")).toBeTruthy();
     expect(screen.getByTestId("v2-lt-slot-2")).toBeTruthy();
     expect(screen.getByTestId("v2-lt-slot-3")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-toggle-1")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-toggle-2")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-toggle-3")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-trigger-1")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-trigger-2")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-trigger-3")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-hide-1")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-hide-2")).toBeTruthy();
+    expect(screen.getByTestId("v2-lt-hide-3")).toBeTruthy();
   });
 
-  it("each slot's toggle form carries the correct instanceSlot field", () => {
+  it("each slot's re-trigger form carries the correct instanceSlot field", () => {
     const { container } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
@@ -69,10 +73,10 @@ describe("LowerThirdControl", () => {
       />,
     );
     const form1 = container.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-1"]',
+      '[data-testid="v2-retrigger-form-08-lower-third-1"]',
     ) as HTMLFormElement;
     const form2 = container.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-2"]',
+      '[data-testid="v2-retrigger-form-08-lower-third-2"]',
     ) as HTMLFormElement;
     expect(
       (form1.querySelector('input[name="instanceSlot"]') as HTMLInputElement)
@@ -84,6 +88,35 @@ describe("LowerThirdControl", () => {
     ).toBe("2");
   });
 
+  it("each slot's hide form carries the correct instanceSlot field", () => {
+    const { container } = render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+      />,
+    );
+    const hideForm1 = container.querySelector(
+      '[data-testid="v2-hide-form-08-lower-third-1"]',
+    ) as HTMLFormElement;
+    const hideForm3 = container.querySelector(
+      '[data-testid="v2-hide-form-08-lower-third-3"]',
+    ) as HTMLFormElement;
+    expect(
+      (
+        hideForm1.querySelector(
+          'input[name="instanceSlot"]',
+        ) as HTMLInputElement
+      )?.value,
+    ).toBe("1");
+    expect(
+      (
+        hideForm3.querySelector(
+          'input[name="instanceSlot"]',
+        ) as HTMLInputElement
+      )?.value,
+    ).toBe("3");
+  });
+
   it("payload field for slot 1 contains a UUID-shaped playerId + name + tag", () => {
     const { container } = render(
       <LowerThirdControl
@@ -92,7 +125,7 @@ describe("LowerThirdControl", () => {
       />,
     );
     const form1 = container.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-1"]',
+      '[data-testid="v2-retrigger-form-08-lower-third-1"]',
     ) as HTMLFormElement;
     const payloadInput = form1.querySelector(
       'input[name="payload"]',
@@ -117,7 +150,7 @@ describe("LowerThirdControl", () => {
     fireEvent.change(nameInput, { target: { value: "ZARA" } });
 
     const form1 = container.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-1"]',
+      '[data-testid="v2-retrigger-form-08-lower-third-1"]',
     ) as HTMLFormElement;
     const payloadInput = form1.querySelector(
       'input[name="payload"]',
@@ -137,7 +170,7 @@ describe("LowerThirdControl", () => {
     const roleInput = screen.getByTestId("v2-lt-role-1") as HTMLInputElement;
     const getPayload = () => {
       const form1 = container.querySelector(
-        '[data-testid="v2-toggle-form-08-lower-third-1"]',
+        '[data-testid="v2-retrigger-form-08-lower-third-1"]',
       ) as HTMLFormElement;
       return JSON.parse(
         (
@@ -219,7 +252,7 @@ describe("LowerThirdControl", () => {
     expect(roleInput.value).toBe("GUEST");
   });
 
-  it("slotsActive flips toggle button per-slot to OFF state", () => {
+  it("Trigger button text stays 'Trigger' regardless of slot active state", () => {
     render(
       <LowerThirdControl
         sessionId={SESSION_ID}
@@ -227,20 +260,60 @@ describe("LowerThirdControl", () => {
         slotsActive={[true, false, true]}
       />,
     );
-    // slot 1 active → "Hide"
-    const f1 = document.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-1"]',
-    ) as HTMLFormElement;
-    expect(f1.getAttribute("data-active")).toBe("true");
-    // slot 2 inactive → "Update & Show"
-    const f2 = document.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-2"]',
-    ) as HTMLFormElement;
-    expect(f2.getAttribute("data-active")).toBe("false");
-    // slot 3 active
-    const f3 = document.querySelector(
-      '[data-testid="v2-toggle-form-08-lower-third-3"]',
-    ) as HTMLFormElement;
-    expect(f3.getAttribute("data-active")).toBe("true");
+    const trigger1 = screen.getByTestId("v2-lt-trigger-1") as HTMLButtonElement;
+    const trigger2 = screen.getByTestId("v2-lt-trigger-2") as HTMLButtonElement;
+    const trigger3 = screen.getByTestId("v2-lt-trigger-3") as HTMLButtonElement;
+    expect(trigger1.textContent?.trim()).toBe("Trigger");
+    expect(trigger2.textContent?.trim()).toBe("Trigger");
+    expect(trigger3.textContent?.trim()).toBe("Trigger");
+  });
+
+  it("Hide buttons mirror per-slot active state (disabled when slot is inactive)", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slotsActive={[true, false, true]}
+      />,
+    );
+    const hide1 = screen.getByTestId("v2-lt-hide-1") as HTMLButtonElement;
+    const hide2 = screen.getByTestId("v2-lt-hide-2") as HTMLButtonElement;
+    const hide3 = screen.getByTestId("v2-lt-hide-3") as HTMLButtonElement;
+    expect(hide1.disabled).toBe(false);
+    expect(hide2.disabled).toBe(true);
+    expect(hide3.disabled).toBe(false);
+  });
+
+  it("slot-level Live badge surfaces per-slot active state", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slotsActive={[true, false, true]}
+      />,
+    );
+    expect(screen.getByTestId("v2-lt-live-1")).toBeTruthy();
+    expect(screen.queryByTestId("v2-lt-live-2")).toBeNull();
+    expect(screen.getByTestId("v2-lt-live-3")).toBeTruthy();
+  });
+
+  it("card-level Live badge appears when ANY slot is active", () => {
+    const { rerender } = render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slotsActive={[false, false, false]}
+      />,
+    );
+    expect(screen.queryByTestId("v2-live-badge-08-lower-third")).toBeNull();
+
+    rerender(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slotsActive={[false, true, false]}
+      />,
+    );
+    expect(screen.getByTestId("v2-live-badge-08-lower-third")).toBeTruthy();
   });
 });

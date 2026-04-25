@@ -5,6 +5,7 @@ vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
   toggleOverlayAction: vi.fn(async () => undefined),
+  retriggerOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { SecondaryScoreBugControl } from "./SecondaryScoreBugControl";
@@ -92,7 +93,49 @@ describe("SecondaryScoreBugControl", () => {
     expect(after.players[1].score).toBe(3);
   });
 
-  it("active=true flips toggle button to OFF state", () => {
+  it("renders BOTH Trigger + Hide forms (re-trigger pattern)", () => {
+    const { container } = render(
+      <SecondaryScoreBugControl sessionId="S" viewToken="T" />,
+    );
+    expect(
+      container.querySelector(
+        '[data-testid="v2-retrigger-form-09-secondary-score-bug"]',
+      ),
+    ).toBeTruthy();
+    expect(
+      container.querySelector(
+        '[data-testid="v2-hide-form-09-secondary-score-bug"]',
+      ),
+    ).toBeTruthy();
+  });
+
+  it("Trigger button always says 'Trigger' regardless of active state", () => {
+    const { rerender } = render(
+      <SecondaryScoreBugControl
+        sessionId="S"
+        viewToken="T"
+        active={false}
+      />,
+    );
+    let btn = screen.getByTestId(
+      "v2-retrigger-btn-09-secondary-score-bug",
+    ) as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe("Trigger");
+
+    rerender(
+      <SecondaryScoreBugControl
+        sessionId="S"
+        viewToken="T"
+        active={true}
+      />,
+    );
+    btn = screen.getByTestId(
+      "v2-retrigger-btn-09-secondary-score-bug",
+    ) as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe("Trigger");
+  });
+
+  it("active=true shows the Live badge", () => {
     render(
       <SecondaryScoreBugControl
         sessionId="S"
@@ -100,6 +143,8 @@ describe("SecondaryScoreBugControl", () => {
         active={true}
       />,
     );
-    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
+    expect(
+      screen.getByTestId("v2-live-badge-09-secondary-score-bug"),
+    ).toBeTruthy();
   });
 });

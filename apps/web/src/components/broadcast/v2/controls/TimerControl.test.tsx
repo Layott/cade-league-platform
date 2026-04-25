@@ -5,6 +5,7 @@ vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
   toggleOverlayAction: vi.fn(async () => undefined),
+  retriggerOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { TimerControl } from "./TimerControl";
@@ -64,7 +65,7 @@ describe("TimerControl", () => {
     fireEvent.change(minutes, { target: { value: "3" } });
 
     const form = container.querySelector(
-      '[data-testid="v2-toggle-form-02-timer"]',
+      '[data-testid="v2-retrigger-form-02-timer"]',
     ) as HTMLFormElement;
     const payloadInput = form.querySelector(
       'input[name="payload"]',
@@ -93,8 +94,55 @@ describe("TimerControl", () => {
     }
   });
 
-  it("active=true flips toggle button to OFF state", () => {
+  it("renders BOTH Trigger + Hide forms (re-trigger pattern, not toggle)", () => {
+    const { container } = render(<TimerControl sessionId="S" viewToken="T" />);
+    expect(
+      container.querySelector('[data-testid="v2-retrigger-form-02-timer"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="v2-hide-form-02-timer"]'),
+    ).toBeTruthy();
+  });
+
+  it("Trigger button label stays 'Trigger' regardless of active state", () => {
+    const { rerender } = render(
+      <TimerControl sessionId="S" viewToken="T" active={false} />,
+    );
+    const triggerBtn1 = screen.getByTestId(
+      "v2-retrigger-btn-02-timer",
+    ) as HTMLButtonElement;
+    expect(triggerBtn1.textContent?.trim()).toBe("Trigger");
+
+    rerender(<TimerControl sessionId="S" viewToken="T" active={true} />);
+    const triggerBtn2 = screen.getByTestId(
+      "v2-retrigger-btn-02-timer",
+    ) as HTMLButtonElement;
+    expect(triggerBtn2.textContent?.trim()).toBe("Trigger");
+  });
+
+  it("Hide button is disabled when inactive, enabled when active", () => {
+    const { rerender } = render(
+      <TimerControl sessionId="S" viewToken="T" active={false} />,
+    );
+    const hideBtn1 = screen.getByTestId(
+      "v2-hide-btn-02-timer",
+    ) as HTMLButtonElement;
+    expect(hideBtn1.disabled).toBe(true);
+
+    rerender(<TimerControl sessionId="S" viewToken="T" active={true} />);
+    const hideBtn2 = screen.getByTestId(
+      "v2-hide-btn-02-timer",
+    ) as HTMLButtonElement;
+    expect(hideBtn2.disabled).toBe(false);
+  });
+
+  it("active=true renders the Live badge in the card header", () => {
     render(<TimerControl sessionId="S" viewToken="T" active={true} />);
-    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
+    expect(screen.getByTestId("v2-live-badge-02-timer")).toBeTruthy();
+  });
+
+  it("active=false hides the Live badge", () => {
+    render(<TimerControl sessionId="S" viewToken="T" active={false} />);
+    expect(screen.queryByTestId("v2-live-badge-02-timer")).toBeNull();
   });
 });

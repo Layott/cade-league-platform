@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { ToggleTriggerButton } from "../ToggleTriggerButton";
+import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import { SecondaryButton } from "@/components/admin/buttons";
 import type { SimpleControlProps } from "./BrbControl";
 
@@ -13,14 +13,16 @@ import type { SimpleControlProps } from "./BrbControl";
  * (per `server/broadcast/v2/off_routing.ts`). Each of the 3 slots maps
  * to `instance_slot` 1..3 in `overlay_active_instances`.
  *
- * Each slot now gets its own toggle button — green ON when slot is
- * inactive, pink OFF when slot is currently live. Slot active state is
- * passed in via the `slotsActive` prop (length 3) computed server-side
- * by the page from `overlay_active_instances`.
+ * EDITABLE control — each of the 3 slots gets its OWN ReTriggerHideButtons
+ * pair (Trigger + Hide). Trigger always re-fires the current payload for
+ * that slot (clear-then-trigger), so editing a slot's name/role and
+ * re-clicking replays the entry animation with the fresh values. Hide
+ * clears that slot without re-firing. Slot active state is shown via a
+ * "Live" pill on each slot card.
  *
  * Presets persist in `localStorage['cade-lt-presets']`. Save = stash
  * current name+role under a user-supplied label. Load = pop into the
- * inputs (does NOT auto-trigger; operator still clicks the toggle).
+ * inputs (does NOT auto-trigger; operator still clicks the button).
  */
 
 type LtPreset = {
@@ -147,6 +149,7 @@ export function LowerThirdControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      liveBadge={slotsActive.some(Boolean)}
       editPanel={
         <div className="space-y-3">
           {([1, 2, 3] as const).map((n) => (
@@ -154,11 +157,25 @@ export function LowerThirdControl({
               key={n}
               className="rounded-sm border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/40 p-2"
               data-testid={`v2-lt-slot-${n}`}
+              data-active={slotsActive[n - 1] ? "true" : "false"}
             >
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[var(--signal)]">
                   Slot {n}
                 </span>
+                {slotsActive[n - 1] ? (
+                  <span
+                    data-testid={`v2-lt-live-${n}`}
+                    className="inline-flex items-center gap-1 rounded-sm border border-[rgba(255,91,59,0.55)] bg-[rgba(255,91,59,0.15)] px-1.5 py-[1px] font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--flare)]"
+                    title="Slot is currently live"
+                  >
+                    <span
+                      className="inline-block h-[5px] w-[5px] rounded-full bg-[var(--flare)] animate-pulse"
+                      aria-hidden="true"
+                    />
+                    Live
+                  </span>
+                ) : null}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]">
@@ -213,15 +230,16 @@ export function LowerThirdControl({
                 </div>
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <ToggleTriggerButton
+                <ReTriggerHideButtons
                   overlayKey="08-lower-third"
                   sessionId={sessionId}
                   active={slotsActive[n - 1]}
                   instanceSlot={n}
                   testIdSuffix="08-lower-third"
-                  buttonTestId={`v2-lt-toggle-${n}`}
-                  onLabel="Update & Show"
-                  offLabel="Hide"
+                  triggerLabel="Trigger"
+                  hideLabel="Hide"
+                  triggerButtonTestId={`v2-lt-trigger-${n}`}
+                  hideButtonTestId={`v2-lt-hide-${n}`}
                   payloadFields={
                     <input
                       type="hidden"
@@ -237,7 +255,8 @@ export function LowerThirdControl({
       }
       triggerSlot={
         <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--chalk-3)]">
-          Use per-slot toggle buttons above.
+          Use per-slot Trigger / Hide buttons above. Trigger re-fires
+          with current values; Hide clears.
         </p>
       }
     />

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { ToggleTriggerButton } from "../ToggleTriggerButton";
+import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import { PlayerSelect } from "../PlayerSelect";
 import { V2_PLAYER_NAMES, type V2PlayerSlug } from "../players";
 import type { V2OverlayKey } from "../overlay-keys";
@@ -10,10 +10,14 @@ import type { V2OverlayKey } from "../overlay-keys";
 /**
  * Plan 51 — generic H2H control (2 / 3 / 5 player variants).
  *
- * The 13-player roster powers each dropdown. Toggle button posts a
- * `players` array of `{ displayName }` objects matching the legacy
- * h2h_*Schema shape from server/overlays/schemas.ts. Live preview uses
- * the v2-mockup-compatible payload (slug + name).
+ * The 13-player roster powers each dropdown. EDITABLE control — clicking
+ * "Trigger" always re-fires the current payload (clear-then-trigger) so
+ * swapping a player and re-clicking replays the entry animation with the
+ * new lineup. "Hide" clears without re-firing.
+ *
+ * Payload shape: `players` array of `{ displayName }` objects matching
+ * the legacy h2h_*Schema shape from server/overlays/schemas.ts. Live
+ * preview uses the v2-mockup-compatible payload (slug + name).
  */
 export type H2HControlProps = {
   sessionId: string;
@@ -65,6 +69,7 @@ export function H2HControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      liveBadge={active}
       editPanel={
         <div className="grid grid-cols-2 gap-2">
           {Array.from({ length: count }, (_, i) => (
@@ -80,7 +85,7 @@ export function H2HControl({
         </div>
       }
       triggerSlot={
-        <ToggleTriggerButton
+        <ReTriggerHideButtons
           overlayKey={overlayKey}
           sessionId={sessionId}
           active={active}

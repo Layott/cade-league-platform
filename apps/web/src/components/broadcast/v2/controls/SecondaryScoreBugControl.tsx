@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { ToggleTriggerButton } from "../ToggleTriggerButton";
+import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import { PlayerSelect } from "../PlayerSelect";
 import { V2_PLAYER_NAMES, type V2PlayerSlug } from "../players";
 import type { SimpleControlProps } from "./BrbControl";
@@ -11,8 +11,13 @@ import type { SimpleControlProps } from "./BrbControl";
  * Plan 51 — secondary score bug control.
  *
  * Two-player face-off. Score inputs default to 0 — operator types live
- * score. Toggle button posts the legacy `score_bug` schema's `players[]`
- * array of `{ displayName, score }` (length 2).
+ * score. EDITABLE control — clicking "Trigger" always re-fires the
+ * current payload (clear-then-trigger), so updating a score and
+ * re-clicking replays the entry animation with the new line. "Hide"
+ * clears without re-firing.
+ *
+ * Payload shape: legacy `score_bug` schema's `players[]` array of
+ * `{ displayName, score }` (length 2).
  */
 export function SecondaryScoreBugControl({
   sessionId,
@@ -53,6 +58,7 @@ export function SecondaryScoreBugControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      liveBadge={active}
       editPanel={
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
@@ -108,7 +114,7 @@ export function SecondaryScoreBugControl({
         </div>
       }
       triggerSlot={
-        <ToggleTriggerButton
+        <ReTriggerHideButtons
           overlayKey="09-secondary-score-bug"
           sessionId={sessionId}
           active={active}

@@ -5,6 +5,7 @@ vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
   toggleOverlayAction: vi.fn(async () => undefined),
+  retriggerOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { UpNextBugControl } from "./UpNextBugControl";
@@ -49,14 +50,14 @@ describe("UpNextBugControl", () => {
     expect(screen.getByText(/No upcoming matches/i)).toBeTruthy();
   });
 
-  it("toggle button is disabled when no upcoming matches", () => {
+  it("Trigger button is disabled when no upcoming matches", () => {
     render(
       <UpNextBugControl sessionId="S" viewToken="T" upcoming={[]} />,
     );
-    const toggleBtn = screen.getByTestId(
-      "v2-toggle-btn-10-up-next-bug",
+    const triggerBtn = screen.getByTestId(
+      "v2-retrigger-btn-10-up-next-bug",
     ) as HTMLButtonElement;
-    expect(toggleBtn.disabled).toBe(true);
+    expect(triggerBtn.disabled).toBe(true);
   });
 
   it("payload carries home/away/kickoffAt from the selected match", () => {
@@ -118,7 +119,53 @@ describe("UpNextBugControl", () => {
     expect(after.kickoffAt).toBe("2026-04-25T19:00:00Z");
   });
 
-  it("active=true flips toggle button to OFF state", () => {
+  it("renders BOTH Trigger + Hide forms (re-trigger pattern)", () => {
+    const { container } = render(
+      <UpNextBugControl
+        sessionId="S"
+        viewToken="T"
+        upcoming={UPCOMING}
+      />,
+    );
+    expect(
+      container.querySelector(
+        '[data-testid="v2-retrigger-form-10-up-next-bug"]',
+      ),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="v2-hide-form-10-up-next-bug"]'),
+    ).toBeTruthy();
+  });
+
+  it("Trigger button always says 'Trigger' regardless of active state", () => {
+    const { rerender } = render(
+      <UpNextBugControl
+        sessionId="S"
+        viewToken="T"
+        upcoming={UPCOMING}
+        active={false}
+      />,
+    );
+    let btn = screen.getByTestId(
+      "v2-retrigger-btn-10-up-next-bug",
+    ) as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe("Trigger");
+
+    rerender(
+      <UpNextBugControl
+        sessionId="S"
+        viewToken="T"
+        upcoming={UPCOMING}
+        active={true}
+      />,
+    );
+    btn = screen.getByTestId(
+      "v2-retrigger-btn-10-up-next-bug",
+    ) as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe("Trigger");
+  });
+
+  it("active=true shows the Live badge", () => {
     render(
       <UpNextBugControl
         sessionId="S"
@@ -127,6 +174,6 @@ describe("UpNextBugControl", () => {
         active={true}
       />,
     );
-    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
+    expect(screen.getByTestId("v2-live-badge-10-up-next-bug")).toBeTruthy();
   });
 });

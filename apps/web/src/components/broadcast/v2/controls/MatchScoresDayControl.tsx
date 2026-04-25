@@ -2,8 +2,8 @@
 
 import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { ToggleTriggerButton } from "../ToggleTriggerButton";
-import { triggerOverlayEnterAction } from "@/app/admin/broadcast/v2/[sessionId]/actions";
+import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
+import { retriggerOverlayAction } from "@/app/admin/broadcast/v2/[sessionId]/actions";
 import {
   PrimaryButton,
   SecondaryButton,
@@ -14,14 +14,14 @@ import type { SimpleControlProps } from "./BrbControl";
  * Plan 51 — Match Scores (today) control with 3-part split buttons.
  *
  * Three pre-defined ranges (1-4, 5-8, 9-12) + Show All. Each part button
- * fires its own ENTER form so the persistent payload carries the right
- * `partRange`. Live preview gets the same shape via postMessage so the
- * iframe scrolls to the relevant part instantly.
+ * fires its own re-trigger form so the persistent payload carries the
+ * right `partRange` AND replays the entry animation each click. Live
+ * preview gets the same shape via postMessage so the iframe scrolls to
+ * the relevant part instantly.
  *
- * The footer toggle only fires when the overlay is currently active —
- * one-button OFF for the operator regardless of which part is showing.
- * When inactive, the toggle is a "Trigger ON (Show all)" shortcut that
- * mirrors the Show All part button.
+ * The footer pair (Trigger + Hide) is the EDITABLE re-trigger pattern.
+ * "Trigger" always re-fires "Show all" (clear-then-trigger); "Hide"
+ * clears the active row.
  *
  * Persistent payload mirrors the legacy `match_scores_day` schema —
  * `matchDayLabel`+`rows` are computed server-side by the overlay route
@@ -60,12 +60,13 @@ export function MatchScoresDayControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      liveBadge={active}
       editPanel={
         <div className="grid grid-cols-2 gap-2">
           {PARTS.map((p) => (
             <form
               key={String(p.id)}
-              action={triggerOverlayEnterAction}
+              action={retriggerOverlayAction}
               data-testid={`v2-msd-part-form-${p.id}`}
               onSubmit={() => previewPart(p.id)}
             >
@@ -114,11 +115,11 @@ export function MatchScoresDayControl({
         </div>
       }
       triggerSlot={
-        <ToggleTriggerButton
+        <ReTriggerHideButtons
           overlayKey="11-match-scores-day"
           sessionId={sessionId}
           active={active}
-          onLabel="Trigger ON (Show all)"
+          triggerLabel="Trigger (Show all)"
           payloadFields={
             <input
               type="hidden"

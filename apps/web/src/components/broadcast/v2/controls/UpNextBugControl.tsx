@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { ToggleTriggerButton } from "../ToggleTriggerButton";
+import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -10,8 +10,10 @@ import type { SimpleControlProps } from "./BrbControl";
  *
  * Renders a dropdown of upcoming matches from the current match-day. The
  * match list is fetched server-side by the page and passed in via the
- * `upcoming` prop. Toggle button fires the legacy `up_next_bug` payload
- * with `home` + `away` + `kickoffAt` ISO datetime.
+ * `upcoming` prop. EDITABLE control — clicking "Trigger" always re-fires
+ * the legacy `up_next_bug` payload (`home` + `away` + `kickoffAt` ISO
+ * datetime), so swapping the selected match and re-clicking replays the
+ * entry animation with the new pairing. "Hide" clears without re-firing.
  */
 export type UpcomingMatch = {
   matchId: string;
@@ -79,6 +81,7 @@ export function UpNextBugControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      liveBadge={active}
       editPanel={
         upcoming.length === 0 ? (
           <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--chalk-3)]">
@@ -108,11 +111,11 @@ export function UpNextBugControl({
         )
       }
       triggerSlot={
-        <ToggleTriggerButton
+        <ReTriggerHideButtons
           overlayKey="10-up-next-bug"
           sessionId={sessionId}
           active={active}
-          canEnter={upcoming.length > 0}
+          canTrigger={upcoming.length > 0}
           payloadFields={
             <input type="hidden" name="payload" value={payloadJson} />
           }

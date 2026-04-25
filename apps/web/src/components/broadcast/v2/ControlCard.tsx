@@ -62,6 +62,13 @@ export type ControlCardProps = {
    * (e.g. lower_third 3-slot UI updates without round-tripping the DB).
    */
   onIframeReady?: (iframe: HTMLIFrameElement | null) => void;
+  /**
+   * When true, renders a small "LIVE" pill in the header strip so
+   * EDITABLE controls (which don't morph their button label on active)
+   * still surface live state to operators. Optional — SIMPLE controls
+   * leave this off because the button itself flips ON↔OFF.
+   */
+  liveBadge?: boolean;
 };
 
 export function ControlCard({
@@ -71,6 +78,7 @@ export function ControlCard({
   editPanel,
   triggerSlot,
   onIframeReady,
+  liveBadge = false,
 }: ControlCardProps) {
   const previewUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, true);
   const liveUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, false);
@@ -236,6 +244,20 @@ export function ControlCard({
           >
             {label}
           </span>
+          {liveBadge ? (
+            <span
+              data-testid={`v2-live-badge-${overlayKey}`}
+              className="inline-flex items-center gap-1 rounded-sm border border-[rgba(255,91,59,0.55)] bg-[rgba(255,91,59,0.15)] px-1.5 py-[1px] font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--flare)]"
+              title="Overlay is currently live"
+              aria-label="Overlay is live"
+            >
+              <span
+                className="inline-block h-[5px] w-[5px] rounded-full bg-[var(--flare)] animate-pulse"
+                aria-hidden="true"
+              />
+              Live
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-1">
           <button

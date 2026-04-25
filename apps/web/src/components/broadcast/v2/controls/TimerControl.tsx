@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
-import { ToggleTriggerButton } from "../ToggleTriggerButton";
+import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -13,15 +13,16 @@ import type { SimpleControlProps } from "./BrbControl";
  *  - clock     (HH:MM 24h WAT — overlay computes secondsRemaining itself)
  *
  * The control sends an immediate postMessage into the preview iframe so
- * the operator sees the countdown before committing the trigger. The
- * single toggle button persists the row by computing an `expiresAt` ISO
- * string from the current input values and embedding it in the trigger
- * payload (the `layout_timer` schema at server/overlays/schemas.ts
- * requires `expiresAt: ISO datetime`).
+ * the operator sees the countdown before committing the trigger.
+ *
+ * EDITABLE control — uses ReTriggerHideButtons. The "Trigger" button
+ * always re-fires the current payload with a freshly computed expiresAt;
+ * "Hide" clears the active row without re-firing. Live badge in the
+ * header surfaces active state.
  *
  * IMPORTANT: `expiresAt` is recomputed AT SUBMIT TIME (not render time)
- * so re-clicking the toggle with the same min:sec values resets the
- * timer relative to the click moment, not the last render.
+ * so re-clicking Trigger with the same min:sec values resets the timer
+ * relative to the click moment, not the last render.
  */
 export function TimerControl({
   sessionId,
@@ -91,6 +92,7 @@ export function TimerControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      liveBadge={active}
       editPanel={
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
@@ -147,11 +149,11 @@ export function TimerControl({
         </div>
       }
       triggerSlot={
-        <ToggleTriggerButton
+        <ReTriggerHideButtons
           overlayKey="02-timer"
           sessionId={sessionId}
           active={active}
-          onSubmit={refreshPayloadOnSubmit}
+          onTriggerSubmit={refreshPayloadOnSubmit}
           payloadFields={
             <input
               ref={payloadInputRef}

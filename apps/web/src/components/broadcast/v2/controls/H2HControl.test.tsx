@@ -5,6 +5,7 @@ vi.mock("@/app/admin/broadcast/v2/[sessionId]/actions", () => ({
   triggerOverlayEnterAction: vi.fn(async () => undefined),
   triggerOverlayOffAction: vi.fn(async () => undefined),
   toggleOverlayAction: vi.fn(async () => undefined),
+  retriggerOverlayAction: vi.fn(async () => undefined),
 }));
 
 import { H2H2Control } from "./H2H2Control";
@@ -87,8 +88,52 @@ describe("H2H controls", () => {
     expect(after.players[1].displayName).toBe("MITCH");
   });
 
-  it("active=true flips the H2H toggle to OFF label", () => {
+  it("renders BOTH Trigger + Hide forms (re-trigger pattern)", () => {
+    const { container } = render(
+      <H2H2Control sessionId="S" viewToken="T" />,
+    );
+    expect(
+      container.querySelector('[data-testid="v2-retrigger-form-04-h2h-2"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="v2-hide-form-04-h2h-2"]'),
+    ).toBeTruthy();
+  });
+
+  it("Trigger button always says 'Trigger' regardless of active state", () => {
+    const { rerender } = render(
+      <H2H2Control sessionId="S" viewToken="T" active={false} />,
+    );
+    let btn = screen.getByTestId(
+      "v2-retrigger-btn-04-h2h-2",
+    ) as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe("Trigger");
+
+    rerender(<H2H2Control sessionId="S" viewToken="T" active={true} />);
+    btn = screen.getByTestId(
+      "v2-retrigger-btn-04-h2h-2",
+    ) as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe("Trigger");
+  });
+
+  it("active=true shows the Live badge in the card header", () => {
     render(<H2H2Control sessionId="S" viewToken="T" active={true} />);
-    expect(screen.getByText(/Trigger OFF/i)).toBeTruthy();
+    expect(screen.getByTestId("v2-live-badge-04-h2h-2")).toBeTruthy();
+  });
+
+  it("Hide button is disabled when inactive, enabled when active", () => {
+    const { rerender } = render(
+      <H2H2Control sessionId="S" viewToken="T" active={false} />,
+    );
+    let hideBtn = screen.getByTestId(
+      "v2-hide-btn-04-h2h-2",
+    ) as HTMLButtonElement;
+    expect(hideBtn.disabled).toBe(true);
+
+    rerender(<H2H2Control sessionId="S" viewToken="T" active={true} />);
+    hideBtn = screen.getByTestId(
+      "v2-hide-btn-04-h2h-2",
+    ) as HTMLButtonElement;
+    expect(hideBtn.disabled).toBe(false);
   });
 });
