@@ -669,15 +669,26 @@
     switch (msg.type) {
       case 'update': {
         const d = msg.data || {};
-        if (d.playerA) {
-          if (typeof d.playerA.name  === 'string') state.playerA.name  = d.playerA.name;
-          if (typeof d.playerA.slug  === 'string') state.playerA.slug  = d.playerA.slug;
-          if (typeof d.playerA.score === 'number') state.playerA.score = d.playerA.score;
+        // Accept two payload shapes:
+        //   { playerA: {name, slug, score}, playerB: {...} }  (control panel preview)
+        //   { players: [{displayName, score}, {displayName, score}] }  (Plan 51 scoreBugSchema)
+        let pA = d.playerA;
+        let pB = d.playerB;
+        if (!pA && Array.isArray(d.players) && d.players[0]) {
+          pA = { name: d.players[0].displayName || d.players[0].name, slug: d.players[0].slug, score: d.players[0].score };
         }
-        if (d.playerB) {
-          if (typeof d.playerB.name  === 'string') state.playerB.name  = d.playerB.name;
-          if (typeof d.playerB.slug  === 'string') state.playerB.slug  = d.playerB.slug;
-          if (typeof d.playerB.score === 'number') state.playerB.score = d.playerB.score;
+        if (!pB && Array.isArray(d.players) && d.players[1]) {
+          pB = { name: d.players[1].displayName || d.players[1].name, slug: d.players[1].slug, score: d.players[1].score };
+        }
+        if (pA) {
+          if (typeof pA.name  === 'string') state.playerA.name  = pA.name;
+          if (typeof pA.slug  === 'string') state.playerA.slug  = pA.slug;
+          if (typeof pA.score === 'number') state.playerA.score = pA.score;
+        }
+        if (pB) {
+          if (typeof pB.name  === 'string') state.playerB.name  = pB.name;
+          if (typeof pB.slug  === 'string') state.playerB.slug  = pB.slug;
+          if (typeof pB.score === 'number') state.playerB.score = pB.score;
         }
         render();
         pulse();

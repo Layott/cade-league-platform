@@ -572,9 +572,10 @@
       //   { player1, player2 }                    (legacy + control panel)
       //   { homePlayer, awayPlayer, kickoffAt? }  (broadcast trigger)
       //   { players: [{slug,name}, ...] }         (generic h2h shape)
-      var p1 = data.player1 || data.homePlayer ||
+      // Plan 51 upNextBugSchema sends {home:{displayName},away:{displayName}}.
+      var p1 = data.player1 || data.homePlayer || data.home ||
                (Array.isArray(data.players) ? data.players[0] : null);
-      var p2 = data.player2 || data.awayPlayer ||
+      var p2 = data.player2 || data.awayPlayer || data.away ||
                (Array.isArray(data.players) ? data.players[1] : null);
       var n1 = normalizePlayer(p1);
       var n2 = normalizePlayer(p2);
