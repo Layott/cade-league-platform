@@ -102,9 +102,9 @@
     text-rendering: geometricPrecision;
   }
   /* === STRICT GATE: nothing renders / animates until {type:'show'} === */
-  body { opacity: 0; transition: opacity 0.4s ease; }
-  body.cade-visible { opacity: 1; }
-  body.cade-exiting { opacity: 0; }
+  body { opacity: 0; }
+  body.cade-visible { opacity: 1 !important; }
+  body.cade-exiting { opacity: 0 !important; }
   body:not(.cade-visible):not(.cade-exiting) * {
     animation-play-state: paused !important;
   }
@@ -1005,6 +1005,22 @@
       }
     }, false);
   })();
+</script>
+<script>
+/* Plan 51 cade-gate observer — keeps body inline opacity in sync with
+   cade-visible / cade-exiting classes so the gate works even when CSS
+   transitions/animations are paused (e.g. background-tab iframes). */
+(function(){
+  function applyOpacity(){
+    var b = document.body;
+    if (!b) return;
+    if (b.classList.contains('cade-visible')) b.style.opacity = '1';
+    else if (b.classList.contains('cade-exiting')) b.style.opacity = '0';
+    else b.style.opacity = '0';
+  }
+  applyOpacity();
+  if (document.body) new MutationObserver(applyOpacity).observe(document.body, {attributes:true, attributeFilter:['class']});
+})();
 </script>
 </body>
 </html>
