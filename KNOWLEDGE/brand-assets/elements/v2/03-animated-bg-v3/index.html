@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #03 ANIMATED BACKGROUND — VARIANT 3 OF 3
+  Concept: Halftone BG (ELITE S2 BG.png) + traveling green spotlight
+           sweeps + pseudo grain shimmer + breathing hue cycle.
+  Smooth + smoother — no chevrons, no marching particles.
+  Distinct from v1 (Ken-Burns base) and v2 (particles + chevrons).
+  Canvas: 1920×1080 OPAQUE. Silent. Seamless infinite loops.
+-->
+<!-- DATA WIRES: none (decorative bg) -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — Animated Background v3</title>
+
+<style>
+  /* ── REAL BRAND FONTS (woff2 from PILOT BRB paths) ─────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS ────────────────────────────────────────────── */
+  :root {
+    --green:       #6bcd06;
+    --green-soft:  rgba(107, 205, 6, 0.55);
+    --green-faint: rgba(107, 205, 6, 0.18);
+    --pink:        #fe036d;
+    --black:       #030503;
+    --ink:         #ffffff;
+    --display:     'Agharti', 'Impact', sans-serif;
+    --mono:        'Quedora', 'JetBrains Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--black);
+    font-family: var(--display);
+  }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--black);
+  }
+
+  /* ── LAYER 1 ─ HALFTONE BASE (ELITE S2 BG.png) ───────────────────
+     Static base, fills the frame. Slight scale + brightness tune so
+     spotlights have something to bounce off. */
+  .halftone {
+    position: absolute;
+    inset: 0;
+    background-image: url('../../../designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    /* Subtle hue cycling — keeps green dominant but breathes.
+       -2deg → +2deg over 18s mirror. Brightness/contrast nudge so the
+       halftone field feels alive without flickering. */
+    animation: halftoneBreath 18s ease-in-out infinite alternate;
+    will-change: filter;
+  }
+
+  @keyframes halftoneBreath {
+    0%   { filter: hue-rotate(-2deg) brightness(0.94) contrast(1.06) saturate(1.05); }
+    100% { filter: hue-rotate(2deg)  brightness(1.02) contrast(1.02) saturate(1.12); }
+  }
+
+  /* ── LAYER 2 ─ DEEPENING TINT (locks the field a touch darker) ─── */
+  .tint {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.08) 40%, rgba(0,0,0,0.28) 100%),
+      radial-gradient(ellipse 80% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.22) 100%);
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  /* ── LAYER 3 ─ TRAVELING SPOTLIGHT BEAMS ────────────────────────
+     Two large soft green radial gradients translating diagonally on
+     opposite vectors. Crossover happens around midpoint, then they
+     fade past the edges and loop seamlessly via mirrored positions.
+     Blur + screen blend keeps them airy on the halftone. */
+  .beam {
+    position: absolute;
+    width: 2400px;
+    height: 1400px;
+    top: -160px;
+    left: -360px;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    filter: blur(80px);
+    will-change: transform, opacity;
+  }
+
+  /* Beam A : top-left → bottom-right diagonal sweep, 16s loop */
+  .beam-a {
+    background:
+      radial-gradient(ellipse 38% 26% at 50% 50%,
+        rgba(107, 205, 6, 0.55) 0%,
+        rgba(107, 205, 6, 0.32) 22%,
+        rgba(107, 205, 6, 0.10) 48%,
+        transparent 72%);
+    animation: beamSweepA 16s linear infinite;
+  }
+
+  /* Beam B : bottom-right → top-left diagonal sweep, 20s loop
+             different tempo, lighter weight, different starting phase */
+  .beam-b {
+    background:
+      radial-gradient(ellipse 42% 24% at 50% 50%,
+        rgba(107, 205, 6, 0.42) 0%,
+        rgba(107, 205, 6, 0.22) 26%,
+        rgba(107, 205, 6, 0.08) 52%,
+        transparent 76%);
+    animation: beamSweepB 20s linear infinite;
+    animation-delay: -7s;
+  }
+
+  /* For seamless loop: start position == end position.
+     Beam crosses the visible area in the middle of the cycle. */
+  @keyframes beamSweepA {
+    0%   { transform: translate3d(-1400px, -800px, 0) rotate(28deg); opacity: 0; }
+    12%  { opacity: 0.95; }
+    50%  { transform: translate3d(  200px,  100px, 0) rotate(28deg); opacity: 0.95; }
+    88%  { opacity: 0.95; }
+    100% { transform: translate3d( 1800px, 1000px, 0) rotate(28deg); opacity: 0; }
+  }
+
+  @keyframes beamSweepB {
+    0%   { transform: translate3d( 1800px, 1000px, 0) rotate(-32deg); opacity: 0; }
+    14%  { opacity: 0.85; }
+    50%  { transform: translate3d(  200px,  100px, 0) rotate(-32deg); opacity: 0.85; }
+    86%  { opacity: 0.85; }
+    100% { transform: translate3d(-1400px, -800px, 0) rotate(-32deg); opacity: 0; }
+  }
+
+  /* ── LAYER 4 ─ THIRD ACCENT BEAM (slow, very wide, low opacity) ──
+     Provides a continuous wash so there's never a dead frame. */
+  .beam-wash {
+    position: absolute;
+    inset: -200px;
+    background:
+      radial-gradient(ellipse 55% 35% at 30% 40%,
+        rgba(107, 205, 6, 0.18) 0%,
+        rgba(107, 205, 6, 0.06) 35%,
+        transparent 65%),
+      radial-gradient(ellipse 50% 30% at 75% 65%,
+        rgba(107, 205, 6, 0.14) 0%,
+        rgba(107, 205, 6, 0.05) 38%,
+        transparent 68%);
+    pointer-events: none;
+    mix-blend-mode: screen;
+    filter: blur(40px);
+    animation: beamWash 24s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
+  @keyframes beamWash {
+    0%   { transform: translate3d(-30px, -20px, 0) scale(1.02); }
+    100% { transform: translate3d( 30px,  20px, 0) scale(1.06); }
+  }
+
+  /* ── LAYER 5 ─ PSEUDO GRAIN SHIMMER ──────────────────────────────
+     Pure CSS noise via tiled radial-gradient dots, animated by
+     translating the tile sub-pixel + slowly cycling opacity. Two
+     stacked grain tiles at different sizes/phases give a film-grain
+     shimmer that doesn't look mechanical. */
+  .grain {
+    position: absolute;
+    inset: -50px;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    opacity: 0.32;
+    background-image:
+      radial-gradient(circle at 23% 17%, rgba(255,255,255,0.55) 0.5px, transparent 1px),
+      radial-gradient(circle at 71% 41%, rgba(255,255,255,0.40) 0.5px, transparent 1px),
+      radial-gradient(circle at 47% 83%, rgba(255,255,255,0.45) 0.5px, transparent 1px),
+      radial-gradient(circle at 11% 67%, rgba(255,255,255,0.35) 0.5px, transparent 1px),
+      radial-gradient(circle at 89% 91%, rgba(255,255,255,0.50) 0.5px, transparent 1px),
+      radial-gradient(circle at 35% 31%, rgba(255,255,255,0.40) 0.5px, transparent 1px);
+    background-size: 140px 140px;
+    background-repeat: repeat;
+    animation: grainShimmerA 1.8s steps(6) infinite,
+               grainOpacity   7s ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  /* Second grain layer — finer, faster, screen blend for sparkle */
+  .grain-fine {
+    position: absolute;
+    inset: -50px;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.18;
+    background-image:
+      radial-gradient(circle at 18% 22%, rgba(170, 255, 100, 0.45) 0.4px, transparent 0.9px),
+      radial-gradient(circle at 62% 14%, rgba(255, 255, 255, 0.35) 0.4px, transparent 0.9px),
+      radial-gradient(circle at 39% 71%, rgba(170, 255, 100, 0.30) 0.4px, transparent 0.9px),
+      radial-gradient(circle at 84% 58%, rgba(255, 255, 255, 0.30) 0.4px, transparent 0.9px),
+      radial-gradient(circle at 7%  92%, rgba(170, 255, 100, 0.35) 0.4px, transparent 0.9px);
+    background-size: 90px 90px;
+    background-repeat: repeat;
+    animation: grainShimmerB 1.3s steps(5) infinite,
+               grainOpacity2  9s ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  /* Stepped translation gives the staccato, real-grain micro-jitter */
+  @keyframes grainShimmerA {
+    0%   { transform: translate3d(0, 0, 0); }
+    16%  { transform: translate3d(-12px, 6px, 0); }
+    33%  { transform: translate3d(8px, -10px, 0); }
+    50%  { transform: translate3d(-6px, 14px, 0); }
+    66%  { transform: translate3d(14px, 4px, 0); }
+    83%  { transform: translate3d(-10px, -8px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+  }
+
+  @keyframes grainShimmerB {
+    0%   { transform: translate3d(0, 0, 0); }
+    20%  { transform: translate3d(7px, -5px, 0); }
+    40%  { transform: translate3d(-9px, 8px, 0); }
+    60%  { transform: translate3d(5px, 11px, 0); }
+    80%  { transform: translate3d(-11px, -3px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+  }
+
+  @keyframes grainOpacity  { 0%,100% { opacity: 0.28; } 50% { opacity: 0.36; } }
+  @keyframes grainOpacity2 { 0%,100% { opacity: 0.14; } 50% { opacity: 0.22; } }
+
+  /* ── LAYER 6 ─ SOFT VIGNETTE ─────────────────────────────────── */
+  .vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 92% 92% at 50% 50%,
+      transparent 38%,
+      rgba(0, 0, 0, 0.42) 78%,
+      rgba(0, 0, 0, 0.62) 100%
+    );
+  }
+
+  /* ── LAYER 7 ─ TOP HEADER BAND (CADE | PRO LEAGUE) ────────────── */
+  .top-band {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    height: 168px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 44px;
+    z-index: 10;
+  }
+
+  .top-band .logo {
+    height: 140px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+
+  .top-band .logo--cade { height: 128px; }
+  .top-band .logo--pro  { height: 152px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 110px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── BOTTOM PARTNER STRIP (static) ────────────────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 12;
+  }
+
+  .partners-label {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+
+  .partners-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 76px;
+    padding: 14px 38px;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .partners-row .partner {
+    height: 70px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+
+  .partners-row .partner--gameevo { height: 64px; }
+  .partners-row .partner--pride   { height: 58px; }
+  .partners-row .partner--africa  { height: 64px; }
+  .partners-row .partner--trace   { height: 72px; }
+
+  /* Tiny season tag top-right */
+  .kicker-tr {
+    position: absolute;
+    top: 64px;
+    right: 64px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(107, 205, 6, 0.45);
+    pointer-events: none;
+    z-index: 11;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <!-- 1 : halftone base with breathing hue -->
+    <div class="halftone" aria-hidden="true"></div>
+
+    <!-- 2 : darken/lock tint -->
+    <div class="tint" aria-hidden="true"></div>
+
+    <!-- 3 : traveling green spotlight beams (opposite diagonals) -->
+    <div class="beam beam-a" aria-hidden="true"></div>
+    <div class="beam beam-b" aria-hidden="true"></div>
+
+    <!-- 4 : continuous wide wash so no dead frame -->
+    <div class="beam-wash" aria-hidden="true"></div>
+
+    <!-- 5 : grain shimmer (two layers) -->
+    <div class="grain" aria-hidden="true"></div>
+    <div class="grain-fine" aria-hidden="true"></div>
+
+    <!-- 6 : soft vignette -->
+    <div class="vignette" aria-hidden="true"></div>
+
+    <!-- 7 : top header band (CADE | Pro League) -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="../../../logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro"  src="../../../logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- season marker top-right -->
+    <div class="kicker-tr">ELITE 2025-26</div>
+
+    <!-- bottom partner strip (static) -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="partners-row">
+        <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+        <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="Gamepride" />
+        <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+        <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="Trace" />
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

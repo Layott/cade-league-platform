@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #01 — "INTERMISSION" (rebuilt 2026-04-24)
+  Full-screen brand-heavy waiting screen. Halftone-green stadium BG.
+  No upcoming-match list. No ad. No timer. Pure brand presence.
+  This file is the PILOT visual template — all other v2 overlays follow it.
+
+  DATA WIRES: none (pure waiting screen)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — INTERMISSION</title>
+
+<style>
+  /* ── REAL BRAND FONTS ───────────────────────────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--black);
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080 fixed canvas) ─────────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0a0e07;
+    isolation: isolate;
+  }
+
+  /* ── BG: halftone-green stadium texture ─────────────────────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('../../../designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.02) saturate(1.05); }
+  }
+
+  /* dark gradient overlay so text reads cleanly (heavier at bottom 30%) */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* subtle scanline grain to match samples' "screen" feel */
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) ────────────────────── */
+  .top-band {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    z-index: 10;
+  }
+
+  .top-band .logo {
+    height: 96px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+
+  .top-band .logo--cade { height: 88px; }
+  .top-band .logo--pro  { height: 104px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 80px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── SIDE CHEVRONS (decorative motif from samples) ──────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 38px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .chevrons--left  { left: 70px; }
+  .chevrons--right { right: 70px; }
+
+  .chevron {
+    width: 88px;
+    height: 64px;
+    color: var(--green);
+    opacity: 0.55;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron {
+    animation-name: chev-pulse-right;
+  }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(-6px); }
+  }
+
+  /* ── BODY: kicker + giant title + subtitle ──────────────────── */
+  .body {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -52%);
+    width: 1500px;
+    text-align: center;
+    z-index: 20;
+  }
+
+  .kicker {
+    display: inline-block;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 32px;
+    letter-spacing: 0.22em;
+    color: var(--ink);
+    text-transform: uppercase;
+    padding: 10px 26px;
+    border: 2px solid rgba(255,255,255,0.22);
+    border-radius: 4px;
+    margin-bottom: 24px;
+    background: rgba(0,0,0,0.28);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 320px;
+    line-height: 0.86;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin: 0;
+    /* layered glow + crisp edge */
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 6px 22px rgba(0,0,0,0.65),
+      0 0 38px rgba(107,205,6,0.18);
+    animation: title-pulse 3.4s ease-in-out infinite;
+  }
+
+  @keyframes title-pulse {
+    0%, 100% {
+      text-shadow:
+        0 0 1px rgba(255,255,255,0.85),
+        0 6px 22px rgba(0,0,0,0.65),
+        0 0 22px rgba(107,205,6,0.10);
+    }
+    50% {
+      text-shadow:
+        0 0 1px rgba(255,255,255,1),
+        0 6px 22px rgba(0,0,0,0.65),
+        0 0 64px rgba(107,205,6,0.34);
+    }
+  }
+
+  /* a thin pink underline accent — micro brand cue */
+  .title-rule {
+    width: 220px;
+    height: 5px;
+    margin: 28px auto 22px;
+    background: var(--pink);
+    border-radius: 3px;
+    box-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+  }
+
+  .subtitle {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 38px;
+    letter-spacing: 0.32em;
+    color: var(--ink);
+    text-transform: uppercase;
+    opacity: 0.92;
+    animation: subtitle-breathe 4s ease-in-out infinite;
+  }
+
+  @keyframes subtitle-breathe {
+    0%, 100% { opacity: 0.72; letter-spacing: 0.32em; }
+    50%      { opacity: 1.00; letter-spacing: 0.36em; }
+  }
+
+  /* ── BOTTOM PARTNER STRIP ───────────────────────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    z-index: 12;
+  }
+
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+
+  .partners-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 76px;
+    padding: 18px 56px;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .partners-row .partner {
+    height: 78px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+
+  .partners-row .partner--gameevo  { height: 70px; }
+  .partners-row .partner--pride    { height: 64px; }
+  .partners-row .partner--africa   { height: 70px; }
+  .partners-row .partner--trace    { height: 80px; }
+
+  /* ── CORNER WATERMARK (season ID, very subtle) ──────────────── */
+  .season-mark {
+    position: absolute;
+    top: 30px;
+    right: 38px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Top header: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="../../../logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="../../../logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Left chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Right chevrons (mirrored) -->
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Body: kicker + INTERMISSION + subtitle -->
+    <section class="body">
+      <span class="kicker">Live · CADE Pro League</span>
+      <h1 class="title">INTERMISSION</h1>
+      <div class="title-rule" aria-hidden="true"></div>
+      <p class="subtitle">We'll Be Right Back</p>
+    </section>
+
+    <!-- Bottom partner strip -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="partners-row">
+        <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+        <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="Gamepride" />
+        <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+        <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="Trace" />
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

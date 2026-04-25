@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<!-- DATA WIRES: partners[] (auto-loaded from logo files) -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>CADE Esports League — Overlay #18 : Official Partners Strip</title>
+<style>
+  /* ============================================================
+     CADE Esports League — Overlay #18 : Official Partners Strip
+     Canvas   : 1920x1080, fully transparent
+     Anchor   : lower-third (bottom of frame, 50px from edge)
+     Strip    : 1920px wide, ~92px tall, dark band w/ green edge fades
+     Content  : 4 partner logos in continuous left-scroll marquee
+                + small "OFFICIAL PARTNERS" Quedora label at left
+     Loop     : 36s per full marquee cycle (linear, seamless)
+     Idle FX  : per-logo breathe-pulse with phase offsets so the strip
+                feels alive even at constant scroll speed
+     Persistent: no entry / exit — meant to stay on through segments
+     ============================================================ */
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    font-family: "Quedora", "Inter", sans-serif;
+    color: #ffffff;
+  }
+
+  /* ---- Local font registration (real files first, generic fallback) ---- */
+  @font-face {
+    font-family: "Agharti";
+    src: url("../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2") format("woff2"),
+         url("../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff") format("woff"),
+         local("Agharti Bold"),
+         local("Agharti");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Quedora";
+    src: url("../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Quedora";
+    src: url("../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Quedora";
+    src: url("../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+  }
+
+  /* ============================================================
+     STRIP SHELL
+     Lower-third anchor: bottom: 50px → ~50px clearance from frame edge
+     Height: 92px. Full 1920px wide.
+  ============================================================ */
+  /* Reduced from 92px → 76px for consistency with the slimmer
+     partner-strips in the per-overlay variants (#11, #16). */
+  .strip {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    width: 1920px;
+    height: 76px;
+    overflow: hidden;
+    /* Dark band w/ subtle vertical depth */
+    background:
+      linear-gradient(
+        180deg,
+        rgba(8, 12, 10, 0.0)   0%,
+        rgba(8, 12, 10, 0.78)  18%,
+        rgba(6, 10, 8, 0.92)   50%,
+        rgba(8, 12, 10, 0.78)  82%,
+        rgba(8, 12, 10, 0.0)   100%
+      );
+    /* Soft top + bottom hairline accents in brand green */
+    box-shadow:
+      inset 0 1px 0 rgba(107, 205, 6, 0.18),
+      inset 0 -1px 0 rgba(107, 205, 6, 0.22),
+      0 8px 28px rgba(0, 0, 0, 0.45);
+    /* Halftone-influenced texture overlay */
+    isolation: isolate;
+  }
+
+  /* Halftone dot pattern, super low opacity, brand-green tint */
+  .strip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(107, 205, 6, 0.14) 1px, transparent 1.6px);
+    background-size: 8px 8px;
+    background-position: 0 0;
+    mix-blend-mode: screen;
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ============================================================
+     LEFT-SIDE LABEL : "OFFICIAL PARTNERS"
+     Stacked 2-line on its own dark backdrop
+  ============================================================ */
+  .label {
+    position: absolute;
+    top: 50%;
+    left: 28px;
+    transform: translateY(-50%);
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 10px 16px 10px 14px;
+    background:
+      linear-gradient(135deg,
+        rgba(0, 0, 0, 0.85) 0%,
+        rgba(8, 14, 10, 0.92) 100%);
+    border-left: 3px solid #6bcd06;
+    border-right: 1px solid rgba(107, 205, 6, 0.35);
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.55),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    font-family: "Quedora", "Inter", sans-serif;
+  }
+  .label-eye {
+    font-size: 9px;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: #6bcd06;
+    text-shadow: 0 0 6px rgba(107, 205, 6, 0.55);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .label-main {
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #ffffff;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .label-tick {
+    width: 22px;
+    height: 2px;
+    margin-top: 2px;
+    background: linear-gradient(90deg, #fe036d 0%, rgba(254, 3, 109, 0) 100%);
+  }
+
+  /* ============================================================
+     EDGE FADE MASKS (left + right)
+     The marquee viewport sits BEHIND these.
+     Uses true alpha gradient → logos visually emerge / dissolve
+     from / into the surrounding (transparent) canvas.
+  ============================================================ */
+  .marquee-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    /* CSS mask creates the fade so this works on top of any
+       arbitrary live-stream background, not just on a solid color */
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 180px,
+      #000 280px,
+      #000 calc(100% - 80px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 180px,
+      #000 280px,
+      #000 calc(100% - 80px),
+      transparent 100%
+    );
+    z-index: 2;
+  }
+
+  /* ============================================================
+     MARQUEE TRACK
+     Two duplicate sets side-by-side; translate -50% over the cycle
+     for seamless loop (the second set already covers the first
+     when the first finishes scrolling).
+  ============================================================ */
+  .marquee-track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    will-change: transform;
+    animation: marqueeScroll 36s linear infinite;
+    padding-left: 0;
+  }
+
+  @keyframes marqueeScroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .partner {
+    flex: 0 0 auto;
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 56px; /* effective 112px gap between siblings */
+    position: relative;
+  }
+
+  .partner img,
+  .partner .fallback {
+    height: 52px;
+    width: auto;
+    max-width: 220px;
+    object-fit: contain;
+    filter:
+      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55))
+      drop-shadow(0 0 8px rgba(0, 0, 0, 0.35));
+    transition: filter 320ms ease-out;
+    will-change: filter, transform, opacity;
+  }
+
+  /* Per-partner breathe-pulse — staggered phases so the strip
+     feels alive even though the scroll is constant linear speed */
+  .partner.p0 img, .partner.p0 .fallback { animation: breathe 5.4s ease-in-out infinite; animation-delay: 0s;    }
+  .partner.p1 img, .partner.p1 .fallback { animation: breathe 5.4s ease-in-out infinite; animation-delay: 1.35s; }
+  .partner.p2 img, .partner.p2 .fallback { animation: breathe 5.4s ease-in-out infinite; animation-delay: 2.7s;  }
+  .partner.p3 img, .partner.p3 .fallback { animation: breathe 5.4s ease-in-out infinite; animation-delay: 4.05s; }
+
+  @keyframes breathe {
+    0%, 100% {
+      opacity: 0.92;
+      transform: scale(1);
+      filter:
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55))
+        drop-shadow(0 0 8px rgba(0, 0, 0, 0.35));
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.035);
+      filter:
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55))
+        drop-shadow(0 0 14px rgba(107, 205, 6, 0.32));
+    }
+  }
+
+  /* Fallback chip when a logo file 404s */
+  .partner .fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 56px;
+    min-width: 140px;
+    padding: 0 18px;
+    background: linear-gradient(135deg, rgba(20, 24, 22, 0.95), rgba(8, 12, 10, 0.95));
+    border: 1px solid rgba(107, 205, 6, 0.35);
+    color: #e8f5d0;
+    font-family: "Quedora", "Inter", sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+    border-radius: 2px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Subtle separator dot between consecutive partners
+     (lives on the gap rather than the partner so duplication
+      across the seam stays clean) */
+  .partner + .partner::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(107, 205, 6, 0.55);
+    box-shadow: 0 0 6px rgba(107, 205, 6, 0.6);
+    transform: translate(-50%, -50%);
+  }
+
+  /* ============================================================
+     SUBTLE BACKGROUND SHEEN — slow-traveling highlight that
+     sweeps across the strip every ~12s (keeps the band alive)
+  ============================================================ */
+  .strip-sheen {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    background: linear-gradient(
+      100deg,
+      transparent 0%,
+      transparent 38%,
+      rgba(107, 205, 6, 0.10) 48%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(107, 205, 6, 0.10) 52%,
+      transparent 62%,
+      transparent 100%
+    );
+    background-size: 220% 100%;
+    background-position: 200% 0;
+    animation: sheenSweep 12s cubic-bezier(0.55, 0.05, 0.45, 0.95) infinite;
+    mix-blend-mode: screen;
+  }
+  @keyframes sheenSweep {
+    0%   { background-position: 200% 0; }
+    55%  { background-position: -120% 0; }
+    100% { background-position: -120% 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="strip" role="complementary" aria-label="Official Partners">
+
+      <!-- Marquee viewport with edge fade mask -->
+      <div class="marquee-viewport" aria-hidden="true">
+        <div class="marquee-track" id="marquee-track">
+          <!-- Two identical sets are injected by JS for seamless loop -->
+        </div>
+      </div>
+
+      <!-- Slow traveling sheen -->
+      <div class="strip-sheen"></div>
+    </div>
+  </div>
+
+<script>
+  // ============================================================
+  // PARTNERS DATA  (DATA WIRES: partners[])
+  // Order is locked: GameEvo, Gamepride, ESPORTS AFRICA NEWS, TRACE
+  // ============================================================
+  const partners = [
+    {
+      name: "GameEvo Esports",
+      shortName: "GameEvo",
+      src: "../../../logos/GameEvo%20Esports%20White.png"
+    },
+    {
+      name: "Gamepride",
+      shortName: "Gamepride",
+      src: "../../../logos/Gamepride%20Green-01.png"
+    },
+    {
+      name: "Esports Africa News",
+      shortName: "ESPORTS AFRICA NEWS",
+      src: "../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png"
+    },
+    {
+      name: "TRACE",
+      shortName: "TRACE",
+      src: "../../../logos/TRACE_2010_logo.svg.png"
+    }
+  ];
+
+  function buildPartner(p, indexInSet) {
+    const wrap = document.createElement("div");
+    wrap.className = "partner p" + indexInSet;
+
+    const img = document.createElement("img");
+    img.src = p.src;
+    img.alt = p.name;
+    img.loading = "eager";
+    img.decoding = "async";
+
+    // Graceful fallback if the file 404s
+    img.addEventListener("error", () => {
+      const fb = document.createElement("span");
+      fb.className = "fallback";
+      fb.textContent = p.shortName;
+      img.replaceWith(fb);
+    }, { once: true });
+
+    wrap.appendChild(img);
+    return wrap;
+  }
+
+  function mountMarquee() {
+    const track = document.getElementById("marquee-track");
+    if (!track) return;
+
+    // Build TWO identical sets back-to-back so translateX -50%
+    // produces a perfectly seamless loop.
+    for (let set = 0; set < 2; set++) {
+      partners.forEach((p, i) => track.appendChild(buildPartner(p, i)));
+    }
+  }
+
+  // Keep the timing exactly synchronized after font load (avoids
+  // the sub-pixel layout shift that would otherwise cause a tiny
+  // jump on the first cycle).
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(mountMarquee);
+  } else {
+    mountMarquee();
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #12 — "STARTING SOON" (FULL-SCREEN HOLD)
+  1920×1080 opaque waiting screen. Halftone-green ELITE S2 BG.
+  Design system inherited from pilot ../01-brb/index.html — same fonts,
+  same halftone bg + drift/breathe, same top CADE+Pro League logo pair,
+  same side chevron motifs, same bottom marquee partner strip.
+
+  HOLD-SCREEN CHARACTER:
+  - No countdown, no social handles.
+  - Continuous animation everywhere — title glow pulse + per-letter
+    scale offset, subtitle breathe, chevron stagger, bg drift,
+    partner marquee scroll, animated "stand by" dots, accent ring.
+  - Silent.
+
+  DATA WIRES: none (waiting screen)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — STARTING SOON</title>
+
+<style>
+  /* ── REAL BRAND FONTS ───────────────────────────────────────── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--black);
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080 fixed canvas, OPAQUE) ─────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0a0e07;
+    isolation: isolate;
+  }
+
+  /* ── BG: halftone ELITE S2 BG (animated) ────────────────────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: url('../../../designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 20s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.04) saturate(1.06); }
+  }
+
+  /* dark gradient overlay so text reads cleanly */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 42%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.32) 55%, rgba(5,5,5,0.80) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.12) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* subtle scanline grain */
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) ────────────────────── */
+  .top-band {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    z-index: 10;
+  }
+
+  .top-band .logo {
+    height: 96px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+
+  .top-band .logo--cade { height: 88px; }
+  .top-band .logo--pro  { height: 104px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 80px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── SIDE CHEVRONS (decorative motif) ───────────────────────── */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 38px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .chevrons--left  { left: 70px; }
+  .chevrons--right { right: 70px; }
+
+  .chevron {
+    width: 88px;
+    height: 64px;
+    color: var(--green);
+    opacity: 0.55;
+    animation: chev-pulse 4.2s ease-in-out infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
+
+  @keyframes chev-pulse {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(6px); }
+  }
+  .chevrons--right .chevron {
+    animation-name: chev-pulse-right;
+  }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.30; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(-6px); }
+  }
+
+  /* ── BODY: title + accent + subtitle ────────────────────────── */
+  .body {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -52%);
+    width: 1700px;
+    text-align: center;
+    z-index: 20;
+  }
+
+  /* HUGE Agharti condensed title — letters animated individually */
+  .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 320px;
+    line-height: 0.86;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    gap: 0.01em;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  /* per-letter spans — staggered scale pulse + glow cycle */
+  .title .ltr {
+    display: inline-block;
+    transform-origin: 50% 70%;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 6px 22px rgba(0,0,0,0.65),
+      0 0 38px rgba(107,205,6,0.18);
+    animation: ltr-pulse 3.6s ease-in-out infinite;
+    will-change: transform, text-shadow;
+  }
+  .title .ltr--gap { width: 0.32em; display: inline-block; }
+
+  /* stagger across 13 child spans (8 + gap + 4) */
+  .title .ltr:nth-child(1)  { animation-delay: 0.00s; }
+  .title .ltr:nth-child(2)  { animation-delay: 0.10s; }
+  .title .ltr:nth-child(3)  { animation-delay: 0.20s; }
+  .title .ltr:nth-child(4)  { animation-delay: 0.30s; }
+  .title .ltr:nth-child(5)  { animation-delay: 0.40s; }
+  .title .ltr:nth-child(6)  { animation-delay: 0.50s; }
+  .title .ltr:nth-child(7)  { animation-delay: 0.60s; }
+  .title .ltr:nth-child(8)  { animation-delay: 0.70s; }
+  /* spacer (9) skipped */
+  .title .ltr:nth-child(10) { animation-delay: 0.80s; }
+  .title .ltr:nth-child(11) { animation-delay: 0.90s; }
+  .title .ltr:nth-child(12) { animation-delay: 1.00s; }
+  .title .ltr:nth-child(13) { animation-delay: 1.10s; }
+
+  @keyframes ltr-pulse {
+    0%, 100% {
+      transform: translateY(0) scale(1.000);
+      text-shadow:
+        0 0 1px rgba(255,255,255,0.85),
+        0 6px 22px rgba(0,0,0,0.65),
+        0 0 22px rgba(107,205,6,0.10);
+    }
+    50% {
+      transform: translateY(-6px) scale(1.018);
+      text-shadow:
+        0 0 1px rgba(255,255,255,1),
+        0 6px 22px rgba(0,0,0,0.65),
+        0 0 64px rgba(107,205,6,0.36);
+    }
+  }
+
+  /* thin pink underline accent */
+  .title-rule {
+    width: 280px;
+    height: 5px;
+    margin: 36px auto 24px;
+    background: var(--pink);
+    border-radius: 3px;
+    box-shadow:
+      0 0 14px var(--pink-glow),
+      0 0 28px rgba(254,3,109,0.30);
+    animation: rule-pulse 3.4s ease-in-out infinite;
+  }
+  @keyframes rule-pulse {
+    0%, 100% { transform: scaleX(1.00); opacity: 0.85; }
+    50%      { transform: scaleX(1.18); opacity: 1.00; }
+  }
+
+  /* subtitle row: "PLEASE STAND BY" + animated dots + spinner */
+  .subtitle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    margin-top: 4px;
+  }
+
+  .subtitle {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 38px;
+    letter-spacing: 0.32em;
+    color: var(--ink);
+    text-transform: uppercase;
+    opacity: 0.92;
+    animation: subtitle-breathe 4s ease-in-out infinite;
+  }
+
+  @keyframes subtitle-breathe {
+    0%, 100% { opacity: 0.72; letter-spacing: 0.32em; }
+    50%      { opacity: 1.00; letter-spacing: 0.36em; }
+  }
+
+  /* three animated dots after subtitle */
+  .dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 4px;
+  }
+  .dots .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 12px var(--green-glow);
+    animation: dot-bounce 1.4s ease-in-out infinite;
+  }
+  .dots .dot:nth-child(1) { animation-delay: 0.00s; }
+  .dots .dot:nth-child(2) { animation-delay: 0.20s; }
+  .dots .dot:nth-child(3) { animation-delay: 0.40s; }
+
+  @keyframes dot-bounce {
+    0%, 100% { transform: translateY(0)    scale(1.00); opacity: 0.55; }
+    50%      { transform: translateY(-8px) scale(1.20); opacity: 1.00; }
+  }
+
+  /* small spinning ring loader on the right of the subtitle row */
+  .spinner {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: var(--green);
+    border-right-color: var(--green);
+    box-shadow: 0 0 12px rgba(107,205,6,0.35);
+    animation: spin 1.6s linear infinite;
+  }
+  @keyframes spin {
+    0%   { transform: rotate(0deg);   }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* season watermark beneath the subtitle row */
+  .season-watermark {
+    margin-top: 44px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.46em;
+    color: rgba(255,255,255,0.58);
+    text-transform: uppercase;
+    animation: subtitle-breathe 5.2s ease-in-out infinite;
+  }
+  .season-watermark .sep {
+    display: inline-block;
+    margin: 0 14px;
+    color: var(--green);
+    transform: translateY(-2px);
+  }
+
+  /* ── BOTTOM PARTNER STRIP (MARQUEE) ─────────────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    z-index: 12;
+  }
+
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+
+  .marquee {
+    position: relative;
+    width: 1080px;
+    max-width: 90%;
+    overflow: hidden;
+    padding: 18px 0;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 60px,
+      #000 calc(100% - 60px),
+      transparent 100%
+    );
+  }
+
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee-scroll 40s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes marquee-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-33.3333%); }
+  }
+
+  .marquee-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 76px;
+    padding: 0 38px;
+    flex-shrink: 0;
+  }
+
+  .marquee-group .partner {
+    height: 78px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+
+  .marquee-group .partner--gameevo  { height: 70px; }
+  .marquee-group .partner--pride    { height: 64px; }
+  .marquee-group .partner--africa   { height: 70px; }
+  .marquee-group .partner--trace    { height: 80px; }
+
+  /* ── CORNER WATERMARK (top-right pulse dot + season label) ──── */
+  .season-mark {
+    position: absolute;
+    top: 30px;
+    right: 38px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 10px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1);   }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+</style>
+</head>
+<body>
+  <!-- DATA WIRES: none (waiting screen) -->
+  <main class="stage">
+
+    <!-- BG halftone + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- Top-right season watermark -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2 · 2026</div>
+
+    <!-- Top header: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="../../../logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro" src="../../../logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Left chevrons -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Right chevrons (mirrored) -->
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Body: huge title + pink rule + subtitle row + season watermark -->
+    <section class="body">
+      <h1 class="title" aria-label="Starting Soon">
+        <span class="ltr">S</span><span class="ltr">T</span><span class="ltr">A</span><span class="ltr">R</span><span class="ltr">T</span><span class="ltr">I</span><span class="ltr">N</span><span class="ltr">G</span><span class="ltr ltr--gap" aria-hidden="true"></span><span class="ltr">S</span><span class="ltr">O</span><span class="ltr">O</span><span class="ltr">N</span>
+      </h1>
+      <div class="title-rule" aria-hidden="true"></div>
+
+      <div class="subtitle-row">
+        <p class="subtitle">Please Stand By</p>
+        <span class="dots" aria-hidden="true">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+        <span class="spinner" aria-hidden="true"></span>
+      </div>
+
+      <p class="season-watermark">
+        Elite League<span class="sep">·</span>Season 2<span class="sep">·</span>2026
+      </p>
+    </section>
+
+    <!-- Bottom partner strip — MARQUEE: 3× duplicated row scrolls right→left -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="marquee" aria-label="Official partners ticker">
+        <div class="marquee-track">
+
+          <!-- Group 1 (source) -->
+          <div class="marquee-group" aria-hidden="false">
+            <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+            <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="Gamepride" />
+            <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+            <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="Trace" />
+          </div>
+
+          <!-- Group 2 (duplicate) -->
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+
+          <!-- Group 3 (duplicate, seamless loop buffer) -->
+          <div class="marquee-group" aria-hidden="true">
+            <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="" />
+            <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="" />
+            <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="" />
+            <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="" />
+          </div>
+
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    /* OBS show/hide opacity-fade handler. Static screen — no data wires. */
+    (function () {
+      var stage = document.querySelector('.stage') || document.body;
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        if (msg.type === 'show') { stage.style.transition = ''; stage.style.opacity = '1'; }
+        else if (msg.type === 'hide') { stage.style.transition = 'opacity 0.5s ease'; stage.style.opacity = '0'; }
+      }, false);
+    })();
+  </script>
+</body>
+</html>

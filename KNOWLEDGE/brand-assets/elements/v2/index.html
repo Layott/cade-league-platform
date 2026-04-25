@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CADE Broadcast v2 — Overlay Mockup Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Rajdhani:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #07080b;
+    color: #fff;
+    font-family: "Rajdhani", system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 48px 40px 80px;
+  }
+  h1 {
+    font-family: "Oswald", sans-serif;
+    font-weight: 700;
+    font-size: 56px;
+    letter-spacing: 2px;
+    line-height: 1.05;
+    margin-bottom: 8px;
+  }
+  h1 span.accent { color: #6bcd06; }
+  h1 span.pink { color: #fe036d; }
+  .sub {
+    font-family: "Rajdhani", sans-serif;
+    font-size: 17px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #9ba3b0;
+    margin-bottom: 24px;
+  }
+  .callout {
+    padding: 16px 22px;
+    border: 1px solid #6bcd06;
+    background: rgba(107, 205, 6, 0.08);
+    border-radius: 6px;
+    margin-bottom: 32px;
+    font-size: 14px;
+    line-height: 1.55;
+    max-width: 900px;
+  }
+  .callout strong {
+    font-family: "Oswald", sans-serif;
+    color: #6bcd06;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-size: 13px;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .legend {
+    display: inline-flex;
+    gap: 20px;
+    margin-bottom: 32px;
+    padding: 12px 18px;
+    border: 1px solid #1b1e26;
+    background: #0c0e12;
+    border-radius: 6px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .legend .k { color: #9ba3b0; }
+  .legend .v { color: #fff; margin-right: 14px; }
+  .legend .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .legend .pill.live { background: #6bcd06; color: #0a0a0a; }
+  .legend .pill.pending { background: #2a2e36; color: #9ba3b0; }
+  .legend .pill.pilot { background: #fe036d; color: #fff; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 28px;
+  }
+  .card {
+    background: #0d0f13;
+    border: 1px solid #1b1e26;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+  }
+  .card.pilot {
+    border-color: #fe036d;
+    box-shadow: 0 0 0 1px rgba(254, 3, 109, 0.3);
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: #6bcd06;
+  }
+  .card.pilot:hover { border-color: #fe036d; }
+  .card .preview {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"><rect fill="%23111" width="1920" height="1080"/><text x="960" y="540" text-anchor="middle" fill="%23444" font-family="monospace" font-size="72">1920×1080</text></svg>') center/cover no-repeat;
+    overflow: hidden;
+  }
+  .card .preview iframe {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    border: 0;
+    transform: scale(0.198);
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  /* Card with preview width ~380px → scale = 380/1920 = 0.198 */
+  .card .body {
+    padding: 16px 18px 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .card .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .card .num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: #6bcd06;
+    letter-spacing: 1px;
+  }
+  .card .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .card .pill.live { background: #6bcd06; color: #0a0a0a; }
+  .card .pill.pending { background: #2a2e36; color: #9ba3b0; }
+  .card .pill.pilot { background: #fe036d; color: #fff; }
+  .card .pill.editable { background: #1d3a5a; color: #82d3ff; }
+  .card h3 {
+    font-family: "Oswald", sans-serif;
+    font-size: 19px;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .card p {
+    font-size: 13px;
+    color: #7a8391;
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+  .card .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 12px;
+  }
+  .card .actions a, .card .actions button {
+    flex: 1;
+    display: inline-block;
+    padding: 8px 10px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    text-align: center;
+    border-radius: 3px;
+    border: 1px solid #1b1e26;
+    background: #10131a;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+  .card .actions a:hover, .card .actions button:hover {
+    border-color: #6bcd06;
+    color: #6bcd06;
+  }
+  .card .actions a.primary {
+    background: #6bcd06;
+    color: #0a0a0a;
+    border-color: #6bcd06;
+    font-weight: 600;
+  }
+  .card .actions a.primary:hover {
+    background: #8eff14;
+    border-color: #8eff14;
+  }
+  .card .edit-panel {
+    margin-top: 12px;
+    padding: 12px;
+    background: #10131a;
+    border-radius: 4px;
+    border: 1px solid #1b1e26;
+  }
+  .card .edit-panel h4 {
+    font-family: "Oswald", sans-serif;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #82d3ff;
+    margin-bottom: 10px;
+  }
+  .card .edit-panel .row-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .card .edit-panel label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #7a8391;
+    margin-bottom: 3px;
+  }
+  .card .edit-panel input,
+  .card .edit-panel select {
+    width: 100%;
+    padding: 6px 8px;
+    background: #07080b;
+    border: 1px solid #2a2e36;
+    border-radius: 3px;
+    color: #fff;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+  }
+  .card .edit-panel input:focus,
+  .card .edit-panel select:focus {
+    outline: none;
+    border-color: #6bcd06;
+  }
+  .card .edit-panel .btns {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .card .edit-panel button {
+    padding: 6px 10px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: #1a1f28;
+    color: #fff;
+    border: 1px solid #2a2e36;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+  }
+  .card .edit-panel button.primary {
+    background: #6bcd06;
+    color: #0a0a0a;
+    border-color: #6bcd06;
+  }
+  .card .edit-panel button.pink {
+    background: #fe036d;
+    color: #fff;
+    border-color: #fe036d;
+  }
+  .card .edit-panel button:hover { filter: brightness(1.15); }
+  .footer-note {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid #1b1e26;
+    font-size: 12px;
+    color: #7a8391;
+    letter-spacing: 1px;
+    line-height: 1.8;
+  }
+  .footer-note code {
+    font-family: "JetBrains Mono", monospace;
+    background: #10131a;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #6bcd06;
+  }
+</style>
+</head>
+<body>
+
+<h1>CADE BROADCAST <span class="accent">v2</span> — CONTROL PANEL MOCKUP</h1>
+<p class="sub">Broadcast control panel dress-rehearsal · 1920×1080 · Elite Division 1 · Season 2</p>
+
+<div class="callout">
+  <strong>Round 3 — broadcast control panel mockup — 2026-04-25</strong>
+  Animated-bg variants dropped from grid (meta-overlays). H2H now has player-selector dropdowns. Lower-third has 3 simultaneous slots with localStorage presets. Match-scores-day has 3-part split controls. If you don't see your latest changes — hard refresh (Ctrl+F5).
+</div>
+
+<div class="legend">
+  <span class="k">Status:</span>
+  <span class="pill live">LIVE</span><span class="v">&nbsp;= round 2 corrections applied ·&nbsp;</span>
+  <span class="pill editable">EDITABLE / CONTROLS</span><span class="v">&nbsp;= live postMessage controls + pickers</span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="footer-note">
+  <p>Each preview renders the live HTML scaled to ~<code>0.198×</code>. Click <strong>Open 1:1</strong> to see full 1920×1080.</p>
+  <p>Editable overlays (Timer, Lower Third 3-slot, Score Bug, Up Next Bug, H2H pickers, Match Scores parts) expose live inputs — updates post to the iframe via <code>window.postMessage</code>. Lower-third presets persist to <code>localStorage['cade-lt-presets']</code>.</p>
+  <p>Files at <code>KNOWLEDGE/brand-assets/elements/v2/NN-slug/index.html</code>.</p>
+</div>
+
+<script>
+  const PLAYER_SLUGS = [
+    'adefola', 'anife', 'baji_jnr', 'dadaboi', 'faruk', 'guru',
+    'kaykay', 'killer_freak', 'king_nonex', 'mitch', 'mr_oga',
+    'tactical', 'wolevation'
+  ];
+  const PLAYER_NAMES = {
+    adefola: 'ADEFOLA', anife: 'ANIFE', baji_jnr: 'BAJI JNR',
+    dadaboi: 'DADABOI', faruk: 'FARUK', guru: 'GURU',
+    kaykay: 'KAYKAY', killer_freak: 'KILLER FREAK',
+    king_nonex: 'KING NONEX', mitch: 'MITCH', mr_oga: 'MR OGA',
+    tactical: 'TACTICAL', wolevation: 'WOLEVATION'
+  };
+
+  const overlays = [
+    { n: "01", slug: "brb", title: "INTERMISSION (BRB)", desc: "Continuous BRB hold with marquee partner strip. Kicker: 'Live CADE Elite League'.", pilot: false },
+    { n: "02", slug: "timer", title: "Timer (Lower-Third)", desc: "MM:SS countdown. Live-editable duration or end-clock.", editable: "timer" },
+    { n: "04", slug: "h2h-2", title: "Head-to-Head (2 Players)", desc: "Pre-match comparison. 8 stats + win probability.", editable: "h2hPicker", playerCount: 2 },
+    { n: "05", slug: "h2h-3", title: "Head-to-Head (3 Players)", desc: "3-way comparison. Same stat set as H2H-2.", editable: "h2hPicker", playerCount: 3 },
+    { n: "06", slug: "h2h-5", title: "Head-to-Head (5 Players)", desc: "5-way comparison. Compact layout.", editable: "h2hPicker", playerCount: 5 },
+    { n: "07", slug: "leaderboard", title: "Animated Leaderboard", desc: "Full 13-player standings with row-swap animation on snapshot trigger. No header text." },
+    { n: "08", slug: "lower-third", title: "Lower Third (Name Intro)", desc: "Name + role bar. 3 simultaneous slots with localStorage presets. Pro League logo.", editable: "lowerThird" },
+    { n: "09", slug: "secondary-score-bug", title: "Secondary Score Bug", desc: "Off-stream match scores. Live-editable players + scores.", editable: "scoreBug" },
+    { n: "10", slug: "up-next-bug", title: "Up Next Bug", desc: "Upcoming match slide-in. Live-editable players.", editable: "upNext" },
+    { n: "11", slug: "match-scores-day", title: "Match Scores for the Day", desc: "2-col grid up to 12 matches/day. TBD pills pulse-breathe. Title: MATCH DAY N RESULTS.", editable: "matchScoresDay" },
+    { n: "12", slug: "starting-soon", title: "Starting Soon", desc: "Full-screen pre-stream hold." },
+    { n: "13", slug: "stream-ended", title: "Stream Ended", desc: "Post-stream end card. Brand + 'CADE Elite League · Season 2'." },
+    { n: "14", slug: "top-scorers", title: "Top 10 Goal Scorers", desc: "Podium-style top 3 emphasis with positions 4-10 in tail row. #1 with gold accent." },
+    { n: "15", slug: "orgs", title: "Registered Orgs / Teams", desc: "Grid wall of orgs with players underneath." },
+    { n: "16", slug: "coaches", title: "Coach Introductions", desc: "11-coach 4-3-4 staggered placeholder grid (real coaches TBD). Each card shows player they coach + org logo." },
+    { n: "17", slug: "penalties", title: "Player Penalties", desc: "2-col grid for up to 13 players, cascade animation. Only players with active penalties shown." },
+    { n: "18", slug: "partners-strip", title: "Partners Strip (Lower Third)", desc: "Standalone scrolling partner logos. Transparent canvas. Lower-third marquee for use on top of any scene." },
+  ];
+
+  const g = document.getElementById('grid');
+  overlays.forEach((o, idx) => {
+    const file = `${o.n}-${o.slug}/index.html?v=2026-04-25-r2`;
+    const iframeId = `if-${o.slug}`;
+    const card = document.createElement('div');
+    card.className = 'card' + (o.pilot ? ' pilot' : '');
+    const pillLabel = o.pilot ? 'PILOT' : (o.editable ? 'EDITABLE' : 'LIVE');
+    const pillClass = o.pilot ? 'pilot' : (o.editable ? 'editable' : 'live');
+    card.innerHTML = `
+      <div class="preview"><iframe id="${iframeId}" src="${file}" loading="lazy"></iframe></div>
+      <div class="body">
+        <div class="row">
+          <span class="num">#${o.n}</span>
+          <span class="pill ${pillClass}">${pillLabel}</span>
+        </div>
+        <h3>${o.title}</h3>
+        <p>${o.desc}</p>
+        ${o.editable ? renderEditPanel(o, iframeId) : ''}
+        <div class="actions">
+          <a class="primary" href="${file}" target="_blank">Open 1:1</a>
+          <button onclick="copyUrl('${file}', this)">Copy URL</button>
+        </div>
+      </div>
+    `;
+    g.appendChild(card);
+  });
+
+  // Populate any saved lower-third presets into all dropdowns
+  if (typeof refreshLtPresetDropdowns === 'function') refreshLtPresetDropdowns();
+  setTimeout(() => { try { refreshLtPresetDropdowns(); } catch {} }, 0);
+
+  function renderEditPanel(o, iframeId) {
+    if (o.editable === 'timer') {
+      return `
+        <div class="edit-panel">
+          <h4>▸ TIMER CONTROLS</h4>
+          <div class="row-grid">
+            <div><label>Minutes</label><input type="number" id="${iframeId}-min" value="3" min="0" max="999"></div>
+            <div><label>Seconds</label><input type="number" id="${iframeId}-sec" value="0" min="0" max="59"></div>
+          </div>
+          <div>
+            <label>OR end-clock (HH:MM, 24h WAT)</label>
+            <input type="time" id="${iframeId}-clock">
+          </div>
+          <div class="btns">
+            <button class="primary" onclick="sendTimer('${iframeId}', 'duration')">Start (min:sec)</button>
+            <button class="primary" onclick="sendTimer('${iframeId}', 'clock')">Start (end-clock)</button>
+            <button class="pink" onclick="postTo('${iframeId}', {type:'reset'})">Reset</button>
+          </div>
+        </div>
+      `;
+    }
+    if (o.editable === 'lowerThird') {
+      const slots = [1, 2, 3].map(slotNum => {
+        const defaults = { 1: ['JOSH', 'HEAD CASTER'], 2: ['ADE', 'CO-CASTER'], 3: ['MITCH', 'ANALYST'] }[slotNum];
+        return `
+          <div class="edit-panel" style="margin-top:8px;">
+            <h4>▸ SLOT ${slotNum}</h4>
+            <div class="row-grid">
+              <div><label>Name</label><input type="text" id="${iframeId}-name-${slotNum}" value="${defaults[0]}"></div>
+              <div><label>Role</label><input type="text" id="${iframeId}-role-${slotNum}" value="${defaults[1]}"></div>
+            </div>
+            <div class="row-grid">
+              <div>
+                <label>Load Preset</label>
+                <select id="${iframeId}-preset-${slotNum}" onchange="loadLtPreset('${iframeId}', ${slotNum})">
+                  <option value="">— Select preset —</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:flex-end;">
+                <button onclick="saveLtPreset('${iframeId}', ${slotNum})" style="width:100%;">Save as Preset</button>
+              </div>
+            </div>
+            <div class="btns">
+              <button class="primary" onclick="sendLowerThirdSlot('${iframeId}', ${slotNum})">Update &amp; Show</button>
+              <button class="pink" onclick="postTo('${iframeId}', {type:'hide', slot:${slotNum}})">Hide</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="edit-panel">
+          <h4>▸ LOWER THIRD — 3 SIMULTANEOUS SLOTS</h4>
+          ${slots}
+        </div>
+      `;
+    }
+    if (o.editable === 'h2hPicker') {
+      const count = o.playerCount || 2;
+      const defaults = ['baji_jnr', 'king_nonex', 'faruk', 'kaykay', 'guru'];
+      const rows = [];
+      for (let i = 0; i < count; i += 2) {
+        const left = i;
+        const right = i + 1;
+        rows.push(`
+          <div class="row-grid">
+            <div><label>Player ${left + 1}</label>${playerSelect(`${iframeId}-h2h-${left}`, defaults[left])}</div>
+            ${right < count ? `<div><label>Player ${right + 1}</label>${playerSelect(`${iframeId}-h2h-${right}`, defaults[right])}</div>` : '<div></div>'}
+          </div>
+        `);
+      }
+      return `
+        <div class="edit-panel">
+          <h4>▸ H2H-${count} PLAYER PICKER</h4>
+          ${rows.join('')}
+          <div class="btns">
+            <button class="primary" onclick="sendH2HPicker('${iframeId}', ${count})">Update &amp; Show</button>
+            <button class="pink" onclick="postTo('${iframeId}', {type:'hide'})">Hide</button>
+          </div>
+        </div>
+      `;
+    }
+    if (o.editable === 'matchScoresDay') {
+      return `
+        <div class="edit-panel">
+          <h4>▸ MATCH SCORES — PART SPLIT</h4>
+          <div class="btns">
+            <button class="primary" onclick="sendMatchPart('${iframeId}', 1)">Show Part 1 (matches 1-4)</button>
+            <button class="primary" onclick="sendMatchPart('${iframeId}', 2)">Show Part 2 (matches 5-8)</button>
+          </div>
+          <div class="btns">
+            <button class="primary" onclick="sendMatchPart('${iframeId}', 3)">Show Part 3 (matches 9-12)</button>
+            <button onclick="sendMatchPart('${iframeId}', 'all')">Show All</button>
+          </div>
+          <div class="btns">
+            <button class="pink" onclick="postTo('${iframeId}', {type:'hide'})">Hide</button>
+          </div>
+        </div>
+      `;
+    }
+    if (o.editable === 'scoreBug') {
+      return `
+        <div class="edit-panel">
+          <h4>▸ SCORE BUG CONTROLS</h4>
+          <div class="row-grid">
+            <div><label>Player A</label>${playerSelect(iframeId + '-a-slug', 'baji_jnr')}</div>
+            <div><label>Score A</label><input type="number" id="${iframeId}-a-score" value="3" min="0"></div>
+          </div>
+          <div class="row-grid">
+            <div><label>Player B</label>${playerSelect(iframeId + '-b-slug', 'king_nonex')}</div>
+            <div><label>Score B</label><input type="number" id="${iframeId}-b-score" value="1" min="0"></div>
+          </div>
+          <div class="btns">
+            <button class="primary" onclick="sendScoreBug('${iframeId}')">Update &amp; Show</button>
+            <button onclick="postTo('${iframeId}', {type:'scoreIncrement', data:{side:'A'}})">+1 A</button>
+            <button onclick="postTo('${iframeId}', {type:'scoreIncrement', data:{side:'B'}})">+1 B</button>
+            <button class="pink" onclick="postTo('${iframeId}', {type:'hide'})">Hide</button>
+          </div>
+        </div>
+      `;
+    }
+    if (o.editable === 'upNext') {
+      return `
+        <div class="edit-panel">
+          <h4>▸ UP NEXT CONTROLS</h4>
+          <div class="row-grid">
+            <div><label>Player 1</label>${playerSelect(iframeId + '-p1-slug', 'faruk')}</div>
+            <div><label>Player 2</label>${playerSelect(iframeId + '-p2-slug', 'kaykay')}</div>
+          </div>
+          <div class="btns">
+            <button class="primary" onclick="sendUpNext('${iframeId}')">Update &amp; Show</button>
+            <button onclick="postTo('${iframeId}', {type:'show'})">Show</button>
+            <button class="pink" onclick="postTo('${iframeId}', {type:'hide'})">Hide</button>
+          </div>
+        </div>
+      `;
+    }
+    return '';
+  }
+
+  function playerSelect(id, defaultSlug) {
+    const options = PLAYER_SLUGS.map(s =>
+      `<option value="${s}"${s === defaultSlug ? ' selected' : ''}>${PLAYER_NAMES[s]}</option>`
+    ).join('');
+    return `<select id="${id}">${options}</select>`;
+  }
+
+  function postTo(iframeId, message) {
+    const frame = document.getElementById(iframeId);
+    if (!frame || !frame.contentWindow) return;
+    frame.contentWindow.postMessage(message, '*');
+  }
+
+  function sendTimer(iframeId, mode) {
+    if (mode === 'duration') {
+      const minutes = parseInt(document.getElementById(iframeId + '-min').value) || 0;
+      const seconds = parseInt(document.getElementById(iframeId + '-sec').value) || 0;
+      postTo(iframeId, { type: 'update', data: { minutes, seconds } });
+    } else {
+      const endClock = document.getElementById(iframeId + '-clock').value;
+      if (!endClock) { alert('Set an end-clock time first (HH:MM)'); return; }
+      postTo(iframeId, { type: 'update', data: { mode: 'clock', endClock } });
+    }
+  }
+
+  function sendLowerThird(iframeId) {
+    const name = document.getElementById(iframeId + '-name').value.trim();
+    const role = document.getElementById(iframeId + '-role').value.trim();
+    postTo(iframeId, { type: 'update', data: { name, role } });
+  }
+
+  function sendLowerThirdSlot(iframeId, slotNum) {
+    const name = document.getElementById(iframeId + '-name-' + slotNum).value.trim();
+    const role = document.getElementById(iframeId + '-role-' + slotNum).value.trim();
+    const payload = { type: 'update', slot: slotNum, data: { name, role } };
+    console.log('lower-third slot ' + slotNum + ':', { name, role });
+    postTo(iframeId, payload);
+  }
+
+  const LT_PRESET_KEY = 'cade-lt-presets';
+  function getLtPresets() {
+    try { return JSON.parse(localStorage.getItem(LT_PRESET_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function setLtPresets(arr) { localStorage.setItem(LT_PRESET_KEY, JSON.stringify(arr)); }
+
+  function saveLtPreset(iframeId, slotNum) {
+    const name = document.getElementById(iframeId + '-name-' + slotNum).value.trim();
+    const role = document.getElementById(iframeId + '-role-' + slotNum).value.trim();
+    const presetName = prompt('Preset name?', name || 'Preset ' + Date.now());
+    if (!presetName) return;
+    const presets = getLtPresets();
+    const existing = presets.findIndex(p => p.name === presetName);
+    const entry = { name: presetName, slotData: { name, role } };
+    if (existing >= 0) presets[existing] = entry; else presets.push(entry);
+    setLtPresets(presets);
+    refreshLtPresetDropdowns();
+    console.log('lt preset saved:', entry);
+  }
+
+  function loadLtPreset(iframeId, slotNum) {
+    const sel = document.getElementById(iframeId + '-preset-' + slotNum);
+    const presetName = sel.value;
+    if (!presetName) return;
+    const preset = getLtPresets().find(p => p.name === presetName);
+    if (!preset) return;
+    document.getElementById(iframeId + '-name-' + slotNum).value = preset.slotData.name || '';
+    document.getElementById(iframeId + '-role-' + slotNum).value = preset.slotData.role || '';
+  }
+
+  function refreshLtPresetDropdowns() {
+    const presets = getLtPresets();
+    document.querySelectorAll('select[id*="-preset-"]').forEach(sel => {
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— Select preset —</option>' +
+        presets.map(p => `<option value="${p.name}"${p.name === current ? ' selected' : ''}>${p.name}</option>`).join('');
+    });
+  }
+
+  function sendH2HPicker(iframeId, count) {
+    const slugs = [];
+    for (let i = 0; i < count; i++) {
+      const el = document.getElementById(iframeId + '-h2h-' + i);
+      if (el) slugs.push(el.value);
+    }
+    const players = slugs.map(s => ({ slug: s, name: PLAYER_NAMES[s] }));
+    console.log('h2h-' + count + ': players', slugs);
+    postTo(iframeId, { type: 'update', data: { players } });
+  }
+
+  function sendMatchPart(iframeId, partRange) {
+    console.log('match-scores-day: partRange', partRange);
+    postTo(iframeId, { type: 'update', data: { partRange } });
+  }
+
+  function sendScoreBug(iframeId) {
+    const aSlug = document.getElementById(iframeId + '-a-slug').value;
+    const aScore = parseInt(document.getElementById(iframeId + '-a-score').value) || 0;
+    const bSlug = document.getElementById(iframeId + '-b-slug').value;
+    const bScore = parseInt(document.getElementById(iframeId + '-b-score').value) || 0;
+    postTo(iframeId, {
+      type: 'update',
+      data: {
+        playerA: { name: PLAYER_NAMES[aSlug], slug: aSlug, score: aScore },
+        playerB: { name: PLAYER_NAMES[bSlug], slug: bSlug, score: bScore }
+      }
+    });
+  }
+
+  function sendUpNext(iframeId) {
+    const p1Slug = document.getElementById(iframeId + '-p1-slug').value;
+    const p2Slug = document.getElementById(iframeId + '-p2-slug').value;
+    postTo(iframeId, {
+      type: 'update',
+      data: {
+        player1: { name: PLAYER_NAMES[p1Slug], slug: p1Slug },
+        player2: { name: PLAYER_NAMES[p2Slug], slug: p2Slug }
+      }
+    });
+  }
+
+  function copyUrl(file, btn) {
+    const url = new URL(file, window.location.href).href;
+    navigator.clipboard.writeText(url).then(() => {
+      const prev = btn.textContent;
+      btn.textContent = 'COPIED ✓';
+      btn.style.color = '#6bcd06';
+      btn.style.borderColor = '#6bcd06';
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 1500);
+    });
+  }
+</script>
+
+</body>
+</html>

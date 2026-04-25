@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>CADE Animated Background</title>
+<!-- DATA WIRES: none (pure decorative overlay) -->
+<style>
+  /* ============================================================
+     CADE Esports League — Overlay #03 : Animated Background
+     Canvas: 1920x1080 | Base layer | Loops seamlessly
+     Style : Hexagonal lattice drift + dual spotlight sweep
+             + soft green/pink hue pulse on a deep black canvas.
+     ============================================================ */
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #000;
+    font-family: "Agharti", "Oswald", sans-serif;
+  }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    background:
+      radial-gradient(ellipse 140% 100% at 50% 50%, #0a0a0a 0%, #050505 55%, #000 100%);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /* ----- LAYER 1 : Hexagonal lattice (drifts diagonally, seamless) */
+  .hex-field {
+    position: absolute;
+    top: -200px;
+    left: -200px;
+    right: -200px;
+    bottom: -200px;
+    background-image:
+      /* pink hex glow spot */
+      radial-gradient(circle at 20% 30%, rgba(254, 3, 109, 0.07) 0%, transparent 40%),
+      /* green hex glow spot */
+      radial-gradient(circle at 80% 70%, rgba(107, 205, 6, 0.09) 0%, transparent 42%),
+      /* hex lattice (SVG inlined via data URI) */
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='104' viewBox='0 0 120 104'><g fill='none' stroke='%236bcd06' stroke-width='1' stroke-opacity='0.18'><polygon points='30,2 60,19 60,53 30,70 0,53 0,19'/><polygon points='90,2 120,19 120,53 90,70 60,53 60,19'/><polygon points='60,54 90,71 90,105 60,122 30,105 30,71'/></g></svg>");
+    background-size: auto, auto, 120px 104px;
+    background-repeat: no-repeat, no-repeat, repeat;
+    animation: hexDrift 24s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes hexDrift {
+    0%   { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-120px, -104px, 0); } /* one full tile = seamless */
+  }
+
+  /* ----- LAYER 2 : Diagonal light streaks (two offset streaks crossing) */
+  .streak {
+    position: absolute;
+    width: 3400px;
+    height: 260px;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
+    mix-blend-mode: screen;
+    filter: blur(60px);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .streak-green {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(107, 205, 6, 0) 25%,
+      rgba(107, 205, 6, 0.55) 50%,
+      rgba(107, 205, 6, 0) 75%,
+      transparent 100%
+    );
+    animation: streakSweepA 18s ease-in-out infinite;
+  }
+
+  .streak-pink {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(254, 3, 109, 0) 25%,
+      rgba(254, 3, 109, 0.50) 50%,
+      rgba(254, 3, 109, 0) 75%,
+      transparent 100%
+    );
+    animation: streakSweepB 22s ease-in-out infinite;
+    animation-delay: -6s;
+  }
+
+  @keyframes streakSweepA {
+    0%   { transform: translate(-60%, -140%) rotate(-18deg); }
+    50%  { transform: translate(-40%, 40%) rotate(-18deg); }
+    100% { transform: translate(-60%, -140%) rotate(-18deg); }
+  }
+
+  @keyframes streakSweepB {
+    0%   { transform: translate(-40%, 60%) rotate(18deg); }
+    50%  { transform: translate(-60%, -160%) rotate(18deg); }
+    100% { transform: translate(-40%, 60%) rotate(18deg); }
+  }
+
+  /* ----- LAYER 3 : Slow hue pulse vignette (keeps energy subtle) */
+  .pulse {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 50%, rgba(107, 205, 6, 0.06) 0%, transparent 70%);
+    animation: pulseGlow 14s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50%      { opacity: 0.75; transform: scale(1.08); }
+  }
+
+  /* ----- LAYER 4 : Dot particle field (slow drift vertically) */
+  .particles {
+    position: absolute;
+    inset: -100px;
+    background-image:
+      radial-gradient(circle at 15% 20%, #6bcd06 1px, transparent 1.5px),
+      radial-gradient(circle at 45% 65%, #fe036d 1px, transparent 1.5px),
+      radial-gradient(circle at 72% 35%, #6bcd06 1px, transparent 1.5px),
+      radial-gradient(circle at 88% 82%, rgba(255,255,255,0.6) 1px, transparent 1.5px),
+      radial-gradient(circle at 25% 85%, rgba(255,255,255,0.4) 1px, transparent 1.5px);
+    background-size: 280px 280px;
+    background-repeat: repeat;
+    opacity: 0.55;
+    mix-blend-mode: screen;
+    animation: particleDrift 30s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes particleDrift {
+    0%   { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(0, -280px, 0); } /* one tile = seamless */
+  }
+
+  /* ----- LAYER 5 : Bottom scanlines for broadcast feel */
+  .scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ----- LAYER 6 : Edge vignette (keeps center readable for overlays) */
+  .vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 90% 90% at 50% 50%,
+      transparent 40%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+    pointer-events: none;
+  }
+
+  /* ----- LAYER 7 : Corner accent lines (static, branding cue) */
+  .corner {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    opacity: 0.25;
+    pointer-events: none;
+  }
+  .corner::before, .corner::after {
+    content: "";
+    position: absolute;
+    background: linear-gradient(90deg, #6bcd06 0%, transparent 100%);
+  }
+  .corner.tl { top: 40px; left: 40px; }
+  .corner.tl::before { top: 0; left: 0; width: 100%; height: 2px; }
+  .corner.tl::after  { top: 0; left: 0; width: 2px; height: 100%; }
+
+  .corner.tr { top: 40px; right: 40px; transform: scaleX(-1); }
+  .corner.tr::before { top: 0; left: 0; width: 100%; height: 2px; }
+  .corner.tr::after  { top: 0; left: 0; width: 2px; height: 100%; }
+
+  .corner.bl { bottom: 40px; left: 40px; transform: scaleY(-1); }
+  .corner.bl::before { top: 0; left: 0; width: 100%; height: 2px; }
+  .corner.bl::after  { top: 0; left: 0; width: 2px; height: 100%; }
+
+  .corner.br { bottom: 40px; right: 40px; transform: scale(-1, -1); }
+  .corner.br::before { top: 0; left: 0; width: 100%; height: 2px; }
+  .corner.br::after  { top: 0; left: 0; width: 2px; height: 100%; }
+
+  /* ----- LAYER 8 : CADE watermark (bottom-right, subtle pulse) */
+  .watermark {
+    position: absolute;
+    bottom: 54px;
+    right: 54px;
+    width: 140px;
+    height: auto;
+    opacity: 0.08;
+    filter: brightness(1.4) contrast(1.1);
+    animation: watermarkPulse 10s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes watermarkPulse {
+    0%, 100% { opacity: 0.06; }
+    50%      { opacity: 0.12; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <!-- drifting hex lattice base -->
+    <div class="hex-field"></div>
+
+    <!-- diagonal color streaks sweeping across -->
+    <div class="streak streak-green"></div>
+    <div class="streak streak-pink"></div>
+
+    <!-- soft center pulse -->
+    <div class="pulse"></div>
+
+    <!-- drifting particle field -->
+    <div class="particles"></div>
+
+    <!-- broadcast scanlines -->
+    <div class="scanlines"></div>
+
+    <!-- edge vignette -->
+    <div class="vignette"></div>
+
+    <!-- corner accents -->
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <!-- CADE watermark -->
+    <img class="watermark" src="../../../logos/1cade%20esport.png" alt="" />
+  </div>
+</body>
+</html>

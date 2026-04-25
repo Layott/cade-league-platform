@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #03 ANIMATED BACKGROUND — VARIANT 2/3
+  Concept: Halftone stadium BG (static, no Ken-Burns) + drifting particle field
+  + slow vertical CRT scanline crawl + edge chevron motifs + corner watermarks
+  + soft vignette. Pure decoration: no header band, no partner strip, no copy.
+  Distinct from v1 (hex-lattice + streaks) and v3 (forthcoming).
+
+  DATA WIRES: none (decorative bg)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — Animated Background v2</title>
+
+<style>
+  /* ── REAL BRAND FONTS (only used for tiny corner watermarks) ─ */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --black:        #050505;
+    --ink:          #ffffff;
+    --display:      'Agharti', 'Impact', sans-serif;
+    --accent:       'Quedora', 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--black);
+    color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+
+  /* ── STAGE (1920×1080 fixed, OPAQUE) ────────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #0a0e07;
+    isolation: isolate;
+  }
+
+  /* ── LAYER 0: STATIC HALFTONE STADIUM BG ─────────────────────
+     No drift, no Ken-Burns — that's v1's job. Pure static cover.
+  */
+  .bg-image {
+    position: absolute;
+    inset: 0;
+    background-image: url('../../../designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 0;
+  }
+
+  /* Soft vignette for cinematic edge falloff */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 50%,
+        rgba(5,5,5,0) 0%,
+        rgba(5,5,5,0.18) 45%,
+        rgba(5,5,5,0.55) 80%,
+        rgba(5,5,5,0.85) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* Subtle CRT-style horizontal scanline grain (constant, ambient) */
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── LAYER 1: DRIFTING PARTICLE FIELD ───────────────────────
+     ~36 dots spread across the canvas, each rising slowly with
+     subtle horizontal sway. Sizes 2-5px, opacity 0.20-0.60,
+     mix of green + pink. Each particle uses its own animation
+     `delay` so the field looks continuous (no synchronized "wave").
+     Vertical travel goes from y=110% to y=-10% — at the end of
+     the cycle the dot resets below the canvas → seamless loop.
+  */
+  .particles {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .particle {
+    position: absolute;
+    bottom: -10%;
+    border-radius: 50%;
+    will-change: transform, opacity;
+    animation-name: particle-rise;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  /* dot variants — green vs pink, with shared glow blur */
+  .particle.is-green {
+    background: var(--green);
+    box-shadow:
+      0 0 6px rgba(107,205,6,0.55),
+      0 0 14px rgba(107,205,6,0.25);
+  }
+  .particle.is-pink {
+    background: var(--pink);
+    box-shadow:
+      0 0 6px rgba(254,3,109,0.55),
+      0 0 14px rgba(254,3,109,0.25);
+  }
+
+  /* Rise + sway. Travel ~120vh upward; sway via translateX easing
+     baked into a single keyframe set so the loop is seamless when
+     translateY returns to start (delta wraps to bottom: -10% → -10%). */
+  @keyframes particle-rise {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+      opacity: 0;
+    }
+    8% {
+      opacity: var(--p-opacity, 0.45);
+    }
+    25% {
+      transform: translate3d(14px, -300px, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(-12px, -600px, 0) scale(1);
+    }
+    75% {
+      transform: translate3d(10px, -900px, 0) scale(1);
+    }
+    92% {
+      opacity: var(--p-opacity, 0.45);
+    }
+    100% {
+      transform: translate3d(0, -1200px, 0) scale(1);
+      opacity: 0;
+    }
+  }
+
+  /* ── LAYER 2: SLOW VERTICAL SCANLINE CRAWL ───────────────────
+     A 4px-tall semi-transparent green band sliding top→bottom
+     every 14s. At the end of cycle it re-enters from the top.
+     Uses `mix-blend-mode: screen` so it brightens the BG without
+     hard-blocking it.
+  */
+  .scanline-crawl {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -4px;
+    height: 4px;
+    background: linear-gradient(
+      to bottom,
+      rgba(107,205,6,0) 0%,
+      rgba(107,205,6,0.45) 50%,
+      rgba(107,205,6,0) 100%
+    );
+    box-shadow:
+      0 0 18px rgba(107,205,6,0.40),
+      0 0 36px rgba(107,205,6,0.20);
+    mix-blend-mode: screen;
+    z-index: 4;
+    pointer-events: none;
+    animation: scanline-slide 14s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes scanline-slide {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(1090px); } /* canvas + gutter, exits cleanly */
+  }
+
+  /* ── LAYER 3: EDGE CHEVRON MOTIFS (>>) ───────────────────────
+     5 stacked left + 5 stacked right, slow staggered opacity pulse.
+     Right side mirrors direction (<<). Decorative only.
+  */
+  .chevrons {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 42px;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .chevrons--left  { left: 60px;  }
+  .chevrons--right { right: 60px; }
+
+  .chevron {
+    width: 88px;
+    height: 64px;
+    color: var(--green);
+    opacity: 0.40;
+    animation-name: chev-pulse-left;
+    animation-duration: 5.4s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+  .chevron svg { width: 100%; height: 100%; display: block; }
+
+  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
+  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.5s;  }
+  .chevrons--left  .chevron:nth-child(3) { animation-delay: 1.0s;  }
+  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.5s;  }
+  .chevrons--left  .chevron:nth-child(5) { animation-delay: 2.0s;  }
+  .chevrons--right .chevron {
+    animation-name: chev-pulse-right;
+  }
+  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.7s;  }
+  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.2s;  }
+  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.7s;  }
+  .chevrons--right .chevron:nth-child(4) { animation-delay: 2.2s;  }
+  .chevrons--right .chevron:nth-child(5) { animation-delay: 2.7s;  }
+
+  @keyframes chev-pulse-left {
+    0%, 100% { opacity: 0.20; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(8px); }
+  }
+  @keyframes chev-pulse-right {
+    0%, 100% { opacity: 0.20; transform: translateX(0); }
+    50%      { opacity: 0.85; transform: translateX(-8px); }
+  }
+
+  /* ── LAYER 4: TOP HEADER BAND (CADE | PRO LEAGUE) ───────────── */
+  .top-band {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    height: 168px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 44px;
+    z-index: 10;
+  }
+  .top-band .logo {
+    height: 140px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .top-band .logo--cade { height: 128px; }
+  .top-band .logo--pro  { height: 152px; }
+  .top-band .divider {
+    width: 2px;
+    height: 110px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── BOTTOM PARTNER STRIP (static) ────────────────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 12;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+  .partners-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 76px;
+    padding: 14px 38px;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .partners-row .partner {
+    height: 70px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .partners-row .partner--gameevo { height: 64px; }
+  .partners-row .partner--pride   { height: 58px; }
+  .partners-row .partner--africa  { height: 64px; }
+  .partners-row .partner--trace   { height: 72px; }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- LAYER 0: static halftone stadium BG + vignette + grain -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- LAYER 1: drifting particle field (36 dots, green + pink mix) -->
+    <div class="particles" aria-hidden="true">
+      <span class="particle is-green" style="left: 4%;  width: 3px; height: 3px; --p-opacity: 0.45; animation-duration: 18s; animation-delay:  0s;"></span>
+      <span class="particle is-green" style="left: 8%;  width: 2px; height: 2px; --p-opacity: 0.30; animation-duration: 22s; animation-delay: -3s;"></span>
+      <span class="particle is-pink"  style="left: 12%; width: 4px; height: 4px; --p-opacity: 0.50; animation-duration: 20s; animation-delay: -6s;"></span>
+      <span class="particle is-green" style="left: 16%; width: 3px; height: 3px; --p-opacity: 0.35; animation-duration: 24s; animation-delay: -9s;"></span>
+      <span class="particle is-green" style="left: 20%; width: 5px; height: 5px; --p-opacity: 0.55; animation-duration: 19s; animation-delay: -1s;"></span>
+      <span class="particle is-pink"  style="left: 24%; width: 2px; height: 2px; --p-opacity: 0.25; animation-duration: 26s; animation-delay: -4s;"></span>
+      <span class="particle is-green" style="left: 28%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 21s; animation-delay: -7s;"></span>
+      <span class="particle is-green" style="left: 32%; width: 4px; height: 4px; --p-opacity: 0.50; animation-duration: 17s; animation-delay: -10s;"></span>
+      <span class="particle is-pink"  style="left: 36%; width: 3px; height: 3px; --p-opacity: 0.45; animation-duration: 23s; animation-delay: -2s;"></span>
+      <span class="particle is-green" style="left: 40%; width: 2px; height: 2px; --p-opacity: 0.30; animation-duration: 25s; animation-delay: -5s;"></span>
+      <span class="particle is-green" style="left: 44%; width: 5px; height: 5px; --p-opacity: 0.60; animation-duration: 19s; animation-delay: -8s;"></span>
+      <span class="particle is-green" style="left: 48%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 22s; animation-delay: -11s;"></span>
+      <span class="particle is-pink"  style="left: 52%; width: 4px; height: 4px; --p-opacity: 0.55; animation-duration: 20s; animation-delay: -1.5s;"></span>
+      <span class="particle is-green" style="left: 56%; width: 2px; height: 2px; --p-opacity: 0.25; animation-duration: 26s; animation-delay: -4.5s;"></span>
+      <span class="particle is-green" style="left: 60%; width: 3px; height: 3px; --p-opacity: 0.45; animation-duration: 18s; animation-delay: -7.5s;"></span>
+      <span class="particle is-green" style="left: 64%; width: 4px; height: 4px; --p-opacity: 0.50; animation-duration: 24s; animation-delay: -10.5s;"></span>
+      <span class="particle is-pink"  style="left: 68%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 21s; animation-delay: -2.5s;"></span>
+      <span class="particle is-green" style="left: 72%; width: 5px; height: 5px; --p-opacity: 0.55; animation-duration: 19s; animation-delay: -5.5s;"></span>
+      <span class="particle is-green" style="left: 76%; width: 2px; height: 2px; --p-opacity: 0.30; animation-duration: 25s; animation-delay: -8.5s;"></span>
+      <span class="particle is-green" style="left: 80%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 22s; animation-delay: -11.5s;"></span>
+      <span class="particle is-pink"  style="left: 84%; width: 4px; height: 4px; --p-opacity: 0.50; animation-duration: 17s; animation-delay: -3.5s;"></span>
+      <span class="particle is-green" style="left: 88%; width: 3px; height: 3px; --p-opacity: 0.35; animation-duration: 23s; animation-delay: -6.5s;"></span>
+      <span class="particle is-green" style="left: 92%; width: 2px; height: 2px; --p-opacity: 0.25; animation-duration: 26s; animation-delay: -9.5s;"></span>
+      <span class="particle is-green" style="left: 96%; width: 4px; height: 4px; --p-opacity: 0.45; animation-duration: 20s; animation-delay: -12.5s;"></span>
+      <!-- second pass at offset rows so distribution is denser -->
+      <span class="particle is-green" style="left: 6%;  width: 4px; height: 4px; --p-opacity: 0.50; animation-duration: 21s; animation-delay: -13s;"></span>
+      <span class="particle is-pink"  style="left: 14%; width: 2px; height: 2px; --p-opacity: 0.30; animation-duration: 24s; animation-delay: -14s;"></span>
+      <span class="particle is-green" style="left: 22%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 19s; animation-delay: -15s;"></span>
+      <span class="particle is-green" style="left: 30%; width: 5px; height: 5px; --p-opacity: 0.55; animation-duration: 22s; animation-delay: -16s;"></span>
+      <span class="particle is-pink"  style="left: 38%; width: 3px; height: 3px; --p-opacity: 0.45; animation-duration: 26s; animation-delay: -2.2s;"></span>
+      <span class="particle is-green" style="left: 46%; width: 2px; height: 2px; --p-opacity: 0.25; animation-duration: 18s; animation-delay: -3.2s;"></span>
+      <span class="particle is-green" style="left: 54%; width: 4px; height: 4px; --p-opacity: 0.50; animation-duration: 23s; animation-delay: -5.2s;"></span>
+      <span class="particle is-green" style="left: 62%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 20s; animation-delay: -7.2s;"></span>
+      <span class="particle is-pink"  style="left: 70%; width: 5px; height: 5px; --p-opacity: 0.60; animation-duration: 21s; animation-delay: -9.2s;"></span>
+      <span class="particle is-green" style="left: 78%; width: 2px; height: 2px; --p-opacity: 0.30; animation-duration: 25s; animation-delay: -11.2s;"></span>
+      <span class="particle is-green" style="left: 86%; width: 4px; height: 4px; --p-opacity: 0.45; animation-duration: 19s; animation-delay: -13.2s;"></span>
+      <span class="particle is-pink"  style="left: 94%; width: 3px; height: 3px; --p-opacity: 0.40; animation-duration: 24s; animation-delay: -15.2s;"></span>
+    </div>
+
+    <!-- LAYER 2: slow vertical CRT scanline crawl (every 14s) -->
+    <div class="scanline-crawl" aria-hidden="true"></div>
+
+    <!-- LAYER 3: edge chevron motifs (left + right, 5 stacked each) -->
+    <div class="chevrons chevrons--left" aria-hidden="true">
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="chevrons chevrons--right" aria-hidden="true">
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="chevron">
+        <svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- LAYER 4: top header band (CADE | Pro League) -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="../../../logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro"  src="../../../logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- LAYER 5: bottom partner strip (static) -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="partners-row">
+        <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+        <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="Gamepride" />
+        <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+        <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="Trace" />
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

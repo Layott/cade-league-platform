@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #03-ANIMATED-BG — VARIANT 1 of 3
+  "KEN-BURNS BREATHE" — slow cinematic pan/zoom of the halftone stadium
+  image with a gentle brightness breathe loop. Pure decorative base layer
+  for the entire stream. NO header, NO partner strip, NO title, NO data.
+  Watermarks (CADE Esports + Pro League) sit faintly in the bottom corners
+  with a subtle pulse so they never feel static. Vignette + scanline grain
+  match the brand pilot at ../01-brb/.
+
+  Canvas: 1920×1080 OPAQUE. Silent. Seamless infinite loop.
+
+  DATA WIRES: none (decorative bg)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — Animated BG (V1: Ken-Burns Breathe)</title>
+
+<style>
+  /* ── REAL BRAND FONTS (kept available for any optional text) ─── */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+
+  /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
+  :root {
+    --green:        #6bcd06;
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         #fe036d;
+    --black:        #050505;
+    --ink:          #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--black);
+    color: var(--ink);
+    font-family: 'Quedora', 'Inter', system-ui, sans-serif;
+  }
+
+  /* ── STAGE: 1920×1080 fixed canvas ──────────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--black);
+  }
+
+  /* ── BG IMAGE LAYER — Ken-Burns slow pan + zoom ─────────────── */
+  /* Inset is generous so the 1.06 scale + ±1.5% translate never
+     reveals the canvas edge during the loop. */
+  .bg-image {
+    position: absolute;
+    inset: -5% -5%;
+    background-image: url('../../../designsample/ELITE%20S2%20BG.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    /* Two independent loops:
+       - kenburns: 30s scale 1.00 → 1.06 with diagonal drift, mirrored
+       - breathe:   7s brightness 0.95 → 1.05 with subtle saturation,
+                    mirrored; runs ~4× per kenburns cycle for organic feel */
+    animation:
+      kenburns 30s ease-in-out infinite alternate,
+      breathe   7s ease-in-out infinite alternate;
+    will-change: transform, filter;
+    z-index: 0;
+  }
+
+  @keyframes kenburns {
+    0% {
+      transform: scale(1.000) translate3d( 0.00%,  0.00%, 0);
+    }
+    50% {
+      transform: scale(1.030) translate3d(-0.75%, -0.40%, 0);
+    }
+    100% {
+      transform: scale(1.060) translate3d(-1.50%, -0.80%, 0);
+    }
+  }
+
+  @keyframes breathe {
+    0%   { filter: brightness(0.95) saturate(0.98) contrast(1.00); }
+    100% { filter: brightness(1.05) saturate(1.05) contrast(1.02); }
+  }
+
+  /* ── SCANLINE OVERLAY — "screen" feel ───────────────────────── */
+  .bg-scanlines {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.04) 0,
+      rgba(0,0,0,0.04) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  /* ── SOFT EDGE VIGNETTE — keeps center clean for content ────── */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        ellipse at 50% 50%,
+        rgba(5,5,5,0)   0%,
+        rgba(5,5,5,0)   42%,
+        rgba(5,5,5,0.18) 70%,
+        rgba(5,5,5,0.55) 100%
+      );
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* very faint additional bottom-weight so corner watermarks read */
+  .bg-floor {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(5,5,5,0)    0%,
+        rgba(5,5,5,0)   62%,
+        rgba(5,5,5,0.22) 88%,
+        rgba(5,5,5,0.45) 100%
+      );
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) ────────────────────── */
+  .top-band {
+    position: absolute;
+    top: 56px;
+    left: 0;
+    right: 0;
+    height: 168px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 44px;
+    z-index: 10;
+  }
+
+  .top-band .logo {
+    height: 140px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+
+  .top-band .logo--cade { height: 128px; }
+  .top-band .logo--pro  { height: 152px; }
+
+  .top-band .divider {
+    width: 2px;
+    height: 110px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.55) 20%,
+      rgba(255,255,255,0.85) 50%,
+      rgba(255,255,255,0.55) 80%,
+      rgba(255,255,255,0) 100%
+    );
+    border-radius: 1px;
+  }
+
+  /* ── BOTTOM PARTNER STRIP (static) ────────────────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 12;
+  }
+  .partners-label {
+    font-family: 'Quedora', 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+  .partners-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 76px;
+    padding: 14px 38px;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .partners-row .partner {
+    height: 70px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .partners-row .partner--gameevo { height: 64px; }
+  .partners-row .partner--pride   { height: 58px; }
+  .partners-row .partner--africa  { height: 64px; }
+  .partners-row .partner--trace   { height: 72px; }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG halftone, animated Ken-Burns + breathe -->
+    <div class="bg-image"     aria-hidden="true"></div>
+    <div class="bg-scanlines" aria-hidden="true"></div>
+    <div class="bg-vignette"  aria-hidden="true"></div>
+    <div class="bg-floor"     aria-hidden="true"></div>
+
+    <!-- Top header band: CADE | Pro League -->
+    <header class="top-band">
+      <img class="logo logo--cade" src="../../../logos/1cade%20esport.png" alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro"  src="../../../logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- Bottom partner strip (static) -->
+    <footer class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="partners-row">
+        <img class="partner partner--gameevo" src="../../../logos/GameEvo%20Esports%20White.png" alt="GameEvo Esports" />
+        <img class="partner partner--pride"   src="../../../logos/Gamepride%20Green-01.png" alt="Gamepride" />
+        <img class="partner partner--africa"  src="../../../logos/ESPORTS%20AFRICA%20NEWS%20WHITE.png" alt="Esports Africa News" />
+        <img class="partner partner--trace"   src="../../../logos/TRACE_2010_logo.svg.png" alt="Trace" />
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>

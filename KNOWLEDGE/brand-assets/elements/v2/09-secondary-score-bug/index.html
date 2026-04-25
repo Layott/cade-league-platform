@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>CADE Secondary Score Bug</title>
+<!-- DATA WIRES:
+     postMessage({ type: 'update', data: { playerA: { name, slug, score }, playerB: { name, slug, score } } })
+     postMessage({ type: 'scoreIncrement', data: { side: 'A'|'B' } })
+     postMessage({ type: 'show' })   postMessage({ type: 'hide' })
+     Photo src = ../../../players/processed/<slug>/headshot_01_nobg.png
+     Slugs: adefola, anife, baji_jnr, dadaboi, faruk, guru, kaykay, killer_freak,
+            kingnonex, mitch, mr_oga, tactical, wolevation -->
+<style>
+  /* ============================================================
+     CADE Esports League — Overlay #09 : Secondary Score Bug
+     Canvas  : 1920x1080 | TRANSPARENT
+     Position: top-right, 40px margin
+     Width   : auto-fits long names (clamps 720..820px)
+     Sound   : silent
+     ============================================================ */
+
+  /* ============= FONTS ============= */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2'),
+         url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2'),
+         url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2'),
+         url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'AghartiCondensed';
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2'),
+         url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    font-family: "Agharti", "Oswald", "Rajdhani", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  /* =========================================================
+     ROOT MOUNT — top-right anchor.
+     Width is set by JS based on combined name length (720..820).
+     ========================================================= */
+  .bug-mount {
+    position: absolute;
+    top: 40px;
+    right: 40px;
+    width: 760px;             /* JS overrides per-render */
+    height: 152px;
+    transform-origin: top right;
+    opacity: 0;
+    transform: translateX(120%) scale(0.9);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+
+  .bug-mount.visible {
+    /* Slowed ~1.6x: 0.55s → 0.9s for a more confident, less frantic entry */
+    animation: entry 0.9s cubic-bezier(.18,.9,.28,1.18) both;
+  }
+
+  .bug-mount.hidden {
+    animation: exitOut 0.4s cubic-bezier(.6,0,.75,.2) both;
+  }
+
+  @keyframes entry {
+    0%   { transform: translateX(120%) scale(0.88); opacity: 0; }
+    35%  { transform: translateX(20%)  scale(0.96); opacity: 0.7; }
+    72%  { transform: translateX(-2%)  scale(1.02); opacity: 1; }
+    100% { transform: translateX(0)    scale(1);    opacity: 1; }
+  }
+
+  @keyframes exitOut {
+    0%   { transform: translateX(0)    scale(1);    opacity: 1; }
+    100% { transform: translateX(120%) scale(0.92); opacity: 0; }
+  }
+
+  /* Pulse on data update */
+  .bug-mount.pulse .bar {
+    animation: pulseRing 0.7s cubic-bezier(.2, .9, .3, 1.1);
+  }
+  @keyframes pulseRing {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.025); box-shadow:
+             0 10px 30px rgba(0,0,0,0.55),
+             0 0 30px 4px rgba(107, 205, 6, 0.35),
+             0 0 30px 4px rgba(254, 3, 109, 0.25); }
+    100% { transform: scale(1); }
+  }
+
+  /* =========================================================
+     TOP BADGE — "MATCH UPDATE"
+     ========================================================= */
+  .badge {
+    position: absolute;
+    top: 0;
+    right: 24px;
+    height: 28px;
+    padding: 0 16px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: linear-gradient(90deg, #fe036d 0%, #c9025a 100%);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 11px) 100%, 11px 100%);
+    font-family: "Quedora", "Rajdhani", "Oswald", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2.6px;
+    color: #fff;
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(254, 3, 109, 0.4);
+    z-index: 5;
+  }
+
+  .badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255,255,255,0.9);
+    animation: liveBlink 1.2s ease-in-out infinite;
+  }
+
+  @keyframes liveBlink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  /* =========================================================
+     MAIN BAR
+     ========================================================= */
+  .bar {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    height: 100px;
+    display: flex;
+    align-items: stretch;
+    background: linear-gradient(180deg, #161616 0%, #080808 100%);
+    border: 1.5px solid rgba(107, 205, 6, 0.20);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow:
+      0 12px 32px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.025) inset;
+    animation: glowPulse 3.2s ease-in-out infinite;
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% {
+      box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.025) inset,
+        0 0 0 0 rgba(107, 205, 6, 0);
+    }
+    50% {
+      box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.025) inset,
+        0 0 22px 2px rgba(107, 205, 6, 0.14);
+    }
+  }
+
+  /* Left accent stripe (green) */
+  .bar::before {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 5px;
+    background: linear-gradient(180deg, #6bcd06 0%, #4a9004 100%);
+    box-shadow: 0 0 12px rgba(107, 205, 6, 0.65);
+  }
+
+  /* Right accent stripe (pink) */
+  .bar::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; right: 0;
+    width: 5px;
+    background: linear-gradient(180deg, #fe036d 0%, #b8024f 100%);
+    box-shadow: 0 0 12px rgba(254, 3, 109, 0.65);
+  }
+
+  /* =========================================================
+     PLAYER ROW
+     ========================================================= */
+  .player {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    min-width: 0;
+    position: relative;
+  }
+
+  .player-a { padding-left: 22px; }
+  .player-b { justify-content: flex-end; padding-right: 22px; }
+
+  /* Avatar — circular photo with accent ring */
+  .avatar {
+    width: 68px;
+    height: 68px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    position: relative;
+    background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+    box-shadow:
+      0 3px 10px rgba(0, 0, 0, 0.55),
+      0 0 0 2px rgba(255, 255, 255, 0.06);
+  }
+
+  /* Accent ring */
+  .avatar::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    padding: 3px;
+    background: var(--ring-grad);
+    -webkit-mask:
+       linear-gradient(#000 0 0) content-box,
+       linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    box-shadow: 0 0 14px var(--ring-glow);
+    pointer-events: none;
+  }
+
+  .avatar-green {
+    --ring-grad: linear-gradient(145deg, #7fe310 0%, #4a9004 100%);
+    --ring-glow: rgba(107, 205, 6, 0.45);
+  }
+  .avatar-pink {
+    --ring-grad: linear-gradient(145deg, #ff1a7e 0%, #b8024f 100%);
+    --ring-glow: rgba(254, 3, 109, 0.45);
+  }
+
+  .avatar-photo {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: center 22%;
+    display: block;
+    background: transparent;
+  }
+
+  .avatar-photo.hidden { display: none; }
+
+  /* Fallback initials when image missing */
+  .avatar-fallback {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Agharti", "Oswald", sans-serif;
+    font-size: 30px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .avatar-green .avatar-fallback {
+    background: linear-gradient(145deg, #7fe310 0%, #4a9004 100%);
+  }
+  .avatar-pink .avatar-fallback {
+    background: linear-gradient(145deg, #ff1a7e 0%, #b8024f 100%);
+  }
+  .avatar-fallback.hidden { display: none; }
+
+  /* Name block */
+  .name {
+    font-family: "AghartiCondensed", "Agharti", "Oswald", "Rajdhani", sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 1.3px;
+    color: #fff;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: nowrap;          /* never wrap */
+    overflow: visible;            /* never truncate — bar widens instead */
+    text-overflow: clip;
+  }
+
+  .player-a .name { text-shadow: 0 0 12px rgba(107, 205, 6, 0.30); }
+  .player-b .name { text-shadow: 0 0 12px rgba(254, 3, 109, 0.30); }
+
+  /* =========================================================
+     SCORE BLOCK (center)
+     ========================================================= */
+  .score-block {
+    flex-shrink: 0;
+    width: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%);
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+  }
+
+  .score-block::before,
+  .score-block::after {
+    content: "";
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      #6bcd06 25%,
+      #fe036d 75%,
+      transparent 100%);
+    opacity: 0.6;
+  }
+  .score-block::before { top: 0; }
+  .score-block::after  { bottom: 0; }
+
+  /* ─── ODOMETER-STYLE ROLLING SCORE ───
+     Each .score is a 64×72 viewport that clips a vertical strip of digits.
+     The strip translates -SCORE * digitHeight (px) when the value changes,
+     giving a true rolling-counter feel. CSS handles the smooth interpolation;
+     JS only sets the strip's translateY. */
+  .score {
+    position: relative;
+    font-family: "Agharti", "Oswald", "Rajdhani", sans-serif;
+    font-size: 64px;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85);
+    width: 56px;
+    height: 72px;
+    overflow: hidden;
+    text-align: center;
+    will-change: transform;
+    /* mask the viewport edges so digits fade in/out at top + bottom */
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 22%,
+      #000 78%,
+      transparent 100%
+    );
+            mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      #000 22%,
+      #000 78%,
+      transparent 100%
+    );
+  }
+
+  .score-strip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.55s cubic-bezier(.2, .8, .2, 1.05);
+    will-change: transform;
+  }
+  .score-strip > span {
+    height: 72px;
+    line-height: 72px;
+    display: block;
+  }
+
+  .score-a { color: #fff; }
+  .score-b { color: #fff; }
+
+  /* Brief pop accent on the entire score viewport when a digit lands */
+  .score.pop {
+    animation: scorePop 0.65s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .score-a.pop { text-shadow: 0 0 24px rgba(107, 205, 6, 0.95), 0 2px 12px rgba(0,0,0,0.85); }
+  .score-b.pop { text-shadow: 0 0 24px rgba(254, 3, 109, 0.95), 0 2px 12px rgba(0,0,0,0.85); }
+
+  @keyframes scorePop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.18); }
+    70%  { transform: scale(0.97); }
+    100% { transform: scale(1); }
+  }
+
+  /* Dash between scores */
+  .dash {
+    font-family: "Quedora", "Rajdhani", sans-serif;
+    font-size: 38px;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.40);
+    line-height: 1;
+    align-self: center;
+  }
+
+  /* Subtle grain on bar for broadcast feel */
+  .bar-grain {
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        rgba(255,255,255,0.012) 0px,
+        rgba(255,255,255,0.012) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+
+    <!-- ===== SECONDARY SCORE BUG ===== -->
+    <div class="bug-mount" id="bugMount">
+
+      <!-- Top label badge -->
+      <div class="badge">
+        <span class="badge-dot"></span>
+        <span>Match Update</span>
+      </div>
+
+      <!-- Main bar -->
+      <div class="bar">
+
+        <!-- Player A (left) -->
+        <div class="player player-a">
+          <div class="avatar avatar-green">
+            <img class="avatar-photo" id="photoA" alt="" />
+            <div class="avatar-fallback hidden" id="fallbackA">B</div>
+          </div>
+          <div class="name" id="nameA">BAJI JNR</div>
+        </div>
+
+        <!-- Score block (center) — odometer-style rolling digits -->
+        <div class="score-block">
+          <div class="score score-a" id="scoreA">
+            <div class="score-strip" id="stripA">
+              <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            </div>
+          </div>
+          <div class="dash">-</div>
+          <div class="score score-b" id="scoreB">
+            <div class="score-strip" id="stripB">
+              <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player B (right) -->
+        <div class="player player-b">
+          <div class="name" id="nameB">KING NONEX</div>
+          <div class="avatar avatar-pink">
+            <img class="avatar-photo" id="photoB" alt="" />
+            <div class="avatar-fallback hidden" id="fallbackB">K</div>
+          </div>
+        </div>
+
+        <!-- grain layer -->
+        <div class="bar-grain"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+<script>
+(function() {
+  // ============================================================
+  // STATE — initial values
+  // ============================================================
+  const state = {
+    playerA: { name: 'BAJI JNR',   slug: 'baji_jnr',  score: 3 },
+    playerB: { name: 'KING NONEX', slug: 'kingnonex', score: 1 },
+  };
+
+  // ============================================================
+  // DOM REFS
+  // ============================================================
+  const mount     = document.getElementById('bugMount');
+  const nameA     = document.getElementById('nameA');
+  const nameB     = document.getElementById('nameB');
+  const scoreA    = document.getElementById('scoreA');
+  const scoreB    = document.getElementById('scoreB');
+  const stripA    = document.getElementById('stripA');
+  const stripB    = document.getElementById('stripB');
+  const photoA    = document.getElementById('photoA');
+  const photoB    = document.getElementById('photoB');
+  const fallbackA = document.getElementById('fallbackA');
+  const fallbackB = document.getElementById('fallbackB');
+
+  // Each digit row in the strip is 72px tall (matches CSS `.score-strip > span`).
+  // setStripValue clamps to 0..9; for scores >= 10 we render the last digit only
+  // (Pro-League matches realistically never exceed single digits — fits brief).
+  const DIGIT_H = 72;
+  function setStripValue(stripEl, value) {
+    const v = Math.max(0, Math.min(9, Math.floor(Number(value) || 0)));
+    stripEl.style.transform = `translateY(${-v * DIGIT_H}px)`;
+  }
+
+  // ============================================================
+  // PHOTO LOADING (with fallback to initials)
+  // ============================================================
+  function photoUrl(slug) {
+    return `../../../players/processed/${slug}/headshot_01_nobg.png`;
+  }
+
+  function setPhoto(imgEl, fallbackEl, slug, name) {
+    fallbackEl.textContent = (name || '?').trim().charAt(0).toUpperCase();
+    if (!slug) {
+      imgEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+      return;
+    }
+    // Reset state, hide fallback while we try to load
+    imgEl.classList.remove('hidden');
+    fallbackEl.classList.add('hidden');
+
+    const url = photoUrl(slug);
+    // Clear handlers first to avoid leaks when src changes mid-flight
+    imgEl.onload  = () => {
+      imgEl.classList.remove('hidden');
+      fallbackEl.classList.add('hidden');
+    };
+    imgEl.onerror = () => {
+      imgEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+    };
+    imgEl.src = url;
+  }
+
+  // ============================================================
+  // BAR WIDTH AUTO-FIT (720..820 based on combined name length)
+  // ============================================================
+  function computeWidth() {
+    const lenA = (state.playerA.name || '').length;
+    const lenB = (state.playerB.name || '').length;
+    const total = lenA + lenB;
+    // baseline 720; each extra char beyond 14 combined adds 5px, capped at 820
+    const extra = Math.max(0, total - 14) * 5;
+    return Math.min(820, Math.max(720, 720 + extra));
+  }
+
+  function applyWidth() {
+    mount.style.width = computeWidth() + 'px';
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+  function render() {
+    nameA.textContent  = state.playerA.name;
+    nameB.textContent  = state.playerB.name;
+    setStripValue(stripA, state.playerA.score);
+    setStripValue(stripB, state.playerB.score);
+    setPhoto(photoA, fallbackA, state.playerA.slug, state.playerA.name);
+    setPhoto(photoB, fallbackB, state.playerB.slug, state.playerB.name);
+    applyWidth();
+  }
+
+  function pulse() {
+    mount.classList.remove('pulse');
+    // force reflow to restart animation
+    void mount.offsetWidth;
+    mount.classList.add('pulse');
+    setTimeout(() => mount.classList.remove('pulse'), 800);
+  }
+
+  function popScore(side) {
+    const el = side === 'A' ? scoreA : scoreB;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    setTimeout(() => el.classList.remove('pop'), 600);
+  }
+
+  // ============================================================
+  // SHOW / HIDE
+  // ============================================================
+  function show() {
+    mount.classList.remove('hidden');
+    mount.classList.remove('visible');
+    void mount.offsetWidth;
+    mount.classList.add('visible');
+    mount.style.opacity = '';
+    mount.style.transform = '';
+  }
+
+  function hide() {
+    mount.classList.remove('visible');
+    mount.classList.add('hidden');
+  }
+
+  // ============================================================
+  // postMessage LISTENER
+  // ============================================================
+  window.addEventListener('message', (ev) => {
+    const msg = ev && ev.data;
+    if (!msg || typeof msg !== 'object' || !msg.type) return;
+
+    switch (msg.type) {
+      case 'update': {
+        const d = msg.data || {};
+        if (d.playerA) {
+          if (typeof d.playerA.name  === 'string') state.playerA.name  = d.playerA.name;
+          if (typeof d.playerA.slug  === 'string') state.playerA.slug  = d.playerA.slug;
+          if (typeof d.playerA.score === 'number') state.playerA.score = d.playerA.score;
+        }
+        if (d.playerB) {
+          if (typeof d.playerB.name  === 'string') state.playerB.name  = d.playerB.name;
+          if (typeof d.playerB.slug  === 'string') state.playerB.slug  = d.playerB.slug;
+          if (typeof d.playerB.score === 'number') state.playerB.score = d.playerB.score;
+        }
+        render();
+        pulse();
+        break;
+      }
+      case 'scoreIncrement': {
+        const side = msg.data && msg.data.side;
+        if (side === 'A') {
+          state.playerA.score += 1;
+          setStripValue(stripA, state.playerA.score);
+          popScore('A');
+        } else if (side === 'B') {
+          state.playerB.score += 1;
+          setStripValue(stripB, state.playerB.score);
+          popScore('B');
+        }
+        break;
+      }
+      case 'show': show(); break;
+      case 'hide': hide(); break;
+      default: break;
+    }
+  });
+
+  // ============================================================
+  // INITIAL RENDER — visible with starting data
+  // ============================================================
+  render();
+  // give fonts a tick to load before the slide-in
+  requestAnimationFrame(() => {
+    show();
+  });
+})();
+</script>
+</body>
+</html>
