@@ -30,7 +30,10 @@ declare
   v_blocked              boolean := false;
 begin
   -- 1. seasons.tiebreaker_order column + default.
-  select column_default::jsonb into v_default_tb
+  -- column_default returns the SQL literal (e.g. '["totalPts","gd","gf","name"]'::jsonb)
+  -- which can't be cast directly to jsonb. Strip the wrapping single-quotes + ::jsonb suffix.
+  select (regexp_replace(column_default, '^''(.+)''::jsonb$', '\1'))::jsonb
+    into v_default_tb
     from information_schema.columns
     where table_schema = 'public'
       and table_name = 'seasons'
@@ -183,10 +186,12 @@ begin
     end if;
   end if;
 
-  -- 8. Seven new permission scopes exist.
-  select count(*)::int into v_perm_count
-    from public.permissions
-    where scope in (
+  -- 8. Seven new permission scopes exist (project uses single
+  --    role_permissions table — no separate `permissions` registry).
+  --    Confirm at least one row per scope (any role granted).
+  select count(distinct permission)::int into v_perm_count
+    from public.role_permissions
+    where permission in (
       'tournament.read',
       'tournament.score_entry',
       'tournament.walkover_confirm',
@@ -205,7 +210,7 @@ begin
   select count(*)::int into v_admin_perm_count
     from public.role_permissions
     where role = 'admin'
-      and scope in (
+      and permission in (
         'tournament.read','tournament.score_entry','tournament.walkover_confirm',
         'tournament.tiebreaker_config','tournament.export',
         'broadcast.v2.read','broadcast.v2.trigger'
@@ -218,7 +223,7 @@ begin
   select count(*)::int into v_loc_perm_count
     from public.role_permissions
     where role = 'loc'
-      and scope in ('tournament.read','tournament.export');
+      and permission in ('tournament.read','tournament.export');
   if v_loc_perm_count <> 2 then
     raise exception 'loc role expected 2 plan51 perms (read+export), got %', v_loc_perm_count;
   end if;
@@ -227,25 +232,26 @@ begin
   select count(*)::int into v_idc_perm_count
     from public.role_permissions
     where role = 'idc'
-      and scope in ('tournament.read','tournament.export');
+      and permission in ('tournament.read','tournament.export');
   if v_idc_perm_count <> 2 then
     raise exception 'idc role expected 2 plan51 perms (read+export), got %', v_idc_perm_count;
   end if;
 
-  -- technical: read + export
+  -- technical: tournament.read only (broadcast.v2 perms checked below).
+  -- Per spec §7 technical doesn't get tournament.export.
   select count(*)::int into v_tech_perm_count
     from public.role_permissions
     where role = 'technical'
-      and scope in ('tournament.read','tournament.export');
-  if v_tech_perm_count <> 2 then
-    raise exception 'technical role expected 2 plan51 perms (read+export), got %', v_tech_perm_count;
+      and permission = 'tournament.read';
+  if v_tech_perm_count <> 1 then
+    raise exception 'technical role expected tournament.read, got count=%', v_tech_perm_count;
   end if;
 
   -- referee: walkover_confirm only
   select count(*)::int into v_referee_perm_count
     from public.role_permissions
     where role = 'referee'
-      and scope = 'tournament.walkover_confirm';
+      and permission = 'tournament.walkover_confirm';
   if v_referee_perm_count <> 1 then
     raise exception 'referee role expected tournament.walkover_confirm, got count=%', v_referee_perm_count;
   end if;
@@ -254,18 +260,18 @@ begin
   select count(*)::int into v_prod_perm_count
     from public.role_permissions
     where role = 'production'
-      and scope in ('broadcast.v2.read','broadcast.v2.trigger');
+      and permission in ('broadcast.v2.read','broadcast.v2.trigger');
   if v_prod_perm_count <> 2 then
     raise exception 'production role expected 2 broadcast.v2 perms, got %', v_prod_perm_count;
   end if;
 
-  -- design: broadcast.v2 read + trigger
+  -- design: broadcast.v2.read only (per spec §7).
   select count(*)::int into v_design_perm_count
     from public.role_permissions
     where role = 'design'
-      and scope in ('broadcast.v2.read','broadcast.v2.trigger');
-  if v_design_perm_count <> 2 then
-    raise exception 'design role expected 2 broadcast.v2 perms, got %', v_design_perm_count;
+      and permission = 'broadcast.v2.read';
+  if v_design_perm_count <> 1 then
+    raise exception 'design role expected broadcast.v2.read, got count=%', v_design_perm_count;
   end if;
 
   raise notice 'plan51 smoke OK: schema columns present, append-only enforced, 7 perms seeded, role grants intact';
