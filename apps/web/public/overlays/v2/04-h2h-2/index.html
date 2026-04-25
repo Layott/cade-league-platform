@@ -1295,5 +1295,29 @@
       // Once shown, design holds steady. Operator hits Update to refresh.
     })();
   </script>
+<script data-tag="cade-visible-gate-observer-v2">
+(function(){
+  var SEL = '.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.player-col,.season-mark,.stat-row,.stats-card,.top-band,.winprob-bar-block';
+  function apply() {
+    var b = document.body;
+    if (!b) return;
+    var vis = b.classList.contains('cade-visible');
+    var exit = b.classList.contains('cade-exiting');
+    document.querySelectorAll(SEL).forEach(function(el){
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.removeProperty('transform');
+        el.style.setProperty('visibility', 'visible', 'important');
+      } else if (exit) {
+        el.style.setProperty('opacity', '0', 'important');
+      } else {
+        el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+  }
+  apply();
+  new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+})();
+</script>
 </body>
 </html>
