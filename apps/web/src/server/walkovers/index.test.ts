@@ -9,12 +9,20 @@ import {
 type Tables = Record<string, unknown>;
 
 function mkSb(tables: Tables) {
+  // Plan 51: walkover paths emit a follow-up `walkover.confirmed` broadcast
+  // via sb.channel. Mock no-op channel + removeChannel so unit tests don't
+  // need to thread these through every test setup.
+  const send = vi.fn().mockResolvedValue("ok");
+  const channel = vi.fn(() => ({ send }));
+  const removeChannel = vi.fn();
   return {
     from: vi.fn((t: string) => {
       const table = tables[t];
       if (!table) throw new Error(`unexpected table ${t}`);
       return table;
     }),
+    channel,
+    removeChannel,
   };
 }
 
@@ -200,6 +208,29 @@ describe("triggerAdminWalkover()", () => {
     const sb = mkSb({ matches, match_results: results });
     await triggerAdminWalkover("m-1", "ph", sb as never);
     expect(matches.updates).toContainEqual({ status: "forfeited" });
+  });
+
+  it("Plan 51: emits walkover.confirmed broadcast after admin trigger", async () => {
+    const matches = mkMatchesTable({
+      // match row carries the season via the embedded relation lookup the
+      // emit helper performs after the write succeeds.
+      match: {
+        id: "m-1",
+        home_player_id: "ph",
+        away_player_id: "pa",
+        match_days: { season_id: "season-9" },
+      } as never,
+    });
+    const results = mkResultsTable({
+      existingResult: null,
+      insertedRow: { id: "r-1" },
+    });
+    const sb = mkSb({ matches, match_results: results });
+    await triggerAdminWalkover("m-1", "ph", sb as never);
+    // The mkSb factory installs a channel mock; assert it was reached.
+    expect(
+      (sb as { channel: { mock: { calls: unknown[][] } } }).channel.mock.calls,
+    ).toContainEqual(["public:standings:season-9"]);
   });
 });
 

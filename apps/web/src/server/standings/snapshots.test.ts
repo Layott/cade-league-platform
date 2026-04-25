@@ -8,12 +8,20 @@ import { captureSnapshot, readSnapshot } from "./snapshots";
  * dispatches per table to the configured chain.
  */
 function mkSb(tables: Record<string, unknown>) {
+  // Plan 51: captureSnapshot fires a snapshot.captured broadcast post-insert.
+  // Mock channel + removeChannel as no-ops so tests don't need to thread
+  // these through every fixture.
+  const send = vi.fn().mockResolvedValue("ok");
+  const channel = vi.fn(() => ({ send }));
+  const removeChannel = vi.fn();
   return {
     from: vi.fn((t: string) => {
       const table = tables[t];
       if (!table) throw new Error(`unexpected table ${t}`);
       return table as Record<string, unknown>;
     }),
+    channel,
+    removeChannel,
   };
 }
 

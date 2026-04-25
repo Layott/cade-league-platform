@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { publishWalkoverConfirmed } from "@/server/realtime/publishers/walkover_confirmed";
 
 /**
  * Plan 51 — walkover orchestration.
@@ -49,6 +50,48 @@ type MatchRow = {
   away_player_id: string;
   status?: string | null;
 };
+
+/**
+ * Plan 51: best-effort fire walkover.confirmed on the standings channel.
+ * Resolves seasonId via match → match_day → season. Failures swallowed.
+ */
+async function emitWalkoverConfirmed(
+  sb: SupabaseClient,
+  matchId: string,
+  winnerId: string,
+  initiatedBy: "admin" | "ref",
+): Promise<void> {
+  try {
+    const { data, error } = await sb
+      .from("matches")
+      .select("id, match_day_id, match_days:match_day_id ( season_id )")
+      .eq("id", matchId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error || !data) return;
+    const row = data as {
+      match_days:
+        | { season_id: string }
+        | { season_id: string }[]
+        | null;
+    };
+    // Supabase returns embedded relations as an array even for single-row FKs.
+    const md = Array.isArray(row.match_days)
+      ? row.match_days[0] ?? null
+      : row.match_days;
+    const seasonId = md?.season_id;
+    if (!seasonId) return;
+    await publishWalkoverConfirmed(sb, {
+      seasonId,
+      matchId,
+      winnerPlayerId: winnerId,
+      initiatedBy,
+      at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("emitWalkoverConfirmed failed", err);
+  }
+}
 
 async function loadMatch(
   sb: SupabaseClient,
@@ -140,6 +183,9 @@ export async function triggerAdminWalkover(
     .from("matches")
     .update({ status: "forfeited" })
     .eq("id", matchId);
+
+  // Plan 51: announce walkover.confirmed to the standings channel.
+  await emitWalkoverConfirmed(sb, matchId, winnerId, "admin");
 
   return data as MatchResult;
 }
@@ -261,7 +307,18 @@ export async function confirmRefPendingWalkover(
     .update({ status: "forfeited" })
     .eq("id", matchId);
 
-  return data as MatchResult;
+  // Plan 51: announce walkover.confirmed to the standings channel.
+  const confirmedRow = data as MatchResult;
+  if (confirmedRow.winner_player_id) {
+    await emitWalkoverConfirmed(
+      sb,
+      matchId,
+      confirmedRow.winner_player_id,
+      "ref",
+    );
+  }
+
+  return confirmedRow;
 }
 
 /**

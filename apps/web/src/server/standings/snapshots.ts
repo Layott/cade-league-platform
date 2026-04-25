@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { publishSnapshotCaptured } from "@/server/realtime/publishers/snapshot_captured";
 
 /**
  * Plan 51 — standings snapshots per match-day.
@@ -102,10 +103,29 @@ export async function captureSnapshot(
       `captureSnapshot insert failed: ${insertErr?.message ?? "no row"}`,
     );
   }
+  const insertedRow = inserted as {
+    id: number;
+    captured_at: string;
+    snapshot_data: unknown;
+  };
+
+  // Plan 51: announce snapshot.captured on the standings channel.
+  // Fire-and-forget — the durable record is the SQL row.
+  try {
+    await publishSnapshotCaptured(supabase, {
+      seasonId,
+      matchDayId: typeof matchDayId === "string" ? Number(matchDayId) : matchDayId,
+      snapshotId: insertedRow.id,
+      at: insertedRow.captured_at,
+    });
+  } catch (err) {
+    console.error("publishSnapshotCaptured failed", err);
+  }
+
   return {
-    id: (inserted as { id: number }).id,
-    capturedAt: (inserted as { captured_at: string }).captured_at,
-    snapshotData: (inserted as { snapshot_data: unknown }).snapshot_data,
+    id: insertedRow.id,
+    capturedAt: insertedRow.captured_at,
+    snapshotData: insertedRow.snapshot_data,
   };
 }
 

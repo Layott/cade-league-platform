@@ -5,6 +5,84 @@ import {
   type EnterResultInput,
   type ConfirmResultInput,
 } from "./schemas";
+import { publishScoreChanged } from "@/server/realtime/publishers/score_changed";
+import { publishMatchEnded } from "@/server/realtime/publishers/match_ended";
+import { maybeCaptureMatchDaySnapshot } from "@/server/standings/auto_snapshot";
+
+/**
+ * Plan 51 — best-effort post-write fan-out: realtime score/match-ended
+ * broadcasts + auto-snapshot when the match-day completes. None of these
+ * may bubble up; the match_results row is the durable record.
+ */
+async function emitPlan51SideEffects(
+  sb: SupabaseClient,
+  matchId: string,
+  resultType: EnterResultInput["resultType"],
+  homeScore: number,
+  awayScore: number,
+): Promise<void> {
+  try {
+    // Resolve season + player ids in one round trip via the match row's
+    // ancestors. The fixture chain is matches → match_days → seasons.
+    const { data, error } = await sb
+      .from("matches")
+      .select(
+        "id, home_player_id, away_player_id, match_day_id, match_days:match_day_id ( season_id )",
+      )
+      .eq("id", matchId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error || !data) return;
+    const row = data as {
+      home_player_id: string;
+      away_player_id: string;
+      match_days:
+        | { season_id: string }
+        | { season_id: string }[]
+        | null;
+    };
+    // Supabase returns embedded relations as an array even when the FK is
+    // single — normalise to the first row.
+    const md = Array.isArray(row.match_days)
+      ? row.match_days[0] ?? null
+      : row.match_days;
+    const seasonId = md?.season_id;
+    if (!seasonId) return;
+
+    const at = new Date().toISOString();
+    // score.changed fires for every successful upsert (covers normal +
+    // forfeit; voids would have early-returned in callers).
+    await publishScoreChanged(sb, {
+      seasonId,
+      matchId,
+      homePlayerId: row.home_player_id,
+      awayPlayerId: row.away_player_id,
+      homeScore,
+      awayScore,
+      at,
+    });
+
+    // match.ended fires for terminal result types (normal + forfeit).
+    // void rows mean the match was disqualified, not played to completion.
+    if (resultType === "normal" || resultType === "forfeit") {
+      await publishMatchEnded(sb, {
+        seasonId,
+        matchId,
+        homePlayerId: row.home_player_id,
+        awayPlayerId: row.away_player_id,
+        homeScore,
+        awayScore,
+        resultType,
+        at,
+      });
+      // Auto-snapshot when this finalises the match-day.
+      await maybeCaptureMatchDaySnapshot(matchId, sb);
+    }
+  } catch (err) {
+    // Best-effort — the durable record is the SQL row.
+    console.error("emitPlan51SideEffects failed", err);
+  }
+}
 
 type ExistingResult = { id: string; confirmed_at: string | null } | null;
 
@@ -79,6 +157,8 @@ export async function enterResult(
     .eq("id", input.matchId);
   if (mErr) throw new Error(`match status update failed: ${mErr.message}`);
 
+  await emitPlan51SideEffects(sb, input.matchId, input.resultType, home, away);
+
   return { id: data.id };
 }
 
@@ -112,6 +192,9 @@ export async function editResult(
     .from("matches")
     .update({ status: matchStatusFor(input.resultType) })
     .eq("id", input.matchId);
+
+  await emitPlan51SideEffects(sb, input.matchId, input.resultType, home, away);
+
   return { id: data.id };
 }
 

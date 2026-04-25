@@ -3,17 +3,40 @@ import { listStandings } from "./read";
 import { recomputeStandings } from ".";
 
 describe("recomputeStandings (wrapper around SQL fn)", () => {
+  function mkSb(rpcResult: { error: { message: string } | null }) {
+    const send = vi.fn().mockResolvedValue("ok");
+    const channel = vi.fn(() => ({ send }));
+    const removeChannel = vi.fn();
+    const rpc = vi.fn().mockResolvedValue(rpcResult);
+    return {
+      sb: { rpc, channel, removeChannel } as unknown as never,
+      rpc,
+      channel,
+      send,
+    };
+  }
+
   it("calls rpc('recompute_standings', { p_season_id })", async () => {
-    const rpc = vi.fn().mockResolvedValue({ error: null });
-    const sb = { rpc } as unknown as never;
+    const { sb, rpc } = mkSb({ error: null });
     await recomputeStandings(sb, "s-1");
     expect(rpc).toHaveBeenCalledWith("recompute_standings", { p_season_id: "s-1" });
   });
 
   it("throws when rpc returns error", async () => {
-    const rpc = vi.fn().mockResolvedValue({ error: { message: "boom" } });
-    const sb = { rpc } as unknown as never;
+    const { sb } = mkSb({ error: { message: "boom" } });
     await expect(recomputeStandings(sb, "s-1")).rejects.toThrow(/boom/);
+  });
+
+  it("Plan 51: publishes standings.changed after successful recompute", async () => {
+    const { sb, channel, send } = mkSb({ error: null });
+    await recomputeStandings(sb, "s-99");
+    expect(channel).toHaveBeenCalledWith("public:standings:s-99");
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "broadcast",
+        event: "standings.changed",
+      }),
+    );
   });
 });
 

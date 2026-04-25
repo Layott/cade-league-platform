@@ -23,6 +23,29 @@ function mkSb({
     })),
   }));
   const matchUpdateFn = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+  // Plan 51: enterResult/editResult emit a follow-up read on `matches` to
+  // resolve seasonId + player ids for realtime broadcasts. Mock that chain
+  // so the side-effect path doesn't blow up the test.
+  const matchSelectFn = vi.fn(() => ({
+    eq: vi.fn(() => ({
+      is: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            home_player_id: "p-home",
+            away_player_id: "p-away",
+            match_days: { season_id: "season-1" },
+          },
+          error: null,
+        }),
+      })),
+    })),
+  }));
+  // Plan 51: also stub matches lookups for auto_snapshot — `select('id').eq(...)`.
+  // Stub leaderboard_snapshots + match_days + standings as no-op chains so
+  // the auto_snapshot path runs without throwing in unit tests.
+  const send = vi.fn().mockResolvedValue("ok");
+  const channel = vi.fn(() => ({ send }));
+  const removeChannel = vi.fn();
   return {
     from: vi.fn((t: string) => {
       if (t === "match_results") {
@@ -33,16 +56,70 @@ function mkSb({
                 maybeSingle: vi.fn().mockResolvedValue({ data: existing ?? null, error: null }),
               })),
             })),
+            in: vi.fn(() => ({
+              in: vi.fn(() => ({
+                is: vi.fn().mockResolvedValue({ data: [], error: null }),
+              })),
+            })),
           })),
           insert: insertFn,
           update: updateFn,
         };
       }
       if (t === "matches") {
-        return { update: matchUpdateFn };
+        return {
+          update: matchUpdateFn,
+          select: matchSelectFn,
+        };
+      }
+      if (t === "match_days") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              is: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { id: "md-1", season_id: "season-1" },
+                  error: null,
+                }),
+              })),
+            })),
+          })),
+        };
+      }
+      if (t === "standings") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              is: vi.fn().mockResolvedValue({ data: [], error: null }),
+            })),
+          })),
+        };
+      }
+      if (t === "leaderboard_snapshots") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                limit: vi.fn(() => ({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                })),
+              })),
+            })),
+          })),
+          insert: vi.fn(() => ({
+            select: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { id: 1, captured_at: "x", snapshot_data: [] },
+                error: null,
+              }),
+            })),
+          })),
+        };
       }
       throw new Error(`unexpected ${t}`);
     }),
+    channel,
+    removeChannel,
     _insert: insertFn,
     _update: updateFn,
     _matchUpdate: matchUpdateFn,
