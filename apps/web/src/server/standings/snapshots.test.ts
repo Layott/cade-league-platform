@@ -74,7 +74,7 @@ beforeEach(() => {
 describe("readSnapshot()", () => {
   it("returns null when no snapshot exists", async () => {
     const snapshots = mkSnapshotsTable({ existingRead: null });
-    const sb = mkSb({ standings_snapshots: snapshots });
+    const sb = mkSb({ leaderboard_snapshots: snapshots });
     const out = await readSnapshot(7, sb as never);
     expect(out).toBeNull();
   });
@@ -86,7 +86,7 @@ describe("readSnapshot()", () => {
         snapshot_data: [{ player_id: "p1" }],
       },
     });
-    const sb = mkSb({ standings_snapshots: snapshots });
+    const sb = mkSb({ leaderboard_snapshots: snapshots });
     const out = await readSnapshot(7, sb as never);
     expect(out).toEqual({
       capturedAt: "2026-04-25T10:00:00Z",
@@ -103,7 +103,7 @@ describe("readSnapshot()", () => {
     chain.maybeSingle = vi
       .fn()
       .mockResolvedValue({ data: null, error: { message: "boom" } });
-    const sb = mkSb({ standings_snapshots: { select: () => chain } });
+    const sb = mkSb({ leaderboard_snapshots: { select: () => chain } });
     await expect(readSnapshot(1, sb as never)).rejects.toThrow(/readSnapshot failed/);
   });
 });
@@ -121,7 +121,7 @@ describe("captureSnapshot()", () => {
         snapshot_data: [{ player_id: "p1" }],
       },
     });
-    const sb = mkSb({ standings_snapshots: snapshots });
+    const sb = mkSb({ leaderboard_snapshots: snapshots });
     const out = await captureSnapshot(7, sb as never);
     expect(out.id).toBe(42);
     expect(out.capturedAt).toBe("2026-04-25T10:00:00Z");
@@ -164,7 +164,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
       standings,
     });
@@ -173,7 +173,7 @@ describe("captureSnapshot()", () => {
     expect(insertSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         match_day_id: 7,
-        season_id: "season-99",
+        snapshot_data: expect.objectContaining({ season_id: "season-99" }),
       }),
     );
     expect(out.id).toBe(100);
@@ -191,7 +191,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
     });
     await expect(captureSnapshot(404, sb as never)).rejects.toThrow(
@@ -216,7 +216,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
     });
     await expect(captureSnapshot(404, sb as never)).rejects.toThrow(
@@ -251,7 +251,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
       standings,
     });
@@ -306,7 +306,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
       standings,
     });
@@ -348,13 +348,16 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
       standings,
     });
     const out = await captureSnapshot(1, sb as never);
     expect(insertSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ snapshot_data: [] }),
+      expect.objectContaining({
+        match_day_id: 1,
+        snapshot_data: { season_id: "season-1", rows: [] },
+      }),
     );
     expect(out.id).toBe(9);
   });
@@ -390,7 +393,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
       standings,
     });
@@ -413,7 +416,7 @@ describe("captureSnapshot()", () => {
     });
     const matchDays = { select: vi.fn() };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
     });
     await captureSnapshot(7, sb as never);
@@ -451,7 +454,7 @@ describe("captureSnapshot()", () => {
       })),
     };
     const sb = mkSb({
-      standings_snapshots: snapshots,
+      leaderboard_snapshots: snapshots,
       match_days: matchDays,
       standings,
     });

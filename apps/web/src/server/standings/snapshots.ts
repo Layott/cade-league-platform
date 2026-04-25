@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Plan 51 — standings snapshots per match-day.
  *
  * After every match-day finishes the system captures a frozen copy of the
- * current standings into `standings_snapshots`. The table is append-only via
+ * current standings into `leaderboard_snapshots`. The table is append-only via
  * trigger (parent agent owns the migration), so this module is intentionally
  * IDEMPOTENT: a second `captureSnapshot()` call for the same match-day
  * returns the existing row instead of trying to overwrite + tripping the
@@ -29,11 +29,11 @@ type StandingsRow = Record<string, unknown> & {
 
 /**
  * Look up the season for a match-day, then dump every standings row for that
- * season into a single JSONB array stored on `standings_snapshots`. Re-running
+ * season into a single JSONB array stored on `leaderboard_snapshots`. Re-running
  * this for the same match-day returns the existing row — no overwrite.
  */
 export async function captureSnapshot(
-  matchDayId: number,
+  matchDayId: string,
   supabase: SupabaseClient,
 ): Promise<StandingsSnapshot> {
   // 1. Bail out early if a snapshot already exists.
@@ -41,7 +41,7 @@ export async function captureSnapshot(
   if (existing) {
     // Need to also surface the id for callers that want to link to it.
     const { data: row, error: lookupErr } = await supabase
-      .from("standings_snapshots")
+      .from("leaderboard_snapshots")
       .select("id, captured_at, snapshot_data")
       .eq("match_day_id", matchDayId)
       .order("captured_at", { ascending: false })
@@ -87,13 +87,13 @@ export async function captureSnapshot(
   }
   const snapshotPayload = (rows ?? []) as StandingsRow[];
 
-  // 4. Insert the snapshot row.
+  // 4. Insert the snapshot row. season_id lives inside snapshot_data JSONB
+  //    (the migration's leaderboard_snapshots table only has match_day_id FK).
   const { data: inserted, error: insertErr } = await supabase
-    .from("standings_snapshots")
+    .from("leaderboard_snapshots")
     .insert({
       match_day_id: matchDayId,
-      season_id: seasonId,
-      snapshot_data: snapshotPayload,
+      snapshot_data: { season_id: seasonId, rows: snapshotPayload },
     })
     .select("id, captured_at, snapshot_data")
     .single();
@@ -113,11 +113,11 @@ export async function captureSnapshot(
  * Read the most recent snapshot for a match-day. Returns null if none.
  */
 export async function readSnapshot(
-  matchDayId: number,
+  matchDayId: string,
   supabase: SupabaseClient,
 ): Promise<{ snapshotData: unknown; capturedAt: string } | null> {
   const { data, error } = await supabase
-    .from("standings_snapshots")
+    .from("leaderboard_snapshots")
     .select("captured_at, snapshot_data")
     .eq("match_day_id", matchDayId)
     .order("captured_at", { ascending: false })
