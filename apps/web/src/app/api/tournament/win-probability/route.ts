@@ -135,18 +135,20 @@ async function loadLast5(
     .from("match_results")
     .select(
       `
-      home_score, away_score, result_type,
+      home_score, away_score, result_type, walkover_pending,
       match:match_id ( home_player_id, away_player_id, season_id )
       `,
     )
     .is("deleted_at", null)
-    .neq("result_type", "void")
+    .in("result_type", ["normal", "forfeit"])
+    .or("walkover_pending.is.null,walkover_pending.eq.false")
     .order("created_at", { ascending: false })
     .limit(500);
 
   type Row = {
     home_score: number;
     away_score: number;
+    walkover_pending: boolean | null;
     match: {
       home_player_id: string;
       away_player_id: string;
@@ -155,6 +157,7 @@ async function loadLast5(
   };
   for (const r of (data ?? []) as unknown as Row[]) {
     if (!r.match || r.match.season_id !== seasonId) continue;
+    if (r.walkover_pending === true) continue;
     const home = r.match.home_player_id;
     const away = r.match.away_player_id;
     let homePts = 0;
@@ -186,19 +189,23 @@ async function loadH2HRecord(
   aId: string,
   bId: string,
 ): Promise<H2HRecord | undefined> {
+  // H2H must scope to the (a,b) pair in BOTH directions, season-bounded,
+  // confirmed (normal|forfeit), and exclude pending walkovers + voids.
   const { data } = await sb
     .from("match_results")
     .select(
       `
-      home_score, away_score, result_type,
+      home_score, away_score, result_type, walkover_pending,
       match:match_id ( home_player_id, away_player_id, season_id )
       `,
     )
     .is("deleted_at", null)
-    .neq("result_type", "void");
+    .in("result_type", ["normal", "forfeit"])
+    .or("walkover_pending.is.null,walkover_pending.eq.false");
   type Row = {
     home_score: number;
     away_score: number;
+    walkover_pending: boolean | null;
     match: {
       home_player_id: string;
       away_player_id: string;
@@ -211,6 +218,7 @@ async function loadH2HRecord(
   let draws = 0;
   for (const r of (data ?? []) as unknown as Row[]) {
     if (!r.match || r.match.season_id !== seasonId) continue;
+    if (r.walkover_pending === true) continue;
     const home = r.match.home_player_id;
     const away = r.match.away_player_id;
     if (!((home === aId && away === bId) || (home === bId && away === aId))) continue;

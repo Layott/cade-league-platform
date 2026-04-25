@@ -264,4 +264,35 @@ describe("computeWinProbability()", () => {
     expect(r1.pB).toBeCloseTo(r2.pA, 6);
     expect(r1.pDraw).toBeCloseTo(r2.pDraw, 6);
   });
+
+  it("zero-played guard: disciplinary-only stats must not drive a pre-season bias", () => {
+    // Reproduces the Adefola-vs-Anife bug where a -4 pts / -3 gd disciplinary
+    // adjustment with played=0 leaked through into a fake 80/4 split.
+    const adefola = mkStats({ played: 0, points: -4, gf: 0, ga: 0, gd: -3, last5Form: [] });
+    const anife = mkStats({ played: 0, points: 0, gf: 0, ga: 0, gd: 0, last5Form: [] });
+    const r = computeWinProbability(adefola, anife);
+    // Symmetric — no H2H, no games, no form. Disciplinary deltas don't apply.
+    expect(r.pA).toBeCloseTo(r.pB, 6);
+    // Sum to 1.
+    expect(r.pA + r.pB + r.pDraw).toBeCloseTo(1, 6);
+    // Draw within spec.
+    expect(r.pDraw).toBeGreaterThanOrEqual(0.15);
+    expect(r.pDraw).toBeLessThanOrEqual(0.4);
+    // No way A is anywhere close to "80%" — must stay near 0.4 baseline.
+    expect(r.pA).toBeLessThan(0.5);
+  });
+
+  it("zero-played but H2H present -> still uses H2H signal", () => {
+    // Sanity guard: zero-played short-circuit only triggers WITHOUT H2H.
+    // If a real H2H record exists, formula must still bias toward winner.
+    const a = mkStats({ played: 0, points: 0, last5Form: [] });
+    const b = mkStats({ played: 0, points: 0, last5Form: [] });
+    const r = computeWinProbability(a, b, {
+      totalMatches: 3,
+      aWins: 3,
+      bWins: 0,
+      draws: 0,
+    });
+    expect(r.pA).toBeGreaterThan(r.pB);
+  });
 });

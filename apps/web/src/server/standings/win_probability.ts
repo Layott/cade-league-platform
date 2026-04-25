@@ -135,6 +135,16 @@ export function computeWinProbability(
   playerB: PlayerSeasonStats,
   h2h?: H2HRecord,
 ): WinProbability {
+  // Guard: when both players have zero matches played AND no H2H history,
+  // there is no signal to bias the result. Disciplinary point/GD adjustments
+  // (which can leave `points` < 0 with `played === 0`) must NOT drive a
+  // pre-season favourite. Return the neutral split. Form arrays are also
+  // empty in this case, so the regular formula would land near 50/50 — but
+  // we short-circuit defensively to make the contract explicit.
+  const noH2H = !h2h || h2h.totalMatches <= 0;
+  if (noH2H && playerA.played === 0 && playerB.played === 0) {
+    return { pA: 0.375, pB: 0.375, pDraw: 0.25 };
+  }
   const strA = combinedStrengthA(playerA, h2h);
   const strB = combinedStrengthB(playerB, h2h);
   const delta = strA - strB;

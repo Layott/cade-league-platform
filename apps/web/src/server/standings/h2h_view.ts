@@ -140,18 +140,21 @@ async function loadPairwiseH2H(
   if (playerIds.length < 2) return out;
 
   // Pull every confirmed result in the season for any pair-of-interest.
+  // Walkover_pending rows still carry scores but the walkover hasn't been
+  // counter-confirmed — they must NOT contribute to H2H counts.
   const { data, error } = await sb
     .from("match_results")
     .select(
       `
-      home_score, away_score, result_type,
+      home_score, away_score, result_type, walkover_pending,
       match:match_id (
         home_player_id, away_player_id, season_id
       )
       `,
     )
     .is("deleted_at", null)
-    .neq("result_type", "void");
+    .in("result_type", ["normal", "forfeit"])
+    .or("walkover_pending.is.null,walkover_pending.eq.false");
 
   if (error) return out;
 
@@ -159,6 +162,7 @@ async function loadPairwiseH2H(
     home_score: number;
     away_score: number;
     result_type: string;
+    walkover_pending: boolean | null;
     match: {
       home_player_id: string;
       away_player_id: string;
@@ -172,6 +176,7 @@ async function loadPairwiseH2H(
   for (const r of rows) {
     if (!r.match) continue;
     if (r.match.season_id !== seasonId) continue;
+    if (r.walkover_pending === true) continue;
     const a = r.match.home_player_id;
     const b = r.match.away_player_id;
     if (!set.has(a) || !set.has(b)) continue;
@@ -216,18 +221,21 @@ async function buildLast5Map(
   seasonId: string,
 ): Promise<Map<string, number[]>> {
   const out = new Map<string, number[]>();
+  // Match leaderboard form filter: include only confirmed normal/forfeit
+  // rows, exclude walkover_pending (request still awaiting counter-confirm).
   const { data, error } = await sb
     .from("match_results")
     .select(
       `
-      home_score, away_score, result_type, created_at,
+      home_score, away_score, result_type, walkover_pending, created_at,
       match:match_id (
         home_player_id, away_player_id, season_id
       )
       `,
     )
     .is("deleted_at", null)
-    .neq("result_type", "void")
+    .in("result_type", ["normal", "forfeit"])
+    .or("walkover_pending.is.null,walkover_pending.eq.false")
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -237,6 +245,7 @@ async function buildLast5Map(
     home_score: number;
     away_score: number;
     result_type: string;
+    walkover_pending: boolean | null;
     match: {
       home_player_id: string;
       away_player_id: string;
@@ -247,6 +256,7 @@ async function buildLast5Map(
   for (const r of (data ?? []) as unknown as Row[]) {
     if (!r.match) continue;
     if (r.match.season_id !== seasonId) continue;
+    if (r.walkover_pending === true) continue;
     const home = r.match.home_player_id;
     const away = r.match.away_player_id;
     let homePts: number;

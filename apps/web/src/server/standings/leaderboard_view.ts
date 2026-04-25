@@ -47,11 +47,12 @@ type StandingsViewRow = {
   } | null;
 };
 
-type ResultRow = {
+export type ResultRow = {
   match_id: string;
   home_score: number;
   away_score: number;
   result_type: string | null;
+  walkover_pending: boolean | null;
   match: {
     home_player_id: string;
     away_player_id: string;
@@ -148,15 +149,22 @@ async function readFormResults(
   sb: SupabaseClient,
   seasonId: string,
 ): Promise<ResultRow[]> {
+  // Plan 51 follow-up: form must reflect only confirmed, non-void,
+  // non-pending-walkover results. A row with walkover_pending=true still
+  // carries home_score/away_score but represents a request awaiting the
+  // counter-party's confirmation — it must NOT count toward W/D/L form
+  // until confirmed.
   const { data, error } = await sb
     .from("match_results")
     .select(
       `
-      match_id, home_score, away_score, result_type,
+      match_id, home_score, away_score, result_type, walkover_pending,
       match:match_id ( home_player_id, away_player_id, season_id )
       `,
     )
     .is("deleted_at", null)
+    .in("result_type", ["normal", "forfeit"])
+    .or("walkover_pending.is.null,walkover_pending.eq.false")
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error(`readFormResults: ${error.message}`);
@@ -166,16 +174,18 @@ async function readFormResults(
 
 /**
  * Build a per-player W/D/L form string from the most recent 5 confirmed
- * results. `result_type='void'` rows are skipped (per the void propagation
- * rule). Rows arrive most-recent-first from `readFormResults`; we build
- * letters newest-first then reverse so the rendered string reads "WDLWW"
- * with the leftmost char being the oldest of the five.
+ * results. Skips voids AND walkover_pending rows (a pending walkover
+ * carries scores but isn't yet counter-confirmed, so it must not bias the
+ * form column). Rows arrive most-recent-first from `readFormResults`; we
+ * build letters newest-first then reverse so the rendered string reads
+ * "WDLWW" with the leftmost char being the oldest of the five.
  */
-function buildFormMap(results: ResultRow[]): Map<string, string> {
+export function buildFormMap(results: ResultRow[]): Map<string, string> {
   const out = new Map<string, string[]>();
   for (const r of results) {
     if (!r.match) continue;
     if (r.result_type === "void") continue;
+    if (r.walkover_pending === true) continue;
     const home = r.match.home_player_id;
     const away = r.match.away_player_id;
     let homeLetter: "W" | "D" | "L";
