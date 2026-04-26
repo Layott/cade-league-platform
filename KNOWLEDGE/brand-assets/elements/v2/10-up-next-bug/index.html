@@ -502,6 +502,18 @@
       player2: { name: 'KAYKAY', slug: 'kaykay', photoUrl: null }
     };
 
+    // Canonical roster — derive slug from displayName when payload omits slug/gamerTag.
+    // Mirrors the NAME_TO_SLUG map in 05-h2h-3 / 06-h2h-5 so all overlays resolve photos
+    // identically when broadcast control sends only displayName (e.g. upNextBugSchema).
+    var NAME_TO_SLUG = {
+      'ADEFOLA': 'adefola', 'ANIFE': 'anife', 'BAJI JNR': 'baji_jnr',
+      'DADABOI': 'dadaboi', 'FARUK': 'faruk', 'GURU': 'guru',
+      'KAYKAY': 'kaykay', 'KILLER FREAK': 'killer_freak',
+      'KING NONEX': 'kingnonex', 'KINGNONEX': 'kingnonex',
+      'MITCH': 'mitch', 'MR OGA': 'mr_oga', 'MR. OGA': 'mr_oga',
+      'TACTICAL': 'tactical', 'WOLEVATION': 'wolevation'
+    };
+
     function photoUrl(slug) {
       return '../../../players/processed/' + slug + '/headshot_01_nobg.png';
     }
@@ -534,11 +546,22 @@
     function applyContent() {
       name1El.textContent = state.player1.name;
       name2El.textContent = state.player2.name;
-      // Force browser to refetch by appending cache-buster on slug swap
-      var u1 = state.player1.photoUrl || photoUrl(state.player1.slug);
-      var u2 = state.player2.photoUrl || photoUrl(state.player2.slug);
-      if (photo1El.src !== u1) photo1El.src = u1;
-      if (photo2El.src !== u2) photo2El.src = u2;
+      // photoUrl from payload wins; otherwise resolve via slug.
+      // If slug is empty (unknown roster name), hide the photo cleanly.
+      var u1 = state.player1.photoUrl || (state.player1.slug ? photoUrl(state.player1.slug) : '');
+      var u2 = state.player2.photoUrl || (state.player2.slug ? photoUrl(state.player2.slug) : '');
+      if (u1) {
+        photo1El.style.display = '';
+        if (photo1El.src !== u1) photo1El.src = u1;
+      } else {
+        photo1El.style.display = 'none';
+      }
+      if (u2) {
+        photo2El.style.display = '';
+        if (photo2El.src !== u2) photo2El.src = u2;
+      } else {
+        photo2El.style.display = 'none';
+      }
       photo1El.alt = state.player1.name;
       photo2El.alt = state.player2.name;
       applyWidth();
@@ -574,7 +597,14 @@
       // Plan 51 schema sends gamerTag (canonical slug), legacy sends slug.
       var rawSlug = p.slug || p.gamerTag || '';
       var slug = rawSlug.toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
-      var name = p.displayName || p.name || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
+      var rawName = p.displayName || p.name || '';
+      // upNextBugSchema only carries displayName — fall back to NAME_TO_SLUG so the
+      // headshot resolves correctly without a slug field on the payload.
+      if (!slug && rawName) {
+        var canon = NAME_TO_SLUG[rawName.toString().trim().toUpperCase()];
+        if (canon) slug = canon;
+      }
+      var name = rawName || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
       var photoUrl = p.photoUrl || null;
       return { slug: slug, name: name, photoUrl: photoUrl };
     }
@@ -594,12 +624,17 @@
       var n2 = normalizePlayer(p2);
       if (n1) {
         if (n1.name) state.player1.name = n1.name;
+        // Always overwrite slug when the incoming payload identifies a player.
+        // If slug is empty (unknown name), keep state.player1.slug so we don't
+        // 404 the headshot — but this should never happen for canonical roster.
         if (n1.slug) state.player1.slug = n1.slug;
+        else if (n1.name) state.player1.slug = ''; // signal: no headshot, use alt fallback
         state.player1.photoUrl = n1.photoUrl;
       }
       if (n2) {
         if (n2.name) state.player2.name = n2.name;
         if (n2.slug) state.player2.slug = n2.slug;
+        else if (n2.name) state.player2.slug = '';
         state.player2.photoUrl = n2.photoUrl;
       }
       applyContent();

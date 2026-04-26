@@ -105,16 +105,26 @@
      replaced with single-play fade-out. === */
   body { opacity: 1 !important; }
 
-  /* HIDE bg + inner content until trigger ON */
+  /* HIDE bg + inner content until trigger ON.
+     IMPORTANT: selectors must match the ACTUAL rendered class names.
+     The `title-loop` / `header-loop` / `footer-loop` infinite animations
+     would otherwise flash opacity 0→1 on default load and leak the title /
+     partners through the canvas. */
   body:not(.cade-visible):not(.cade-exiting) .bg-image,
   body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
   body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
+  body:not(.cade-visible):not(.cade-exiting) .top-band .divider,
+  body:not(.cade-visible):not(.cade-exiting) .title-bar,
+  body:not(.cade-visible):not(.cade-exiting) .title-bar__main,
+  body:not(.cade-visible):not(.cade-exiting) .title-bar__rule,
   body:not(.cade-visible):not(.cade-exiting) .matchday-title,
   body:not(.cade-visible):not(.cade-exiting) .match-row,
   body:not(.cade-visible):not(.cade-exiting) .rows-wrap,
   body:not(.cade-visible):not(.cade-exiting) .row,
   body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .partners-label,
+  body:not(.cade-visible):not(.cade-exiting) .marquee,
   body:not(.cade-visible):not(.cade-exiting) .row-card,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
@@ -122,15 +132,22 @@
     opacity: 0 !important;
   }
   body:not(.cade-visible):not(.cade-exiting) .top-band,
+  body:not(.cade-visible):not(.cade-exiting) .top-band .divider,
+  body:not(.cade-visible):not(.cade-exiting) .title-bar,
+  body:not(.cade-visible):not(.cade-exiting) .title-bar__main,
+  body:not(.cade-visible):not(.cade-exiting) .title-bar__rule,
   body:not(.cade-visible):not(.cade-exiting) .matchday-title,
   body:not(.cade-visible):not(.cade-exiting) .match-row,
   body:not(.cade-visible):not(.cade-exiting) .rows-wrap,
   body:not(.cade-visible):not(.cade-exiting) .row,
   body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .partners-label,
+  body:not(.cade-visible):not(.cade-exiting) .marquee,
   body:not(.cade-visible):not(.cade-exiting) .row-card,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
-  body:not(.cade-visible):not(.cade-exiting) .season-mark {
+  body:not(.cade-visible):not(.cade-exiting) .season-mark,
+  body:not(.cade-visible):not(.cade-exiting) .season-mark::before {
     animation-name: none !important;
   }
   body.cade-visible .bg-image,
@@ -935,7 +952,7 @@
             </div>
           </div>
           <div class="row-side row-side--right">
-            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kingnonex/headshot_02_nobg.png" alt="KING NONEX" /></div>
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kingnonex/headshot_03_nobg.png" alt="KING NONEX" /></div>
             <div class="player-name">KING NONEX</div>
           </div>
         </div>
@@ -954,7 +971,7 @@
             <div class="pill-tbd">TBD</div>
           </div>
           <div class="row-side row-side--right">
-            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kingnonex/headshot_02_nobg.png" alt="KING NONEX" /></div>
+            <div class="player-photo"><img src="/overlays/v2/_assets/players/processed/kingnonex/headshot_03_nobg.png" alt="KING NONEX" /></div>
             <div class="player-name">KING NONEX</div>
           </div>
         </div>
@@ -1268,10 +1285,13 @@
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
   // Top-level gated containers — class names listed here MUST exist in the
-  // DOM (legacy SEL had .match-row + .row-card which never appeared).
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.matchday-mark,.matchday-title,.partners,.row,.rows-wrap,.season-mark,.top-band';
+  // DOM. The 2026-04-26 audit added .title-bar, .title-bar__main,
+  // .title-bar__rule, .partners-label, .marquee, .top-band .divider — without
+  // these, the title-loop / footer-loop / header-loop infinite animations
+  // flash through the canvas at load time even with no cade-visible class.
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.matchday-mark,.matchday-title,.partners,.partners-label,.marquee,.row,.rows-wrap,.season-mark,.title-bar,.title-bar__main,.title-bar__rule,.top-band';
   // Inner descendants that the row-builder injects + that have animations.
-  var INNER_SEL = '.row__panel,.row__border,.row__body,.row-side,.row-center,.player-photo,.player-name,.score-block,.match-status,.kickoff-time';
+  var INNER_SEL = '.row__panel,.row__border,.row__body,.row-side,.row-center,.player-photo,.player-name,.score-block,.match-status,.kickoff-time,.divider';
   function apply() {
     var b = document.body;
     if (!b) return;

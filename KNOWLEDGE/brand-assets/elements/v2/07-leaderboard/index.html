@@ -360,9 +360,11 @@
     margin-bottom: 6px;
     font-family: var(--accent);
     font-weight: 700;
-    font-size: 11px;
+    /* 2026-04-26: bumped from 11px → 14px so column labels match the
+       28px stat values below — clearer at distance. */
+    font-size: 14px;
     letter-spacing: 0.28em;
-    color: var(--ink-muted);
+    color: rgba(255,255,255,0.78);
     text-transform: uppercase;
     border-bottom: 1px solid rgba(107,205,6,0.20);
   }
@@ -571,26 +573,35 @@
     100% { opacity: 0; transform: translateY(-3px) scale(0.95); }
   }
 
-  /* numeric stat cells */
+  /* numeric stat cells — 2026-04-26 distance-readability pass:
+     boosted from 17/18px → 26/28px so W/D/L/GF/GA/GD/PTS read clearly
+     on stream at 1080p when the leaderboard is small in frame. */
   .stat {
     font-family: var(--display);
-    font-weight: 700; font-stretch: 100%;
-    font-size: 18px;
-    color: var(--ink);
+    font-weight: 800; font-stretch: 100%;
+    font-size: 28px;
+    color: #fff;
     text-align: center;
     letter-spacing: 0.01em;
+    text-shadow: 0 0 1px rgba(255,255,255,0.5);
   }
   .stat-wdl {
     font-family: var(--display);
-    font-weight: 700; font-stretch: 100%;
-    font-size: 17px;
-    color: var(--ink);
+    font-weight: 800; font-stretch: 100%;
+    font-size: 26px;
+    color: #fff;
     text-align: center;
     letter-spacing: 0.04em;
+    text-shadow: 0 0 1px rgba(255,255,255,0.5);
   }
-  .stat-wdl em { font-style: normal; color: var(--ink-muted); padding: 0 2px; font-weight: 400; }
-  .stat-gd.pos { color: var(--green); }
-  .stat-gd.neg { color: var(--pink); }
+  .stat-wdl em {
+    font-style: normal;
+    color: rgba(255,255,255,0.55);
+    padding: 0 4px;
+    font-weight: 500;
+  }
+  .stat-gd.pos { color: var(--green); text-shadow: 0 0 8px rgba(107,205,6,0.35); }
+  .stat-gd.neg { color: var(--pink); text-shadow: 0 0 8px rgba(254,3,109,0.35); }
 
   /* sanctions chip */
   .sanction {
@@ -635,6 +646,9 @@
     z-index: 12;
   }
   .partners-label {
+    /* 2026-04-26: hide the "OFFICIAL PARTNERS" label per user request —
+       saves vertical space + lets the partner logos own the strip cleanly. */
+    display: none;
     font-family: var(--accent);
     font-weight: 500; font-size: 10px;
     letter-spacing: 0.42em; color: rgba(255,255,255,0.65);
@@ -666,14 +680,16 @@
     gap: 60px; padding: 0 30px; flex-shrink: 0;
   }
   .marquee-group .partner {
-    height: 80px; width: auto; display: block;
+    /* 2026-04-26: shrunk from 80px → 56px for a more refined strip
+       (user feedback: logos were dominating the frame). */
+    height: 56px; width: auto; display: block;
     object-fit: contain;
     filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
   }
-  .marquee-group .partner--gameevo  { height: 80px; }
-  .marquee-group .partner--pride    { height: 80px; }
-  .marquee-group .partner--africa   { height: 80px; }
-  .marquee-group .partner--trace    { height: 80px; }
+  .marquee-group .partner--gameevo  { height: 56px; }
+  .marquee-group .partner--pride    { height: 56px; }
+  .marquee-group .partner--africa   { height: 56px; }
+  .marquee-group .partner--trace    { height: 56px; }
 
   /* CORNER WATERMARK */
   .season-mark {

@@ -1513,6 +1513,11 @@
         if (!data) return;
         var scorers = readScorers(data);
         if (!scorers) return;
+        if (scorers.length === 0) {
+          console.info('[overlay/14-top-scorers] empty scorers[]; clearing mock');
+          // Fall through to the loop below — `entry` will be null for all 3
+          // pods and they'll be cleared.
+        }
         // Normalize server shape (rank/displayName/goals/photoUrl) into the
         // overlay's expected shape (rank/name/slug/goals/photoUrl).
         var normalized = scorers.map(function(r){
@@ -1525,23 +1530,29 @@
           };
         });
         console.info('[overlay/14-top-scorers] scorers[]', normalized.length);
+        // Clear pods 2/3 and tail when fewer scorers come in than slots.
         var pods = ['p1', 'p2', 'p3'];
-        for (var i = 0; i < Math.min(3, normalized.length); i++) {
-          var entry = normalized[i];
-          if (!entry) continue;
+        for (var i = 0; i < pods.length; i++) {
+          var entry = i < normalized.length ? normalized[i] : null;
           var goalsEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-goals');
-          if (goalsEl && typeof entry.goals === 'number') {
-            goalsEl.dataset.target = String(entry.goals);
-            goalsEl.textContent = String(entry.goals);
-          }
           var nameEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-name');
-          if (nameEl && entry.name) nameEl.textContent = entry.name;
-          if (entry.photoUrl) {
-            var img = document.querySelector('.pod-card--' + pods[i] + ' .pod-photo img');
-            if (img) img.src = entry.photoUrl;
+          var img = document.querySelector('.pod-card--' + pods[i] + ' .pod-photo img');
+          if (entry) {
+            if (goalsEl && typeof entry.goals === 'number') {
+              goalsEl.dataset.target = String(entry.goals);
+              goalsEl.textContent = String(entry.goals);
+            }
+            if (nameEl && entry.name) nameEl.textContent = entry.name;
+            if (img && entry.photoUrl) img.src = entry.photoUrl;
+          } else {
+            // Fewer than 3 scorers — clear unused pod slots.
+            if (goalsEl) { goalsEl.dataset.target = '0'; goalsEl.textContent = '—'; }
+            if (nameEl) nameEl.textContent = '—';
+            if (img) img.removeAttribute('src');
           }
         }
-        if (normalized.length > 3) rebuildTail(normalized);
+        // Always rebuild tail (will clear when length <= 3).
+        rebuildTail(normalized);
       }
       function show() {
         document.body.classList.remove('cade-exiting');

@@ -722,24 +722,39 @@
 /* === STRICT GATE: master visibility, controlled ONLY by parent postMessage. ===
    Operator drives via Update & Show / Hide. No auto-demo, no fallback timers.
    Per-slot opacity is handled by the slot-routed handler above; this gate just
-   keeps the canvas-level baseline correct. SEL matches all .lt instances. */
+   tracks aggregate slot visibility on the body so the canvas reflects whether
+   ANY slot is showing. Critical for slot isolation: hiding slot 1 must NOT
+   pull slots 2+3 off-canvas, and vice-versa. */
 (function cadeGate() {
   'use strict';
-  var inIframe = true;
-  try { inIframe = window.top !== window.self; } catch (e) { inIframe = true; }
-  function show() {
-    document.body.classList.remove('cade-exiting');
-    document.body.classList.add('cade-visible');
+  var SLOT_IDS = [1, 2, 3];
+  var slotVisible = { 1: false, 2: false, 3: false };
+  function resolveSlot(msg) {
+    var n = Number(msg && msg.slot);
+    if (n === 1 || n === 2 || n === 3) return n;
+    return 1;
   }
-  function hide() {
-    document.body.classList.remove('cade-visible');
-    document.body.classList.add('cade-exiting');
+  function syncBody() {
+    var any = slotVisible[1] || slotVisible[2] || slotVisible[3];
+    if (any) {
+      document.body.classList.remove('cade-exiting');
+      document.body.classList.add('cade-visible');
+    } else {
+      document.body.classList.remove('cade-visible');
+      document.body.classList.add('cade-exiting');
+    }
   }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
-    else if (msg.type === 'hide') hide();
+    if (msg.type !== 'show' && msg.type !== 'update' && msg.type !== 'hide') return;
+    var slotId = resolveSlot(msg);
+    if (msg.type === 'show' || msg.type === 'update') {
+      slotVisible[slotId] = true;
+    } else {
+      slotVisible[slotId] = false;
+    }
+    syncBody();
   }, false);
 })();
 </script>
