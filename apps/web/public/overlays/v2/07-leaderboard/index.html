@@ -1167,6 +1167,14 @@
 
     function rerender(standings) {
       if (!rowsContainer || !Array.isArray(standings)) return;
+      // TBD stub from LeaderboardControl optimistic + form payload —
+      // 1 row with displayName=TBD. Ignore so real data from initial
+      // fetch / Realtime stays rendered.
+      if (standings.length === 1) {
+        var only = standings[0];
+        var name = (only && (only.displayName || only.name)) || '';
+        if (String(name).trim().toUpperCase() === 'TBD') return;
+      }
       if (standings.length === 0) {
         // Empty payload — clear the table rather than leaking the static
         // sample data the file ships with for designer-preview.
