@@ -472,14 +472,15 @@
     var b = document.body;
     if (!b) return;
     var vis = b.classList.contains('cade-visible');
-    var exit = b.classList.contains('cade-exiting');
     document.querySelectorAll(SEL).forEach(function(el){
+      // Set transition once so opacity flips animate smoothly.
+      if (!el.dataset.cadeTransition) {
+        el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+        el.dataset.cadeTransition = '1';
+      }
       if (vis) {
         el.style.setProperty('opacity', '1', 'important');
-        el.style.removeProperty('transform');
         el.style.setProperty('visibility', 'visible', 'important');
-      } else if (exit) {
-        el.style.setProperty('opacity', '0', 'important');
       } else {
         el.style.setProperty('opacity', '0', 'important');
       }

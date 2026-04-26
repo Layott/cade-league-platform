@@ -1394,6 +1394,7 @@
     var vis = b.classList.contains('cade-visible');
     var exit = b.classList.contains('cade-exiting');
     document.querySelectorAll(SEL).forEach(function(el){
+      if (!el.dataset.cadeTransition) { el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out'; el.dataset.cadeTransition = '1'; }
       if (vis) {
         el.style.setProperty('opacity', '1', 'important');
         el.style.removeProperty('transform');
@@ -1408,6 +1409,7 @@
     // CSS + per-element animations do their thing (visibility inherited
     // from gated parent which is opacity 0).
     document.querySelectorAll(INNER_SEL).forEach(function(el){
+      if (!el.dataset.cadeTransition) { el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out'; el.dataset.cadeTransition = '1'; }
       if (vis) {
         el.style.setProperty('opacity', '1', 'important');
         el.style.removeProperty('transform');
