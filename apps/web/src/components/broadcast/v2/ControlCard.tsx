@@ -69,6 +69,21 @@ export type ControlCardProps = {
    * leave this off because the button itself flips ON↔OFF.
    */
   liveBadge?: boolean;
+  /**
+   * Optional override for the header label. Defaults to
+   * `V2_OVERLAY_LABELS[overlayKey]`. Used when the same overlayKey is
+   * rendered in multiple cards (e.g. 3 lower-third slot cards) so each
+   * gets a distinct title like "Lower Third 1", "Lower Third 2", etc.
+   */
+  labelOverride?: string;
+  /**
+   * Optional suffix appended to every internal `data-testid` so multiple
+   * cards rendering the same overlayKey produce unique test handles.
+   * Pass e.g. `"slot-1"` to get `v2-card-08-lower-third-slot-1`,
+   * `v2-preview-iframe-08-lower-third-slot-1`, etc. When omitted, the
+   * test ids match the legacy single-card layout (one per overlayKey).
+   */
+  instanceSuffix?: string;
 };
 
 export function ControlCard({
@@ -79,9 +94,12 @@ export function ControlCard({
   triggerSlot,
   onIframeReady,
   liveBadge = false,
+  labelOverride,
+  instanceSuffix,
 }: ControlCardProps) {
   const previewUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, true);
   const liveUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, false);
+  const idSuffix = instanceSuffix ? `${overlayKey}-${instanceSuffix}` : overlayKey;
 
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -166,13 +184,13 @@ export function ControlCard({
     }
   }, [absoluteLiveUrl, liveUrl]);
 
-  const label = V2_OVERLAY_LABELS[overlayKey];
+  const label = labelOverride ?? V2_OVERLAY_LABELS[overlayKey];
   const num = overlayKey.split("-")[0];
 
   return (
     <div
       className="flex flex-col overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)]"
-      data-testid={`v2-card-${overlayKey}`}
+      data-testid={`v2-card-${idSuffix}`}
       style={lazyMountStageStyle({
         tileWidth: TILE_WIDTH,
         tileHeight: TILE_HEIGHT,
@@ -181,7 +199,7 @@ export function ControlCard({
       {/* Iframe preview stage */}
       <div
         ref={stageRef}
-        data-testid={`v2-preview-stage-${overlayKey}`}
+        data-testid={`v2-preview-stage-${idSuffix}`}
         data-mounted={mounted ? "true" : "false"}
         style={{
           width: `${TILE_WIDTH}px`,
@@ -197,7 +215,7 @@ export function ControlCard({
             ref={iframeRef}
             src={previewUrl}
             title={`Preview — ${label}`}
-            data-testid={`v2-preview-iframe-${overlayKey}`}
+            data-testid={`v2-preview-iframe-${idSuffix}`}
             style={{
               width: `${IFRAME_WIDTH}px`,
               height: `${IFRAME_HEIGHT}px`,
@@ -246,7 +264,7 @@ export function ControlCard({
           </span>
           {liveBadge ? (
             <span
-              data-testid={`v2-live-badge-${overlayKey}`}
+              data-testid={`v2-live-badge-${idSuffix}`}
               className="inline-flex items-center gap-1 rounded-sm border border-[rgba(255,91,59,0.55)] bg-[rgba(255,91,59,0.15)] px-1.5 py-[1px] font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-[var(--flare)]"
               title="Overlay is currently live"
               aria-label="Overlay is live"
@@ -263,7 +281,7 @@ export function ControlCard({
           <button
             type="button"
             onClick={handleCopy}
-            data-testid={`v2-copy-${overlayKey}`}
+            data-testid={`v2-copy-${idSuffix}`}
             className="rounded-sm border border-[var(--ink-4)] bg-transparent px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:border-[var(--signal)]/40 hover:text-[var(--signal)]"
             aria-label={`Copy browser source URL for ${label}`}
           >
@@ -273,7 +291,7 @@ export function ControlCard({
             href={liveUrl}
             target="_blank"
             rel="noopener noreferrer"
-            data-testid={`v2-open-${overlayKey}`}
+            data-testid={`v2-open-${idSuffix}`}
             className="rounded-sm border border-[var(--signal)]/40 bg-transparent px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--signal)] hover:bg-[var(--signal)]/10"
             aria-label={`Open ${label} in a new tab`}
           >
@@ -286,7 +304,7 @@ export function ControlCard({
       {editPanel ? (
         <div
           className="border-b border-[var(--ink-4)]/40 bg-[var(--ink-2)] p-3"
-          data-testid={`v2-edit-${overlayKey}`}
+          data-testid={`v2-edit-${idSuffix}`}
         >
           {editPanel}
         </div>

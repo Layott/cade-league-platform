@@ -46,71 +46,65 @@ beforeEach(() => {
   installFakeLocalStorage();
 });
 
-describe("LowerThirdControl", () => {
-  it("renders 3 slots + 3 Trigger + 3 Hide buttons (one pair per slot)", () => {
+describe("LowerThirdControl (per-slot card)", () => {
+  it("renders one slot card with its own Trigger + Hide buttons", () => {
     render(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={1}
       />,
     );
     expect(screen.getByTestId("v2-lt-slot-1")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-slot-2")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-slot-3")).toBeTruthy();
     expect(screen.getByTestId("v2-lt-trigger-1")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-trigger-2")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-trigger-3")).toBeTruthy();
     expect(screen.getByTestId("v2-lt-hide-1")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-hide-2")).toBeTruthy();
-    expect(screen.getByTestId("v2-lt-hide-3")).toBeTruthy();
   });
 
-  it("each slot's re-trigger form carries the correct instanceSlot field", () => {
+  it("uses a slot-suffixed testid on the card so 3 cards can co-exist", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+      />,
+    );
+    expect(screen.getByTestId("v2-card-08-lower-third-slot-2")).toBeTruthy();
+    expect(
+      screen.getByTestId("v2-preview-stage-08-lower-third-slot-2"),
+    ).toBeTruthy();
+  });
+
+  it("re-trigger form carries the correct instanceSlot field for slot 2", () => {
     const { container } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={2}
       />,
     );
-    const form1 = container.querySelector(
-      '[data-testid="v2-retrigger-form-08-lower-third-1"]',
-    ) as HTMLFormElement;
-    const form2 = container.querySelector(
+    const form = container.querySelector(
       '[data-testid="v2-retrigger-form-08-lower-third-2"]',
     ) as HTMLFormElement;
     expect(
-      (form1.querySelector('input[name="instanceSlot"]') as HTMLInputElement)
-        ?.value,
-    ).toBe("1");
-    expect(
-      (form2.querySelector('input[name="instanceSlot"]') as HTMLInputElement)
+      (form.querySelector('input[name="instanceSlot"]') as HTMLInputElement)
         ?.value,
     ).toBe("2");
   });
 
-  it("each slot's hide form carries the correct instanceSlot field", () => {
+  it("hide form carries the correct instanceSlot field for slot 3", () => {
     const { container } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={3}
       />,
     );
-    const hideForm1 = container.querySelector(
-      '[data-testid="v2-hide-form-08-lower-third-1"]',
-    ) as HTMLFormElement;
-    const hideForm3 = container.querySelector(
+    const hideForm = container.querySelector(
       '[data-testid="v2-hide-form-08-lower-third-3"]',
     ) as HTMLFormElement;
     expect(
       (
-        hideForm1.querySelector(
-          'input[name="instanceSlot"]',
-        ) as HTMLInputElement
-      )?.value,
-    ).toBe("1");
-    expect(
-      (
-        hideForm3.querySelector(
+        hideForm.querySelector(
           'input[name="instanceSlot"]',
         ) as HTMLInputElement
       )?.value,
@@ -122,12 +116,13 @@ describe("LowerThirdControl", () => {
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={1}
       />,
     );
-    const form1 = container.querySelector(
+    const form = container.querySelector(
       '[data-testid="v2-retrigger-form-08-lower-third-1"]',
     ) as HTMLFormElement;
-    const payloadInput = form1.querySelector(
+    const payloadInput = form.querySelector(
       'input[name="payload"]',
     ) as HTMLInputElement;
     const parsed = JSON.parse(payloadInput.value);
@@ -139,42 +134,44 @@ describe("LowerThirdControl", () => {
     expect(parsed.jerseyNumber).toBe(1);
   });
 
-  it("typing into slot 1 updates the payload value", () => {
+  it("typing into the slot updates the payload value", () => {
     const { container } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={1}
       />,
     );
     const nameInput = screen.getByTestId("v2-lt-name-1") as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "ZARA" } });
 
-    const form1 = container.querySelector(
+    const form = container.querySelector(
       '[data-testid="v2-retrigger-form-08-lower-third-1"]',
     ) as HTMLFormElement;
-    const payloadInput = form1.querySelector(
+    const payloadInput = form.querySelector(
       'input[name="payload"]',
     ) as HTMLInputElement;
     const parsed = JSON.parse(payloadInput.value);
     expect(parsed.displayName).toBe("ZARA");
   });
 
-  it("re-trigger refresh — multi-edit slot reflects latest name+role each time", () => {
+  it("re-trigger refresh — multi-edit reflects latest name+role each time", () => {
     const { container } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={1}
       />,
     );
     const nameInput = screen.getByTestId("v2-lt-name-1") as HTMLInputElement;
     const roleInput = screen.getByTestId("v2-lt-role-1") as HTMLInputElement;
     const getPayload = () => {
-      const form1 = container.querySelector(
+      const form = container.querySelector(
         '[data-testid="v2-retrigger-form-08-lower-third-1"]',
       ) as HTMLFormElement;
       return JSON.parse(
         (
-          form1.querySelector('input[name="payload"]') as HTMLInputElement
+          form.querySelector('input[name="payload"]') as HTMLInputElement
         ).value,
       );
     };
@@ -207,6 +204,7 @@ describe("LowerThirdControl", () => {
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={1}
       />,
     );
 
@@ -226,7 +224,7 @@ describe("LowerThirdControl", () => {
     promptSpy.mockRestore();
   });
 
-  it("preset load populates inputs from localStorage", () => {
+  it("preset load populates the slot's inputs from localStorage", () => {
     window.localStorage.setItem(
       "cade-lt-presets",
       JSON.stringify([
@@ -238,6 +236,7 @@ describe("LowerThirdControl", () => {
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
+        slot={1}
       />,
     );
 
@@ -252,68 +251,128 @@ describe("LowerThirdControl", () => {
     expect(roleInput.value).toBe("GUEST");
   });
 
-  it("Trigger button text stays 'Trigger' regardless of slot active state", () => {
-    render(
-      <LowerThirdControl
-        sessionId={SESSION_ID}
-        viewToken={VIEW_TOKEN}
-        slotsActive={[true, false, true]}
-      />,
-    );
-    const trigger1 = screen.getByTestId("v2-lt-trigger-1") as HTMLButtonElement;
-    const trigger2 = screen.getByTestId("v2-lt-trigger-2") as HTMLButtonElement;
-    const trigger3 = screen.getByTestId("v2-lt-trigger-3") as HTMLButtonElement;
-    expect(trigger1.textContent?.trim()).toBe("Trigger");
-    expect(trigger2.textContent?.trim()).toBe("Trigger");
-    expect(trigger3.textContent?.trim()).toBe("Trigger");
-  });
-
-  it("Hide buttons mirror per-slot active state (disabled when slot is inactive)", () => {
-    render(
-      <LowerThirdControl
-        sessionId={SESSION_ID}
-        viewToken={VIEW_TOKEN}
-        slotsActive={[true, false, true]}
-      />,
-    );
-    const hide1 = screen.getByTestId("v2-lt-hide-1") as HTMLButtonElement;
-    const hide2 = screen.getByTestId("v2-lt-hide-2") as HTMLButtonElement;
-    const hide3 = screen.getByTestId("v2-lt-hide-3") as HTMLButtonElement;
-    expect(hide1.disabled).toBe(false);
-    expect(hide2.disabled).toBe(true);
-    expect(hide3.disabled).toBe(false);
-  });
-
-  it("slot-level Live badge surfaces per-slot active state", () => {
-    render(
-      <LowerThirdControl
-        sessionId={SESSION_ID}
-        viewToken={VIEW_TOKEN}
-        slotsActive={[true, false, true]}
-      />,
-    );
-    expect(screen.getByTestId("v2-lt-live-1")).toBeTruthy();
-    expect(screen.queryByTestId("v2-lt-live-2")).toBeNull();
-    expect(screen.getByTestId("v2-lt-live-3")).toBeTruthy();
-  });
-
-  it("card-level Live badge appears when ANY slot is active", () => {
+  it("Trigger button text stays 'Trigger' regardless of active state", () => {
     const { rerender } = render(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
-        slotsActive={[false, false, false]}
+        slot={1}
+        active={false}
       />,
     );
-    expect(screen.queryByTestId("v2-live-badge-08-lower-third")).toBeNull();
+    expect(
+      (screen.getByTestId("v2-lt-trigger-1") as HTMLButtonElement).textContent
+        ?.trim(),
+    ).toBe("Trigger");
 
     rerender(
       <LowerThirdControl
         sessionId={SESSION_ID}
         viewToken={VIEW_TOKEN}
-        slotsActive={[false, true, false]}
+        slot={1}
+        active={true}
       />,
     );
-    expect(screen.getByTestId("v2-live-badge-08-lower-third")).toBeTruthy();
+    expect(
+      (screen.getByTestId("v2-lt-trigger-1") as HTMLButtonElement).textContent
+        ?.trim(),
+    ).toBe("Trigger");
+  });
+
+  it("Hide button is enabled when active=true, disabled when active=false", () => {
+    const { rerender } = render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+        active={false}
+      />,
+    );
+    expect(
+      (screen.getByTestId("v2-lt-hide-2") as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    rerender(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+        active={true}
+      />,
+    );
+    expect(
+      (screen.getByTestId("v2-lt-hide-2") as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+
+  it("slot-level Live badge surfaces this slot's active state", () => {
+    const { rerender } = render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={3}
+        active={false}
+      />,
+    );
+    expect(screen.queryByTestId("v2-lt-live-3")).toBeNull();
+
+    rerender(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={3}
+        active={true}
+      />,
+    );
+    expect(screen.getByTestId("v2-lt-live-3")).toBeTruthy();
+  });
+
+  it("card header label defaults to 'Lower Third {slot}'", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+      />,
+    );
+    expect(screen.getByText("Lower Third 2")).toBeTruthy();
+  });
+
+  it("cardLabel prop overrides the default header", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={1}
+        cardLabel="Caster A"
+      />,
+    );
+    expect(screen.getByText("Caster A")).toBeTruthy();
+  });
+
+  it("card-level Live badge appears when this slot is active", () => {
+    const { rerender } = render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+        active={false}
+      />,
+    );
+    expect(
+      screen.queryByTestId("v2-live-badge-08-lower-third-slot-2"),
+    ).toBeNull();
+
+    rerender(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+        active={true}
+      />,
+    );
+    expect(
+      screen.getByTestId("v2-live-badge-08-lower-third-slot-2"),
+    ).toBeTruthy();
   });
 });

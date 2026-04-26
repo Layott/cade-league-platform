@@ -26,11 +26,13 @@ import { PenaltiesControl } from "@/components/broadcast/v2/controls/PenaltiesCo
 /**
  * Plan 51 — control card grid layout.
  *
- * Renders the 16 controls in a responsive grid. Each card receives an
- * `active` flag (single-instance) or `slotsActive` array (lower-third)
- * driven from the server-side probe of `overlay_events` /
- * `overlay_active_instances`. The toggle button on each card uses the
- * flag to flip its label / color.
+ * Renders 18 controls in a responsive grid (15 single-instance + 3
+ * separate lower-third cards, one per slot). Each card receives an
+ * `active` flag driven from the server-side probe of `overlay_events`
+ * / `overlay_active_instances`. The toggle button on each card uses
+ * the flag to flip its label / color. For the 3 lower-third cards we
+ * destructure `lowerThirdSlots` per-index so each card only knows
+ * about its own slot.
  *
  * A lightweight Realtime subscriber listens for overlay.* events on the
  * session channel and calls `router.refresh()` so the active flags
@@ -131,7 +133,20 @@ export function ControlGrid({
       <LowerThirdControl
         sessionId={sessionId}
         viewToken={viewToken}
-        slotsActive={lowerThirdSlots}
+        slot={1}
+        active={lowerThirdSlots[0]}
+      />
+      <LowerThirdControl
+        sessionId={sessionId}
+        viewToken={viewToken}
+        slot={2}
+        active={lowerThirdSlots[1]}
+      />
+      <LowerThirdControl
+        sessionId={sessionId}
+        viewToken={viewToken}
+        slot={3}
+        active={lowerThirdSlots[2]}
       />
       <SecondaryScoreBugControl
         sessionId={sessionId}

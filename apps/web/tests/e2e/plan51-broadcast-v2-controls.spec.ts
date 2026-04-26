@@ -11,8 +11,9 @@ import * as fs from "node:fs";
  *   2. Lower-third slot 1 ENTER fires → an `overlay_active_instances`
  *      row exists for the session + slot 1.
  *   3. The same slot 1 OFF clears that row (cleared_at IS NOT NULL).
- *   4. The page surfaces a copy view-token button + an "open legacy"
- *      link to the legacy /admin/broadcast/[sessionId] route.
+ *   4. The page surfaces a copy view-token button + a match-day
+ *      selector. (The "open legacy" link was removed in Plan 52 when
+ *      v2 was promoted to be the canonical broadcast surface.)
  *
  * Prerequisites (skip on missing): active season, ≥2 players, admin
  * login, `broadcast.v2.read`+`broadcast.v2.trigger` perms applied to
@@ -86,7 +87,7 @@ const ALL_OVERLAY_KEYS = [
 ];
 
 test.describe("Plan 51 — broadcast v2 control panel", () => {
-  test("renders 16 control cards + lower-third ENTER/OUT round-trips", async ({
+  test("renders 18 control cards + lower-third ENTER/OUT round-trips", async ({
     page,
   }) => {
     const sb = getServiceRoleClient();
@@ -174,32 +175,46 @@ test.describe("Plan 51 — broadcast v2 control panel", () => {
         waitUntil: "networkidle",
       });
 
-      // 1) Page shell renders + 16 cards visible.
+      // 1) Page shell renders + cards visible. The 16 overlay keys map
+      //    1:1 to cards EXCEPT `08-lower-third`, which renders one card
+      //    per slot (1/2/3) so the operator can drive each slot
+      //    independently. So we expect 18 cards total — 15 single-key
+      //    cards + 3 lower-third slot cards.
       await expect(page.getByTestId("broadcast-v2-session")).toBeVisible();
       await expect(page.getByTestId("v2-control-grid")).toBeVisible();
       for (const k of ALL_OVERLAY_KEYS) {
-        await expect(
-          page.getByTestId(`v2-card-${k}`),
-          `card ${k} should render`,
-        ).toBeVisible();
+        if (k === "08-lower-third") {
+          for (const slot of [1, 2, 3] as const) {
+            await expect(
+              page.getByTestId(`v2-card-${k}-slot-${slot}`),
+              `lower-third slot ${slot} card should render`,
+            ).toBeVisible();
+          }
+        } else {
+          await expect(
+            page.getByTestId(`v2-card-${k}`),
+            `card ${k} should render`,
+          ).toBeVisible();
+        }
       }
       expect(ALL_OVERLAY_KEYS.length).toBe(16);
 
-      // 2) Header surfaces copy-view-token + open-legacy link.
+      // 2) Header surfaces copy-view-token + match-day selector. The
+      // "Open legacy control →" link was removed in Plan 52 (broadcast
+      // v2 promotion) — the legacy URL now redirects here, so the link
+      // would loop.
       if (viewToken) {
         await expect(page.getByTestId("v2-copy-token")).toBeVisible();
       }
-      const legacy = page.getByTestId("v2-open-legacy");
-      await expect(legacy).toBeVisible();
-      await expect(legacy).toHaveAttribute(
-        "href",
-        `/admin/broadcast/${sessionId}`,
-      );
+      await expect(page.getByTestId("v2-open-legacy")).toHaveCount(0);
+      await expect(page.getByTestId("v2-match-day-select")).toBeVisible();
 
       // 3) Lower-third slot 1 ENTER → overlay_active_instances row.
-      const ltCard = page.getByTestId("v2-card-08-lower-third");
-      await ltCard.scrollIntoViewIfNeeded();
-      await ltCard.getByTestId("v2-lt-enter-1").click();
+      //    Each slot has its own card now (`v2-card-08-lower-third-slot-N`),
+      //    so click directly on slot 1's Trigger button.
+      const ltSlot1 = page.getByTestId("v2-card-08-lower-third-slot-1");
+      await ltSlot1.scrollIntoViewIfNeeded();
+      await ltSlot1.getByTestId("v2-lt-trigger-1").click();
       // The action revalidates the page; give it a beat to settle.
       await page.waitForTimeout(1500);
 
@@ -219,7 +234,7 @@ test.describe("Plan 51 — broadcast v2 control panel", () => {
       expect(enteredRow?.cleared_at).toBeNull();
 
       // 4) Lower-third slot 1 OFF → cleared_at populated.
-      await ltCard.getByTestId("v2-lt-off-1").click();
+      await ltSlot1.getByTestId("v2-lt-hide-1").click();
       await page.waitForTimeout(1500);
 
       const { data: cleared } = await sb
