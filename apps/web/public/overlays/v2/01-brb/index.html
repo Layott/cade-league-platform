@@ -120,31 +120,39 @@
      Nothing renders on initial load — postMessage drives visibility. === */
   body { opacity: 1 !important; }
   .bg-image, .bg-vignette, .bg-grain { opacity: 0; }
-  .top-band, .body, .partners, .chevrons, .season-mark {
+  .top-band, .partners, .chevrons, .season-mark {
     opacity: 0;
     transform: translateY(12px);
   }
+  /* .body has its own absolute centering transform — exclude it from the combined translateY animation. */
+  .body { opacity: 0; transform: translate(-50%, calc(-50% + 12px)); }
   body.cade-visible .bg-image,
   body.cade-visible .bg-vignette,
   body.cade-visible .bg-grain { opacity: 1; }
   body.cade-visible .top-band,
-  body.cade-visible .body,
   body.cade-visible .partners,
   body.cade-visible .chevrons,
   body.cade-visible .season-mark {
     opacity: 1;
     transform: translateY(0);
   }
+  body.cade-visible .body {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
   body.cade-exiting .bg-image,
   body.cade-exiting .bg-vignette,
   body.cade-exiting .bg-grain { opacity: 0; }
   body.cade-exiting .top-band,
-  body.cade-exiting .body,
   body.cade-exiting .partners,
   body.cade-exiting .chevrons,
   body.cade-exiting .season-mark {
     opacity: 0;
     transform: translateY(-12px);
+  }
+  body.cade-exiting .body {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 12px));
   }
 
   /* ── STAGE (1920×1080 transparent canvas, default-OFF) ─────── */
