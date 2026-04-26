@@ -21,14 +21,17 @@ import { publishStandingsChanged } from "@/server/standings/realtime";
 
 export const dynamic = "force-dynamic";
 
+// Bugfix 2026-04-26: drop `name` from configurable keys; add `ga`
+// (Goals Against, lower-better). Engine still anchors with `name` as
+// final fallback so equal rows sort deterministically.
 const ALLOWED = [
   "totalPts",
   "gd",
   "gf",
+  "ga",
   "wins",
   "losses",
   "played",
-  "name",
 ] as const;
 
 const bodySchema = z.object({

@@ -111,7 +111,13 @@ export default async function WalkoversPage() {
     })
     .filter((r): r is NonNullable<typeof r> => r !== null);
 
-  // Trigger candidates — fixtures with NO existing result (so we can write one).
+  // Trigger candidates — every fixture in the active season. Fixtures
+  // that already have a result get a `(has result)` annotation so the
+  // operator knows triggering will fail until the existing result is
+  // undone (use the Adjustments tab or Results Entry forfeit option).
+  // Bugfix 2026-04-26: previously we filtered out matches with any
+  // existing result, which hid today's fixtures whenever scores had
+  // already been entered.
   const { data: candRaw, error: cErr } = await svc
     .from("matches")
     .select(
@@ -120,11 +126,12 @@ export default async function WalkoversPage() {
       match_day:match_day_id ( id, match_date, venue_name ),
       home:home_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
       away:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
-      result:match_results ( id )
+      result:match_results ( id, walkover_pending )
       `,
     )
     .eq("season_id", season.id)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .order("scheduled_time", { ascending: true });
 
   if (cErr) {
     throw new Error(`candidates read: ${cErr.message}`);
@@ -139,35 +146,65 @@ export default async function WalkoversPage() {
       | null;
     home: PlayerRef | PlayerRef[] | null;
     away: PlayerRef | PlayerRef[] | null;
-    result: { id: string }[] | { id: string } | null;
+    result: { id: string; walkover_pending: boolean | null }[] | { id: string; walkover_pending: boolean | null } | null;
   };
 
-  const candidates: TriggerCandidate[] = ((candRaw ?? []) as unknown as CandRow[])
-    .filter((m) => {
-      const r = firstOrNull(m.result);
-      return r === null;
-    })
-    .map((m) => {
-      const home = firstOrNull(m.home);
-      const away = firstOrNull(m.away);
-      const md = firstOrNull(m.match_day);
-      const homeName =
-        home?.users?.display_name ?? home?.gamer_tag ?? "TBD";
-      const awayName =
-        away?.users?.display_name ?? away?.gamer_tag ?? "TBD";
-      const dayLabel = md?.match_date
-        ? formatWat(md.match_date, "EEE, dd MMM")
-        : "Date TBD";
-      return {
-        matchId: m.id,
-        matchDayLabel: dayLabel,
-        homeId: home?.id ?? "",
-        homeName,
-        awayId: away?.id ?? "",
-        awayName,
-      };
-    })
-    .filter((c) => c.homeId && c.awayId);
+  // Group fixtures by match-date so the operator scans by day. Sort
+  // descending by date so today's day surfaces first.
+  type GroupedDay = {
+    dateKey: string;
+    dateLabel: string;
+    fixtures: TriggerCandidate[];
+  };
+  const grouped = new Map<string, GroupedDay>();
+  for (const raw of (candRaw ?? []) as unknown as CandRow[]) {
+    const m = raw;
+    const home = firstOrNull(m.home);
+    const away = firstOrNull(m.away);
+    const md = firstOrNull(m.match_day);
+    if (!home?.id || !away?.id) continue;
+    const homeName = home.users?.display_name ?? home.gamer_tag ?? "TBD";
+    const awayName = away.users?.display_name ?? away.gamer_tag ?? "TBD";
+    const dateKey = md?.match_date ?? "9999-12-31";
+    const dateLabel = md?.match_date
+      ? formatWat(md.match_date, "EEE, dd MMM")
+      : "Date TBD";
+    const result = firstOrNull(m.result);
+    const status: TriggerCandidate["status"] = !result
+      ? "open"
+      : result.walkover_pending
+        ? "walkover_pending"
+        : "has_result";
+    if (!grouped.has(dateKey)) {
+      grouped.set(dateKey, {
+        dateKey,
+        dateLabel,
+        fixtures: [],
+      });
+    }
+    grouped.get(dateKey)!.fixtures.push({
+      matchId: m.id,
+      matchDayLabel: dateLabel,
+      scheduledTime: m.scheduled_time,
+      homeId: home.id,
+      homeName,
+      awayId: away.id,
+      awayName,
+      status,
+    });
+  }
+  // Today's date in WAT (Africa/Lagos) — used to anchor the default
+  // selection on the trigger form.
+  const todayKey = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Africa/Lagos",
+  });
+  const sortedGroups = Array.from(grouped.values()).sort((a, b) => {
+    // Place today first, then ascending future, then descending past.
+    if (a.dateKey === todayKey) return -1;
+    if (b.dateKey === todayKey) return 1;
+    return a.dateKey.localeCompare(b.dateKey);
+  });
+  const candidates: TriggerCandidate[] = sortedGroups.flatMap((g) => g.fixtures);
 
   return (
     <section className="space-y-8" data-testid="tournament-tab-walkovers">

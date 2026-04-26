@@ -36,7 +36,7 @@ export default async function ResultsEntryPage() {
         id, scheduled_time,
         home:home_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
         away:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
-        result:match_results ( id, result_type )
+        result:match_results ( id, result_type, home_score, away_score, notes )
       )
       `,
     )
@@ -60,8 +60,20 @@ export default async function ResultsEntryPage() {
     home: PlayerRef | PlayerRef[] | null;
     away: PlayerRef | PlayerRef[] | null;
     result:
-      | { id: string; result_type: string | null }[]
-      | { id: string; result_type: string | null }
+      | {
+          id: string;
+          result_type: string | null;
+          home_score: number | null;
+          away_score: number | null;
+          notes: string | null;
+        }[]
+      | {
+          id: string;
+          result_type: string | null;
+          home_score: number | null;
+          away_score: number | null;
+          notes: string | null;
+        }
       | null;
   };
   type PlayerRef = {
@@ -95,6 +107,10 @@ export default async function ResultsEntryPage() {
             awayName,
             scheduledTime: m.scheduled_time,
             hasResult: !!result,
+            existingHomeScore: result?.home_score ?? null,
+            existingAwayScore: result?.away_score ?? null,
+            existingResultType: result?.result_type ?? null,
+            existingNotes: result?.notes ?? null,
           };
         })
         .sort((a, b) =>

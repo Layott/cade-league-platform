@@ -40,7 +40,7 @@ describe("TiebreakerDragRank", () => {
   it("moves a key down via the down arrow", () => {
     render(
       <TiebreakerDragRank
-        initialOrder={["totalPts", "gd", "gf", "name"]}
+        initialOrder={["totalPts", "gd", "gf"]}
         saveAction={vi.fn().mockResolvedValue({ ok: true })}
       />,
     );
@@ -49,7 +49,9 @@ describe("TiebreakerDragRank", () => {
       "button[aria-label='Move Total Points down']",
     ) as HTMLButtonElement;
     fireEvent.click(downBtn);
-    // After the move the ordered list should be gd, totalPts, gf, name.
+    // After the move the ordered list should be gd, totalPts, gf.
+    // (Bugfix 2026-04-26: `name` no longer appears in the user-facing
+    // ladder — engine still anchors with name automatically.)
     const list = screen.getByTestId("tiebreaker-list");
     const positions = Array.from(list.querySelectorAll("li")).map(
       (li) => li.getAttribute("data-testid"),
@@ -58,7 +60,6 @@ describe("TiebreakerDragRank", () => {
       "tiebreaker-row-gd",
       "tiebreaker-row-totalPts",
       "tiebreaker-row-gf",
-      "tiebreaker-row-name",
     ]);
   });
 
@@ -91,7 +92,7 @@ describe("TiebreakerDragRank", () => {
     const action = vi.fn().mockResolvedValue({ ok: true });
     render(
       <TiebreakerDragRank
-        initialOrder={["totalPts", "gd", "gf", "name"]}
+        initialOrder={["totalPts", "gd", "gf"]}
         saveAction={action}
       />,
     );
@@ -103,7 +104,7 @@ describe("TiebreakerDragRank", () => {
     fireEvent.click(downBtn);
     fireEvent.click(screen.getByTestId("tiebreaker-save"));
     await waitFor(() =>
-      expect(action).toHaveBeenCalledWith(["gd", "totalPts", "gf", "name"]),
+      expect(action).toHaveBeenCalledWith(["gd", "totalPts", "gf"]),
     );
   });
 

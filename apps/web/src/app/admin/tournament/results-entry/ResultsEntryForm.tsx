@@ -14,6 +14,13 @@ import {
  * day. The form posts to `submitMatchResultAction`. After a successful
  * submit the form clears + the success banner stays visible for 5s before
  * fading.
+ *
+ * Bugfix 2026-04-26:
+ *   - When a fixture with an existing confirmed result is reselected, the
+ *     score inputs prefill with the saved scores (was always 0-0).
+ *   - Forfeit option now offers per-side variants ("Home forfeits" sets
+ *     0-3 to away; "Away forfeits" sets 3-0 to home) so admins can choose
+ *     either side, not just whichever input score happens to be higher.
  */
 
 export type MatchDayOption = {
@@ -29,9 +36,15 @@ export type MatchOption = {
   awayName: string;
   hasResult: boolean;
   scheduledTime: string | null;
+  existingHomeScore: number | null;
+  existingAwayScore: number | null;
+  existingResultType: string | null;
+  existingNotes: string | null;
 };
 
 const initialState: SubmitMatchResultState = { status: "idle" };
+
+type ResultMode = "normal" | "forfeit_home" | "forfeit_away";
 
 export function ResultsEntryForm({
   matchDays,
@@ -59,6 +72,15 @@ export function ResultsEntryForm({
     [activeDay, matchId],
   );
 
+  // Score + result-type state, prefilled from the selected fixture's
+  // existing match_results row (if any). Updates whenever the fixture
+  // selection changes — that's how reselecting a saved fixture shows the
+  // previously inputted scores instead of resetting to 0-0.
+  const [homeScore, setHomeScore] = useState<string>("0");
+  const [awayScore, setAwayScore] = useState<string>("0");
+  const [mode, setMode] = useState<ResultMode>("normal");
+  const [notes, setNotes] = useState<string>("");
+
   // Reset matchId when the day changes.
   useEffect(() => {
     if (!activeDay) return;
@@ -67,10 +89,62 @@ export function ResultsEntryForm({
     }
   }, [activeDay, matchId]);
 
-  // Clear form after a successful submit.
+  // Prefill scores + mode from the selected fixture's existing result.
+  useEffect(() => {
+    if (!activeMatch) {
+      setHomeScore("0");
+      setAwayScore("0");
+      setMode("normal");
+      setNotes("");
+      return;
+    }
+    if (activeMatch.hasResult) {
+      const h = activeMatch.existingHomeScore ?? 0;
+      const a = activeMatch.existingAwayScore ?? 0;
+      setHomeScore(String(h));
+      setAwayScore(String(a));
+      if (activeMatch.existingResultType === "forfeit") {
+        // Reverse-engineer which side forfeited from the saved scores.
+        setMode(a > h ? "forfeit_home" : "forfeit_away");
+      } else {
+        setMode("normal");
+      }
+      setNotes(activeMatch.existingNotes ?? "");
+    } else {
+      setHomeScore("0");
+      setAwayScore("0");
+      setMode("normal");
+      setNotes("");
+    }
+    // We intentionally depend on the individual existing-result fields
+    // rather than the activeMatch object reference — useMemo recreates
+    // the object on every render, which would re-run this effect and
+    // overwrite mid-edit input with the stored value. Track only the
+    // primitive fields that should trigger a prefill.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMatch?.id, activeMatch?.hasResult, activeMatch?.existingHomeScore, activeMatch?.existingAwayScore, activeMatch?.existingResultType, activeMatch?.existingNotes]);
+
+  // When user picks a forfeit-home or forfeit-away mode, snap scores
+  // accordingly so the visible score input matches what the server will
+  // actually persist.
+  useEffect(() => {
+    if (mode === "forfeit_home") {
+      setHomeScore("0");
+      setAwayScore("3");
+    } else if (mode === "forfeit_away") {
+      setHomeScore("3");
+      setAwayScore("0");
+    }
+  }, [mode]);
+
+  // Clear the success banner on next selection change so the operator
+  // sees fresh state. We do NOT clear the form here — the score state is
+  // already bound to the active fixture's existing result.
   useEffect(() => {
     if (state.status === "ok") {
-      formRef.current?.reset();
+      // No-op: the page revalidates server-side, which refeeds matchDays
+      // with the new hasResult/scores. The prefill effect above then
+      // resets inputs to the just-saved values on the next render.
     }
   }, [state]);
 
@@ -81,6 +155,12 @@ export function ResultsEntryForm({
       </div>
     );
   }
+
+  // Translate UI mode → server-side resultType. Both forfeit variants
+  // map to resultType=forfeit; the home/away choice is encoded in the
+  // home_score / away_score fields (3-0 vs 0-3) per spec §3.3.
+  const resultTypeForServer = mode === "normal" ? "normal" : "forfeit";
+  const isForfeit = mode !== "normal";
 
   return (
     <form
@@ -134,6 +214,9 @@ export function ResultsEntryForm({
             name="homeScore"
             playerName={activeMatch.homeName}
             testId="home-score"
+            value={homeScore}
+            onChange={setHomeScore}
+            disabled={isForfeit}
           />
           <div className="text-center text-[var(--chalk-3)]">
             <span className="font-display text-[20px]">vs</span>
@@ -142,29 +225,72 @@ export function ResultsEntryForm({
             name="awayScore"
             playerName={activeMatch.awayName}
             testId="away-score"
+            value={awayScore}
+            onChange={setAwayScore}
+            disabled={isForfeit}
           />
         </div>
       ) : null}
 
-      <details className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)]/60 px-4 py-3">
+      {/* Hidden input so server action receives the canonical result-type
+         enum value ("normal" or "forfeit") regardless of which forfeit
+         flavour the operator picked. */}
+      <input type="hidden" name="resultType" value={resultTypeForServer} />
+
+      <details
+        className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)]/60 px-4 py-3"
+        open={isForfeit || (activeMatch?.hasResult ?? false)}
+      >
         <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)] hover:text-[var(--chalk-0)]">
           Advanced (notes, result type)
         </summary>
         <div className="mt-3 space-y-3">
-          <label className="block space-y-1">
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+          <fieldset className="space-y-2">
+            <legend className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
               Result type
-            </span>
-            <select
-              name="resultType"
-              defaultValue="normal"
-              className="w-full max-w-xs rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-2 text-[13px] text-[var(--chalk-0)]"
-              data-testid="results-type-select"
-            >
-              <option value="normal">Normal</option>
-              <option value="forfeit">Forfeit (3-0 to leader)</option>
-            </select>
-          </label>
+            </legend>
+            <div className="flex flex-col gap-1.5 text-[13px] text-[var(--chalk-0)] sm:flex-row sm:flex-wrap sm:gap-4">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resultMode"
+                  value="normal"
+                  checked={mode === "normal"}
+                  onChange={() => setMode("normal")}
+                  data-testid="results-mode-normal"
+                />
+                <span>Normal</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resultMode"
+                  value="forfeit_home"
+                  checked={mode === "forfeit_home"}
+                  onChange={() => setMode("forfeit_home")}
+                  data-testid="results-mode-forfeit-home"
+                />
+                <span>
+                  Forfeit — <strong>{activeMatch?.homeName ?? "Home"}</strong> forfeits
+                  <span className="ml-1 text-[var(--chalk-3)]">(0-3)</span>
+                </span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="resultMode"
+                  value="forfeit_away"
+                  checked={mode === "forfeit_away"}
+                  onChange={() => setMode("forfeit_away")}
+                  data-testid="results-mode-forfeit-away"
+                />
+                <span>
+                  Forfeit — <strong>{activeMatch?.awayName ?? "Away"}</strong> forfeits
+                  <span className="ml-1 text-[var(--chalk-3)]">(3-0)</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
           <label className="block space-y-1">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
               Notes
@@ -172,6 +298,8 @@ export function ResultsEntryForm({
             <textarea
               name="notes"
               rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-2 text-[13px] text-[var(--chalk-0)]"
               placeholder="Optional notes (e.g. controller swap mid-match)"
             />
@@ -181,11 +309,33 @@ export function ResultsEntryForm({
 
       <div className="flex items-center gap-3">
         <PrimaryButton type="submit" disabled={pending} data-testid="results-submit">
-          {pending ? "Submitting..." : "Submit result"}
+          {pending ? "Submitting..." : activeMatch?.hasResult ? "Update result" : "Submit result"}
         </PrimaryButton>
         <SecondaryButton
           type="button"
-          onClick={() => formRef.current?.reset()}
+          onClick={() => {
+            // Reset just the inputs back to the active fixture's existing
+            // values (or 0-0 if no result yet). This is more useful than
+            // wiping everything to 0-0 when the operator is editing a
+            // saved result.
+            if (activeMatch?.hasResult) {
+              setHomeScore(String(activeMatch.existingHomeScore ?? 0));
+              setAwayScore(String(activeMatch.existingAwayScore ?? 0));
+              if (activeMatch.existingResultType === "forfeit") {
+                const a = activeMatch.existingAwayScore ?? 0;
+                const h = activeMatch.existingHomeScore ?? 0;
+                setMode(a > h ? "forfeit_home" : "forfeit_away");
+              } else {
+                setMode("normal");
+              }
+              setNotes(activeMatch.existingNotes ?? "");
+            } else {
+              setHomeScore("0");
+              setAwayScore("0");
+              setMode("normal");
+              setNotes("");
+            }
+          }}
           disabled={pending}
         >
           Reset
@@ -209,10 +359,16 @@ function ScoreInput({
   name,
   playerName,
   testId,
+  value,
+  onChange,
+  disabled,
 }: {
   name: string;
   playerName: string;
   testId: string;
+  value: string;
+  onChange: (next: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-2">
@@ -224,10 +380,12 @@ function ScoreInput({
         name={name}
         min={0}
         max={99}
-        defaultValue={0}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         required
+        disabled={disabled}
         data-testid={testId}
-        className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-3 text-center font-mono text-[28px] font-bold tabular text-[var(--chalk-0)] focus:border-[var(--primary)] focus:outline-none"
+        className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-3 text-center font-mono text-[28px] font-bold tabular text-[var(--chalk-0)] focus:border-[var(--primary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );

@@ -11,21 +11,28 @@ import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
  * are overkill. Keyboard fallback: ↑/↓ buttons next to each row.
  *
  * Save POSTs the new order to /api/tournament/tiebreakers; Reset wipes
- * back to the canonical `["totalPts","gd","gf","name"]` ladder.
+ * back to the canonical `["totalPts","gd","gf"]` ladder. The engine still
+ * anchors with alphabetical name as the deterministic final fallback —
+ * that's automatic, not something the operator configures here.
+ *
+ * Bugfix 2026-04-26: removed `name` from the user-facing ladder per
+ * user spec. Added `ga` (Goals Against, lower-better). Legacy seasons
+ * with `name` saved in `tiebreaker_order` JSONB are migrated on load
+ * (filtered out on display) so the operator never sees a `name` row.
  */
 
 const KEY_LABELS: Record<string, { label: string; hint: string }> = {
   totalPts: { label: "Total Points", hint: "League points (3 win / 1 draw)." },
   gd: { label: "Goal Difference", hint: "Goals For minus Goals Against." },
   gf: { label: "Goals For", hint: "Total goals scored across the season." },
+  ga: { label: "Goals Against", hint: "Total goals conceded (lower better)." },
   wins: { label: "Wins", hint: "Total match wins." },
   losses: { label: "Losses", hint: "Total match losses (lower better)." },
   played: { label: "Played", hint: "Total matches played." },
-  name: { label: "Name (A-Z)", hint: "Alphabetical fallback (always anchored)." },
 };
 
-export const DEFAULT_ORDER = ["totalPts", "gd", "gf", "name"];
-export const ALL_KEYS = ["totalPts", "gd", "gf", "wins", "losses", "played", "name"];
+export const DEFAULT_ORDER = ["totalPts", "gd", "gf"];
+export const ALL_KEYS = ["totalPts", "gd", "gf", "ga", "wins", "losses", "played"];
 
 export function TiebreakerDragRank({
   initialOrder,
@@ -34,13 +41,19 @@ export function TiebreakerDragRank({
   initialOrder: string[];
   saveAction: (order: string[]) => Promise<{ ok: boolean; error?: string }>;
 }) {
-  const [order, setOrder] = useState<string[]>(initialOrder);
+  // Filter legacy `name` entries out of the displayed order (engine
+  // still anchors with `name` automatically). If the filter empties
+  // the list, fall back to DEFAULT_ORDER so the UI is never blank.
+  const sanitizedInitial = initialOrder.filter((k) => k !== "name");
+  const [order, setOrder] = useState<string[]>(
+    sanitizedInitial.length > 0 ? sanitizedInitial : DEFAULT_ORDER,
+  );
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [pending, start] = useTransition();
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const dirty = JSON.stringify(order) !== JSON.stringify(initialOrder);
+  const dirty = JSON.stringify(order) !== JSON.stringify(sanitizedInitial);
 
   function handleDragStart(idx: number, e: React.DragEvent) {
     setDragIndex(idx);
@@ -155,16 +168,15 @@ export function TiebreakerDragRank({
                 >
                   ↓
                 </button>
-                {key !== "name" ? (
-                  <button
-                    type="button"
-                    onClick={() => removeKey(idx)}
-                    aria-label={`Remove ${meta.label}`}
-                    className="rounded-sm border border-[rgba(255,91,59,0.3)] bg-[rgba(255,91,59,0.08)] px-2 py-0.5 text-[10px] text-[var(--flare)] hover:border-[var(--flare)]"
-                  >
-                    ✕
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => removeKey(idx)}
+                  aria-label={`Remove ${meta.label}`}
+                  disabled={order.length <= 1}
+                  className="rounded-sm border border-[rgba(255,91,59,0.3)] bg-[rgba(255,91,59,0.08)] px-2 py-0.5 text-[10px] text-[var(--flare)] hover:border-[var(--flare)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ✕
+                </button>
               </div>
             </li>
           );

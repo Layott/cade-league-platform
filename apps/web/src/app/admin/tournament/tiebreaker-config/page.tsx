@@ -47,8 +47,9 @@ export default async function TiebreakerConfigPage() {
         </div>
         <p className="text-[12px] text-[var(--chalk-2)]">
           Drag (or use ↑/↓) to reorder. Save persists the JSONB array and
-          publishes standings.changed so live overlays re-sort. <em>Name</em>{" "}
-          is always anchored as the final fallback.
+          publishes standings.changed so live overlays re-sort. When all
+          configured rules tie, the engine breaks the remaining tie
+          alphabetically — that anchor is automatic and not user-configurable.
         </p>
       </header>
       <TiebreakerDragRank initialOrder={order} saveAction={saveTiebreakerOrderAction} />

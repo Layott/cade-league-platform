@@ -32,6 +32,7 @@ export const SUPPORTED_TIEBREAKER_KEYS = [
   "totalPts",
   "gd",
   "gf",
+  "ga",
   "wins",
   "losses",
   "played",
@@ -56,6 +57,8 @@ function valueOf(row: StandingsRow, key: TiebreakerKey): number | string {
       return row.gd;
     case "gf":
       return row.gf;
+    case "ga":
+      return row.ga;
     case "wins":
       return row.wins;
     case "played":

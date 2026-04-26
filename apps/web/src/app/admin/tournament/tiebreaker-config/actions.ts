@@ -17,14 +17,19 @@ import { publishStandingsChanged } from "@/server/standings/realtime";
  * LiveLeaderboard re-fetches with the new order applied.
  */
 
+// Bugfix 2026-04-26: drop `name` as a user-configurable tiebreaker —
+// the engine still appends it as the deterministic alphabetical
+// fallback so equal rows sort stably across runs, but operators
+// shouldn't be able to promote it as a primary criterion. Add `ga`
+// (Goals Against, lower-better) per user spec.
 const ALLOWED = [
   "totalPts",
   "gd",
   "gf",
+  "ga",
   "wins",
   "losses",
   "played",
-  "name",
 ] as const;
 
 const orderSchema = z
