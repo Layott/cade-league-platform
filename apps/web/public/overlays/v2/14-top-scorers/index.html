@@ -139,6 +139,8 @@
   body:not(.cade-visible):not(.cade-exiting) .podium,
   body:not(.cade-visible):not(.cade-exiting) .pod-card,
   body:not(.cade-visible):not(.cade-exiting) .leaderboard,
+  body:not(.cade-visible):not(.cade-exiting) .tail-strip,
+  body:not(.cade-visible):not(.cade-exiting) .tail-cell,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
@@ -149,6 +151,8 @@
   body:not(.cade-visible):not(.cade-exiting) .podium,
   body:not(.cade-visible):not(.cade-exiting) .pod-card,
   body:not(.cade-visible):not(.cade-exiting) .leaderboard,
+  body:not(.cade-visible):not(.cade-exiting) .tail-strip,
+  body:not(.cade-visible):not(.cade-exiting) .tail-cell,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
@@ -171,6 +175,8 @@
   body.cade-exiting .podium,
   body.cade-exiting .pod-card,
   body.cade-exiting .leaderboard,
+  body.cade-exiting .tail-strip,
+  body.cade-exiting .tail-cell,
   body.cade-exiting .partners,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
@@ -1532,9 +1538,15 @@
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
         console.info('[overlay/14-top-scorers] message', msg.type || msg.event || '?');
-        if (msg.type === 'update' || msg.type === 'show') {
+        // CONTRACT (per CLAUDE.md §14):
+        //   show   → render data + add cade-visible
+        //   hide   → swap cade-visible → cade-exiting
+        //   update → re-render with new data, NO class change (no auto-show)
+        if (msg.type === 'show') {
           update(msg.data || msg.payload || {});
           show();
+        } else if (msg.type === 'update') {
+          update(msg.data || msg.payload || {});
         } else if (msg.type === 'hide') {
           hide();
         }
@@ -1543,7 +1555,10 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.leaderboard,.partners,.pod-card,.podium,.season-mark,.title-strip,.top-band';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.leaderboard,.partners,.pod-card,.podium,.season-mark,.tail-cell,.tail-strip,.title-strip,.top-band';
+  // Inner descendants whose entrance animations may have burnt out before
+  // cade-visible arrives — force-set opacity 1 on visible.
+  var INNER_SEL = '.pod-rank,.pod-name,.pod-photo,.pod-photo-wrap,.pod-photo-ring,.pod-goals,.pod-goals-row,.pod-goals-label,.pod-crown,.pod-rim,.tail-rank,.tail-tag,.tail-name,.tail-photo,.tail-photo-wrap,.tail-photo-ring,.tail-goals,.tail-goals-row,.tail-goals-label,.tail-header';
   function apply() {
     var b = document.body;
     if (!b) return;
@@ -1558,6 +1573,13 @@
         el.style.setProperty('opacity', '0', 'important');
       } else {
         el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+    document.querySelectorAll(INNER_SEL).forEach(function(el){
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+      } else if (!exit) {
+        el.style.removeProperty('opacity');
       }
     });
   }

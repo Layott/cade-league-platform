@@ -1429,9 +1429,15 @@
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
-        if (msg.type === 'update' || msg.type === 'show') {
+        // CONTRACT (per CLAUDE.md §14):
+        //   show   → render data + add cade-visible
+        //   hide   → swap cade-visible → cade-exiting
+        //   update → re-render with new data, NO class change (no auto-show)
+        if (msg.type === 'show') {
           update(msg.data || {});
           show();
+        } else if (msg.type === 'update') {
+          update(msg.data || msg.payload || {});
         } else if (msg.type === 'hide') {
           hide();
         }

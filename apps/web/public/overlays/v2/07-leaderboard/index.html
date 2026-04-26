@@ -113,7 +113,11 @@
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .headline,
+  body:not(.cade-visible):not(.cade-exiting) .updating-tag,
   body:not(.cade-visible):not(.cade-exiting) .table-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .col-headers,
+  body:not(.cade-visible):not(.cade-exiting) .rows,
+  body:not(.cade-visible):not(.cade-exiting) .row,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
@@ -1112,9 +1116,15 @@
       var msg = ev && ev.data;
       if (!msg || typeof msg !== 'object') return;
       console.info('[overlay/07-leaderboard] message', msg.type || msg.event || '?', msg.payload || msg.data);
-      if (msg.type === 'update' || msg.type === 'show') {
+      // CONTRACT (per CLAUDE.md §14):
+      //   show   → render data + add cade-visible
+      //   hide   → swap cade-visible → cade-exiting
+      //   update → re-render with new data, NO class change (no auto-show)
+      if (msg.type === 'show') {
         update(msg.data || msg.payload || {});
         show();
+      } else if (msg.type === 'update') {
+        update(msg.data || msg.payload || {});
       } else if (msg.type === 'hide') {
         hide();
       }
@@ -1123,7 +1133,13 @@
 </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.headline,.matchday-mark,.partners,.season-mark,.table-wrap,.top-band';
+  // Top-level gated containers — these must be hidden by CSS rule when no
+  // cade-visible class on body. Force-set to opacity:1 on cade-visible so
+  // Chrome cross-origin iframe stuck-transition bug cannot leave them at 0.
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.col-headers,.headline,.matchday-mark,.partners,.rows,.season-mark,.table-wrap,.top-band';
+  // Inner row internals — when the row's own entrance animation has
+  // burnt out before cade-visible, force-set opacity 1.
+  var INNER_SEL = '.row,.pos-num,.photo-wrap,.org-wrap,.player-name,.player-name-text,.move-chip,.stat,.stat-wdl,.stat-gd,.sanctions-cell,.pts,.gold-mark,.title,.title-rule';
   function apply() {
     var b = document.body;
     if (!b) return;
@@ -1138,6 +1154,13 @@
         el.style.setProperty('opacity', '0', 'important');
       } else {
         el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+    document.querySelectorAll(INNER_SEL).forEach(function(el){
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+      } else if (!exit) {
+        el.style.removeProperty('opacity');
       }
     });
   }

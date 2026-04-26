@@ -112,6 +112,8 @@
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .matchday-title,
   body:not(.cade-visible):not(.cade-exiting) .match-row,
+  body:not(.cade-visible):not(.cade-exiting) .rows-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .row,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .row-card,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
@@ -122,6 +124,8 @@
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .matchday-title,
   body:not(.cade-visible):not(.cade-exiting) .match-row,
+  body:not(.cade-visible):not(.cade-exiting) .rows-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .row,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .row-card,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
@@ -1194,9 +1198,15 @@
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
         console.info('[overlay/11-match-scores-day] message', msg.type || msg.event || '?');
-        if (msg.type === 'update' || msg.type === 'show') {
+        // CONTRACT (per CLAUDE.md §14):
+        //   show   → render data + add cade-visible
+        //   hide   → swap cade-visible → cade-exiting
+        //   update → re-render with new data, NO class change (no auto-show)
+        if (msg.type === 'show') {
           update(msg.data || msg.payload || {});
           show();
+        } else if (msg.type === 'update') {
+          update(msg.data || msg.payload || {});
         } else if (msg.type === 'hide') {
           hide();
         }
@@ -1205,7 +1215,11 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.match-row,.matchday-mark,.matchday-title,.partners,.row-card,.season-mark,.top-band';
+  // Top-level gated containers — class names listed here MUST exist in the
+  // DOM (legacy SEL had .match-row + .row-card which never appeared).
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.matchday-mark,.matchday-title,.partners,.row,.rows-wrap,.season-mark,.top-band';
+  // Inner descendants that the row-builder injects + that have animations.
+  var INNER_SEL = '.row__panel,.row__border,.row__body,.row-side,.row-center,.player-photo,.player-name,.score-block,.match-status,.kickoff-time';
   function apply() {
     var b = document.body;
     if (!b) return;
@@ -1220,6 +1234,13 @@
         el.style.setProperty('opacity', '0', 'important');
       } else {
         el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+    document.querySelectorAll(INNER_SEL).forEach(function(el){
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+      } else if (!exit) {
+        el.style.removeProperty('opacity');
       }
     });
   }

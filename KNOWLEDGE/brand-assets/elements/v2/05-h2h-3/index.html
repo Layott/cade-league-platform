@@ -132,6 +132,7 @@
   body:not(.cade-visible):not(.cade-exiting) .headline,
   body:not(.cade-visible):not(.cade-exiting) .card-row,
   body:not(.cade-visible):not(.cade-exiting) .player-card,
+  body:not(.cade-visible):not(.cade-exiting) .winprob-bar,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
@@ -141,6 +142,7 @@
   body:not(.cade-visible):not(.cade-exiting) .headline,
   body:not(.cade-visible):not(.cade-exiting) .card-row,
   body:not(.cade-visible):not(.cade-exiting) .player-card,
+  body:not(.cade-visible):not(.cade-exiting) .winprob-bar,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
@@ -156,6 +158,7 @@
   body.cade-exiting .headline,
   body.cade-exiting .card-row,
   body.cade-exiting .player-card,
+  body.cade-exiting .winprob-bar,
   body.cade-exiting .partners,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
@@ -1359,9 +1362,15 @@
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
-        if (msg.type === 'update' || msg.type === 'show') {
+        // CONTRACT (per CLAUDE.md §14):
+        //   show   → render data + add cade-visible
+        //   hide   → swap cade-visible → cade-exiting
+        //   update → re-render with new data, NO class change (no auto-show)
+        if (msg.type === 'show') {
           update(msg.data || {});
           show();
+        } else if (msg.type === 'update') {
+          update(msg.data || msg.payload || {});
         } else if (msg.type === 'hide') {
           hide();
         }
@@ -1370,7 +1379,15 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card-row,.chevrons,.headline,.partners,.player-card,.season-mark,.top-band';
+  // Top-level gated containers — these must be hidden by CSS rule when no
+  // cade-visible class on body. Force-set to opacity:1 on cade-visible so
+  // Chrome cross-origin iframe stuck-transition bug cannot leave them at 0.
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card-row,.chevrons,.headline,.partners,.player-card,.season-mark,.top-band,.winprob-bar';
+  // Inner descendants that have their own entrance animations — when the
+  // page-load animation has already burnt out by the time cade-visible
+  // arrives, Chrome leaves them at the animation's "to" state OR at the
+  // initial 0 state, both unrecoverable without a forced opacity push.
+  var INNER_SEL = '.photo,.photo-fallback,.name-band,.name-backdrop,.stat-block,.stat,.card-footer,.org,.org img,.org-name,.win-pill,.bar-track,.bar-fill,.bar-labels,.bar-labels span,.heading';
   function apply() {
     var b = document.body;
     if (!b) return;
@@ -1385,6 +1402,19 @@
         el.style.setProperty('opacity', '0', 'important');
       } else {
         el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+    // Inner descendants — only force-show on visible. On exit/idle let
+    // CSS + per-element animations do their thing (visibility inherited
+    // from gated parent which is opacity 0).
+    document.querySelectorAll(INNER_SEL).forEach(function(el){
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.removeProperty('transform');
+      } else if (exit) {
+        // exit anim is on parent — don't fight it
+      } else {
+        el.style.removeProperty('opacity');
       }
     });
   }

@@ -132,6 +132,7 @@
   body:not(.cade-visible):not(.cade-exiting) .title-block,
   body:not(.cade-visible):not(.cade-exiting) .grid,
   body:not(.cade-visible):not(.cade-exiting) .card,
+  body:not(.cade-visible):not(.cade-exiting) .grid-sweep,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
@@ -141,9 +142,17 @@
   body:not(.cade-visible):not(.cade-exiting) .title-block,
   body:not(.cade-visible):not(.cade-exiting) .grid,
   body:not(.cade-visible):not(.cade-exiting) .card,
+  body:not(.cade-visible):not(.cade-exiting) .grid-sweep,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
+  }
+  /* The .grid-sweep::before is the actual animated sheen element. Suppress
+     its animation when not triggered so the diagonal highlight doesn't
+     leak through the off state. */
+  body:not(.cade-visible):not(.cade-exiting) .grid-sweep::before {
+    animation: none !important;
+    opacity: 0 !important;
   }
   body.cade-visible .bg-image,
   body.cade-visible .bg-vignette,
@@ -162,6 +171,7 @@
   body.cade-exiting .title-block,
   body.cade-exiting .grid,
   body.cade-exiting .card,
+  body.cade-exiting .grid-sweep,
   body.cade-exiting .partners,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
@@ -179,15 +189,12 @@
     overflow: hidden;
     background: transparent !important;
     isolation: isolate;
-    animation: stage-loop 18s ease-in-out infinite;
-  }
-  /* loop master: hold for ~14s, fade for ~2s, hold blank ~2s, restart */
-  @keyframes stage-loop {
-    0%      { opacity: 1; }
-    77%     { opacity: 1; }
-    88%     { opacity: 0; }
-    99.9%   { opacity: 0; }
-    100%    { opacity: 1; }
+    /* NO auto-loop — operator drives show/hide via postMessage. The legacy
+       `animation: stage-loop 18s ease-in-out infinite;` was removed because
+       it caused the entire overlay to fade in/out forever in production
+       even when the broadcast control panel had it OFF. Demo preview only
+       runs when `?demo=1` is set (see cade-demo-mode script at the
+       bottom of this file). */
   }
 
   /* ── BG: halftone-green stadium texture ─────────────────────── */
@@ -1077,9 +1084,15 @@
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
         console.info('[overlay/15-orgs] message', msg.type || msg.event || '?', msg.payload || msg.data);
-        if (msg.type === 'update' || msg.type === 'show') {
+        // CONTRACT (per CLAUDE.md §14):
+        //   show   → render data + add cade-visible
+        //   hide   → swap cade-visible → cade-exiting
+        //   update → re-render with new data, NO class change (no auto-show)
+        if (msg.type === 'show') {
           update(msg.data || msg.payload || {});
           show();
+        } else if (msg.type === 'update') {
+          update(msg.data || msg.payload || {});
         } else if (msg.type === 'hide') {
           hide();
         }
@@ -1088,7 +1101,10 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card,.chevrons,.grid,.partners,.season-mark,.title-block,.top-band';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card,.chevrons,.grid,.grid-sweep,.partners,.season-mark,.title-block,.top-band';
+  // Inner card descendants — force-show on cade-visible (Chrome stuck-anim
+  // workaround) when the page-load entrance has already burnt out.
+  var INNER_SEL = '.card-logo,.card-name,.card-players,.player-chip,.face,.pname,.qmark,.pending-label,.kicker,.title,.title-rule';
   function apply() {
     var b = document.body;
     if (!b) return;
@@ -1103,6 +1119,13 @@
         el.style.setProperty('opacity', '0', 'important');
       } else {
         el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+    document.querySelectorAll(INNER_SEL).forEach(function(el){
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+      } else if (!exit) {
+        el.style.removeProperty('opacity');
       }
     });
   }
