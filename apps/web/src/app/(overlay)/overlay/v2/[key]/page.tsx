@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import OverlayDataInjector from "@/components/broadcast/v2/OverlayDataInjector";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { getActiveSession } from "@/server/broadcast/active_session";
+import { isOverlayActive } from "@/server/broadcast/v2/overlay_active_state";
+import type { V2OverlayKey } from "@/components/broadcast/v2/overlay-keys";
 
 /**
  * Resolve the active season for a given broadcast session via
@@ -137,11 +139,36 @@ export default async function OverlayV2Page({
   // the iframe with current server data (active=1, mirrors stream) or
   // leave it idle (active=0, overlay HTML stays in default-OFF state).
   //
-  // Live (OBS) URLs DO NOT carry `preview=1` — they always render in
-  // "isLive" mode so OBS browser sources see the current data on refresh.
-  // Realtime updates flow through regardless.
+  // Live (OBS) URLs DO NOT carry `preview=1`. Until 2026-04-26 they
+  // ALWAYS rendered as active=true, which caused data-driven overlays
+  // (match-scores-day, leaderboard, top-scorers) to "auto-load" with
+  // current data the moment the OBS browser source opened — even when
+  // the operator had not yet triggered the overlay on stream. User
+  // bug 2026-04-26: "the match scores today overlay loads automatically
+  // without trigger". Fix: probe `overlay_events` for an active row
+  // and only flip `active=true` when the server says the overlay is
+  // currently triggered. Realtime `overlay.triggered` / `instance.
+  // triggered` events still flip the iframe to visible mid-stream.
   const isPreview = preview === "1";
-  const isActive = !isPreview ? true : active === "1";
+  let isActive: boolean;
+  if (isPreview) {
+    isActive = active === "1";
+  } else if (resolvedSession && (key as V2OverlayKey)) {
+    try {
+      isActive = await isOverlayActive(
+        getServiceRoleSupabase(),
+        resolvedSession,
+        key as V2OverlayKey,
+      );
+    } catch {
+      // Probe failure must not crash the overlay route — fall back to
+      // hidden so a broken DB read does not flash stale data on stream.
+      isActive = false;
+    }
+  } else {
+    // No session resolved (no live broadcast) — keep overlay hidden.
+    isActive = false;
+  }
 
   // 2026-04-26 lower-third slot isolation — broadcast control mounts
   // 3 mini-preview iframes (one per slot 1..3). Each card passes

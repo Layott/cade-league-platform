@@ -818,7 +818,11 @@
     </div>
 
     <!-- Up to 12 match rows in a 2-column grid (6 left + 6 right) -->
-    <section class="rows-wrap" aria-label="Match scores of the day">
+    <!-- data-static-sample="1" marks the inline JOSH/ANIFE/etc rows below
+         as the unedited static sample. The first non-empty `update`
+         flips this to "0" so subsequent empty Trigger payloads do not
+         wipe the live data. See rebuildRows() guard. -->
+    <section class="rows-wrap" data-static-sample="1" aria-label="Match scores of the day">
 
       <!-- 1. FARUK 4-2 ANIFE -->
       <div class="row row--finished">
@@ -1176,11 +1180,31 @@
         var wrap = document.querySelector('.rows-wrap');
         if (!wrap || !Array.isArray(matches)) return;
         if (matches.length === 0) {
-          // Empty payload — clear the static sample rather than leaking it.
-          wrap.innerHTML = '';
+          // 2026-04-26 — Bug 2 fix: an empty `rows[]` from a Trigger
+          // payload (the broadcast control card sends `{matchDayLabel,
+          // rows: []}` to fire the entry animation) MUST NOT clear the
+          // existing rendered rows. Without this guard, triggering the
+          // overlay AFTER the initial-fetch populated the grid would
+          // wipe the live data and the operator would see an empty
+          // canvas. We only clear if no rows have ever been rendered
+          // (the static sample is still in the DOM) AND we're in a
+          // fresh-mount context — the initial-fetch effect is the
+          // only path that should land non-empty data first.
+          //
+          // To preserve the original "don't leak the static sample"
+          // intent for OBS-without-session smoke previews, we keep the
+          // clear behaviour ONLY when `wrap` still contains the static
+          // sample marker (data-static-sample). After the first
+          // non-empty rebuild we strip that marker, so subsequent
+          // empty payloads no-op.
+          if (wrap.dataset.staticSample === '1') {
+            wrap.innerHTML = '';
+            wrap.dataset.staticSample = '0';
+          }
           return;
         }
         wrap.innerHTML = matches.map(buildRow).join('');
+        wrap.dataset.staticSample = '0';
       }
 
       /**

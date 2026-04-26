@@ -400,6 +400,44 @@ export default function OverlayDataInjector({
       if (!isForThisOverlay(msg.payload)) return;
       const payload = (msg.payload as { payload?: Record<string, unknown> })
         ?.payload;
+      // 2026-04-26 — Bug 2 fix: data-driven overlays (match-scores-day,
+      // leaderboard, top-scorers) receive Trigger payloads with empty
+      // arrays (`rows: []`) because the broadcast control card just
+      // re-fires the entry animation — the live data lives behind the
+      // INITIAL_FETCH_PATH endpoint. If we forward only the trigger
+      // payload, the iframe would render empty rows on Trigger and
+      // would not repaint until the next score.changed / match.ended
+      // event. So when the overlay key has an INITIAL_FETCH_PATH
+      // builder + we have a session, refetch the fresh data and
+      // forward THAT alongside `show`. Other (non-data-driven) keys
+      // fall through to the original payload-only path.
+      const builder = INITIAL_FETCH_PATH[overlayKey];
+      if (builder && currentSessionId) {
+        const url = builder(currentSessionId);
+        const fetchUrl = currentToken
+          ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
+          : url;
+        // Show first so the entry animation begins immediately, then
+        // post `update` once the fresh data lands. The HTML's update()
+        // is idempotent with respect to the visibility class.
+        postToInner({ type: "show", data: payload ?? null });
+        fetch(fetchUrl, { cache: "no-store" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) {
+              postToInner({
+                type: "update",
+                event: "trigger.refresh",
+                payload: data,
+                data: data,
+              });
+            }
+          })
+          .catch(() => {
+            /* swallow — Realtime score.changed will refresh next tick */
+          });
+        return;
+      }
       postToInner({ type: "show", data: payload ?? null });
       postToInner({ type: "update", data: payload ?? null });
     });
@@ -452,7 +490,7 @@ export default function OverlayDataInjector({
         /* best-effort */
       }
     };
-  }, [overlayKey, currentSessionId, slot]);
+  }, [overlayKey, currentSessionId, currentToken, slot]);
 
   /* --------------------------------------------------------------- *
    * 1b. Data feed — public:standings:<seasonId> (existing behaviour) *
