@@ -563,13 +563,26 @@
   const fallbackA = document.getElementById('fallbackA');
   const fallbackB = document.getElementById('fallbackB');
 
-  // Each digit row in the strip is 72px tall (matches CSS `.score-strip > span`).
-  // setStripValue clamps to 0..9; for scores >= 10 we render the last digit only
-  // (Pro-League matches realistically never exceed single digits — fits brief).
+  // 2026-04-26 — score-strip supports any 0..99 number. For 0..9 we keep
+  // the rolling-digit animation; for 10..99 we replace the parent's text
+  // content with the full number (e.g. "13") since Pro-League high-scoring
+  // matches are common.
   const DIGIT_H = 72;
   function setStripValue(stripEl, value) {
-    const v = Math.max(0, Math.min(9, Math.floor(Number(value) || 0)));
-    stripEl.style.transform = `translateY(${-v * DIGIT_H}px)`;
+    const v = Math.max(0, Math.min(99, Math.floor(Number(value) || 0)));
+    const parent = stripEl.parentElement;
+    if (v < 10) {
+      // Restore strip if it was previously textified.
+      if (!stripEl.querySelector('span')) {
+        stripEl.innerHTML = '<span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>';
+      }
+      stripEl.style.transform = `translateY(${-v * DIGIT_H}px)`;
+      stripEl.style.fontSize = '';
+    } else {
+      // Two-digit: replace the strip with simple text. No rolling animation.
+      stripEl.style.transform = 'translateY(0)';
+      stripEl.innerHTML = '<span style="display:block;font-size:0.78em;line-height:72px;text-align:center;">' + v + '</span>';
+    }
   }
 
   // ============================================================

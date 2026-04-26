@@ -44,11 +44,13 @@ export function SecondaryScoreBugControl({
     });
   }, [aSlug, bSlug, aScore, bScore]);
 
-  // Persistent payload mirrors legacy scoreBugSchema (length 2 array).
+  // Persistent payload mirrors legacy scoreBugSchema + carries slug so
+  // ambient OBS browser sources can resolve player photos via the same
+  // slug map the broadcast preview uses.
   const payloadJson = JSON.stringify({
     players: [
-      { displayName: V2_PLAYER_NAMES[aSlug], score: aScore },
-      { displayName: V2_PLAYER_NAMES[bSlug], score: bScore },
+      { displayName: V2_PLAYER_NAMES[aSlug], slug: aSlug, score: aScore },
+      { displayName: V2_PLAYER_NAMES[bSlug], slug: bSlug, score: bScore },
     ],
   });
 

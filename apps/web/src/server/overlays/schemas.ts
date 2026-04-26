@@ -348,6 +348,7 @@ export const scoreBugSchema = z.object({
     .array(
       z.object({
         displayName: z.string().trim().min(1).max(80),
+        slug: z.string().trim().min(1).max(80).optional(),
         photoUrl: photoUrlSchema.optional(),
         score: z.coerce.number().int().min(0).max(99),
       }),
