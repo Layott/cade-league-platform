@@ -46,7 +46,10 @@ const STAFF_LINKS: LinkRow[] = [
   { href: "/admin/players", label: "Players" },
   { href: "/admin/match-days", label: "Match Days" },
   { href: "/admin/squads", label: "Squads" },
-  { href: "/admin/broadcast", label: "Broadcast" },
+  // Plan 52 — Broadcast v2 promoted; the legacy /admin/broadcast still
+  // resolves via 307 redirect but pointing the nav at the canonical URL
+  // avoids the address-bar hop / flash (lessons.md entry 484).
+  { href: "/admin/broadcast/v2", label: "Broadcast" },
   { href: "/admin/broadcast/stingers", label: "Stingers" },
   { href: "/admin/youtube-channels", label: "YouTube Channels" },
   { href: "/admin/punishments", label: "Punishments" },

@@ -78,6 +78,17 @@ test("admin starts session, triggers scorebar, overlay updates within 2s, clears
   browser,
   page,
 }) => {
+  // Plan 52 — broadcast v2 promoted to be THE control room. The legacy
+  // /admin/broadcast/[sessionId] panel that exposed `trigger-payload-scorebar`
+  // / `clear-scorebar` / `end-session-btn` testids is now a 307 redirect
+  // and the v1 textarea grid + scorebar trigger no longer have a UI
+  // surface. The flow this test exercised needs to be rebuilt against
+  // the v2 ControlGrid (ToggleTriggerButton on the secondary-score-bug
+  // card) before re-enabling.
+  test.skip(
+    true,
+    "broadcast v1 textarea trigger grid removed; rewrite against v2 ToggleTriggerButton",
+  );
   await login(page);
 
   // 1. Create a disposable match day via API fixture helper (direct DB write

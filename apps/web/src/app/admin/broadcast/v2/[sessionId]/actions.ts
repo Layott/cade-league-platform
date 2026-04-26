@@ -78,6 +78,33 @@ async function gateTrigger(): Promise<{
   return { sb, publicUserId };
 }
 
+/**
+ * Gate for session-level mutations (changing the match-day binding,
+ * editing the tag, etc). Re-uses the existing `broadcast.manage` perm
+ * because moving a session between match-days is a producer/admin action
+ * — not in the trigger fast-path.
+ */
+async function gateManage(): Promise<{
+  sb: ReturnType<typeof getServiceRoleSupabase>;
+  publicUserId: string;
+}> {
+  const { publicUserId, roles } = await resolveAuthed();
+  const sb = getServiceRoleSupabase();
+  try {
+    await requirePermAsync(
+      sb,
+      { userId: publicUserId, roles },
+      "broadcast.manage",
+    );
+  } catch (e) {
+    if (e instanceof PermissionError) {
+      throw new Error("Forbidden: missing broadcast.manage");
+    }
+    throw e;
+  }
+  return { sb, publicUserId };
+}
+
 function isV2Key(x: string): x is V2OverlayKey {
   return (V2_OVERLAY_KEYS as readonly string[]).includes(x);
 }
@@ -314,6 +341,72 @@ export async function retriggerOverlayAction(formData: FormData) {
       payload,
       userId: publicUserId,
     });
+  }
+
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
+}
+
+/**
+ * SET SESSION MATCH-DAY — repoint a `stream_sessions` row at a different
+ * `match_day_id`. Used by the match-day selector at the top of the v2
+ * control room when the producer realises the session was minted on the
+ * wrong day, or wants to repurpose an idle session for a fresh day.
+ *
+ * Downstream overlays (match-scores-day, up-next, autofill) read
+ * `stream_sessions.match_day_id` directly — flipping the column re-points
+ * every data feed without needing to mint a new session row.
+ *
+ * Validation:
+ *   - sessionId + matchDayId required.
+ *   - Active sessions must respect the `stream_sessions_one_active_per_day`
+ *     partial unique index — moving an active session to a day that
+ *     already has another active session is rejected at the DB layer
+ *     and surfaced as a friendlier error here.
+ *   - Match-day must exist + not be soft-deleted.
+ *
+ * Perm: `broadcast.manage` (gateManage). Re-validates the v2 session
+ * page so the header + downstream feeds re-render against the new day.
+ */
+export async function setSessionMatchDayAction(formData: FormData) {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  if (!sessionId) throw new Error("sessionId required");
+  if (!matchDayId) throw new Error("matchDayId required");
+
+  const { sb } = await gateManage();
+
+  // Confirm the target match_day exists + isn't soft-deleted. Cheap
+  // single-row check; surfaces a clearer error than the generic
+  // "FK violation" the DB would otherwise return.
+  const { data: md, error: mdErr } = await sb
+    .from("match_days")
+    .select("id")
+    .eq("id", matchDayId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (mdErr) {
+    throw new Error(`match-day lookup failed: ${mdErr.message}`);
+  }
+  if (!md) {
+    throw new Error("match-day not found or has been deleted");
+  }
+
+  // Apply the update. The partial unique index
+  // `stream_sessions_one_active_per_day` will throw 23505 if we try to
+  // move an active session onto a day that already has another active
+  // session — translate that to a friendlier error.
+  const { error: upErr } = await sb
+    .from("stream_sessions")
+    .update({ match_day_id: matchDayId })
+    .eq("id", sessionId)
+    .is("deleted_at", null);
+  if (upErr) {
+    if (upErr.code === "23505") {
+      throw new Error(
+        "Another session is already active on that match day — end it first.",
+      );
+    }
+    throw new Error(`update failed: ${upErr.message}`);
   }
 
   revalidatePath(`/admin/broadcast/v2/${sessionId}`);

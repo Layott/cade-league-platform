@@ -30,9 +30,13 @@ const TAB_PERMS: Array<{ href: string; perm: string }> = [
   { href: "/admin/disputes", perm: "disputes.read" },
   { href: "/admin/appeals", perm: "appeals.read" },
   { href: "/admin/announcements", perm: "announcements.read" },
-  // Plan 51 — Tournament + Broadcast v2 entries.
   { href: "/admin/tournament", perm: "tournament.read" },
-  { href: "/admin/broadcast", perm: "broadcast.manage" },
+  // Plan 52 — Broadcast v2 promoted to be THE broadcast surface; the
+  // old /admin/broadcast hrefs redirect to /admin/broadcast/v2. Tab
+  // visibility now keys off `broadcast.v2.read` (the perm that gates
+  // the v2 layout). `broadcast.manage` is still required for the
+  // session-level edits inside the control room (start session, change
+  // match-day, end session).
   { href: "/admin/broadcast/v2", perm: "broadcast.v2.read" },
   { href: "/admin/youtube-channels", perm: "branding.manage" },
   { href: "/admin/roles", perm: "roles.manage" },

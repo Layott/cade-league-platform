@@ -280,11 +280,15 @@ export default async function AdminHome() {
       perm: "users.edit",
       icon: <Icon d={I.users} />,
     },
+    // Plan 52 — single Broadcast tile pointing at the canonical v2
+    // control room. The legacy /admin/broadcast tile (gated on
+    // broadcast.manage) was merged here; the route still exists as a
+    // 307 redirect to /admin/broadcast/v2.
     {
-      href: "/admin/broadcast",
+      href: "/admin/broadcast/v2",
       label: "Broadcast",
-      description: "Stream sessions, overlays.",
-      perm: "broadcast.manage",
+      description: "Stream sessions, overlay control room.",
+      perm: "broadcast.v2.read",
       icon: <Icon d={I.broadcast} />,
       tone: hero.activeSessionId ? "signal" : undefined,
     },
@@ -294,13 +298,6 @@ export default async function AdminHome() {
       description: "Standings, fixtures, results, walkovers.",
       perm: "tournament.read",
       icon: <Icon d={I.trophy} />,
-    },
-    {
-      href: "/admin/broadcast/v2",
-      label: "Broadcast v2",
-      description: "Next-gen overlay control room.",
-      perm: "broadcast.v2.read",
-      icon: <Icon d={I.broadcastV2} />,
     },
     {
       href: "/admin/youtube-channels",
@@ -412,7 +409,7 @@ function HeroStrip({ hero }: { hero: HeroStats }) {
         hint={
           hero.activeSessionId ? (
             <Link
-              href={`/admin/broadcast/${hero.activeSessionId}`}
+              href={`/admin/broadcast/v2/${hero.activeSessionId}`}
               className="text-[var(--signal)] hover:underline"
             >
               Open control panel →

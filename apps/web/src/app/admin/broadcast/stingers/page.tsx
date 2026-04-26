@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * Six stingers surface as large trigger buttons in a responsive grid.
  * Each button posts to `triggerOverlayAction` with the matching
  * STARTER_PAYLOADS entry. Requires an active session; if none exists,
- * the page invites the admin back to `/admin/broadcast`.
+ * the page invites the admin back to `/admin/broadcast/v2`.
  */
 
 const STINGERS: Array<{
@@ -143,7 +143,7 @@ export default async function StingersPanelPage({
         title="Stingers"
         description="One-click transition clips. Active session auto-selected; use the session picker below to switch targets."
         action={
-          <Link href="/admin/broadcast">
+          <Link href="/admin/broadcast/v2">
             <SecondaryButton>All sessions →</SecondaryButton>
           </Link>
         }
@@ -166,8 +166,8 @@ export default async function StingersPanelPage({
         </div>
       ) : (
         <div className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center text-xs text-[var(--chalk-3)]">
-          No active stream session. Open /admin/broadcast, start a session,
-          then come back here.
+          No active stream session. Open /admin/broadcast/v2, start a
+          session, then come back here.
         </div>
       )}
 

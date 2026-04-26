@@ -63,6 +63,15 @@ test.describe("Plan 42 — match-aware overlays", () => {
   test("select → start → +1 home → end match writes match_results", async ({
     page,
   }) => {
+    // Plan 52 — broadcast v2 promoted; v1 MatchControlPanel testids
+    // (`match-control-panel`, `match-select`, etc.) live on a route that
+    // is now a 307 redirect. The match-flow server modules are still
+    // unit-tested in isolation; rewrite this E2E against v2's
+    // MatchControl card before re-enabling.
+    test.skip(
+      true,
+      "v1 MatchControlPanel removed; rewrite against v2 surface when match-control is ported",
+    );
     const sb = getServiceRoleClient();
 
     // Resolve the active season.

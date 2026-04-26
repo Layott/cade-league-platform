@@ -3,14 +3,18 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
-import { SectionHeader } from "@/components/admin/SectionHeader";
 
 /**
  * Plan 51 — /admin/broadcast/v2/* layout.
  *
  * Area gate (requires `broadcast.v2.read`). Per-action perms (e.g.
  * `broadcast.v2.trigger`) are re-checked inside the session control
- * surface owned by sibling agent UI-BC.
+ * surface.
+ *
+ * The shared SectionHeader was removed once v2 became the canonical
+ * broadcast surface — each child page renders its own header so we
+ * avoid double headers (the legacy `/admin/broadcast` index used to
+ * have its own header and the v2 layout duplicated it on top).
  */
 
 export const dynamic = "force-dynamic";
@@ -43,11 +47,6 @@ export default async function BroadcastV2Layout({
 
   return (
     <div className="space-y-6" data-testid="broadcast-v2-shell">
-      <SectionHeader
-        eyebrow="Broadcast v2"
-        title="Overlay control room"
-        description="Next-gen overlay router. Pick a session to drive overlays, or start a new one. Browser sources continue to read /overlay/v2/<key>?session=<id>&token=<viewToken>."
-      />
       {children}
     </div>
   );

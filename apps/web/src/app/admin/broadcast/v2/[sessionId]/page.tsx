@@ -15,6 +15,7 @@ import { listSelectableMatches } from "@/server/broadcast/match_flow";
 import { probeAllActiveStates } from "@/server/broadcast/v2/overlay_active_state";
 import { CopyTokenButton } from "./CopyTokenButton";
 import { ControlGrid } from "./ControlGrid";
+import { MatchDaySelector, type MatchDayOption } from "./MatchDaySelector";
 import type { UpcomingMatch } from "@/components/broadcast/v2/controls/UpNextBugControl";
 
 /**
@@ -81,6 +82,11 @@ export default async function BroadcastV2SessionPage({
     throw err;
   }
   const canTrigger = await hasPermAsync(sb, actor, "broadcast.v2.trigger");
+  // `broadcast.manage` gates session-level edits (changing match-day,
+  // ending the session). Producers + admins have it; design/QA-only
+  // readers do not — for them the match-day selector renders as
+  // disabled rather than vanishing.
+  const canManage = await hasPermAsync(sb, actor, "broadcast.manage");
 
   const { data: sessionRaw } = await sb
     .from("stream_sessions")
@@ -135,6 +141,44 @@ export default async function BroadcastV2SessionPage({
       seasonLabel = s.season_label ?? s.name ?? null;
     }
   }
+
+  // Plan 52 — match-day options for the selector at the top of the
+  // control room. Window is the same as the legacy index page (last 30
+  // days through next 90) so producers can hop between recent + scheduled
+  // days without leaving the v2 surface.
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  const until = new Date();
+  until.setDate(until.getDate() + 90);
+  const { data: matchDaysRaw } = await sb
+    .from("match_days")
+    .select("id, match_date, venue_name, status")
+    .is("deleted_at", null)
+    .gte("match_date", since.toISOString().slice(0, 10))
+    .lte("match_date", until.toISOString().slice(0, 10))
+    .order("match_date", { ascending: false })
+    .limit(60);
+  const matchDayRows = (matchDaysRaw ?? []) as Array<{
+    id: string;
+    match_date: string;
+    venue_name: string;
+    status: string;
+  }>;
+  // Make sure the session's currently-bound match_day is always in the
+  // list, even if it falls outside the 30/90 window.
+  const haveCurrent = matchDayRows.some((r) => r.id === session.match_day_id);
+  if (!haveCurrent && matchDay) {
+    matchDayRows.unshift({
+      id: matchDay.id,
+      match_date: matchDay.match_date,
+      venue_name: matchDay.venue_name,
+      status: "outside-window",
+    });
+  }
+  const matchDayOptions: MatchDayOption[] = matchDayRows.map((d) => ({
+    id: d.id,
+    label: `${formatWat(`${d.match_date}T00:00:00Z`, "EEE MMM d")} · ${d.venue_name} · ${d.status}`,
+  }));
 
   // Match dropdown for the up-next-bug control. Pull "today" scope which
   // matches the legacy panel; fall back to all if today's list is empty.
@@ -192,18 +236,32 @@ export default async function BroadcastV2SessionPage({
             {session.view_token ? (
               <CopyTokenButton token={session.view_token} />
             ) : null}
-            <Link
-              href={`/admin/broadcast/${session.id}`}
-              data-testid="v2-open-legacy"
-            >
-              <SecondaryButton>Open legacy control →</SecondaryButton>
-            </Link>
             <Link href="/admin/broadcast/v2">
               <SecondaryButton>Back</SecondaryButton>
             </Link>
           </div>
         }
       />
+
+      {/* Plan 52 — match-day selector. Sits between the header + the
+          control grid so producers can re-target the session before
+          firing overlays. Disabled for read-only viewers. */}
+      <div
+        className="flex flex-wrap items-end gap-4 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4"
+        data-testid="v2-session-meta"
+      >
+        <MatchDaySelector
+          sessionId={session.id}
+          currentMatchDayId={session.match_day_id}
+          options={matchDayOptions}
+          disabled={!canManage}
+        />
+        {!canManage ? (
+          <span className="text-[10px] text-[var(--chalk-3)]">
+            Match-day binding is read-only — requires `broadcast.manage`.
+          </span>
+        ) : null}
+      </div>
 
       {!canTrigger ? (
         <div className="rounded-sm border border-[rgba(255,176,32,0.35)] bg-[rgba(255,176,32,0.08)] p-3 text-xs text-[var(--amber)]">

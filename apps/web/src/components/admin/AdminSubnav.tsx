@@ -27,8 +27,11 @@ const TABS = [
   { href: "/admin/appeals", label: "Appeals" },
   { href: "/admin/announcements", label: "Announcements" },
   { href: "/admin/tournament", label: "Tournament" },
-  { href: "/admin/broadcast", label: "Broadcast" },
-  { href: "/admin/broadcast/v2", label: "Broadcast v2" },
+  // Plan 52 — Broadcast tab now points at /admin/broadcast/v2 (the
+  // promoted v2 control room). The old /admin/broadcast paths still
+  // resolve via 307 redirects; updating the href avoids the address-bar
+  // hop / flash described in `tasks/lessons.md` (lesson 484).
+  { href: "/admin/broadcast/v2", label: "Broadcast" },
   { href: "/admin/youtube-channels", label: "YouTube" },
   { href: "/admin/roles", label: "Roles" },
   { href: "/admin/users", label: "Users" },
@@ -38,14 +41,12 @@ const TABS = [
 
 function matches(pathname: string, href: string, exact?: boolean) {
   if (exact) return pathname === href;
-  // Plan 51 — special-case the original /admin/broadcast tab so it does
-  // NOT light up while the user is browsing the new /admin/broadcast/v2
-  // surface (which has its own dedicated tab).
-  if (
-    href === "/admin/broadcast" &&
-    pathname.startsWith("/admin/broadcast/v2")
-  ) {
-    return false;
+  // Plan 52 — light the Broadcast tab for both the v2 path (canonical)
+  // and the legacy /admin/broadcast paths so a producer who lands on a
+  // stale bookmark still sees the tab highlighted while the redirect
+  // resolves.
+  if (href === "/admin/broadcast/v2" && pathname.startsWith("/admin/broadcast")) {
+    return true;
   }
   return pathname === href || pathname.startsWith(href + "/");
 }

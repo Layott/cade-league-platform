@@ -2,36 +2,40 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
-import { hasPermAsync } from "@/lib/perms-db";
+import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { SectionHeader } from "@/components/admin/SectionHeader";
+import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { StatusPill } from "@/components/admin/StatusPill";
+import { PrimaryButton } from "@/components/admin/buttons";
 import { formatWat } from "@/lib/time";
+import {
+  getActiveSession,
+  listSessions,
+  type StreamSessionRow,
+} from "@/server/broadcast/sessions";
+import { startSessionAction } from "../actions";
 
 /**
- * Plan 51 — /admin/broadcast/v2 landing page.
+ * Plan 51 → Plan 52 — promoted v2 landing page.
  *
- * Lists every recent stream session and lets the operator open one in
- * the v2 control room (filled in later by sibling agent UI-BC at
- * /admin/broadcast/v2/[sessionId]/page.tsx). Also offers a "create new
- * session" link that defers to the existing v1 broadcast form so we
- * don't duplicate the start-session UX while v2 is still scaffolding.
+ * Mirrors the legacy `/admin/broadcast` index: pick a match-day, see the
+ * active session for that day (or start one), browse past sessions for
+ * the same day. Each "Open" link goes to `/admin/broadcast/v2/[sessionId]`
+ * which renders the v2 control room.
  *
- * Per-page perm checks: layout already enforces `broadcast.v2.read`.
- * The trigger button visibility flips against `broadcast.v2.trigger`.
+ * The legacy `/admin/broadcast` route now redirects here.
  */
 
 export const dynamic = "force-dynamic";
 
-type SessionRow = {
+type MatchDayRow = {
   id: string;
-  match_day_id: string;
-  session_tag: string | null;
-  started_at: string;
-  ended_at: string | null;
+  match_date: string;
+  venue_name: string;
+  status: string;
 };
 
-type MatchDayLite = { id: string; match_date: string; venue_name: string };
-
-async function resolveActor() {
+async function resolveAdmin() {
   const userClient = await getServerSupabase();
   const { data: auth } = await userClient.auth.getUser();
   if (!auth.user) redirect("/login?next=/admin/broadcast/v2");
@@ -47,136 +51,219 @@ async function resolveActor() {
     .eq("user_id", pub.id)
     .is("deleted_at", null);
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
-  return { userId: pub.id, roles };
+
+  const sb = getServiceRoleSupabase();
+  try {
+    await requirePermAsync(sb, { userId: pub.id, roles }, "broadcast.v2.read");
+  } catch (err) {
+    if (err instanceof PermissionError) throw err;
+    throw err;
+  }
+  return sb;
 }
 
-export default async function BroadcastV2LandingPage() {
-  const actor = await resolveActor();
-  const sb = getServiceRoleSupabase();
-  const canTrigger = await hasPermAsync(sb, actor, "broadcast.v2.trigger");
+export default async function BroadcastV2LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ matchDayId?: string }>;
+}) {
+  const sb = await resolveAdmin();
+  const sp = await searchParams;
 
-  // Pull last 30 days of sessions, joined with their match day for context.
+  // Pull last-30-day match_days (covers scheduled/in-progress/recent).
   const since = new Date();
   since.setDate(since.getDate() - 30);
-
-  const { data: sessionRows } = await sb
-    .from("stream_sessions")
-    .select("id, match_day_id, session_tag, started_at, ended_at")
+  const until = new Date();
+  until.setDate(until.getDate() + 90);
+  const { data: matchDaysRaw } = await sb
+    .from("match_days")
+    .select("id, match_date, venue_name, status")
     .is("deleted_at", null)
-    .gte("started_at", since.toISOString())
-    .order("started_at", { ascending: false })
+    .gte("match_date", since.toISOString().slice(0, 10))
+    .lte("match_date", until.toISOString().slice(0, 10))
+    .order("match_date", { ascending: false })
     .limit(40);
-  const sessions = (sessionRows ?? []) as SessionRow[];
+  const matchDays = (matchDaysRaw ?? []) as MatchDayRow[];
 
-  const matchDayIds = Array.from(new Set(sessions.map((s) => s.match_day_id)));
-  let dayMap = new Map<string, MatchDayLite>();
-  if (matchDayIds.length > 0) {
-    const { data: dayRows } = await sb
-      .from("match_days")
-      .select("id, match_date, venue_name")
-      .in("id", matchDayIds);
-    dayMap = new Map(
-      ((dayRows ?? []) as MatchDayLite[]).map((d) => [d.id, d]),
-    );
-  }
+  // Resolve selected match day (default: nearest to today with a scheduled
+  // or in_progress status, else the first row).
+  const selectedId =
+    sp.matchDayId ??
+    matchDays.find((d) => d.status === "in_progress" || d.status === "scheduled")
+      ?.id ??
+    matchDays[0]?.id ??
+    "";
 
-  const active = sessions.filter((s) => s.ended_at === null);
-  const past = sessions.filter((s) => s.ended_at !== null);
+  const selected = matchDays.find((d) => d.id === selectedId) ?? null;
+  const active: StreamSessionRow | null = selected
+    ? await getActiveSession(sb, selected.id)
+    : null;
+  const past: StreamSessionRow[] = selected
+    ? await listSessions(sb, selected.id)
+    : [];
+
+  const cols: DataTableColumn<StreamSessionRow>[] = [
+    {
+      key: "started",
+      label: "Started",
+      render: (s) => (
+        <span className="tabular text-[var(--chalk-0)]">
+          {formatWat(s.started_at, "EEE MMM d · HH:mm")}
+        </span>
+      ),
+    },
+    {
+      key: "ended",
+      label: "Ended",
+      render: (s) => (
+        <span className="tabular text-[var(--chalk-2)]">
+          {s.ended_at ? formatWat(s.ended_at, "HH:mm") : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "tag",
+      label: "Tag",
+      render: (s) => (
+        <span className="text-[var(--chalk-1)]">
+          {s.session_tag ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (s) => (
+        <StatusPill status={s.ended_at ? "ended" : "live"} />
+      ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "right",
+      render: (s) => (
+        <div className="flex justify-end gap-3 text-xs font-semibold uppercase tracking-[0.18em]">
+          <Link
+            href={`/admin/broadcast/v2/${s.id}`}
+            className="text-[var(--chalk-2)] hover:text-[var(--signal)]"
+            data-testid={`resume-${s.id}`}
+          >
+            Open
+          </Link>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-8" data-testid="broadcast-v2-landing">
-      <div className="flex flex-col gap-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-            Start a new session
-          </div>
-          <p className="mt-1 max-w-xl text-sm text-[var(--chalk-2)]">
-            Sessions are minted from the v1 broadcast page (one active per match
-            day). Open the v2 control room from any active or recent session
-            below to drive overlays.
-          </p>
-        </div>
-        {canTrigger ? (
-          <Link
-            href="/admin/broadcast"
-            className="inline-flex items-center gap-2 rounded-sm border border-[var(--signal)] bg-[var(--ink-1)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--signal)] hover:bg-[rgba(107,205,6,0.08)]"
-            data-testid="v2-create-link"
-          >
-            Open v1 → start session →
-          </Link>
-        ) : null}
-      </div>
+      <SectionHeader
+        eyebrow="Broadcast"
+        title="Stream control"
+        description="Start a stream session against a scheduled match day, then trigger overlays from its control panel. Browser sources (OBS, vMix, Streamlabs, etc.) point at /overlay/<key>?session=<id>."
+      />
 
-      <section className="space-y-3" data-testid="v2-active-sessions">
-        <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-          Active sessions
-        </h2>
-        {active.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center text-sm text-[var(--chalk-3)]">
-            No live sessions right now.
-          </div>
-        ) : (
-          <ul className="grid gap-2">
-            {active.map((s) => (
-              <SessionRow key={s.id} s={s} day={dayMap.get(s.match_day_id) ?? null} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3" data-testid="v2-past-sessions">
-        <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-          Recent sessions (last 30 days)
-        </h2>
-        {past.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center text-sm text-[var(--chalk-3)]">
-            No completed sessions in the last 30 days.
-          </div>
-        ) : (
-          <ul className="grid gap-2">
-            {past.map((s) => (
-              <SessionRow key={s.id} s={s} day={dayMap.get(s.match_day_id) ?? null} />
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function SessionRow({
-  s,
-  day,
-}: {
-  s: SessionRow;
-  day: MatchDayLite | null;
-}) {
-  const live = s.ended_at === null;
-  return (
-    <li>
-      <Link
-        href={`/admin/broadcast/v2/${s.id}`}
-        className="group flex items-center justify-between gap-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-4 py-3 transition-colors hover:border-[var(--signal)]"
-        data-testid={`v2-session-${s.id}`}
+      <form
+        method="get"
+        className="flex flex-col gap-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 md:flex-row md:items-end"
       >
-        <div className="flex flex-col gap-0.5">
-          <div className="font-display text-sm text-[var(--chalk-0)] group-hover:text-[var(--signal)]">
-            {day
-              ? `${formatWat(`${day.match_date}T00:00:00Z`, "EEE MMM d")} · ${day.venue_name}`
-              : "—"}
-            {s.session_tag ? (
-              <span className="ml-2 text-[var(--chalk-3)]">· {s.session_tag}</span>
+        <div className="flex-1">
+          <label
+            htmlFor="matchDayId"
+            className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]"
+          >
+            Match day
+          </label>
+          <select
+            id="matchDayId"
+            name="matchDayId"
+            defaultValue={selectedId}
+            data-testid="match-day-picker"
+            className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-2 text-sm text-[var(--chalk-1)] focus:border-[var(--signal)] focus:outline-none"
+          >
+            {matchDays.length === 0 ? (
+              <option value="">— no match days in window —</option>
             ) : null}
-          </div>
-          <div className="text-xs text-[var(--chalk-3)]">
-            Started {formatWat(s.started_at, "EEE MMM d · HH:mm")}
-            {s.ended_at
-              ? ` · Ended ${formatWat(s.ended_at, "HH:mm")}`
-              : null}
-          </div>
+            {matchDays.map((d) => (
+              <option key={d.id} value={d.id}>
+                {formatWat(`${d.match_date}T00:00:00Z`, "EEE MMM d")} ·{" "}
+                {d.venue_name} · {d.status}
+              </option>
+            ))}
+          </select>
         </div>
-        <StatusPill status={live ? "live" : "ended"} />
-      </Link>
-    </li>
+        <button
+          type="submit"
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)] hover:border-[var(--signal)] hover:text-[var(--signal)]"
+        >
+          Select
+        </button>
+      </form>
+
+      {selected ? (
+        active ? (
+          <div
+            className="flex flex-col gap-2 rounded-sm border border-[var(--primary)] bg-[rgba(107,205,6,0.06)] p-5 md:flex-row md:items-center md:justify-between"
+            data-testid="active-session-card"
+          >
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--signal)]">
+                Active session
+              </div>
+              <div className="mt-1 font-display text-lg text-[var(--chalk-0)]">
+                Started {formatWat(active.started_at, "HH:mm")} WAT
+              </div>
+              <div className="text-xs text-[var(--chalk-2)]">
+                Tag: {active.session_tag ?? "—"}
+              </div>
+            </div>
+            <Link
+              href={`/admin/broadcast/v2/${active.id}`}
+              data-testid="resume-active"
+            >
+              <PrimaryButton>Resume session</PrimaryButton>
+            </Link>
+          </div>
+        ) : (
+          <form action={startSessionAction}>
+            <input type="hidden" name="matchDayId" value={selected.id} />
+            <div className="flex flex-col gap-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 md:flex-row md:items-end">
+              <div className="flex-1">
+                <label
+                  htmlFor="tag"
+                  className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]"
+                >
+                  Session tag (optional)
+                </label>
+                <input
+                  id="tag"
+                  name="tag"
+                  placeholder="e.g. MD-08 main output"
+                  className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-2 text-sm text-[var(--chalk-1)] focus:border-[var(--signal)] focus:outline-none"
+                />
+              </div>
+              <PrimaryButton type="submit" data-testid="start-session-btn">
+                Start stream session
+              </PrimaryButton>
+            </div>
+          </form>
+        )
+      ) : null}
+
+      {selected ? (
+        <div className="space-y-3">
+          <h2 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+            Past sessions · this match day
+          </h2>
+          <DataTable
+            columns={cols}
+            rows={past.filter((s) => !active || s.id !== active.id)}
+            rowKey={(s) => s.id}
+            emptyLabel="No prior sessions"
+            emptyHint="Nothing recorded for this match day yet."
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }

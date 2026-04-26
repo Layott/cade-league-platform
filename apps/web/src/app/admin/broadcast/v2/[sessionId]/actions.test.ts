@@ -50,8 +50,43 @@ vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: () => userClientMock,
 }));
 
-// Service-role client — handed to perm + trigger fns. Just a marker object.
-const serviceSb = { __serviceRoleSupabase: true };
+// Service-role client — handed to perm + trigger fns + the new
+// `setSessionMatchDayAction` (which calls `.from("match_days")` +
+// `.from("stream_sessions")` directly). Each table chain ends in a
+// terminal method that returns the canned `{data, error}`.
+//
+//   match_days chain: from().select().eq().is().maybeSingle()
+//   stream_sessions chain: from().update().eq().is()
+//
+// Tests can swap the resolved value via `matchDayLookupMock.mockResolvedValue(...)`
+// or `sessionUpdateMock.mockResolvedValue(...)` inside their `beforeEach`.
+const matchDayLookupMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: { id: "md-1" }, error: null }),
+);
+const sessionUpdateMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: null, error: null }),
+);
+const matchDaySelectChain = vi.hoisted(() => ({
+  select: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  is: vi.fn().mockReturnThis(),
+  maybeSingle: matchDayLookupMock,
+}));
+const sessionUpdateChain = vi.hoisted(() => ({
+  update: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  // Terminal: the legacy code `await sb.from('stream_sessions').update(...).eq(...).is(...)`
+  // expects `is` to resolve to `{data, error}`.
+  is: sessionUpdateMock,
+}));
+const serviceSb = vi.hoisted(() => ({
+  __serviceRoleSupabase: true,
+  from: vi.fn((table: string) => {
+    if (table === "match_days") return matchDaySelectChain;
+    if (table === "stream_sessions") return sessionUpdateChain;
+    throw new Error(`unexpected table on service-role mock: ${table}`);
+  }),
+}));
 vi.mock("@/lib/supabase/service", () => ({
   getServiceRoleSupabase: () => serviceSb,
 }));
@@ -110,7 +145,10 @@ vi.mock("@/components/broadcast/v2/template-mapping", () => ({
   }),
 }));
 
-import { retriggerOverlayAction } from "./actions";
+import {
+  retriggerOverlayAction,
+  setSessionMatchDayAction,
+} from "./actions";
 
 function buildForm({
   sessionId = "sess-1",
@@ -143,6 +181,17 @@ beforeEach(() => {
   clearInstanceMock.mockClear();
   listActiveInstancesMock.mockReset();
   isMultiInstanceMock.mockReset();
+  // Reset the service-role chain stubs back to "found" / "ok".
+  matchDayLookupMock.mockReset();
+  matchDayLookupMock.mockResolvedValue({ data: { id: "md-1" }, error: null });
+  sessionUpdateMock.mockReset();
+  sessionUpdateMock.mockResolvedValue({ data: null, error: null });
+  serviceSb.from.mockClear();
+  matchDaySelectChain.select.mockClear();
+  matchDaySelectChain.eq.mockClear();
+  matchDaySelectChain.is.mockClear();
+  sessionUpdateChain.update.mockClear();
+  sessionUpdateChain.eq.mockClear();
 });
 
 describe("retriggerOverlayAction", () => {
@@ -293,5 +342,77 @@ describe("retriggerOverlayAction", () => {
         ),
       ).rejects.toThrow(/payload must be valid JSON/);
     });
+  });
+});
+
+describe("setSessionMatchDayAction", () => {
+  function buildMdForm({
+    sessionId = "sess-1",
+    matchDayId = "md-target",
+  }: { sessionId?: string; matchDayId?: string } = {}): FormData {
+    const fd = new FormData();
+    fd.set("sessionId", sessionId);
+    fd.set("matchDayId", matchDayId);
+    return fd;
+  }
+
+  it("looks up the match-day, applies the update, revalidates v2 path", async () => {
+    matchDayLookupMock.mockResolvedValueOnce({
+      data: { id: "md-target" },
+      error: null,
+    });
+    sessionUpdateMock.mockResolvedValueOnce({ data: null, error: null });
+
+    await setSessionMatchDayAction(buildMdForm());
+
+    expect(serviceSb.from).toHaveBeenCalledWith("match_days");
+    expect(serviceSb.from).toHaveBeenCalledWith("stream_sessions");
+    expect(matchDaySelectChain.eq).toHaveBeenCalledWith("id", "md-target");
+    expect(sessionUpdateChain.update).toHaveBeenCalledWith({
+      match_day_id: "md-target",
+    });
+    expect(sessionUpdateChain.eq).toHaveBeenCalledWith("id", "sess-1");
+    expect(revalidateMock).toHaveBeenCalledWith(
+      "/admin/broadcast/v2/sess-1",
+    );
+  });
+
+  it("rejects missing sessionId", async () => {
+    const fd = buildMdForm();
+    fd.delete("sessionId");
+    await expect(setSessionMatchDayAction(fd)).rejects.toThrow(
+      /sessionId required/,
+    );
+  });
+
+  it("rejects missing matchDayId", async () => {
+    const fd = buildMdForm();
+    fd.delete("matchDayId");
+    await expect(setSessionMatchDayAction(fd)).rejects.toThrow(
+      /matchDayId required/,
+    );
+  });
+
+  it("rejects when the target match-day does not exist", async () => {
+    matchDayLookupMock.mockResolvedValueOnce({ data: null, error: null });
+    await expect(setSessionMatchDayAction(buildMdForm())).rejects.toThrow(
+      /not found/,
+    );
+    expect(sessionUpdateChain.update).not.toHaveBeenCalled();
+  });
+
+  it("translates 23505 unique-violation into a friendlier error", async () => {
+    matchDayLookupMock.mockResolvedValueOnce({
+      data: { id: "md-target" },
+      error: null,
+    });
+    sessionUpdateMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "23505", message: "unique_violation" },
+    });
+
+    await expect(setSessionMatchDayAction(buildMdForm())).rejects.toThrow(
+      /already active on that match day/,
+    );
   });
 });

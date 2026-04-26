@@ -78,6 +78,15 @@ test.describe("Plan 42.2 — lazy auto-create score_bug + Plan 48.3 inline mini 
   test("score +1 without startMatch seeds the bug + mini preview nests inside editable panel", async ({
     page,
   }) => {
+    // Plan 52 — broadcast v2 promoted; the v1 EditableTemplatePanel +
+    // MatchControlPanel that this test exercised live behind a redirect
+    // now. The lazy score-bug fix is still covered by unit tests on
+    // `@/server/broadcast/match_flow`. Rewrite against the v2 control
+    // grid before re-enabling.
+    test.skip(
+      true,
+      "v1 mini-preview + match-control panels removed; rewrite against v2 cards when ported",
+    );
     const sb = getServiceRoleClient();
 
     const { data: season, error: seasonErr } = await sb

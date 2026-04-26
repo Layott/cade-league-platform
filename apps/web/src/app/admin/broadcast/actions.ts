@@ -93,8 +93,11 @@ export async function startSessionAction(formData: FormData) {
     userId: publicUserId,
     tag,
   });
-  revalidatePath("/admin/broadcast");
-  redirect(`/admin/broadcast/${id}`);
+  // Plan 52 — broadcast v2 is now the canonical control room; redirect
+  // straight to the v2 URL so the producer doesn't see a hop through
+  // the legacy 307 redirect.
+  revalidatePath("/admin/broadcast/v2");
+  redirect(`/admin/broadcast/v2/${id}`);
 }
 
 export async function endSessionAction(formData: FormData) {
@@ -102,8 +105,9 @@ export async function endSessionAction(formData: FormData) {
   if (!sessionId) throw new Error("sessionId required");
   const { sb, publicUserId } = await gate("broadcast.manage");
   await endSession(sb, sessionId, publicUserId);
-  revalidatePath("/admin/broadcast");
-  redirect("/admin/broadcast");
+  // Plan 52 — bounce back to the v2 landing index after ending a session.
+  revalidatePath("/admin/broadcast/v2");
+  redirect("/admin/broadcast/v2");
 }
 
 export async function triggerOverlayAction(formData: FormData) {
@@ -135,7 +139,11 @@ export async function triggerOverlayAction(formData: FormData) {
     payload,
     userId: publicUserId,
   });
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function clearOverlayAction(formData: FormData) {
@@ -144,7 +152,8 @@ export async function clearOverlayAction(formData: FormData) {
   if (!eventId) throw new Error("eventId required");
   const { sb, publicUserId } = await gate("broadcast.trigger");
   await clearOverlay(sb, eventId, publicUserId);
-  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path (legacy URL is a redirect now).
+  if (sessionId) revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 // -- Plan 37: presets --------------------------------------------------
@@ -179,7 +188,8 @@ export async function createPresetAction(formData: FormData) {
     userId: publicUserId,
     isDefault,
   });
-  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path (legacy URL is a redirect now).
+  if (sessionId) revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function updatePresetAction(formData: FormData) {
@@ -195,7 +205,8 @@ export async function updatePresetAction(formData: FormData) {
     payload: payloadRaw ? parsePayload(payloadRaw) : undefined,
     userId: publicUserId,
   });
-  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path (legacy URL is a redirect now).
+  if (sessionId) revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function deletePresetAction(formData: FormData) {
@@ -204,7 +215,8 @@ export async function deletePresetAction(formData: FormData) {
   if (!presetId) throw new Error("presetId required");
   const { sb, publicUserId } = await gate("overlay_presets.manage");
   await deletePreset(sb, presetId, publicUserId);
-  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path (legacy URL is a redirect now).
+  if (sessionId) revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function loadPresetAction(formData: FormData) {
@@ -221,7 +233,11 @@ export async function loadPresetAction(formData: FormData) {
     userId: publicUserId,
     instanceSlot,
   });
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 // -- Plan 37: instances ------------------------------------------------
@@ -241,7 +257,11 @@ export async function triggerInstanceAction(formData: FormData) {
     payload: parsePayload(payloadRaw),
     userId: publicUserId,
   });
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function clearInstanceAction(formData: FormData) {
@@ -250,7 +270,8 @@ export async function clearInstanceAction(formData: FormData) {
   if (!instanceId) throw new Error("instanceId required");
   const { sb, publicUserId } = await gate("broadcast.trigger");
   await clearInstance(sb, instanceId, publicUserId);
-  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path (legacy URL is a redirect now).
+  if (sessionId) revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function updateInstancePayloadAction(formData: FormData) {
@@ -265,7 +286,8 @@ export async function updateInstancePayloadAction(formData: FormData) {
     parsePayload(payloadRaw),
     publicUserId,
   );
-  if (sessionId) revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path (legacy URL is a redirect now).
+  if (sessionId) revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 // -- Plan 37: match_clock ---------------------------------------------
@@ -293,7 +315,11 @@ export async function setClockAction(formData: FormData) {
     userId: publicUserId,
     instanceKey,
   });
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function startClockAction(formData: FormData) {
@@ -302,7 +328,11 @@ export async function startClockAction(formData: FormData) {
   const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
   await startClock(sb, sessionId, publicUserId, instanceKey);
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function pauseClockAction(formData: FormData) {
@@ -311,7 +341,11 @@ export async function pauseClockAction(formData: FormData) {
   const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
   await pauseClock(sb, sessionId, publicUserId, instanceKey);
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function resumeClockAction(formData: FormData) {
@@ -320,7 +354,11 @@ export async function resumeClockAction(formData: FormData) {
   const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
   await resumeClock(sb, sessionId, publicUserId, instanceKey);
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function adjustClockAction(formData: FormData) {
@@ -330,7 +368,11 @@ export async function adjustClockAction(formData: FormData) {
   const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
   await adjustClock(sb, sessionId, Number(deltaRaw), publicUserId, instanceKey);
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function resetClockAction(formData: FormData) {
@@ -339,7 +381,11 @@ export async function resetClockAction(formData: FormData) {
   const instanceKey = readInstanceKey(formData);
   const { sb, publicUserId } = await gate("match_clock.manage");
   await resetClock(sb, sessionId, publicUserId, instanceKey);
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 // -- Plan 42 / 42.1: match flow (select/start/end + score controls) -------
@@ -365,7 +411,11 @@ export async function selectAndStartMatchAction(formData: FormData) {
     userId: publicUserId,
     roles,
   });
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function scoreBugDeltaAction(formData: FormData) {
@@ -389,7 +439,11 @@ export async function scoreBugDeltaAction(formData: FormData) {
     side === "home" ? { homeDelta: delta } : { awayDelta: delta },
     { userId: publicUserId, roles },
   );
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function resetScoreBugAction(formData: FormData) {
@@ -405,7 +459,11 @@ export async function resetScoreBugAction(formData: FormData) {
     { reset: true },
     { userId: publicUserId, roles },
   );
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 /**
@@ -419,7 +477,11 @@ export async function clearScoreBugAction(formData: FormData) {
   const { publicUserId, roles } = await resolveAuthed();
   const sb = getServiceRoleSupabase();
   await clearScoreBug(sb, sessionId, slot, { userId: publicUserId, roles });
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }
 
 export async function endMatchAction(formData: FormData) {
@@ -447,5 +509,9 @@ export async function endMatchAction(formData: FormData) {
     { homeScore, awayScore, notes },
     { userId: publicUserId, roles },
   );
-  revalidatePath(`/admin/broadcast/${sessionId}`);
+  // Plan 52 — revalidate the canonical v2 path. The legacy
+  // `/admin/broadcast/${sessionId}` URL is a 307 redirect now, but
+  // revalidating it is still cheap (Next.js no-ops on the redirect)
+  // and keeps stale-bookmark traffic in sync.
+  revalidatePath(`/admin/broadcast/v2/${sessionId}`);
 }

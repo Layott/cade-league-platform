@@ -81,6 +81,14 @@ test("Plan 37 — preset CRUD + multi-instance lower-third + live clock", async 
   browser,
   page,
 }) => {
+  // Plan 52 — broadcast v2 promoted; v1 EditableTemplatePanel + preset
+  // forms are now orphaned (no UI route renders them). The preset CRUD
+  // backend (`@/server/overlays/presets`) still has unit-test coverage,
+  // so the durable contract is not regressed — just the UI wrapper.
+  test.skip(
+    true,
+    "v1 EditableTemplatePanel + preset save form removed; rewrite against v2 control surface when preset support is added there",
+  );
   await login(page);
 
   // 1. Disposable match day + start session.
