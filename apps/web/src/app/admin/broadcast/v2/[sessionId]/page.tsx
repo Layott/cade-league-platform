@@ -16,6 +16,7 @@ import { probeAllActiveStates } from "@/server/broadcast/v2/overlay_active_state
 import { CopyTokenButton } from "./CopyTokenButton";
 import { ControlGrid } from "./ControlGrid";
 import { MatchDaySelector, type MatchDayOption } from "./MatchDaySelector";
+import { EndSessionForm } from "./EndSessionForm";
 import type { UpcomingMatch } from "@/components/broadcast/v2/controls/UpNextBugControl";
 
 /**
@@ -235,6 +236,9 @@ export default async function BroadcastV2SessionPage({
             <StatusPill status={isLive ? "live" : "ended"} />
             {session.view_token ? (
               <CopyTokenButton token={session.view_token} />
+            ) : null}
+            {isLive && canManage ? (
+              <EndSessionForm sessionId={session.id} />
             ) : null}
             <Link href="/admin/broadcast/v2">
               <SecondaryButton>Back</SecondaryButton>

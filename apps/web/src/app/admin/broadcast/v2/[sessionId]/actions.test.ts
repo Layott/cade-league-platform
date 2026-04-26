@@ -72,13 +72,36 @@ const matchDaySelectChain = vi.hoisted(() => ({
   is: vi.fn().mockReturnThis(),
   maybeSingle: matchDayLookupMock,
 }));
-const sessionUpdateChain = vi.hoisted(() => ({
-  update: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
-  // Terminal: the legacy code `await sb.from('stream_sessions').update(...).eq(...).is(...)`
-  // expects `is` to resolve to `{data, error}`.
-  is: sessionUpdateMock,
-}));
+// 2026-04-26: the action now chains `.is().is().neq()` for the auto-end
+// stale call before doing the final `.is()` for the swap, so the chain
+// must be thenable — when the action `await`s the builder, run the
+// resolver. The fluent builder returns the chain object on `.is()` /
+// `.neq()` / `.eq()` and only "fires" when awaited via `.then`. Tests
+// continue to reference `.update`, `.eq`, `.is`, `.neq` as vi.fn mocks
+// for assertion (e.g. `sessionUpdateChain.update.mockClear()`).
+const sessionUpdateChain = vi.hoisted(() => {
+  const obj = {
+    update: vi.fn(),
+    eq: vi.fn(),
+    is: vi.fn(),
+    neq: vi.fn(),
+    then: (
+      resolve: (v: unknown) => unknown,
+      reject?: (e: unknown) => unknown,
+    ) =>
+      (sessionUpdateMock as unknown as () => Promise<unknown>)().then(
+        resolve,
+        reject,
+      ),
+  };
+  // After the object exists, point each fluent method back at it so
+  // chains compose. Self-reference must happen post-construction.
+  obj.update.mockImplementation(() => obj);
+  obj.eq.mockImplementation(() => obj);
+  obj.is.mockImplementation(() => obj);
+  obj.neq.mockImplementation(() => obj);
+  return obj;
+});
 const serviceSb = vi.hoisted(() => ({
   __serviceRoleSupabase: true,
   from: vi.fn((table: string) => {
@@ -356,11 +379,13 @@ describe("setSessionMatchDayAction", () => {
     return fd;
   }
 
-  it("looks up the match-day, applies the update, revalidates v2 path", async () => {
+  it("looks up the match-day, auto-ends stale active sessions on target day, applies the update, revalidates v2 path", async () => {
     matchDayLookupMock.mockResolvedValueOnce({
       data: { id: "md-target" },
       error: null,
     });
+    // Two awaits hit sessionUpdateMock: (1) auto-end stale, (2) swap.
+    sessionUpdateMock.mockResolvedValueOnce({ data: null, error: null });
     sessionUpdateMock.mockResolvedValueOnce({ data: null, error: null });
 
     await setSessionMatchDayAction(buildMdForm());
@@ -368,10 +393,16 @@ describe("setSessionMatchDayAction", () => {
     expect(serviceSb.from).toHaveBeenCalledWith("match_days");
     expect(serviceSb.from).toHaveBeenCalledWith("stream_sessions");
     expect(matchDaySelectChain.eq).toHaveBeenCalledWith("id", "md-target");
+    // Auto-end stale leaves an `ended_at` timestamp on the chain.
+    expect(sessionUpdateChain.update).toHaveBeenCalledWith(
+      expect.objectContaining({ ended_at: expect.any(String) }),
+    );
+    // Swap supplies the new match_day_id.
     expect(sessionUpdateChain.update).toHaveBeenCalledWith({
       match_day_id: "md-target",
     });
     expect(sessionUpdateChain.eq).toHaveBeenCalledWith("id", "sess-1");
+    expect(sessionUpdateChain.neq).toHaveBeenCalledWith("id", "sess-1");
     expect(revalidateMock).toHaveBeenCalledWith(
       "/admin/broadcast/v2/sess-1",
     );
@@ -401,11 +432,14 @@ describe("setSessionMatchDayAction", () => {
     expect(sessionUpdateChain.update).not.toHaveBeenCalled();
   });
 
-  it("translates 23505 unique-violation into a friendlier error", async () => {
+  it("translates 23505 unique-violation into a friendlier error when the swap still hits the partial unique index after auto-end", async () => {
     matchDayLookupMock.mockResolvedValueOnce({
       data: { id: "md-target" },
       error: null,
     });
+    // Auto-end stale succeeds (or there were no stale rows); the actual
+    // swap then 23505s — translate to friendlier error.
+    sessionUpdateMock.mockResolvedValueOnce({ data: null, error: null });
     sessionUpdateMock.mockResolvedValueOnce({
       data: null,
       error: { code: "23505", message: "unique_violation" },

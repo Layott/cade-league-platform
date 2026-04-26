@@ -358,11 +358,17 @@ export async function retriggerOverlayAction(formData: FormData) {
  *
  * Validation:
  *   - sessionId + matchDayId required.
- *   - Active sessions must respect the `stream_sessions_one_active_per_day`
- *     partial unique index — moving an active session to a day that
- *     already has another active session is rejected at the DB layer
- *     and surfaced as a friendlier error here.
  *   - Match-day must exist + not be soft-deleted.
+ *
+ * Concurrency handling (2026-04-26 fix for live-event blocker):
+ *   The partial unique index `stream_sessions_one_active_per_day` allows
+ *   exactly one active session per match-day. If the target day already
+ *   has a stale leftover active session (e.g. a producer forgot to end
+ *   the previous one), the swap would 23505-fail. We now AUTO-END any
+ *   other active sessions on the target day before applying the swap so
+ *   the producer doesn't have to chase down old sessions during a live
+ *   event. The auto-end only touches sessions OTHER THAN the current one
+ *   and only ones whose ended_at IS NULL.
  *
  * Perm: `broadcast.manage` (gateManage). Re-validates the v2 session
  * page so the header + downstream feeds re-render against the new day.
@@ -391,10 +397,33 @@ export async function setSessionMatchDayAction(formData: FormData) {
     throw new Error("match-day not found or has been deleted");
   }
 
+  // 2026-04-26 — pre-empt the partial unique index by ending any OTHER
+  // active sessions on the target day. Without this, a stale leftover
+  // session would 23505-block the swap — the producer's only recourse
+  // was hunting down the old session and ending it manually. During a
+  // live event that's a non-starter. We end any sessions on the target
+  // day that aren't the current one and have null ended_at.
+  const nowIso = new Date().toISOString();
+  const { error: endStaleErr } = await sb
+    .from("stream_sessions")
+    .update({ ended_at: nowIso })
+    .eq("match_day_id", matchDayId)
+    .is("ended_at", null)
+    .is("deleted_at", null)
+    .neq("id", sessionId);
+  if (endStaleErr) {
+    // Non-fatal: surface a hint but still attempt the swap. If the
+    // index then 23505s we'll fall through to the friendly error below.
+    console.warn(
+      `[setSessionMatchDay] auto-end stale failed: ${endStaleErr.message}`,
+    );
+  }
+
   // Apply the update. The partial unique index
   // `stream_sessions_one_active_per_day` will throw 23505 if we try to
-  // move an active session onto a day that already has another active
-  // session — translate that to a friendlier error.
+  // move an active session onto a day that *still* has another active
+  // session (e.g. the auto-end above failed silently) — translate that
+  // to a friendlier error.
   const { error: upErr } = await sb
     .from("stream_sessions")
     .update({ match_day_id: matchDayId })

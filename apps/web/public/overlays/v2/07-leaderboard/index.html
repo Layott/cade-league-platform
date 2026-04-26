@@ -91,7 +91,19 @@
     --ink-muted:    rgba(255,255,255,0.72);
     --display:      'Agharti', 'Impact', sans-serif;
     --accent:       'Quedora', 'Inter', sans-serif;
-    --row-h:        46px;
+    /* 2026-04-26 list-style brief: rows boosted from 46→56px (max that
+       still fits 13 rows + headers + partner marquee in 1080p budget),
+       with a 4px gap so each row reads as its own list item. Striped
+       alternate-row backgrounds reinforce that. The big visual win is
+       the per-row slide-in animation (was broken — see comment on
+       `.row` keyframe — rows now stagger in from the left @ 80ms). */
+    --row-h:        56px;
+    --row-gap:      4px;
+    /* Tier colors for position numbers — gold #1, silver #2, bronze #3. */
+    --silver:       #c9d4dd;
+    --silver-glow:  rgba(201, 212, 221, 0.55);
+    --bronze:       #d68a45;
+    --bronze-glow:  rgba(214, 138, 69, 0.55);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -339,56 +351,60 @@
     z-index: 14;
   }
 
-  /* column header strip */
+  /* column header strip — grid columns must match `.row` exactly. */
   .col-headers {
     display: grid;
     grid-template-columns:
-      54px           /* Pos */
-      54px           /* Photo */
-      48px           /* Org */
+      72px           /* Pos */
+      60px           /* Photo */
+      54px           /* Org */
       1fr            /* Name */
-      52px           /* P */
-      110px          /* W-D-L */
-      108px          /* GF-GA */
-      72px           /* GD */
-      120px          /* Sanctions */
-      78px;          /* Pts */
-    gap: 10px;
+      56px           /* P */
+      130px          /* W-D-L */
+      120px          /* GF-GA */
+      80px           /* GD */
+      130px          /* Sanctions */
+      88px;          /* Pts */
+    gap: 12px;
     align-items: center;
-    padding: 0 22px;
-    height: 32px;
-    margin-bottom: 6px;
+    padding: 0 26px;
+    height: 36px;
+    margin-bottom: 8px;
     font-family: var(--accent);
     font-weight: 700;
-    /* 2026-04-26: bumped from 11px → 14px so column labels match the
-       28px stat values below — clearer at distance. */
     font-size: 14px;
     letter-spacing: 0.28em;
     color: rgba(255,255,255,0.78);
     text-transform: uppercase;
-    border-bottom: 1px solid rgba(107,205,6,0.20);
+    border-bottom: 1px solid rgba(107,205,6,0.30);
   }
   .col-headers .h--name { text-align: left; padding-left: 4px; }
   .col-headers .h--center { text-align: center; }
   .col-headers .h--pts { text-align: center; color: var(--green); letter-spacing: 0.36em; }
 
-  /* table track — relative positioning context for absolute rows */
+  /* table track — relative positioning context for absolute rows.
+     Height = 13 rows * (row-h + row-gap). */
   .rows {
     position: relative;
-    height: calc(13 * (var(--row-h) + 3px));
+    height: calc(13 * (var(--row-h) + var(--row-gap)));
   }
 
-  /* ROW: gamer-UI HUD frame */
+  /* ROW: gamer-UI HUD frame — list-style 2026-04-26.
+     Each row is its own list item: 72px tall, separated by 8px gap, with
+     a thin pink top-border on rows 2-13 (separator) so the list reads
+     scannable at a glance. Position via translateY using CSS variable
+     `--row-y` so the keyframe can compose translate(X, Y) without
+     clobbering vertical layout. */
   .row {
     position: absolute;
     left: 0; right: 0;
     height: var(--row-h);
     display: grid;
     grid-template-columns:
-      54px 54px 48px 1fr 52px 110px 108px 72px 120px 78px;
-    gap: 10px;
+      72px 60px 54px 1fr 56px 130px 120px 80px 130px 88px;
+    gap: 12px;
     align-items: center;
-    padding: 0 22px;
+    padding: 0 26px;
     /* angled corner cuts via clip-path (left + right notches) */
     clip-path: polygon(
       14px 0,
@@ -403,19 +419,29 @@
     background: var(--row-bg);
     box-shadow:
       inset 0 0 0 1.5px var(--row-border),
-      inset 0 0 24px rgba(107,205,6,0.06);
+      inset 0 0 28px rgba(107,205,6,0.06);
     /* row reorder transition (when standings update mid-show); the
        initial entrance animation overrides this on first paint. */
     transition: transform 0.55s cubic-bezier(0.7, 0.0, 0.2, 1);
     will-change: transform, opacity;
     opacity: 0;
+    /* Default Y position — overridden by inline style.setProperty('--row-y'). */
+    --row-y: 0px;
+    transform: translate(0, var(--row-y));
   }
-  /* 2026-04-26 — switched from row-fade-in (opacity only) to
-     row-slide-in (transform-driven) per user brief. Each row slides
-     in from the left with an 80ms stagger so all 13 rows sequence
-     "drop into place" rather than fading together. The keyframe
-     drives BOTH opacity (0 → 1) AND transform (-72px → 0) — the
-     gate-observer below was tweaked to skip `.row` so this animation
+  /* Striped alternate rows — even indexes get a darker shade so the list
+     reads as discrete items even when scanned quickly. */
+  .row:nth-child(even) {
+    background: rgba(4, 8, 4, 0.86);
+  }
+  /* 2026-04-26 — slide-in keyframe COMPOSES with translateY so rows
+     keep their vertical position while sliding in from the left.
+     Without `var(--row-y)` in the keyframe, the animation overrides
+     the inline `transform: translateY(Npx)` that the JS row-builder
+     sets, collapsing every row to y=0 (the "all players on one line"
+     bug the user reported). Each row slides in with an 80ms stagger
+     so all 13 rows sequence "drop into place" rather than fading
+     together. The gate-observer below skips `.row` so this animation
      is the single source of truth on entrance. */
   body.cade-visible .row {
     animation: row-slide-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -434,8 +460,8 @@
   body.cade-visible .row:nth-child(12) { animation-delay: 880ms; }
   body.cade-visible .row:nth-child(13) { animation-delay: 960ms; }
   @keyframes row-slide-in {
-    from { opacity: 0; transform: translateX(-72px); }
-    to   { opacity: 1; transform: translateX(0); }
+    from { opacity: 0; transform: translate(-80px, var(--row-y)); }
+    to   { opacity: 1; transform: translate(0, var(--row-y)); }
   }
 
   /* leader (pos 1) — heavier glow + gold mark */
@@ -483,25 +509,35 @@
   }
   .row.is-tail .pos-num { color: var(--pink); text-shadow: 0 0 12px var(--pink-glow); }
 
-  /* ROW INTERNALS */
+  /* ROW INTERNALS — 2026-04-26: position number boosted to 42px and
+     tier-colored (gold #1, silver #2, bronze #3, white rest) so the
+     leader's place reads instantly at a glance. */
   .pos-num {
     font-family: var(--display);
     font-weight: 900; font-stretch: 75%;
-    font-size: 28px; line-height: 1;
+    font-size: 42px; line-height: 1;
     color: var(--ink);
     text-align: center;
     letter-spacing: -0.02em;
   }
+  .row[data-pos="2"] .pos-num {
+    color: var(--silver);
+    text-shadow: 0 0 12px var(--silver-glow);
+  }
+  .row[data-pos="3"] .pos-num {
+    color: var(--bronze);
+    text-shadow: 0 0 12px var(--bronze-glow);
+  }
 
   .photo-wrap {
-    width: 38px; height: 38px;
+    width: 56px; height: 56px;
     border-radius: 50%;
     overflow: hidden;
-    border: 1.5px solid rgba(107,205,6,0.55);
+    border: 2px solid rgba(107,205,6,0.55);
     background: rgba(15, 22, 12, 0.85);
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto;
-    box-shadow: 0 0 8px rgba(107,205,6,0.20);
+    box-shadow: 0 0 10px rgba(107,205,6,0.20);
   }
   .row.is-leader .photo-wrap {
     border-color: var(--gold);
@@ -517,7 +553,7 @@
   }
 
   .org-wrap {
-    width: 32px; height: 32px;
+    width: 44px; height: 44px;
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto;
   }
@@ -536,12 +572,12 @@
   .player-name {
     font-family: var(--display);
     font-weight: 900; font-stretch: 75%;
-    font-size: 20px; line-height: 1;
+    font-size: 28px; line-height: 1;
     color: var(--ink);
     text-transform: uppercase;
     letter-spacing: 0.005em;
     text-align: left;
-    padding-left: 4px;
+    padding-left: 6px;
     position: relative;
     white-space: nowrap;
     overflow: hidden;
@@ -832,8 +868,12 @@
 <script>
   // DATA WIRES
   // batchSize=2, batchPauseMs=500, arrowFadeMs=3000
-  const ROW_HEIGHT  = 46;   // matches CSS --row-h
-  const ROW_GAP     = 3;    // visual gap between rows
+  // 2026-04-26 list-style update: row geometry now matches CSS vars
+  // --row-h (56px) + --row-gap (4px). Y position is written to a CSS
+  // variable `--row-y` (not inline transform) so the slide-in keyframe
+  // can compose translate(X, Y) without clobbering vertical position.
+  const ROW_HEIGHT  = 56;   // matches CSS --row-h
+  const ROW_GAP     = 4;    // matches CSS --row-gap
   const STEP        = ROW_HEIGHT + ROW_GAP;
   const BATCH_SIZE      = 2;
   const BATCH_PAUSE_MS  = 500;
@@ -926,7 +966,12 @@
     const row = document.createElement('div');
     row.className = klass.join(' ');
     row.id = 'pid-' + pid;
-    row.style.transform = 'translateY(' + (posIdx * STEP) + 'px)';
+    // Use CSS variable instead of inline `transform` so the slide-in
+    // keyframe (translate -80→0, var(--row-y)) doesn't clobber vertical
+    // position. Setting `transform` directly would lose the Y when the
+    // animation runs — that's the "all on one line" bug.
+    row.style.setProperty('--row-y', (posIdx * STEP) + 'px');
+    row.setAttribute('data-pos', String(pos));
     row.innerHTML =
       goldMark +
       '<div class="pos-num">' + pos + '</div>' +
@@ -1002,9 +1047,13 @@
         currentVisualOrder[p] = targetPid;
         currentVisualOrder[currentPos] = displacedPid;
 
-        // animate transforms
-        rowEls[targetPid].style.transform    = 'translateY(' + (p * STEP) + 'px)';
-        rowEls[displacedPid].style.transform = 'translateY(' + (currentPos * STEP) + 'px)';
+        // animate via the same `--row-y` channel as the initial render
+        // so the row stays put on X (slide-in already complete) and
+        // moves on Y. The .row CSS rule's `transform: translate(0, var(--row-y))`
+        // composes the new Y, and CSS transition on transform animates
+        // the swap.
+        rowEls[targetPid].style.setProperty('--row-y', (p * STEP) + 'px');
+        rowEls[displacedPid].style.setProperty('--row-y', (currentPos * STEP) + 'px');
       });
     }
 
@@ -1051,8 +1100,9 @@
   (function () {
     var stage = document.querySelector('.stage') || document.body;
     var rowsContainer = document.getElementById('rows');
-    var ROW_HEIGHT_LOCAL = 70;
-    var ROW_GAP_LOCAL    = 8;
+    // 2026-04-26 — sync with CSS --row-h (56) + --row-gap (4).
+    var ROW_HEIGHT_LOCAL = 56;
+    var ROW_GAP_LOCAL    = 4;
     var STEP_LOCAL       = ROW_HEIGHT_LOCAL + ROW_GAP_LOCAL;
 
     function fmtSigned(n) {
@@ -1085,7 +1135,10 @@
       var delta = Number(s.delta) || 0;
       var chipText = delta === 0 ? '' : (delta > 0 ? ('↑' + delta) : ('↓' + Math.abs(delta)));
       var chipKlass = delta === 0 ? '' : (delta > 0 ? 'up show' : 'down show');
-      return '<div class="' + klass.join(' ') + '" id="pid-' + (s.playerId || s.slug || ('row' + i)) + '" style="transform: translateY(' + (i * STEP_LOCAL) + 'px);">' +
+      // Use `--row-y` CSS variable instead of inline transform so the
+      // slide-in keyframe can compose translate(X, Y). Setting transform
+      // directly would clobber Y when the animation runs.
+      return '<div class="' + klass.join(' ') + '" id="pid-' + (s.playerId || s.slug || ('row' + i)) + '" data-pos="' + pos + '" style="--row-y: ' + (i * STEP_LOCAL) + 'px;">' +
         goldMark +
         '<div class="pos-num">' + pos + '</div>' +
         '<div class="photo-wrap">' + photo + '</div>' +
@@ -1167,9 +1220,11 @@
       document.body.classList.remove('cade-exiting');
       document.body.classList.add('cade-visible');
       // restart entry animations on every show by reflowing animated nodes
+      // 2026-04-26 — added `.row` so the staggered slide-in re-fires on
+      // every cade-visible (e.g. demo loop, or live re-show after hide).
       if (stage) {
         var animated = stage.querySelectorAll(
-          '.top-band, .header-row, .lb-row, .partners, .table-headers'
+          '.top-band, .header-row, .lb-row, .partners, .table-headers, .row'
         );
         animated.forEach(function (el) {
           var orig = el.style.animation;
