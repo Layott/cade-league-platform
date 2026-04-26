@@ -111,7 +111,6 @@ export const standingsWidgetSchema = z.object({
         gd: z.coerce.number().int().min(-999).max(999),
       }),
     )
-    .min(1)
     .max(20),
   soundSlot: soundSlotSchema,
 });

@@ -6,11 +6,11 @@ import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import type { SimpleControlProps } from "./BrbControl";
 
 const LEADERBOARD_PAYLOAD = {
-  // Stub satisfies legacy `leaderboard_animated` schema's `rows.min(1)`
-  // requirement. The overlay route fetches the real 13-row standings via
-  // Realtime once mounted.
+  // Schema accepts empty rows — overlay route fetches the real 13-row
+  // standings via Realtime + initial fetch once mounted. Posting an
+  // empty rows array means "trigger visibility, don't override data".
   topN: 13,
-  rows: [{ rank: 1, displayName: "TBD", pts: 0, gd: 0 }],
+  rows: [],
 };
 
 /**
@@ -33,10 +33,8 @@ export function LeaderboardControl({
 
   const optimisticToggle = useCallback((nextActive: boolean) => {
     if (nextActive) {
-      postToFrame(iframeRef.current, {
-        type: "show",
-        data: LEADERBOARD_PAYLOAD,
-      });
+      // No data — preserves whatever the iframe already fetched/rendered.
+      postToFrame(iframeRef.current, { type: "show" });
     } else {
       postToFrame(iframeRef.current, { type: "hide" });
     }
