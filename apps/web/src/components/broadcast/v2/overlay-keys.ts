@@ -63,16 +63,29 @@ export const V2_OVERLAY_LABELS: Record<V2OverlayKey, string> = {
 /**
  * Build the relative URL for the v2 overlay route. Caller is responsible
  * for prefixing with the deployment origin when copying-to-clipboard.
+ *
+ * `active` is honoured ONLY on preview iframes (admin control room) so
+ * the mini-preview can decide whether to seed the iframe with live data
+ * or render in default-OFF idle state. Live (OBS) URLs never include it
+ * — copy-to-clipboard / open-in-new-tab paths render the public overlay
+ * which always seeds, since OBS browser sources have no notion of an
+ * "off" state. Without this flag the mini-preview would always look
+ * "live" regardless of the server's `overlay_active_instances` row.
  */
 export function v2OverlayUrl(
   key: V2OverlayKey,
   sessionId: string,
   viewToken: string | null,
   preview = false,
+  active = false,
 ): string {
   const params = new URLSearchParams();
   params.set("session", sessionId);
   if (viewToken) params.set("token", viewToken);
-  if (preview) params.set("preview", "1");
+  if (preview) {
+    params.set("preview", "1");
+    // Only mini-previews carry the active flag — see jsdoc above.
+    params.set("active", active ? "1" : "0");
+  }
   return `/overlay/v2/${key}?${params.toString()}`;
 }

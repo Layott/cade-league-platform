@@ -69,6 +69,8 @@ type SearchParams = {
   session?: string;
   token?: string;
   season?: string;
+  preview?: string;
+  active?: string;
 };
 
 export default async function OverlayV2Page({
@@ -79,7 +81,7 @@ export default async function OverlayV2Page({
   searchParams: Promise<SearchParams>;
 }): Promise<ReactElement> {
   const { key } = await params;
-  const { session, token, season } = await searchParams;
+  const { session, token, season, preview, active } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) redirect("/overlay/v2/01-brb");
 
   // Derive season server-side when only session is supplied (OBS URLs
@@ -87,12 +89,26 @@ export default async function OverlayV2Page({
   // in the URL still wins.
   const resolvedSeason = season ?? (session ? await resolveSeasonId(session) : null);
 
+  // S2 smoke fix (2026-04-26) — Bug CC#2.
+  //
+  // The mini-preview iframes inside the broadcast control room append
+  // `?preview=1&active=0|1` so the injector can decide whether to seed
+  // the iframe with current server data (active=1, mirrors stream) or
+  // leave it idle (active=0, overlay HTML stays in default-OFF state).
+  //
+  // Live (OBS) URLs DO NOT carry `preview=1` — they always render in
+  // "isLive" mode so OBS browser sources see the current data on refresh.
+  // Realtime updates flow through regardless.
+  const isPreview = preview === "1";
+  const isActive = !isPreview ? true : active === "1";
+
   return (
     <OverlayDataInjector
       overlayKey={key}
       sessionId={session}
       token={token}
       seasonId={resolvedSeason ?? undefined}
+      active={isActive}
     />
   );
 }

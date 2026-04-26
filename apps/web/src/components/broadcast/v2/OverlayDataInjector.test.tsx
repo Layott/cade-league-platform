@@ -320,4 +320,67 @@ describe("OverlayDataInjector", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
+
+  // S2 smoke fix (2026-04-26) — Bug CC#2.
+  it("does NOT call initial-fetch when active=false (mini-preview gate)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const { container } = render(
+      <OverlayDataInjector
+        overlayKey="15-orgs"
+        sessionId="sess-x"
+        active={false}
+      />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    // Initial-fetch must be suppressed so the mini-preview iframe stays
+    // in default-OFF state. Realtime events still flow on demand.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("DOES call initial-fetch when active=true (mirrors stream)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const { container } = render(
+      <OverlayDataInjector
+        overlayKey="15-orgs"
+        sessionId="sess-x"
+        active={true}
+      />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    const url = fetchSpy.mock.calls[0]?.[0] as string | undefined;
+    expect(url).toContain("/api/broadcast/v2/sessions/sess-x/orgs");
+    fetchSpy.mockRestore();
+  });
+
+  it("default active=true preserves legacy fetch-on-mount behavior", async () => {
+    // Smoke test: callers that don't pass `active` (e.g. OBS browser
+    // sources, standalone /overlay/v2/<key> URLs) keep the original
+    // behavior of fetching on mount.
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+    const { container } = render(
+      <OverlayDataInjector overlayKey="07-leaderboard" sessionId="sess-y" />,
+    );
+    const iframe = getIframe(container);
+    await act(async () => {
+      iframe.dispatchEvent(new Event("load"));
+      await flush();
+    });
+    expect(fetchSpy).toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
 });

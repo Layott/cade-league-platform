@@ -48,6 +48,7 @@ export function LeaderboardControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      active={active}
       editPanel={
         <p className="text-[10px] leading-relaxed text-[var(--chalk-3)]">
           Pulls live standings + match-day delta arrows from the active

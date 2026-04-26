@@ -84,6 +84,23 @@ export type ControlCardProps = {
    * test ids match the legacy single-card layout (one per overlayKey).
    */
   instanceSuffix?: string;
+  /**
+   * S2 smoke fix (2026-04-26) — Bug CC#2.
+   *
+   * Whether this overlay is currently triggered on stream (server has
+   * a row in `overlay_events` / `overlay_active_instances`). Forwarded
+   * to the preview URL so `OverlayDataInjector` can gate its initial
+   * data-fetch + auto-show on actual server state. Without this flag
+   * data-driven mini-previews (orgs / coaches / penalties) always look
+   * "live" regardless of what's actually on stream — operator
+   * confusion risk.
+   *
+   * Live (OBS) URLs DO NOT receive this flag — `v2OverlayUrl` only
+   * appends `active` when `preview=true`. Realtime updates still flow
+   * through the channel subscription, so server state changes during
+   * a session repaint the preview correctly.
+   */
+  active?: boolean;
 };
 
 export function ControlCard({
@@ -96,8 +113,15 @@ export function ControlCard({
   liveBadge = false,
   labelOverride,
   instanceSuffix,
+  active = false,
 }: ControlCardProps) {
-  const previewUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, true);
+  const previewUrl = v2OverlayUrl(
+    overlayKey,
+    sessionId,
+    viewToken,
+    true,
+    active,
+  );
   const liveUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, false);
   const idSuffix = instanceSuffix ? `${overlayKey}-${instanceSuffix}` : overlayKey;
 

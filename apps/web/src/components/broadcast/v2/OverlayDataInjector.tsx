@@ -98,6 +98,21 @@ export type OverlayDataInjectorProps = {
    * legacy `/overlay/v2/<key>` smoke tests without a live session.
    */
   seasonId?: string;
+  /**
+   * Whether the overlay is currently triggered on stream (server has a
+   * row in `overlay_events` / `overlay_active_instances`). Defaults to
+   * `true` so legacy / OBS / smoke callers preserve the existing
+   * fetch-on-mount behaviour. The broadcast control room mini-preview
+   * passes `false` when no row exists so the iframe stays idle (overlay
+   * HTML's default-OFF) — without this gate, the always-fired initial
+   * fetch + update postMessage caused data-driven overlays
+   * (orgs / coaches / penalties) to look "live" in the preview even
+   * when they were OFF on stream.
+   *
+   * Realtime channel subscriptions remain on regardless so any server
+   * state change mid-session repaints the iframe.
+   */
+  active?: boolean;
 };
 
 export default function OverlayDataInjector({
@@ -105,6 +120,7 @@ export default function OverlayDataInjector({
   sessionId,
   token,
   seasonId,
+  active = true,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -112,14 +128,23 @@ export default function OverlayDataInjector({
   /* --------------------------------------------------------------- *
    * 0. Initial-state fetch — seed iframe with current data on mount  *
    *                                                                 *
-   * Only fires when both `sessionId` is supplied AND the overlay     *
-   * key is in `INITIAL_FETCH_PATH`. Standalone OBS smoke previews    *
-   * (no session) render empty until a control-panel postMessage      *
-   * arrives. The payload is forwarded as a `{type:'update'}`         *
-   * postMessage matching the Realtime event shape.                   *
+   * Only fires when ALL of:                                          *
+   *   - `sessionId` is supplied                                      *
+   *   - the overlay key is in `INITIAL_FETCH_PATH`                   *
+   *   - `active` is true (server has the row in overlay_events /     *
+   *     overlay_active_instances)                                    *
+   *                                                                 *
+   * Standalone OBS smoke previews (no session) render empty until a  *
+   * control-panel postMessage arrives. When `active=false` the       *
+   * iframe still mounts but the initial fetch is skipped so the      *
+   * overlay HTML stays in default-OFF (no `cade-visible` class) —    *
+   * Realtime events will fire `show` if the server flips it on later.*
+   * The payload is forwarded as a `{type:'update'}` postMessage      *
+   * matching the Realtime event shape.                               *
    * --------------------------------------------------------------- */
   useEffect(() => {
     if (!sessionId) return;
+    if (!active) return;
     const builder = INITIAL_FETCH_PATH[overlayKey];
     if (!builder) return;
     if (!iframeLoaded) return;
@@ -150,7 +175,7 @@ export default function OverlayDataInjector({
     return () => {
       cancelled = true;
     };
-  }, [overlayKey, sessionId, token, iframeLoaded]);
+  }, [overlayKey, sessionId, token, iframeLoaded, active]);
 
   /* --------------------------------------------------------------- *
    * 1a. Trigger channel — overlay:<sessionId>                        *

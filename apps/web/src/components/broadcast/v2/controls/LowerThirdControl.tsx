@@ -91,6 +91,9 @@ export function LowerThirdControl({
 }: LowerThirdControlProps) {
   const [state, setState] = useState<SlotState>(DEFAULT_SLOTS[slot]);
   const [presets, setPresets] = useState<LtPreset[]>([]);
+  // S2 smoke fix (2026-04-26): replace `window.prompt` with inline input.
+  // null = not editing; string = current draft text in the inline field.
+  const [presetNameDraft, setPresetNameDraft] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -126,12 +129,24 @@ export function LowerThirdControl({
     });
   };
 
-  const saveAsPreset = () => {
-    const proposed = window.prompt(
-      `Preset name for slot ${slot}?`,
-      state.name || `Preset ${Date.now()}`,
-    );
-    if (!proposed) return;
+  // S2 smoke fix (2026-04-26): inline preset-name editor instead of
+  // `window.prompt`. Native dialogs freeze browser automation AND look
+  // unstyled. Click "Save preset" → opens a small inline input; Enter
+  // commits, Escape cancels. The button itself toggles label to "Cancel"
+  // while editing so the operator can bail without keyboard.
+  const beginPresetSave = () => {
+    setPresetNameDraft(state.name || `Preset ${Date.now()}`);
+  };
+  const cancelPresetSave = () => {
+    setPresetNameDraft(null);
+  };
+  const commitPresetSave = () => {
+    const proposed = (presetNameDraft ?? "").trim();
+    if (!proposed) {
+      // Treat empty/whitespace as cancel — same as old prompt behavior.
+      setPresetNameDraft(null);
+      return;
+    }
     const next = [...presets];
     const idx = next.findIndex((p) => p.name === proposed);
     const entry: LtPreset = {
@@ -142,6 +157,7 @@ export function LowerThirdControl({
     else next.push(entry);
     writePresets(next);
     setPresets(next);
+    setPresetNameDraft(null);
   };
 
   const loadPreset = (presetName: string) => {
@@ -252,15 +268,60 @@ export function LowerThirdControl({
               </select>
             </label>
             <div className="flex items-end">
-              <SecondaryButton
-                type="button"
-                size="sm"
-                onClick={saveAsPreset}
-                data-testid={`v2-lt-preset-save-${slot}`}
-                className="w-full"
-              >
-                Save preset
-              </SecondaryButton>
+              {presetNameDraft === null ? (
+                <SecondaryButton
+                  type="button"
+                  size="sm"
+                  onClick={beginPresetSave}
+                  data-testid={`v2-lt-preset-save-${slot}`}
+                  className="w-full"
+                >
+                  Save preset
+                </SecondaryButton>
+              ) : (
+                <div
+                  className="flex w-full items-stretch gap-1"
+                  data-testid={`v2-lt-preset-name-row-${slot}`}
+                >
+                  <input
+                    type="text"
+                    autoFocus
+                    value={presetNameDraft}
+                    onChange={(e) => setPresetNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitPresetSave();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelPresetSave();
+                      }
+                    }}
+                    placeholder="Preset name"
+                    aria-label={`Preset name for slot ${slot}`}
+                    data-testid={`v2-lt-preset-name-${slot}`}
+                    className="flex-1 rounded-sm border border-[var(--signal)]/60 bg-[var(--ink-1)] px-2 py-1.5 font-mono text-[11px] text-[var(--chalk-1)] focus:border-[var(--signal)] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={commitPresetSave}
+                    data-testid={`v2-lt-preset-confirm-${slot}`}
+                    aria-label="Save preset"
+                    className="rounded-sm border border-[var(--signal)]/60 bg-[var(--signal)]/15 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--signal)] hover:bg-[var(--signal)]/25"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelPresetSave}
+                    data-testid={`v2-lt-preset-cancel-${slot}`}
+                    aria-label="Cancel preset save"
+                    className="rounded-sm border border-[var(--ink-4)] bg-transparent px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:border-[var(--flare)]/40 hover:text-[var(--flare)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

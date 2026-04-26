@@ -37,6 +37,7 @@ export function OrgsControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      active={active}
       triggerSlot={
         <ToggleTriggerButton
           overlayKey="15-orgs"

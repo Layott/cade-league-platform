@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { setSessionMatchDayAction } from "./actions";
 
 /**
@@ -16,6 +16,13 @@ import { setSessionMatchDayAction } from "./actions";
  * the producer's flow is single-click. While the action is in flight
  * the dropdown disables to avoid double-submits, and the live region
  * announces success/failure for screen readers.
+ *
+ * S2 smoke fix (2026-04-26): the server action throws when the target
+ * day already has another active session (DB partial unique index 23505
+ * surfaced as a friendlier "Another session is already active…" error).
+ * `useTransition` swallows the rejection so we wrap the action in
+ * try/catch and surface the message in the existing live region. Errors
+ * clear on the next attempt.
  */
 export type MatchDayOption = {
   id: string;
@@ -34,15 +41,26 @@ export function MatchDaySelector({
   disabled?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const next = e.target.value;
     if (!next || next === currentMatchDayId) return;
+    // Clear any prior error before retrying.
+    setError(null);
     const fd = new FormData();
     fd.set("sessionId", sessionId);
     fd.set("matchDayId", next);
     startTransition(async () => {
-      await setSessionMatchDayAction(fd);
+      try {
+        await setSessionMatchDayAction(fd);
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Could not change match day. Try again.";
+        setError(message);
+      }
     });
   }
 
@@ -65,6 +83,7 @@ export function MatchDaySelector({
         disabled={disabled || pending}
         data-testid="v2-match-day-select"
         aria-busy={pending}
+        aria-invalid={error ? true : undefined}
         className="min-w-[260px] rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-2 text-sm text-[var(--chalk-1)] focus:border-[var(--signal)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         {options.length === 0 ? (
@@ -79,9 +98,12 @@ export function MatchDaySelector({
       <span
         role="status"
         aria-live="polite"
-        className="text-[10px] tracking-wide text-[var(--chalk-3)]"
+        data-testid="v2-match-day-status"
+        className={`text-[10px] tracking-wide ${
+          error ? "text-[var(--flare)] font-semibold" : "text-[var(--chalk-3)]"
+        }`}
       >
-        {pending ? "Saving…" : ""}
+        {pending ? "Saving…" : error ? error : ""}
       </span>
     </div>
   );

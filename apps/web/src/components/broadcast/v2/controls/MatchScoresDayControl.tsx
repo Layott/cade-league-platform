@@ -80,6 +80,7 @@ export function MatchScoresDayControl({
       viewToken={viewToken}
       onIframeReady={onIframeReady}
       liveBadge={active}
+      active={active}
       editPanel={
         <div className="grid grid-cols-2 gap-2">
           {PARTS.map((p) => (

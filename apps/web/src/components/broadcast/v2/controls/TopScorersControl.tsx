@@ -30,6 +30,7 @@ export function TopScorersControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      active={active}
       triggerSlot={
         <ToggleTriggerButton
           overlayKey="14-top-scorers"

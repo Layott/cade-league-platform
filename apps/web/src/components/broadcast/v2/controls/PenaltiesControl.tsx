@@ -30,6 +30,7 @@ export function PenaltiesControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      active={active}
       triggerSlot={
         <ToggleTriggerButton
           overlayKey="17-penalties"

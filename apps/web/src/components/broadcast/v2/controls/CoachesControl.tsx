@@ -37,6 +37,7 @@ export function CoachesControl({
       sessionId={sessionId}
       viewToken={viewToken}
       onIframeReady={onIframeReady}
+      active={active}
       triggerSlot={
         <ToggleTriggerButton
           overlayKey="16-coaches"

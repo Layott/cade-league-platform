@@ -195,10 +195,10 @@ describe("LowerThirdControl (per-slot card)", () => {
     expect(after.jerseyNumber).toBe(1);
   });
 
-  it("preset save persists to localStorage[cade-lt-presets]", () => {
-    const promptSpy = vi
-      .spyOn(window, "prompt")
-      .mockReturnValue("MD3-introductions");
+  it("preset save uses inline input (not window.prompt) and persists on Enter", () => {
+    // Spy on prompt — must NOT be called. S2 smoke fix replaced the
+    // native dialog with an inline input.
+    const promptSpy = vi.spyOn(window, "prompt");
 
     render(
       <LowerThirdControl
@@ -208,8 +208,19 @@ describe("LowerThirdControl (per-slot card)", () => {
       />,
     );
 
+    // Clicking "Save preset" reveals the inline name input — no dialog.
     const saveBtn = screen.getByTestId("v2-lt-preset-save-1");
     fireEvent.click(saveBtn);
+    expect(promptSpy).not.toHaveBeenCalled();
+
+    const nameInput = screen.getByTestId(
+      "v2-lt-preset-name-1",
+    ) as HTMLInputElement;
+    expect(nameInput).toBeTruthy();
+
+    // Type a name + press Enter to commit.
+    fireEvent.change(nameInput, { target: { value: "MD3-introductions" } });
+    fireEvent.keyDown(nameInput, { key: "Enter" });
 
     const raw = window.localStorage.getItem("cade-lt-presets");
     expect(raw).toBeTruthy();
@@ -221,7 +232,48 @@ describe("LowerThirdControl (per-slot card)", () => {
       },
     ]);
 
+    // After commit, the inline input collapses back to the Save button.
+    expect(screen.queryByTestId("v2-lt-preset-name-1")).toBeNull();
+    expect(screen.getByTestId("v2-lt-preset-save-1")).toBeTruthy();
+
     promptSpy.mockRestore();
+  });
+
+  it("preset save inline input — Escape cancels without writing", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={1}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("v2-lt-preset-save-1"));
+    const nameInput = screen.getByTestId(
+      "v2-lt-preset-name-1",
+    ) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "to-discard" } });
+    fireEvent.keyDown(nameInput, { key: "Escape" });
+
+    // No localStorage write, input collapsed back.
+    expect(window.localStorage.getItem("cade-lt-presets")).toBeNull();
+    expect(screen.queryByTestId("v2-lt-preset-name-1")).toBeNull();
+    expect(screen.getByTestId("v2-lt-preset-save-1")).toBeTruthy();
+  });
+
+  it("preset save inline input — Cancel button bails without writing", () => {
+    render(
+      <LowerThirdControl
+        sessionId={SESSION_ID}
+        viewToken={VIEW_TOKEN}
+        slot={2}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("v2-lt-preset-save-2"));
+    fireEvent.click(screen.getByTestId("v2-lt-preset-cancel-2"));
+    expect(window.localStorage.getItem("cade-lt-presets")).toBeNull();
+    expect(screen.queryByTestId("v2-lt-preset-name-2")).toBeNull();
   });
 
   it("preset load populates the slot's inputs from localStorage", () => {
