@@ -337,7 +337,6 @@ export const leaderboardAnimatedSchema = z.object({
         sanctions: z.string().trim().max(40).optional(),
       }),
     )
-    .min(1)
     .max(20),
   soundSlot: soundSlotSchema,
   slot: matchSlotSchema,
