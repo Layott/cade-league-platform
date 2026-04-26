@@ -1,10 +1,14 @@
 # Heavy asset bulk — sync script regenerates only what's needed at build
 KNOWLEDGE/extracted/
 KNOWLEDGE/brand-assets/players/processed/*/card_*.png
-KNOWLEDGE/brand-assets/players/processed/*/headshot_03*.png
+# 2026-04-26 — keep pose-03 *_nobg variants (used by 09-secondary-score-bug,
+# 10-up-next-bug, 11-match-scores-day for the kingnonex face-detected
+# headshot override). Skip the non-_nobg pose 3+ originals + pose 4-5
+# variants (no overlay references them).
+KNOWLEDGE/brand-assets/players/processed/*/headshot_03.png
 KNOWLEDGE/brand-assets/players/processed/*/headshot_04*.png
 KNOWLEDGE/brand-assets/players/processed/*/headshot_05*.png
-KNOWLEDGE/brand-assets/players/processed/*/fullbody_03*.png
+KNOWLEDGE/brand-assets/players/processed/*/fullbody_03.png
 KNOWLEDGE/brand-assets/players/processed/*/fullbody_04*.png
 KNOWLEDGE/brand-assets/players/processed/*/fullbody_05*.png
 KNOWLEDGE/brand-assets/players/_camera_originals/
