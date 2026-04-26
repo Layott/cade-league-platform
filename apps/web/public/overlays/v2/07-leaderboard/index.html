@@ -344,12 +344,15 @@
   /* TABLE BLOCK */
   .table-wrap {
     position: absolute;
-    top: 222px;
+    top: 150px;
     left: 50%;
     transform: translateX(-50%);
     width: 1480px;
     z-index: 14;
   }
+
+  /* Hide partner strip on leaderboard (user request 2026-04-26) */
+  .partners { display: none !important; }
 
   /* column header strip — grid columns must match `.row` exactly. */
   .col-headers {
