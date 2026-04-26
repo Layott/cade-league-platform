@@ -123,15 +123,16 @@ describe("fetchLeaderboardData", () => {
     expect(out.rows[0].player_name).toBe("(unknown)");
   });
 
-  it("clamps topN into [1, 10]", async () => {
+  it("clamps topN into [1, 13]", async () => {
     const sb = mkSb({ standings: chain({ data: [], error: null }) });
-    // topN = 50 should pass through as 10 to .limit()
+    // 2026-04-26 — bumped cap from 10 → 13 (full Elite roster). topN = 50
+    // should pass through as 13 to .limit().
     const q = sb.from("standings");
     await fetchLeaderboardData(sb as never, SEASON, 50);
     const limitMock = (
       q as unknown as { limit: ReturnType<typeof vi.fn> }
     ).limit;
-    expect(limitMock).toHaveBeenCalledWith(10);
+    expect(limitMock).toHaveBeenCalledWith(13);
   });
 
   it("throws a useful error when the query returns an error", async () => {
@@ -162,6 +163,7 @@ describe("toLeaderboardAnimatedPayload", () => {
           rank: 1,
           player_id: "p1",
           player_name: "Faruk",
+          slug: "faruk",
           matches_played: 3,
           wins: 3,
           draws: 0,
@@ -175,6 +177,7 @@ describe("toLeaderboardAnimatedPayload", () => {
           rank: 2,
           player_id: "p2",
           player_name: "Adefola",
+          slug: "adefola",
           matches_played: 3,
           wins: 2,
           draws: 0,
@@ -190,13 +193,26 @@ describe("toLeaderboardAnimatedPayload", () => {
     const payload = toLeaderboardAnimatedPayload(data);
     expect(payload).not.toBeNull();
     expect(payload?.topN).toBe(2);
-    expect(payload?.rows[0]).toEqual({
+    // 2026-04-26 — payload now carries slug, photoUrl, orgLogoUrl, and
+    // p/w/d/l/gf/ga so the v2 07-leaderboard overlay can render the
+    // 13-player table without a second round-trip. Subset assertion so
+    // future field additions don't break the test.
+    expect(payload?.rows[0]).toMatchObject({
       rank: 1,
       displayName: "Faruk",
       pts: 9,
       gd: 7,
+      slug: "faruk",
+      photoUrl: "/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png",
+      p: 3,
+      w: 3,
+      d: 0,
+      l: 0,
+      gf: 9,
+      ga: 2,
     });
     expect(payload?.rows[1].displayName).toBe("Adefola");
+    expect(payload?.rows[1].slug).toBe("adefola");
   });
 });
 

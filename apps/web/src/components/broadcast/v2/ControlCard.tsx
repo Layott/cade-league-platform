@@ -132,10 +132,20 @@ export function ControlCard({
     active,
     previewSlot ?? null,
   );
-  // Live URL for clipboard / open-in-new-tab — never carries `slot`
-  // (OBS browser source needs the multi-slot HTML to render all 3
-  // simultaneous anchors per the legacy contract).
-  const liveUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, false);
+  // Live URL for clipboard / open-in-new-tab.
+  // 2026-04-26: lower-third LIVE URLs MUST carry `?slot=N` so OBS gets
+  // 3 distinct browser-source URLs (one per slot anchor). Without slot
+  // in the live URL all 3 cards' "COPY URL" produced identical strings —
+  // operators can't drop them as 3 separate browser sources. The static
+  // HTML reads `?slot=N` to render only that slot anchor on stream.
+  const liveUrl = v2OverlayUrl(
+    overlayKey,
+    sessionId,
+    viewToken,
+    false,
+    false,
+    previewSlot ?? null,
+  );
   const idSuffix = instanceSuffix ? `${overlayKey}-${instanceSuffix}` : overlayKey;
 
   const [mounted, setMounted] = useState(false);

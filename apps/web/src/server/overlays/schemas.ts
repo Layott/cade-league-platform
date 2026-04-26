@@ -321,6 +321,21 @@ export const leaderboardAnimatedSchema = z.object({
         pts: z.coerce.number().int().min(-99).max(9999),
         gd: z.coerce.number().int().min(-999).max(999),
         delta: z.coerce.number().int().min(-99).max(99).optional(),
+        // 2026-04-26 — full-row payload extension so the v2
+        // 07-leaderboard overlay can render the 13-player table with
+        // photo, org logo + W/D/L/GF/GA breakdown without a second
+        // round-trip. All optional so legacy `{rank, displayName, pts,
+        // gd}` payloads still validate.
+        slug: z.string().trim().min(1).max(80).optional(),
+        photoUrl: photoUrlSchema.optional(),
+        orgLogoUrl: photoUrlSchema.optional(),
+        p: z.coerce.number().int().min(0).max(99).optional(),
+        w: z.coerce.number().int().min(0).max(99).optional(),
+        d: z.coerce.number().int().min(0).max(99).optional(),
+        l: z.coerce.number().int().min(0).max(99).optional(),
+        gf: z.coerce.number().int().min(0).max(999).optional(),
+        ga: z.coerce.number().int().min(0).max(999).optional(),
+        sanctions: z.string().trim().max(40).optional(),
       }),
     )
     .min(1)

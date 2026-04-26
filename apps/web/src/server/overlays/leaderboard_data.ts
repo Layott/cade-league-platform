@@ -35,6 +35,8 @@ export type LeaderboardRowDb = {
   rank: number;
   player_id: string;
   player_name: string;
+  /** gamer_tag from players table — used to resolve photo + org assets. */
+  slug: string | null;
   matches_played: number;
   wins: number;
   draws: number;
@@ -68,9 +70,12 @@ export type LeaderboardData = {
 export async function fetchLeaderboardData(
   sb: SupabaseClient,
   seasonId: string,
-  topN: number = 10,
+  topN: number = 13,
 ): Promise<LeaderboardData> {
-  const n = Math.min(Math.max(topN, 1), 10);
+  // 2026-04-26 — bumped cap from 10 → 13 so the full Elite roster
+  // (13 players) renders. The static overlay HTML is sized for 13
+  // rows; the prior cap meant ranks 11-13 were dropped silently.
+  const n = Math.min(Math.max(topN, 1), 13);
   const { data, error } = await sb
     .from("standings")
     .select(
@@ -117,6 +122,7 @@ export async function fetchLeaderboardData(
     player_id: r.player_id,
     player_name:
       r.player?.users?.display_name ?? r.player?.gamer_tag ?? "(unknown)",
+    slug: r.player?.gamer_tag ?? null,
     matches_played: r.matches_played,
     wins: r.wins,
     draws: r.draws,
@@ -144,18 +150,71 @@ export async function fetchLeaderboardData(
  * page then renders a "NO STANDINGS YET" fallback instead of crashing
  * on a `.parse()` of an empty array.
  */
+/**
+ * Slug → org logo URL map (mirrors the shared maps in the v2 overlay
+ * static HTML: 04-h2h-2 / 05-h2h-3 / 06-h2h-5 / 07-leaderboard).
+ *
+ * Kept in sync intentionally — the overlay HTML carries its own copy so
+ * the static design files render correctly in standalone smoke mode
+ * (`?demo=1`). The server payload is authoritative for live runs.
+ */
+const PLAYER_ORG_LOGO: Record<string, string | null> = {
+  adefola: "/overlays/v2/_assets/Orgs/cade%20esport%20-%20ADEFOLA.png",
+  anife: "/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg",
+  baji_jnr: "/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20BAJI%20JNR.png",
+  dadaboi: "/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png",
+  faruk: "/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png",
+  guru: "/overlays/v2/_assets/Orgs/YAKABU%20GLOBAL%20ENTERPRISE%20LIMITED%20-%20GURU.jpg",
+  kaykay: "/overlays/v2/_assets/Orgs/LUMO%20LABS%20-%20KAYKAY.png",
+  killer_freak: "/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20KILLER%20FREAK.png",
+  kingnonex: "/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png",
+  king_nonex: "/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png",
+  mitch: "/overlays/v2/_assets/Orgs/PHOENIX%20ESPORTS%20-%20MITCH.png",
+  mr_oga: null,
+  tactical: "/overlays/v2/_assets/Orgs/FUNQUEST%20ESPORTS%20-%20TACTICAL.jpeg",
+  wolevation: "/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg",
+};
+
+/** Pose override for canonical headshot — kingnonex pose 01 is back-facing. */
+const POSE_FOR_SLUG: Record<string, string> = { kingnonex: "03" };
+
+function canonSlug(raw: string | null): string {
+  if (!raw) return "";
+  const s = raw.toString().toLowerCase().trim();
+  // Reuse the same alias rules the overlay HTML uses.
+  if (s === "king_nonex") return "kingnonex";
+  return s.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
 export function toLeaderboardAnimatedPayload(
   data: LeaderboardData,
 ): LeaderboardAnimatedPayload | null {
   if (data.rows.length === 0) return null;
-  const rows = data.rows.map((r) => ({
-    rank: r.rank,
-    displayName: r.player_name,
-    pts: r.points,
-    gd: r.goal_difference,
-  }));
+  const rows = data.rows.map((r) => {
+    const slug = canonSlug(r.slug);
+    const pose = POSE_FOR_SLUG[slug] || "01";
+    const photoUrl = slug
+      ? `/overlays/v2/_assets/players/processed/${slug}/headshot_${pose}_nobg.png`
+      : undefined;
+    const orgLogoUrl = slug && PLAYER_ORG_LOGO[slug] ? PLAYER_ORG_LOGO[slug]! : undefined;
+    return {
+      rank: r.rank,
+      displayName: r.player_name,
+      pts: r.points,
+      gd: r.goal_difference,
+      slug: slug || undefined,
+      photoUrl,
+      orgLogoUrl,
+      p: r.matches_played,
+      w: r.wins,
+      d: r.draws,
+      l: r.losses,
+      gf: r.goals_for,
+      ga: r.goals_against,
+    };
+  });
   return leaderboardAnimatedSchema.parse({
-    topN: Math.min(rows.length, 10),
+    topN: Math.min(rows.length, 13),
     rows,
   });
 }

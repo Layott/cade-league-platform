@@ -61,9 +61,10 @@ export async function GET(
   }
   const md = mdRaw as { id: string; season_id: string };
 
-  // Optional `?topN=` override — defaults to 10, capped at 10 by reader.
+  // Optional `?topN=` override — defaults to 13 (full Elite roster),
+  // capped at 13 by reader. Older callers may still pass `topN=10`.
   const topNRaw = req.nextUrl.searchParams.get("topN");
-  const topN = topNRaw ? Number(topNRaw) : 10;
+  const topN = topNRaw ? Number(topNRaw) : 13;
 
   const data = await fetchLeaderboardData(sb, md.season_id, topN);
   const payload = toLeaderboardAnimatedPayload(data);
