@@ -310,9 +310,12 @@ export async function fetchMatchScoresDayData(
   const rawRows = (matchesRaw ?? []) as unknown as MatchRowDb[];
 
   const rows: MatchScoreRow[] = rawRows.map((m) => {
-    const results = (m.match_results ?? []).filter(
-      (r) => r.result_type !== "void",
-    );
+    // Supabase may return one-row relations as object instead of array.
+    // Normalize to array first.
+    const rawResults = Array.isArray(m.match_results)
+      ? m.match_results
+      : (m.match_results ? [m.match_results] : []);
+    const results = rawResults.filter((r) => r.result_type !== "void");
     const r = pickResult(results);
     let status: "scheduled" | "in_progress" | "completed" = "scheduled";
     if (m.status === "completed" || r?.confirmed) {
