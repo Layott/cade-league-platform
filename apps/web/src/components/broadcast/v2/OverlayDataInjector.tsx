@@ -88,6 +88,15 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string) => string>
   "17-penalties": (s) => `/api/broadcast/v2/sessions/${s}/penalties`,
 };
 
+/**
+ * Ambient-session poll interval — see "ambient mode" jsdoc on
+ * OverlayDataInjector. 30s matches the spec; tunable if event ops want
+ * snappier failover, but each poll is a single fetch with no DB read on
+ * a steady-state hit (Supabase covers the index lookup). Exported so
+ * tests can stub a faster cadence without faking timers.
+ */
+export const AMBIENT_POLL_MS = 30_000;
+
 export type OverlayDataInjectorProps = {
   overlayKey: string;
   sessionId?: string;
@@ -124,6 +133,23 @@ export type OverlayDataInjectorProps = {
    * Live (OBS) routes leave this null so all 3 anchors render.
    */
   slot?: 1 | 2 | 3 | null;
+  /**
+   * Ambient-session mode (2026-04-26).
+   *
+   * When true, the injector polls `/api/broadcast/active-session` every
+   * `AMBIENT_POLL_MS` and updates its internal session id when the
+   * active broadcast session flips (one ends + a new one starts mid-
+   * stream). Used by live OBS / vMix browser sources pointed at the
+   * stable `https://cade-league.vercel.app/overlay/v2/<key>` URL with
+   * NO `?session=` param — the page-level resolver picks up the current
+   * session at SSR time + this flag keeps it fresh thereafter.
+   *
+   * Mini-preview iframes inside the broadcast control room MUST leave
+   * this off — they should stay pinned to the session the operator
+   * picked. Default is false to preserve test-suite behaviour for
+   * callers that pass an explicit `sessionId`.
+   */
+  ambient?: boolean;
 };
 
 export default function OverlayDataInjector({
@@ -133,9 +159,111 @@ export default function OverlayDataInjector({
   seasonId,
   active = true,
   slot = null,
+  ambient = false,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+
+  /* --------------------------------------------------------------- *
+   * Ambient-session live state.                                      *
+   *                                                                 *
+   * `sessionId` is captured into state so the 30s poll below can     *
+   * mutate it when the active broadcast session flips (one ends + a *
+   * new one starts mid-stream). All downstream effects key off       *
+   * `currentSessionId` / `currentSeasonId` so they tear down + re-   *
+   * subscribe automatically when these change.                       *
+   *                                                                 *
+   * Live (OBS) routes typically pass `sessionId=undefined` because   *
+   * the page-level resolver couldn't find one at request time. In    *
+   * that case the poll latches the first sessionId it sees and keeps *
+   * the channel open. Preview / explicit-session callers (mini-      *
+   * preview iframes in the broadcast control room) pass an explicit  *
+   * sessionId — we still poll, but only swap when the ambient ID     *
+   * differs (so the operator-pinned mini-preview never accidentally  *
+   * jumps to a different session).                                   *
+   * --------------------------------------------------------------- */
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(
+    sessionId,
+  );
+  const [currentSeasonId, setCurrentSeasonId] = useState<string | undefined>(
+    seasonId,
+  );
+
+  // Sync incoming prop changes (e.g. parent re-renders with a new explicit
+  // session) into local state so user-driven URL changes still take effect.
+  useEffect(() => {
+    setCurrentSessionId(sessionId);
+  }, [sessionId]);
+  useEffect(() => {
+    setCurrentSeasonId(seasonId);
+  }, [seasonId]);
+
+  // Reset iframeLoaded when the session changes — the iframe `src`
+  // recomputes (it includes `?session=`), the iframe reloads, and we
+  // need the initial-fetch effect to wait for the fresh `load` event
+  // before posting `update` / `show`. Otherwise a race posts into a
+  // half-parsed document mid-reload.
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [currentSessionId]);
+
+  /* --------------------------------------------------------------- *
+   * Ambient-session poll — fires every AMBIENT_POLL_MS while         *
+   * `ambient=true`.                                                  *
+   *                                                                 *
+   * Live (OBS) URLs paste once + never change. To survive a session  *
+   * transition without operator action, we poll                      *
+   * `/api/broadcast/active-session` and update local state when the  *
+   * active session id changes. The existing channel-subscribe effect *
+   * sees the new id in its dep array, tears down the old channel,    *
+   * and re-subscribes to the new one.                                *
+   *                                                                  *
+   * Off by default — only the page-level OBS route enables ambient   *
+   * mode. Mini-preview iframes in the broadcast control room stay    *
+   * pinned to the operator-picked session.                           *
+   *                                                                  *
+   * No-ops gracefully when:                                          *
+   *   - server returns null (no live session) — we keep current id   *
+   *     until a new one arrives, so a brief inter-session gap does   *
+   *     not blank the overlay.                                        *
+   *   - response is identical to the latched value.                  *
+   * --------------------------------------------------------------- */
+  useEffect(() => {
+    if (!ambient) return;
+    let cancelled = false;
+    async function pollOnce(): Promise<void> {
+      try {
+        const res = await fetch("/api/broadcast/active-session", {
+          cache: "no-store",
+        });
+        if (cancelled || !res.ok) return;
+        const json = (await res.json()) as {
+          sessionId?: string | null;
+          seasonId?: string | null;
+        };
+        if (cancelled) return;
+        const nextSession = json.sessionId ?? null;
+        const nextSeason = json.seasonId ?? null;
+        // Don't blank a live overlay just because the poll briefly saw
+        // null — keep the latched id. New ids overwrite; explicit session
+        // termination is signalled via the `session.ended` Realtime event.
+        if (nextSession && nextSession !== currentSessionId) {
+          setCurrentSessionId(nextSession);
+        }
+        if (nextSeason && nextSeason !== currentSeasonId) {
+          setCurrentSeasonId(nextSeason);
+        }
+      } catch {
+        /* network blip — try again next tick */
+      }
+    }
+    void pollOnce();
+    const handle = setInterval(pollOnce, AMBIENT_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(handle);
+    };
+  }, [ambient, currentSessionId, currentSeasonId]);
 
   /* --------------------------------------------------------------- *
    * 0. Initial-state fetch — seed iframe with current data on mount  *
@@ -155,14 +283,14 @@ export default function OverlayDataInjector({
    * matching the Realtime event shape.                               *
    * --------------------------------------------------------------- */
   useEffect(() => {
-    if (!sessionId) return;
+    if (!currentSessionId) return;
     if (!active) return;
     const builder = INITIAL_FETCH_PATH[overlayKey];
     if (!builder) return;
     if (!iframeLoaded) return;
 
     let cancelled = false;
-    const url = builder(sessionId);
+    const url = builder(currentSessionId);
     const fetchUrl = token
       ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
       : url;
@@ -202,7 +330,7 @@ export default function OverlayDataInjector({
     return () => {
       cancelled = true;
     };
-  }, [overlayKey, sessionId, token, iframeLoaded, active]);
+  }, [overlayKey, currentSessionId, token, iframeLoaded, active]);
 
   /* --------------------------------------------------------------- *
    * 1a. Trigger channel — overlay:<sessionId>                        *
@@ -220,9 +348,9 @@ export default function OverlayDataInjector({
    * designers can keep editing CSS/HTML without touching .tsx.       *
    * --------------------------------------------------------------- */
   useEffect(() => {
-    if (!sessionId) return;
+    if (!currentSessionId) return;
     const sb = getBrowserSupabase();
-    const channel = sb.channel(REALTIME.channel(sessionId), {
+    const channel = sb.channel(REALTIME.channel(currentSessionId), {
       config: { broadcast: { self: true } },
     });
 
@@ -308,18 +436,18 @@ export default function OverlayDataInjector({
         /* best-effort */
       }
     };
-  }, [overlayKey, sessionId, slot]);
+  }, [overlayKey, currentSessionId, slot]);
 
   /* --------------------------------------------------------------- *
    * 1b. Data feed — public:standings:<seasonId> (existing behaviour) *
    * --------------------------------------------------------------- */
   useEffect(() => {
-    if (!seasonId) return;
+    if (!currentSeasonId) return;
     const events = REALTIME_KEY_EVENTS[overlayKey];
     if (!events || events.length === 0) return;
 
     const sb = getBrowserSupabase();
-    const channel = sb.channel(REALTIME.standingsChannel(seasonId), {
+    const channel = sb.channel(REALTIME.standingsChannel(currentSeasonId), {
       config: { broadcast: { self: false } },
     });
 
@@ -343,7 +471,7 @@ export default function OverlayDataInjector({
         // best-effort cleanup
       }
     };
-  }, [overlayKey, seasonId]);
+  }, [overlayKey, currentSeasonId]);
 
   /* --------------------------------------------------------------- *
    * 2. Parent postMessage relay (control panel → overlay iframe)    *
@@ -370,8 +498,10 @@ export default function OverlayDataInjector({
 
   // Pass session + token in the iframe URL so HTML-side handlers that opt
   // into auth can grab them via `URLSearchParams`. They're optional.
+  // Note: we use `currentSessionId` (state) so that when the ambient poll
+  // swaps the active session the static HTML reloads with the new param.
   const params = new URLSearchParams();
-  if (sessionId) params.set("session", sessionId);
+  if (currentSessionId) params.set("session", currentSessionId);
   if (token) params.set("token", token);
   // 2026-04-26 lower-third slot isolation — when scoped to a single
   // slot, the static HTML reads `?slot=N` to hide the other anchors +

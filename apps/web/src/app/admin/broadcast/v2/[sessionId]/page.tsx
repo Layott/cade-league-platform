@@ -225,9 +225,12 @@ export default async function BroadcastV2SessionPage({
             <span className="block">
               Browser source URL stub:{" "}
               <code className="text-[var(--signal)]">
-                /overlay/v2/&lt;key&gt;?session={session.id}
-                {session.view_token ? `&token=${session.view_token}` : ""}
-              </code>
+                /overlay/v2/&lt;key&gt;
+              </code>{" "}
+              <span className="text-[var(--chalk-2)]">
+                (ambient — no session needed; server resolves the active
+                session at request time + the page polls for hot-swap)
+              </span>
             </span>
           </span>
         }

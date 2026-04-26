@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { redirect } from "next/navigation";
 import OverlayDataInjector from "@/components/broadcast/v2/OverlayDataInjector";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { getActiveSession } from "@/server/broadcast/active_session";
 
 /**
  * Resolve the active season for a given broadcast session via
@@ -85,10 +86,39 @@ export default async function OverlayV2Page({
   const { session, token, season, preview, active, slot } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) redirect("/overlay/v2/01-brb");
 
-  // Derive season server-side when only session is supplied (OBS URLs
-  // typically only carry `?session=...&token=...`). Explicit `?season=`
-  // in the URL still wins.
-  const resolvedSeason = season ?? (session ? await resolveSeasonId(session) : null);
+  // Ambient-session resolve (2026-04-26):
+  //
+  // OBS / vMix browser sources should be able to point at a stable
+  // `https://cade-league.vercel.app/overlay/v2/<key>` URL with NO
+  // `?session=` query param and have the server resolve to whichever
+  // `stream_sessions` row is currently live. Operators paste the URL once
+  // into OBS, then never re-paste across sessions / redeploys.
+  //
+  // Behaviour:
+  //   - explicit `?session=<uuid>` in the URL  → use it (back-compat)
+  //   - `?session=current` (sentinel)          → resolve server-side
+  //   - missing `session`                      → resolve server-side
+  //   - resolve returns null (no live session) → render anyway with
+  //     `sessionId=undefined`. The injector handles the empty case
+  //     gracefully (no fetch, no channel) and the static HTML stays
+  //     in default-OFF state.
+  let resolvedSession = session;
+  let resolvedSeason: string | null | undefined = season;
+  if (!resolvedSession || resolvedSession === "current") {
+    const ambient = await getActiveSession(getServiceRoleSupabase());
+    if (ambient) {
+      resolvedSession = ambient.sessionId;
+      // Prefer ambient season unless caller explicitly passed `?season=`.
+      if (!resolvedSeason) resolvedSeason = ambient.seasonId ?? undefined;
+    } else {
+      resolvedSession = undefined;
+    }
+  }
+  // If we still don't have a season but we DO have a session, fall back
+  // to the legacy per-session resolver (joins via match_day).
+  if (!resolvedSeason && resolvedSession) {
+    resolvedSeason = (await resolveSeasonId(resolvedSession)) ?? undefined;
+  }
 
   // S2 smoke fix (2026-04-26) — Bug CC#2.
   //
@@ -113,14 +143,20 @@ export default async function OverlayV2Page({
     return n === 1 || n === 2 || n === 3 ? (n as 1 | 2 | 3) : null;
   })();
 
+  // Ambient mode — only enabled for non-preview (live OBS / vMix) URLs.
+  // Mini-previews in the broadcast control room embed `?preview=1` so they
+  // stay pinned to the operator-picked session and never auto-swap.
+  const ambient = !isPreview;
+
   return (
     <OverlayDataInjector
       overlayKey={key}
-      sessionId={session}
+      sessionId={resolvedSession}
       token={token}
       seasonId={resolvedSeason ?? undefined}
       active={isActive}
       slot={slotParsed}
+      ambient={ambient}
     />
   );
 }

@@ -383,4 +383,67 @@ describe("OverlayDataInjector", () => {
     expect(fetchSpy).toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
+
+  // Ambient-session mode (2026-04-26).
+  describe("ambient mode", () => {
+    it("polls /api/broadcast/active-session on mount when ambient=true", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            sessionId: "ambient-1",
+            seasonId: "season-1",
+          }),
+          { status: 200 },
+        ),
+      );
+      render(<OverlayDataInjector overlayKey="01-brb" ambient />);
+      await act(async () => {
+        await flush();
+      });
+      const calls = fetchSpy.mock.calls.map((c) => String(c[0] ?? ""));
+      expect(
+        calls.some((u) => u.includes("/api/broadcast/active-session")),
+      ).toBe(true);
+      fetchSpy.mockRestore();
+    });
+
+    it("does NOT poll when ambient=false (default)", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response("{}", { status: 200 }));
+      render(<OverlayDataInjector overlayKey="01-brb" />);
+      await act(async () => {
+        await flush();
+      });
+      const calls = fetchSpy.mock.calls.map((c) => String(c[0] ?? ""));
+      expect(
+        calls.some((u) => u.includes("/api/broadcast/active-session")),
+      ).toBe(false);
+      fetchSpy.mockRestore();
+    });
+
+    it("opens Realtime channel after ambient resolve picks up sessionId", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            sessionId: "ambient-2",
+            seasonId: null,
+          }),
+          { status: 200 },
+        ),
+      );
+      // Render with no explicit sessionId — only ambient resolve provides it.
+      render(<OverlayDataInjector overlayKey="01-brb" ambient />);
+      await act(async () => {
+        await flush();
+      });
+      // Channel for 01-brb (single-instance, so no realtime data feed)
+      // still opens the per-session overlay channel.
+      expect(mockSb.channel).toHaveBeenCalledWith(
+        "overlay:ambient-2",
+        expect.any(Object),
+      );
+      fetchSpy.mockRestore();
+    });
+  });
 });

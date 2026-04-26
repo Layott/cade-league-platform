@@ -67,7 +67,9 @@ describe("ControlCard", () => {
     expect(screen.getByTestId("my-panel")).toBeTruthy();
   });
 
-  it("open ↗ link points at the live overlay URL (no preview=1)", () => {
+  it("open ↗ link points at the AMBIENT live overlay URL (no session/token)", () => {
+    // Ambient (2026-04-26): live URLs strip session + token so OBS
+    // operators paste a stable URL once + never re-paste across sessions.
     render(
       <ControlCard
         overlayKey="14-top-scorers"
@@ -77,8 +79,6 @@ describe("ControlCard", () => {
       />,
     );
     const a = screen.getByTestId("v2-open-14-top-scorers") as HTMLAnchorElement;
-    expect(a.getAttribute("href")).toBe(
-      "/overlay/v2/14-top-scorers?session=S5&token=TT",
-    );
+    expect(a.getAttribute("href")).toBe("/overlay/v2/14-top-scorers");
   });
 });

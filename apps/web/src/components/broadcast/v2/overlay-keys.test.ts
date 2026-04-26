@@ -57,20 +57,31 @@ describe("v2OverlayUrl()", () => {
     );
   });
 
-  it("omits token when null", () => {
-    const url = v2OverlayUrl("02-timer", "S-2", null);
-    expect(url).toBe("/overlay/v2/02-timer?session=S-2");
+  it("omits token when null in preview mode", () => {
+    const url = v2OverlayUrl("02-timer", "S-2", null, true);
+    expect(url).toBe("/overlay/v2/02-timer?session=S-2&preview=1&active=0");
   });
 
-  it("omits preview AND active flags when preview=false (live OBS URL)", () => {
-    // Live URLs never carry `active` — OBS browser sources have no notion
-    // of active, they always render the public overlay.
+  // Ambient (2026-04-26): live URLs are stable + carry no session/token.
+  it("emits stable URL with NO session/token when preview=false (ambient OBS URL)", () => {
     const url = v2OverlayUrl("07-leaderboard", "S-3", "TOK", false);
-    expect(url).toBe("/overlay/v2/07-leaderboard?session=S-3&token=TOK");
+    expect(url).toBe("/overlay/v2/07-leaderboard");
   });
 
   it("active arg is ignored when preview=false (live URLs)", () => {
     const url = v2OverlayUrl("07-leaderboard", "S-3", "TOK", false, true);
-    expect(url).toBe("/overlay/v2/07-leaderboard?session=S-3&token=TOK");
+    expect(url).toBe("/overlay/v2/07-leaderboard");
+  });
+
+  it("preserves slot on live URLs (each lower-third anchor needs its own browser source)", () => {
+    const url = v2OverlayUrl("08-lower-third", "S-4", "TOK", false, false, 2);
+    expect(url).toBe("/overlay/v2/08-lower-third?slot=2");
+  });
+
+  it("preserves slot on preview URLs alongside session/preview/active", () => {
+    const url = v2OverlayUrl("08-lower-third", "S-4", "TOK", true, false, 1);
+    expect(url).toBe(
+      "/overlay/v2/08-lower-third?session=S-4&token=TOK&preview=1&active=0&slot=1",
+    );
   });
 });

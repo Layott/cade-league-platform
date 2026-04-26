@@ -71,6 +71,22 @@ export const V2_OVERLAY_LABELS: Record<V2OverlayKey, string> = {
  * which always seeds, since OBS browser sources have no notion of an
  * "off" state. Without this flag the mini-preview would always look
  * "live" regardless of the server's `overlay_active_instances` row.
+ *
+ * Ambient (2026-04-26):
+ *
+ *   When `preview=false` the URL omits `session` + `token` entirely so
+ *   operators can paste a stable browser-source URL into OBS once and
+ *   never re-paste across broadcast sessions / redeploys. The page-side
+ *   resolver (`/overlay/v2/[key]/page.tsx`) calls
+ *   `getActiveSession(getServiceRoleSupabase())` at request time and
+ *   `OverlayDataInjector` polls `/api/broadcast/active-session` every
+ *   30s so live overlays auto-resubscribe when the active session flips.
+ *
+ *   Slot is the only query param that survives onto a live URL — each
+ *   lower-third slot needs its own browser source.
+ *
+ *   Preview URLs (`preview=true`) still embed the operator-pinned session
+ *   so mini-previews in the control room never accidentally swap.
  */
 export function v2OverlayUrl(
   key: V2OverlayKey,
@@ -81,9 +97,10 @@ export function v2OverlayUrl(
   slot: 1 | 2 | 3 | null = null,
 ): string {
   const params = new URLSearchParams();
-  params.set("session", sessionId);
-  if (viewToken) params.set("token", viewToken);
   if (preview) {
+    // Mini-preview iframes pin to the operator-picked session.
+    params.set("session", sessionId);
+    if (viewToken) params.set("token", viewToken);
     params.set("preview", "1");
     // Only mini-previews carry the active flag — see jsdoc above.
     params.set("active", active ? "1" : "0");
@@ -92,7 +109,9 @@ export function v2OverlayUrl(
   // 3 mini-preview iframes (one per slot 1..3) for `08-lower-third`.
   // Each card passes its slot via this param so the static HTML can
   // hide the other 2 slots + drop incoming postMessages targeting other
-  // slots. Live (OBS) URLs leave slot null so all 3 anchors render.
+  // slots. Live (OBS) URLs preserve slot so each anchor gets a separate
+  // OBS browser-source URL.
   if (slot != null) params.set("slot", String(slot));
-  return `/overlay/v2/${key}?${params.toString()}`;
+  const qs = params.toString();
+  return qs ? `/overlay/v2/${key}?${qs}` : `/overlay/v2/${key}`;
 }
