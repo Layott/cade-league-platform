@@ -762,7 +762,34 @@
         }
         break;
       }
-      case 'show': show(); break;
+      case 'show': {
+        // Process data payload if provided (broadcast control sends both
+        // state + show in a single trigger event).
+        const d = msg.data;
+        if (d && typeof d === 'object') {
+          let pA = d.playerA;
+          let pB = d.playerB;
+          if (!pA && Array.isArray(d.players) && d.players[0]) {
+            pA = { name: d.players[0].displayName || d.players[0].name, slug: d.players[0].slug, score: d.players[0].score };
+          }
+          if (!pB && Array.isArray(d.players) && d.players[1]) {
+            pB = { name: d.players[1].displayName || d.players[1].name, slug: d.players[1].slug, score: d.players[1].score };
+          }
+          if (pA) {
+            if (typeof pA.name  === 'string') state.playerA.name  = pA.name;
+            if (typeof pA.slug  === 'string') state.playerA.slug  = pA.slug;
+            if (typeof pA.score === 'number') state.playerA.score = pA.score;
+          }
+          if (pB) {
+            if (typeof pB.name  === 'string') state.playerB.name  = pB.name;
+            if (typeof pB.slug  === 'string') state.playerB.slug  = pB.slug;
+            if (typeof pB.score === 'number') state.playerB.score = pB.score;
+          }
+          render();
+        }
+        show();
+        break;
+      }
       case 'hide': hide(); break;
       default: break;
     }
