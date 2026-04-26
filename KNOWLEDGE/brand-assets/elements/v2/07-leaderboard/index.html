@@ -1168,6 +1168,15 @@
         return;
       }
       rowsContainer.innerHTML = standings.map(buildRow).join('');
+      // Force-show new rows when body is cade-visible (gate observer
+      // doesn't pick up dynamically inserted rows; Chrome iframe
+      // stuck-transition bug otherwise leaves them at opacity 0).
+      if (document.body.classList.contains('cade-visible')) {
+        rowsContainer.querySelectorAll('.row').forEach(function(el){
+          el.style.setProperty('opacity', '1', 'important');
+          el.style.setProperty('visibility', 'visible', 'important');
+        });
+      }
     }
 
     /**
