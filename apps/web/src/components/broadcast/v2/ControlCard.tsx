@@ -247,9 +247,12 @@ export function ControlCard({
               transform: `scale(${SCALE})`,
               transformOrigin: "top left",
               pointerEvents: "none",
+              background: "transparent",
+              colorScheme: "normal",
             }}
             sandbox="allow-scripts allow-same-origin"
             loading="lazy"
+            allowTransparency
           />
         ) : (
           <div

@@ -21,6 +21,12 @@ export default function OverlayLayout({
 }) {
   return (
     <>
+      <style
+        dangerouslySetInnerHTML={{
+          __html:
+            "html,body{background:transparent!important;background-image:none!important;background-color:rgba(0,0,0,0)!important;color-scheme:normal!important}",
+        }}
+      />
       <OverlayBodyTransparent />
       {children}
     </>
