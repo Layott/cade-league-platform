@@ -117,7 +117,7 @@ export async function fetchLeaderboardData(
   };
 
   const raw = (data ?? []) as unknown as Row[];
-  const rows: LeaderboardRowDb[] = raw.map((r, i) => ({
+  let rows: LeaderboardRowDb[] = raw.map((r, i) => ({
     rank: i + 1,
     player_id: r.player_id,
     player_name:
@@ -132,6 +132,55 @@ export async function fetchLeaderboardData(
     goal_difference: r.goal_difference,
     points: r.points,
   }));
+
+  // Bug 4 fix (2026-04-26) — when `standings` is empty (fresh season,
+  // never recomputed) fall back to `season_participants` so the overlay
+  // still shows all 13 roster players at 0 pts. Without this, the
+  // overlay renders blank until the first match result lands +
+  // recompute_standings() seeds the table. User wants 13 zero-pt rows
+  // visible from session start.
+  if (rows.length === 0) {
+    const { data: participants, error: pErr } = await sb
+      .from("season_participants")
+      .select(
+        `
+        player_id,
+        player:player_id (
+          gamer_tag,
+          users:users!players_user_id_fkey ( display_name )
+        )
+        `,
+      )
+      .eq("season_id", seasonId)
+      .is("deleted_at", null)
+      .limit(n);
+
+    if (!pErr && participants) {
+      type ParticipantRow = {
+        player_id: string;
+        player: {
+          gamer_tag: string | null;
+          users: { display_name: string | null } | null;
+        } | null;
+      };
+      const pRows = participants as unknown as ParticipantRow[];
+      rows = pRows.map((p, i) => ({
+        rank: i + 1,
+        player_id: p.player_id,
+        player_name:
+          p.player?.users?.display_name ?? p.player?.gamer_tag ?? "(unknown)",
+        slug: p.player?.gamer_tag ?? null,
+        matches_played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goals_for: 0,
+        goals_against: 0,
+        goal_difference: 0,
+        points: 0,
+      }));
+    }
+  }
 
   return {
     seasonId,

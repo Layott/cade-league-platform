@@ -48,10 +48,11 @@ describe("getActiveSessionId", () => {
 });
 
 describe("getActiveSession", () => {
-  it("returns sessionId + matchDayId + seasonId when join resolves an object", async () => {
+  it("returns sessionId + matchDayId + seasonId + viewToken when join resolves an object", async () => {
     const sb = mkSb({
       id: "sess-7",
       match_day_id: "md-3",
+      view_token: "tok-abc",
       match_days: { season_id: "season-x" },
     });
     const info = await getActiveSession(sb as never);
@@ -59,6 +60,7 @@ describe("getActiveSession", () => {
       sessionId: "sess-7",
       matchDayId: "md-3",
       seasonId: "season-x",
+      viewToken: "tok-abc",
     });
   });
 
@@ -82,6 +84,7 @@ describe("getActiveSession", () => {
     const sb = mkSb({
       id: "sess-3",
       match_day_id: null,
+      view_token: null,
       match_days: null,
     });
     const info = await getActiveSession(sb as never);
@@ -89,6 +92,7 @@ describe("getActiveSession", () => {
       sessionId: "sess-3",
       matchDayId: null,
       seasonId: null,
+      viewToken: null,
     });
   });
 });

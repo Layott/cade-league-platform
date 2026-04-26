@@ -38,12 +38,39 @@ function mkSb(handlers: Record<string, unknown>) {
 const SEASON = "11111111-1111-4111-8111-111111111111";
 
 describe("fetchLeaderboardData", () => {
-  it("returns empty rows + channel when standings is empty", async () => {
-    const sb = mkSb({ standings: chain({ data: [], error: null }) });
+  it("returns empty rows + channel when standings + season_participants both empty", async () => {
+    const sb = mkSb({
+      standings: chain({ data: [], error: null }),
+      season_participants: chain({ data: [], error: null }),
+    });
     const out = await fetchLeaderboardData(sb as never, SEASON, 10);
     expect(out.rows).toEqual([]);
     expect(out.channel).toBe(`public:standings:${SEASON}`);
     expect(out.seasonId).toBe(SEASON);
+  });
+
+  it("falls back to season_participants when standings is empty (Bug 4 fix 2026-04-26)", async () => {
+    const participants = [
+      {
+        player_id: "p1",
+        player: { gamer_tag: "FARUK", users: { display_name: "Faruk" } },
+      },
+      {
+        player_id: "p2",
+        player: { gamer_tag: "ADEFOLA", users: { display_name: "Adefola" } },
+      },
+    ];
+    const sb = mkSb({
+      standings: chain({ data: [], error: null }),
+      season_participants: chain({ data: participants, error: null }),
+    });
+    const out = await fetchLeaderboardData(sb as never, SEASON, 10);
+    expect(out.rows.length).toBe(2);
+    expect(out.rows[0].rank).toBe(1);
+    expect(out.rows[0].player_name).toBe("Faruk");
+    expect(out.rows[0].points).toBe(0);
+    expect(out.rows[0].matches_played).toBe(0);
+    expect(out.rows[1].player_name).toBe("Adefola");
   });
 
   it("maps rows + assigns ranks 1..N from sorted order", async () => {
@@ -124,7 +151,10 @@ describe("fetchLeaderboardData", () => {
   });
 
   it("clamps topN into [1, 13]", async () => {
-    const sb = mkSb({ standings: chain({ data: [], error: null }) });
+    const sb = mkSb({
+      standings: chain({ data: [], error: null }),
+      season_participants: chain({ data: [], error: null }),
+    });
     // 2026-04-26 — bumped cap from 10 → 13 (full Elite roster). topN = 50
     // should pass through as 13 to .limit().
     const q = sb.from("standings");

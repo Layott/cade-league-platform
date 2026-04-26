@@ -284,7 +284,10 @@ describe("OverlayDataInjector", () => {
     const url = fetchSpy.mock.calls[0]?.[0] as string | undefined;
     expect(url).toBeTruthy();
     expect(url).toContain("/api/broadcast/sessions/sess-2/top-scorers");
-    expect(url).toContain("token=tok-9");
+    // 2026-04-26 — view_token_gate accepts `?t=<token>` only (see
+    // view_token_gate.ts). Previous `?token=` was a no-op the gate
+    // ignored, causing every per-session feed call to 401 in prod.
+    expect(url).toContain("t=tok-9");
     fetchSpy.mockRestore();
   });
 

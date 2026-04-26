@@ -28,6 +28,13 @@ export type ActiveSessionInfo = {
   sessionId: string;
   matchDayId: string | null;
   seasonId: string | null;
+  /**
+   * 2026-04-26 — view_token surfaced so OBS / vMix browser sources hitting
+   * the bare `https://cade-league.vercel.app/overlay/v2/<key>` URL can
+   * authenticate the per-session data-feed endpoints (which require a
+   * matching `?t=<view_token>`). Null for pre-Plan 39 historical rows.
+   */
+  viewToken: string | null;
 };
 
 /**
@@ -66,7 +73,7 @@ export async function getActiveSession(
     const { data } = await sb
       .from("stream_sessions")
       .select(
-        "id, match_day_id, match_days:match_day_id ( season_id )",
+        "id, match_day_id, view_token, match_days:match_day_id ( season_id )",
       )
       .is("ended_at", null)
       .is("deleted_at", null)
@@ -77,6 +84,7 @@ export async function getActiveSession(
     const row = data as {
       id: string;
       match_day_id: string | null;
+      view_token: string | null;
       match_days?:
         | { season_id?: string | null }
         | { season_id?: string | null }[]
@@ -93,6 +101,7 @@ export async function getActiveSession(
       sessionId: row.id,
       matchDayId: row.match_day_id ?? null,
       seasonId,
+      viewToken: row.view_token ?? null,
     };
   } catch {
     return null;

@@ -1274,13 +1274,29 @@
         // if (typeof data.partRange === 'string') applyPartRange(data.partRange);
         // Match-day label can come as `matchDay` (legacy number) OR
         // `matchDayLabel` (server payload shape) OR
-        // `payload.matchDayLabel`.
+        // `payload.matchDayLabel`. Bug 1 fix (2026-04-26) — server now
+        // sets `matchDayLabel = "MATCH DAY N RESULTS"` derived from the
+        // session's match_day_id sequence within the season, so the title
+        // tracks live match-day instead of static "MATCH DAY 5".
         var label = data.matchDayLabel ||
           (data.payload && data.payload.matchDayLabel) ||
           (typeof data.matchDay === 'number' ? 'MATCH DAY ' + data.matchDay + ' RESULTS' : null);
         if (label) {
-          var titleEl = document.querySelector('.title, .matchday-title, h1');
-          if (titleEl) titleEl.textContent = label;
+          var titleEl = document.querySelector('.title-bar__main') ||
+                        document.querySelector('.title, .matchday-title, h1');
+          if (titleEl) {
+            // Preserve the .accent span structure: split "MATCH DAY N"
+            // (everything before the trailing " RESULTS") into the
+            // accent span + a literal " RESULTS" sibling. Plain
+            // textContent assignment would strip the green-glow accent.
+            var match = String(label).match(/^(.*?)(\s+RESULTS)\s*$/i);
+            if (match) {
+              titleEl.innerHTML =
+                '<span class="accent">' + match[1] + '</span>' + match[2];
+            } else {
+              titleEl.textContent = label;
+            }
+          }
         }
       }
 

@@ -63,6 +63,14 @@ export type MatchScoresDayData = {
   venueName: string | null;
   /** Display label like "Match Day 5 — Fri May 2" */
   label: string;
+  /**
+   * Bug 1 fix (2026-04-26) — 1-based position of this match day within its
+   * season, computed from `match_date ASC` order across all sibling
+   * match_days. Used by the v2 11-match-scores-day overlay to render
+   * "MATCH DAY N RESULTS" in the title bar. Null when the season has
+   * zero match_days (defensive).
+   */
+  sequenceNumber: number | null;
   rows: MatchScoreRow[];
   channels: {
     standings: string | null;
@@ -75,6 +83,38 @@ function deriveLabel(matchDate: string | null, venueName: string | null): string
   const formatted = formatWat(`${matchDate}T00:00:00Z`, "EEE MMM d");
   if (venueName) return `${formatted} · ${venueName}`;
   return formatted;
+}
+
+/**
+ * Bug 1 fix (2026-04-26) — match_days has no `sequence_number` column.
+ * Derive the 1-based position of THIS match day within its season by
+ * counting all match_days with the same `season_id` ordered by
+ * `match_date ASC` and finding our row's index. Used to render
+ * "MATCH DAY N RESULTS" in the overlay title bar instead of a hardcoded
+ * "5". Returns null when the season has zero match_days (shouldn't
+ * happen in practice but defensive).
+ */
+async function deriveSequenceNumber(
+  sb: SupabaseClient,
+  matchDayId: string,
+  seasonId: string,
+): Promise<number | null> {
+  try {
+    const { data, error } = await sb
+      .from("match_days")
+      .select("id, match_date")
+      .eq("season_id", seasonId)
+      .is("deleted_at", null)
+      .order("match_date", { ascending: true });
+    if (error || !data || !Array.isArray(data)) return null;
+    const idx = (data as { id: string }[]).findIndex(
+      (r) => r.id === matchDayId,
+    );
+    if (idx < 0) return null;
+    return idx + 1;
+  } catch {
+    return null;
+  }
 }
 
 type SessionRow = {
@@ -218,6 +258,7 @@ export async function fetchMatchScoresDayData(
       matchDate: null,
       venueName: null,
       label: "Match Day",
+      sequenceNumber: null,
       rows: [],
       channels: {
         standings: null,
@@ -227,6 +268,14 @@ export async function fetchMatchScoresDayData(
       },
     };
   }
+
+  // Bug 1 (2026-04-26) — derive 1-based position within season so the
+  // overlay title bar reads the SESSION'S match-day, not a hardcoded "5".
+  const sequenceNumber = await deriveSequenceNumber(
+    sb,
+    matchDayId,
+    matchDay.season_id,
+  );
 
   const { data: matchesRaw, error: matchErr } = await sb
     .from("matches")
@@ -295,6 +344,7 @@ export async function fetchMatchScoresDayData(
     matchDate: matchDay.match_date,
     venueName: matchDay.venue_name,
     label: deriveLabel(matchDay.match_date, matchDay.venue_name),
+    sequenceNumber,
     rows,
     channels: {
       standings: REALTIME.standingsChannel(matchDay.season_id),
@@ -336,12 +386,21 @@ export async function fetchMatchScoresDayDataBySession(
 
 /**
  * Map DB data to a schema-valid `MatchScoresDayPayload`.
+ *
+ * Bug 1 fix (2026-04-26) — `matchDayLabel` is now derived from the
+ * 1-based `sequenceNumber` (e.g. "MATCH DAY 1 RESULTS") so the overlay
+ * title bar reads the session's actual match-day, not a hardcoded "5"
+ * from the static demo HTML. Falls back to the date+venue string when
+ * sequence cannot be derived.
  */
 export function toMatchScoresDayPayload(
   data: MatchScoresDayData,
 ): MatchScoresDayPayload {
+  const titleLabel = data.sequenceNumber
+    ? `MATCH DAY ${data.sequenceNumber} RESULTS`
+    : data.label;
   return matchScoresDaySchema.parse({
-    matchDayLabel: data.label,
+    matchDayLabel: titleLabel,
     rows: data.rows.map((r) => ({
       home: r.home,
       away: r.away,

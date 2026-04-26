@@ -104,12 +104,22 @@ export default async function OverlayV2Page({
   //     in default-OFF state.
   let resolvedSession = session;
   let resolvedSeason: string | null | undefined = season;
+  // 2026-04-26 — when ambient resolution kicks in, also adopt the active
+  // session's `view_token` so the iframe's INITIAL_FETCH_PATH calls pass
+  // the gate. OBS browser sources paste the bare ambient URL with no
+  // `?token=` query param; without this, every `/api/broadcast/sessions/
+  // <id>/<feed>` call returns 401 and the static demo HTML leaks
+  // through. Explicit `?token=<...>` from the caller wins.
+  let resolvedToken: string | undefined = token;
   if (!resolvedSession || resolvedSession === "current") {
     const ambient = await getActiveSession(getServiceRoleSupabase());
     if (ambient) {
       resolvedSession = ambient.sessionId;
       // Prefer ambient season unless caller explicitly passed `?season=`.
       if (!resolvedSeason) resolvedSeason = ambient.seasonId ?? undefined;
+      if (!resolvedToken && ambient.viewToken) {
+        resolvedToken = ambient.viewToken;
+      }
     } else {
       resolvedSession = undefined;
     }
@@ -152,7 +162,7 @@ export default async function OverlayV2Page({
     <OverlayDataInjector
       overlayKey={key}
       sessionId={resolvedSession}
-      token={token}
+      token={resolvedToken}
       seasonId={resolvedSeason ?? undefined}
       active={isActive}
       slot={slotParsed}

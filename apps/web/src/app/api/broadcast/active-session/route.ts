@@ -33,6 +33,13 @@ export async function GET() {
       sessionId: info?.sessionId ?? null,
       matchDayId: info?.matchDayId ?? null,
       seasonId: info?.seasonId ?? null,
+      // 2026-04-26 — surface viewToken so live OBS / vMix browser sources
+      // pointed at the bare ambient URL can sign their per-session
+      // initial-fetch calls (`/api/broadcast/sessions/<id>/<feed>?t=...`).
+      // Without this, the `view_token` gate returns 401 + the iframe
+      // never receives the seed payload, so static demo data leaks
+      // through (wrong match-day label, wrong matches, no live update).
+      viewToken: info?.viewToken ?? null,
     },
     {
       headers: {

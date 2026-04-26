@@ -188,6 +188,11 @@ export default function OverlayDataInjector({
   const [currentSeasonId, setCurrentSeasonId] = useState<string | undefined>(
     seasonId,
   );
+  // 2026-04-26 — view_token tracked alongside session id so an ambient
+  // hot-swap mid-stream picks up the new session's token automatically.
+  // Without this, the initial-fetch effect would keep using the stale
+  // token from the prior session and 401 against the new one.
+  const [currentToken, setCurrentToken] = useState<string | undefined>(token);
 
   // Sync incoming prop changes (e.g. parent re-renders with a new explicit
   // session) into local state so user-driven URL changes still take effect.
@@ -197,6 +202,9 @@ export default function OverlayDataInjector({
   useEffect(() => {
     setCurrentSeasonId(seasonId);
   }, [seasonId]);
+  useEffect(() => {
+    setCurrentToken(token);
+  }, [token]);
 
   // Reset iframeLoaded when the session changes — the iframe `src`
   // recomputes (it includes `?session=`), the iframe reloads, and we
@@ -240,10 +248,12 @@ export default function OverlayDataInjector({
         const json = (await res.json()) as {
           sessionId?: string | null;
           seasonId?: string | null;
+          viewToken?: string | null;
         };
         if (cancelled) return;
         const nextSession = json.sessionId ?? null;
         const nextSeason = json.seasonId ?? null;
+        const nextToken = json.viewToken ?? null;
         // Don't blank a live overlay just because the poll briefly saw
         // null — keep the latched id. New ids overwrite; explicit session
         // termination is signalled via the `session.ended` Realtime event.
@@ -252,6 +262,9 @@ export default function OverlayDataInjector({
         }
         if (nextSeason && nextSeason !== currentSeasonId) {
           setCurrentSeasonId(nextSeason);
+        }
+        if (nextToken && nextToken !== currentToken) {
+          setCurrentToken(nextToken);
         }
       } catch {
         /* network blip — try again next tick */
@@ -263,7 +276,7 @@ export default function OverlayDataInjector({
       cancelled = true;
       clearInterval(handle);
     };
-  }, [ambient, currentSessionId, currentSeasonId]);
+  }, [ambient, currentSessionId, currentSeasonId, currentToken]);
 
   /* --------------------------------------------------------------- *
    * 0. Initial-state fetch — seed iframe with current data on mount  *
@@ -291,8 +304,11 @@ export default function OverlayDataInjector({
 
     let cancelled = false;
     const url = builder(currentSessionId);
-    const fetchUrl = token
-      ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}`
+    // 2026-04-26 — the per-session feed endpoints accept the token via
+    // `?t=<view_token>` (see `view_token_gate.ts`). Pass `currentToken`
+    // (state) so an ambient hot-swap picks up the new session's token.
+    const fetchUrl = currentToken
+      ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
       : url;
 
     fetch(fetchUrl, { cache: "no-store" })
@@ -330,7 +346,7 @@ export default function OverlayDataInjector({
     return () => {
       cancelled = true;
     };
-  }, [overlayKey, currentSessionId, token, iframeLoaded, active]);
+  }, [overlayKey, currentSessionId, currentToken, iframeLoaded, active]);
 
   /* --------------------------------------------------------------- *
    * 1a. Trigger channel — overlay:<sessionId>                        *
@@ -440,6 +456,15 @@ export default function OverlayDataInjector({
 
   /* --------------------------------------------------------------- *
    * 1b. Data feed — public:standings:<seasonId> (existing behaviour) *
+   *                                                                 *
+   * Bug 4 fix (2026-04-26) — the SQL realtime.send payload for       *
+   * `standings.changed` is just `{seasonId, at}` (see migration      *
+   * 20260518000100). Forwarding it as-is would leave the iframe with *
+   * no rows to render. So when we receive an event AND the overlay   *
+   * has an `INITIAL_FETCH_PATH` builder, we re-fetch the fresh       *
+   * payload from `/api/broadcast/sessions/<id>/<feed>` and post it to *
+   * the iframe — same shape as the initial-mount fetch. This is the  *
+   * live-update wire that links result-entry → leaderboard repaint.  *
    * --------------------------------------------------------------- */
   useEffect(() => {
     if (!currentSeasonId) return;
@@ -451,14 +476,47 @@ export default function OverlayDataInjector({
       config: { broadcast: { self: false } },
     });
 
-    for (const event of events) {
-      channel.on("broadcast", { event }, (msg) => {
-        const iframe = iframeRef.current;
-        if (!iframe || !iframe.contentWindow) return;
+    const fetchBuilder = INITIAL_FETCH_PATH[overlayKey];
+
+    async function refetchAndPost(
+      event: KeyEvent,
+      origPayload: unknown,
+    ): Promise<void> {
+      const iframe = iframeRef.current;
+      if (!iframe || !iframe.contentWindow) return;
+      // No initial-fetch path → forward the bare Realtime payload as
+      // before. This preserves prior behaviour for score.changed on
+      // 09-secondary-score-bug (the SQL realtime.send carries the score
+      // delta itself, no API roundtrip needed).
+      if (!fetchBuilder || !currentSessionId) {
         iframe.contentWindow.postMessage(
-          { type: "update", event, payload: msg.payload ?? null },
+          { type: "update", event, payload: origPayload ?? null },
           "*",
         );
+        return;
+      }
+      try {
+        const url = fetchBuilder(currentSessionId);
+        const fetchUrl = currentToken
+          ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
+          : url;
+        const res = await fetch(fetchUrl, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const ifr = iframeRef.current;
+        if (!ifr || !ifr.contentWindow) return;
+        ifr.contentWindow.postMessage(
+          { type: "update", event, payload: data, data: data },
+          "*",
+        );
+      } catch {
+        /* swallow — Realtime will re-fire on next change */
+      }
+    }
+
+    for (const event of events) {
+      channel.on("broadcast", { event }, (msg) => {
+        void refetchAndPost(event, msg.payload);
       });
     }
 
@@ -471,7 +529,7 @@ export default function OverlayDataInjector({
         // best-effort cleanup
       }
     };
-  }, [overlayKey, currentSeasonId]);
+  }, [overlayKey, currentSeasonId, currentSessionId, currentToken]);
 
   /* --------------------------------------------------------------- *
    * 2. Parent postMessage relay (control panel → overlay iframe)    *
@@ -502,7 +560,7 @@ export default function OverlayDataInjector({
   // swaps the active session the static HTML reloads with the new param.
   const params = new URLSearchParams();
   if (currentSessionId) params.set("session", currentSessionId);
-  if (token) params.set("token", token);
+  if (currentToken) params.set("token", currentToken);
   // 2026-04-26 lower-third slot isolation — when scoped to a single
   // slot, the static HTML reads `?slot=N` to hide the other anchors +
   // filter postMessages. Live (OBS) URLs leave it unset.
