@@ -97,8 +97,8 @@
        alternate-row backgrounds reinforce that. The big visual win is
        the per-row slide-in animation (was broken — see comment on
        `.row` keyframe — rows now stagger in from the left @ 80ms). */
-    --row-h:        56px;
-    --row-gap:      4px;
+    --row-h:        44px;
+    --row-gap:      3px;
     /* Tier colors for position numbers — gold #1, silver #2, bronze #3. */
     --silver:       #c9d4dd;
     --silver-glow:  rgba(201, 212, 221, 0.55);
@@ -518,7 +518,7 @@
   .pos-num {
     font-family: var(--display);
     font-weight: 900; font-stretch: 75%;
-    font-size: 42px; line-height: 1;
+    font-size: 32px; line-height: 1;
     color: var(--ink);
     text-align: center;
     letter-spacing: -0.02em;
@@ -533,7 +533,7 @@
   }
 
   .photo-wrap {
-    width: 56px; height: 56px;
+    width: 42px; height: 42px;
     border-radius: 50%;
     overflow: hidden;
     border: 2px solid rgba(107,205,6,0.55);
@@ -556,7 +556,7 @@
   }
 
   .org-wrap {
-    width: 44px; height: 44px;
+    width: 34px; height: 34px;
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto;
   }
@@ -575,7 +575,7 @@
   .player-name {
     font-family: var(--display);
     font-weight: 900; font-stretch: 75%;
-    font-size: 28px; line-height: 1;
+    font-size: 22px; line-height: 1;
     color: var(--ink);
     text-transform: uppercase;
     letter-spacing: 0.005em;
@@ -629,7 +629,7 @@
   .stat {
     font-family: var(--display);
     font-weight: 800; font-stretch: 100%;
-    font-size: 28px;
+    font-size: 22px;
     color: #fff;
     text-align: center;
     letter-spacing: 0.01em;
@@ -638,7 +638,7 @@
   .stat-wdl {
     font-family: var(--display);
     font-weight: 800; font-stretch: 100%;
-    font-size: 26px;
+    font-size: 20px;
     color: #fff;
     text-align: center;
     letter-spacing: 0.04em;
@@ -679,7 +679,7 @@
   .pts {
     font-family: var(--display);
     font-weight: 900; font-stretch: 100%;
-    font-size: 28px; line-height: 1;
+    font-size: 22px; line-height: 1;
     color: var(--green);
     text-align: center;
     text-shadow: 0 0 14px rgba(107,205,6,0.30);
@@ -875,8 +875,8 @@
   // --row-h (56px) + --row-gap (4px). Y position is written to a CSS
   // variable `--row-y` (not inline transform) so the slide-in keyframe
   // can compose translate(X, Y) without clobbering vertical position.
-  const ROW_HEIGHT  = 56;   // matches CSS --row-h
-  const ROW_GAP     = 4;    // matches CSS --row-gap
+  const ROW_HEIGHT  = 44;   // matches CSS --row-h
+  const ROW_GAP     = 3;    // matches CSS --row-gap
   const STEP        = ROW_HEIGHT + ROW_GAP;
   const BATCH_SIZE      = 2;
   const BATCH_PAUSE_MS  = 500;
@@ -1103,9 +1103,9 @@
   (function () {
     var stage = document.querySelector('.stage') || document.body;
     var rowsContainer = document.getElementById('rows');
-    // 2026-04-26 — sync with CSS --row-h (56) + --row-gap (4).
-    var ROW_HEIGHT_LOCAL = 56;
-    var ROW_GAP_LOCAL    = 4;
+    // 2026-04-26 — sync with CSS --row-h (44) + --row-gap (3).
+    var ROW_HEIGHT_LOCAL = 44;
+    var ROW_GAP_LOCAL    = 3;
     var STEP_LOCAL       = ROW_HEIGHT_LOCAL + ROW_GAP_LOCAL;
 
     function fmtSigned(n) {
