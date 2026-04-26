@@ -22,6 +22,14 @@ import type { V2OverlayKey } from "./overlay-keys";
  * card header (rendered by the parent control), not by morphing the
  * Trigger button label or color — that would re-introduce the same
  * confusion the toggle pattern caused.
+ *
+ * Optimistic UX: each button accepts an `onOptimistic*` callback fired
+ * SYNCHRONOUSLY on click (before the server-action form submit). Lets
+ * the parent control postMessage into its sibling preview iframe so the
+ * UI reacts in <50ms instead of waiting 300-800ms for the realtime
+ * round-trip. Server action still runs in parallel for OBS overlays +
+ * persistence + audit. Callbacks are wrapped in try/catch so a
+ * postMessage failure can never block the form submit.
  */
 export type ReTriggerHideButtonsProps = {
   overlayKey: V2OverlayKey;
@@ -48,6 +56,13 @@ export type ReTriggerHideButtonsProps = {
   /** Test ID overrides for buttons. */
   triggerButtonTestId?: string;
   hideButtonTestId?: string;
+  /**
+   * Optimistic callbacks — fired SYNCHRONOUSLY on click BEFORE the
+   * server-action form submit. Must NEVER throw or the form submit
+   * could be blocked.
+   */
+  onOptimisticTrigger?: () => void;
+  onOptimisticHide?: () => void;
 };
 
 export function ReTriggerHideButtons({
@@ -64,6 +79,8 @@ export function ReTriggerHideButtons({
   className = "",
   triggerButtonTestId,
   hideButtonTestId,
+  onOptimisticTrigger,
+  onOptimisticHide,
 }: ReTriggerHideButtonsProps) {
   const id = testIdSuffix ?? overlayKey;
   const slotSuffix = typeof instanceSlot === "number" ? `-${instanceSlot}` : "";
@@ -79,6 +96,26 @@ export function ReTriggerHideButtons({
         value={String(instanceSlot)}
       />
     ) : null;
+
+  // Wrap optimistic callbacks in try/catch so a postMessage failure can
+  // never block the server-action form submit.
+  const handleOptimisticTrigger = () => {
+    if (!onOptimisticTrigger) return;
+    try {
+      onOptimisticTrigger();
+    } catch {
+      /* swallow — never block submit */
+    }
+  };
+
+  const handleOptimisticHide = () => {
+    if (!onOptimisticHide) return;
+    try {
+      onOptimisticHide();
+    } catch {
+      /* swallow — never block submit */
+    }
+  };
 
   return (
     <div
@@ -103,6 +140,7 @@ export function ReTriggerHideButtons({
           disabled={!canTrigger}
           data-testid={triggerBtnId}
           className="w-full"
+          onClick={handleOptimisticTrigger}
         >
           {triggerLabel}
         </PrimaryButton>
@@ -123,6 +161,7 @@ export function ReTriggerHideButtons({
           disabled={!active}
           data-testid={hideBtnId}
           className="w-full"
+          onClick={handleOptimisticHide}
         >
           {hideLabel}
         </DangerButton>

@@ -93,6 +93,9 @@
      Body always opacity 1 — bg-image stays visible.
      Inner content shells hidden until cade-visible. === */
   body { opacity: 1 !important; }
+  body:not(.cade-visible):not(.cade-exiting) .bg-image,
+  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .title-band,
@@ -101,7 +104,27 @@
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
+  }
+  body:not(.cade-visible):not(.cade-exiting) .top-band,
+  body:not(.cade-visible):not(.cade-exiting) .chevrons,
+  body:not(.cade-visible):not(.cade-exiting) .title-band,
+  body:not(.cade-visible):not(.cade-exiting) .grid-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .card,
+  body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
+  }
+  body.cade-visible .bg-image,
+  body.cade-visible .bg-vignette,
+  body.cade-visible .bg-grain {
+    opacity: 1;
+    transition: opacity 0.4s ease-out;
+  }
+  body.cade-exiting .bg-image,
+  body.cade-exiting .bg-vignette,
+  body.cade-exiting .bg-grain {
+    opacity: 0 !important;
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
   body.cade-exiting .top-band,
   body.cade-exiting .chevrons,
@@ -1233,7 +1256,7 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.card,.chevrons,.grid-wrap,.partners,.season-mark,.title-band,.top-band';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card,.chevrons,.grid-wrap,.partners,.season-mark,.title-band,.top-band';
   function apply() {
     var b = document.body;
     if (!b) return;

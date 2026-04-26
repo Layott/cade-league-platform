@@ -122,6 +122,9 @@
      Inner content shells hidden until cade-visible.
      Single-play entry, smooth exit on cade-exiting. === */
   body { opacity: 1 !important; }
+  body:not(.cade-visible):not(.cade-exiting) .bg-image,
+  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .headline,
@@ -130,7 +133,21 @@
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
+  }
+  body:not(.cade-visible):not(.cade-exiting) .top-band,
+  body:not(.cade-visible):not(.cade-exiting) .chevrons,
+  body:not(.cade-visible):not(.cade-exiting) .headline,
+  body:not(.cade-visible):not(.cade-exiting) .card-row,
+  body:not(.cade-visible):not(.cade-exiting) .player-card,
+  body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
+  }
+  body.cade-exiting .bg-image,
+  body.cade-exiting .bg-vignette,
+  body.cade-exiting .bg-grain {
+    opacity: 0 !important;
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
   body.cade-exiting .top-band,
   body.cade-exiting .chevrons,
@@ -1264,7 +1281,13 @@
           if (canon) slug = canon;
         }
         var name = rawName || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
-        return { slug: slug, name: name };
+        // Server payload photoUrl/orgLogoUrl (when present) win over the static slug map.
+        return {
+          slug: slug,
+          name: name,
+          photoUrl: p.photoUrl || null,
+          orgLogoUrl: p.orgLogoUrl || null
+        };
       }
 
       function applyToCard(cardEl, info) {
@@ -1278,7 +1301,7 @@
         if (nameBackdrop) nameBackdrop.textContent = info.name || '';
         if (nameBand)     nameBand.textContent = info.name || '';
         if (photoEl) {
-          var src = PLAYER_HEADSHOT[info.slug];
+          var src = info.photoUrl || PLAYER_HEADSHOT[info.slug];
           if (src) {
             photoEl.style.display = '';
             photoEl.src = src;
@@ -1289,7 +1312,7 @@
           }
         }
         if (orgImg) {
-          var orgSrc = PLAYER_ORG[info.slug];
+          var orgSrc = info.orgLogoUrl || PLAYER_ORG[info.slug];
           if (orgSrc) { orgImg.style.display = ''; orgImg.src = orgSrc; }
           else { orgImg.style.display = 'none'; }
         }
@@ -1345,7 +1368,7 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.card-row,.chevrons,.headline,.partners,.player-card,.season-mark,.top-band';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card-row,.chevrons,.headline,.partners,.player-card,.season-mark,.top-band';
   function apply() {
     var b = document.body;
     if (!b) return;

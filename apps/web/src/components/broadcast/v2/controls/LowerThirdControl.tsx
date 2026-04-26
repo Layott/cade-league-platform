@@ -159,6 +159,23 @@ export function LowerThirdControl({
     jerseyNumber: slot,
   });
 
+  // Optimistic — postMessage the lower-third slot payload synchronously
+  // on Trigger click so the operator sees the entry animation in <50ms
+  // instead of waiting for the realtime round-trip. The v2 overlay HTML
+  // accepts `{name, role}` for slot rendering (matches the inline preview
+  // path used during typing).
+  const optimisticTrigger = useCallback(() => {
+    postToFrame(iframeRef.current, {
+      type: "show",
+      slot,
+      data: { name: state.name, role: state.role },
+    });
+  }, [slot, state.name, state.role]);
+
+  const optimisticHide = useCallback(() => {
+    postToFrame(iframeRef.current, { type: "hide", slot });
+  }, [slot]);
+
   const headerLabel = cardLabel ?? `Lower Third ${slot}`;
 
   return (
@@ -259,6 +276,8 @@ export function LowerThirdControl({
           hideLabel="Hide"
           triggerButtonTestId={`v2-lt-trigger-${slot}`}
           hideButtonTestId={`v2-lt-hide-${slot}`}
+          onOptimisticTrigger={optimisticTrigger}
+          onOptimisticHide={optimisticHide}
           payloadFields={
             <input type="hidden" name="payload" value={payload} />
           }

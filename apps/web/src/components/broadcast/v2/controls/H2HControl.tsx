@@ -63,6 +63,22 @@ export function H2HControl({
     players: slugs.map((s) => ({ displayName: V2_PLAYER_NAMES[s] })),
   });
 
+  // Optimistic — postMessage v2-mockup-shape payload (slug + name) to the
+  // preview iframe instantly on Trigger click so the operator sees the
+  // entry animation before the server round-trip lands.
+  const optimisticTrigger = useCallback(() => {
+    postToFrame(iframeRef.current, {
+      type: "show",
+      data: {
+        players: slugs.map((s) => ({ slug: s, name: V2_PLAYER_NAMES[s] })),
+      },
+    });
+  }, [slugs]);
+
+  const optimisticHide = useCallback(() => {
+    postToFrame(iframeRef.current, { type: "hide" });
+  }, []);
+
   return (
     <ControlCard
       overlayKey={overlayKey}
@@ -89,6 +105,8 @@ export function H2HControl({
           overlayKey={overlayKey}
           sessionId={sessionId}
           active={active}
+          onOptimisticTrigger={optimisticTrigger}
+          onOptimisticHide={optimisticHide}
           payloadFields={
             <input type="hidden" name="payload" value={payloadJson} />
           }

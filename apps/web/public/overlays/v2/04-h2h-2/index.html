@@ -131,9 +131,12 @@
      Atmospheric bg-image / chev-pulse / dot-pulse animations always run. === */
   body { opacity: 1 !important; }
 
-  /* HIDE inner content until trigger ON. animation-name: none cancels the
-     existing entry animations during the dormant state — when cade-visible
-     class is added, the animation re-runs fresh (with help of show() reflow). */
+  /* HIDE bg + inner content until trigger ON. animation-name: none cancels
+     the entry animations during the dormant state — when cade-visible
+     is added, the animation re-runs fresh (with help of show() reflow). */
+  body:not(.cade-visible):not(.cade-exiting) .bg-image,
+  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .h2h-kicker-wrap,
@@ -145,10 +148,27 @@
   body:not(.cade-visible):not(.cade-exiting) .winprob-bar-block,
   body:not(.cade-visible):not(.cade-exiting) .stat-row {
     opacity: 0 !important;
+  }
+  body:not(.cade-visible):not(.cade-exiting) .top-band,
+  body:not(.cade-visible):not(.cade-exiting) .chevrons,
+  body:not(.cade-visible):not(.cade-exiting) .h2h-kicker-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .player-col,
+  body:not(.cade-visible):not(.cade-exiting) .name-backdrop,
+  body:not(.cade-visible):not(.cade-exiting) .stats-card,
+  body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .season-mark,
+  body:not(.cade-visible):not(.cade-exiting) .winprob-bar-block,
+  body:not(.cade-visible):not(.cade-exiting) .stat-row {
     animation-name: none !important;
   }
 
   /* Smooth exit on cade-exiting — applies cade-fade-out to all content shells */
+  body.cade-exiting .bg-image,
+  body.cade-exiting .bg-vignette,
+  body.cade-exiting .bg-grain {
+    opacity: 0 !important;
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
+  }
   body.cade-exiting .top-band,
   body.cade-exiting .chevrons,
   body.cade-exiting .h2h-kicker-wrap,
@@ -172,7 +192,7 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: #0a0e07;     /* mostly opaque since this is a full-screen H2H card */
+    background: transparent !important;
     isolation: isolate;
     --winA-pct: 58%;
     --winB-pct: 42%;
@@ -1207,7 +1227,13 @@
           if (canon) slug = canon;
         }
         var name = rawName || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
-        return { slug: slug, name: name };
+        // Server payload photoUrl/orgLogoUrl (when present) win over the static slug map.
+        return {
+          slug: slug,
+          name: name,
+          photoUrl: p.photoUrl || null,
+          orgLogoUrl: p.orgLogoUrl || null
+        };
       }
 
       function applyToCol(colEl, info) {
@@ -1220,7 +1246,7 @@
         if (nameEl)   nameEl.textContent = info.name || '';
         if (backdrop) backdrop.textContent = info.name || '';
         if (photoEl) {
-          var src = PLAYER_PHOTO[info.slug];
+          var src = info.photoUrl || PLAYER_PHOTO[info.slug];
           if (src) {
             photoEl.classList.remove('broken');
             photoEl.src = src;
@@ -1230,7 +1256,7 @@
           }
         }
         if (orgEl) {
-          var orgSrc = PLAYER_ORG[info.slug];
+          var orgSrc = info.orgLogoUrl || PLAYER_ORG[info.slug];
           if (orgSrc) {
             orgEl.style.display = '';
             orgEl.src = orgSrc;
@@ -1297,7 +1323,7 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.player-col,.season-mark,.stat-row,.stats-card,.top-band,.winprob-bar-block';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.player-col,.season-mark,.stat-row,.stats-card,.top-band,.winprob-bar-block';
   function apply() {
     var b = document.body;
     if (!b) return;

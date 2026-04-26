@@ -13,6 +13,14 @@ import type { V2OverlayKey } from "./overlay-keys";
  * always posts to `toggleOverlayAction`, which probes the current state
  * server-side and routes to triggerOverlay / clearOverlay accordingly —
  * the `active` prop here only drives the UI label, not the server logic.
+ *
+ * Optimistic UX: `onOptimisticToggle` fires SYNCHRONOUSLY on click
+ * BEFORE the server-action submit. Receives `nextActive` so the parent
+ * control can postMessage `show` or `hide` into its sibling preview
+ * iframe for instant UX (<50ms) instead of waiting for the realtime
+ * round-trip (300-800ms). Server action still runs in parallel for OBS
+ * overlays + persistence + audit. The callback is wrapped in try/catch
+ * so a postMessage failure can never block the form submit.
  */
 export type ToggleTriggerButtonProps = {
   overlayKey: V2OverlayKey;
@@ -38,6 +46,12 @@ export type ToggleTriggerButtonProps = {
   className?: string;
   /** Test ID override for the submit button itself. */
   buttonTestId?: string;
+  /**
+   * Optimistic callback fired synchronously on click BEFORE the server-
+   * action submit. Receives the next active state the toggle is about
+   * to flip to. Must NEVER throw.
+   */
+  onOptimisticToggle?: (nextActive: boolean) => void;
 };
 
 export function ToggleTriggerButton({
@@ -53,12 +67,24 @@ export function ToggleTriggerButton({
   onSubmit,
   className = "",
   buttonTestId,
+  onOptimisticToggle,
 }: ToggleTriggerButtonProps) {
   const id = testIdSuffix ?? overlayKey;
   const slotSuffix = typeof instanceSlot === "number" ? `-${instanceSlot}` : "";
   const Btn = active ? DangerButton : PrimaryButton;
   const label = active ? offLabel : onLabel;
   const btnId = buttonTestId ?? `v2-toggle-btn-${id}${slotSuffix}`;
+
+  // Wrap optimistic toggle in try/catch so a postMessage failure can
+  // never block the server-action form submit.
+  const handleOptimistic = () => {
+    if (!onOptimisticToggle) return;
+    try {
+      onOptimisticToggle(!active);
+    } catch {
+      /* swallow — never block submit */
+    }
+  };
 
   return (
     <form
@@ -84,6 +110,7 @@ export function ToggleTriggerButton({
         disabled={!active && !canEnter}
         data-testid={btnId}
         className="w-full"
+        onClick={handleOptimistic}
       >
         {label}
       </Btn>

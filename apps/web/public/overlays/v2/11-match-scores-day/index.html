@@ -103,7 +103,10 @@
      replaced with single-play fade-out. === */
   body { opacity: 1 !important; }
 
-  /* HIDE inner content until trigger ON */
+  /* HIDE bg + inner content until trigger ON */
+  body:not(.cade-visible):not(.cade-exiting) .bg-image,
+  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .matchday-title,
   body:not(.cade-visible):not(.cade-exiting) .match-row,
@@ -113,7 +116,28 @@
   body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
+  }
+  body:not(.cade-visible):not(.cade-exiting) .top-band,
+  body:not(.cade-visible):not(.cade-exiting) .matchday-title,
+  body:not(.cade-visible):not(.cade-exiting) .match-row,
+  body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .row-card,
+  body:not(.cade-visible):not(.cade-exiting) .chevrons,
+  body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
+  body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
+  }
+  body.cade-visible .bg-image,
+  body.cade-visible .bg-vignette,
+  body.cade-visible .bg-grain {
+    opacity: 1;
+    transition: opacity 0.4s ease-out;
+  }
+  body.cade-exiting .bg-image,
+  body.cade-exiting .bg-vignette,
+  body.cade-exiting .bg-grain {
+    opacity: 0 !important;
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
 
   /* On cade-visible: replace infinite loops with single-play fade-in */
@@ -154,7 +178,7 @@
     width: 1920px;
     height: 1080px;
     overflow: hidden;
-    background: transparent;
+    background: transparent !important;
     isolation: isolate;
   }
 
@@ -1179,7 +1203,7 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.chevrons,.match-row,.matchday-mark,.matchday-title,.partners,.row-card,.season-mark,.top-band';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.match-row,.matchday-mark,.matchday-title,.partners,.row-card,.season-mark,.top-band';
   function apply() {
     var b = document.body;
     if (!b) return;

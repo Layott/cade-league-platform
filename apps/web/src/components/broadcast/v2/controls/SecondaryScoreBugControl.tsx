@@ -52,6 +52,23 @@ export function SecondaryScoreBugControl({
     ],
   });
 
+  // Optimistic — postMessage v2-mockup-shape payload (playerA / playerB)
+  // synchronously on Trigger click so the score-bug entry animation runs
+  // before the server round-trip lands.
+  const optimisticTrigger = useCallback(() => {
+    postToFrame(iframeRef.current, {
+      type: "show",
+      data: {
+        playerA: { name: V2_PLAYER_NAMES[aSlug], slug: aSlug, score: aScore },
+        playerB: { name: V2_PLAYER_NAMES[bSlug], slug: bSlug, score: bScore },
+      },
+    });
+  }, [aSlug, bSlug, aScore, bScore]);
+
+  const optimisticHide = useCallback(() => {
+    postToFrame(iframeRef.current, { type: "hide" });
+  }, []);
+
   return (
     <ControlCard
       overlayKey="09-secondary-score-bug"
@@ -118,6 +135,8 @@ export function SecondaryScoreBugControl({
           overlayKey="09-secondary-score-bug"
           sessionId={sessionId}
           active={active}
+          onOptimisticTrigger={optimisticTrigger}
+          onOptimisticHide={optimisticHide}
           payloadFields={
             <input type="hidden" name="payload" value={payloadJson} />
           }

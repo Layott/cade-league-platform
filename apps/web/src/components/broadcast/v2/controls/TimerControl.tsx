@@ -86,6 +86,20 @@ export function TimerControl({
     }
   }, [computeExpiresAt]);
 
+  // Optimistic — push a freshly-computed `expiresAt` into the preview
+  // iframe synchronously on Trigger click, before the server round-trip
+  // lands. Same payload shape the server action will eventually publish.
+  const optimisticTrigger = useCallback(() => {
+    postToFrame(iframeRef.current, {
+      type: "show",
+      data: { expiresAt: computeExpiresAt() },
+    });
+  }, [computeExpiresAt]);
+
+  const optimisticHide = useCallback(() => {
+    postToFrame(iframeRef.current, { type: "hide" });
+  }, []);
+
   return (
     <ControlCard
       overlayKey="02-timer"
@@ -154,6 +168,8 @@ export function TimerControl({
           sessionId={sessionId}
           active={active}
           onTriggerSubmit={refreshPayloadOnSubmit}
+          onOptimisticTrigger={optimisticTrigger}
+          onOptimisticHide={optimisticHide}
           payloadFields={
             <input
               ref={payloadInputRef}

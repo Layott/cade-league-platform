@@ -47,12 +47,31 @@ export function MatchScoresDayControl({
     iframeRef.current = el;
   }, []);
 
+  // Optimistic preview for a part-button click — postMessage `show` (not
+  // `update`) so the overlay's entry animation runs immediately. Wrapped
+  // in try/catch so a postMessage failure can never block the form
+  // submit.
   const previewPart = (id: 1 | 2 | 3 | "all") => {
-    postToFrame(iframeRef.current, {
-      type: "update",
-      data: { partRange: id },
-    });
+    try {
+      postToFrame(iframeRef.current, {
+        type: "show",
+        data: { partRange: id, matchDayLabel: "MATCH DAY", rows: [] },
+      });
+    } catch {
+      /* never block submit */
+    }
   };
+
+  const optimisticTriggerAll = useCallback(() => {
+    postToFrame(iframeRef.current, {
+      type: "show",
+      data: { partRange: "all", matchDayLabel: "MATCH DAY", rows: [] },
+    });
+  }, []);
+
+  const optimisticHide = useCallback(() => {
+    postToFrame(iframeRef.current, { type: "hide" });
+  }, []);
 
   return (
     <ControlCard
@@ -68,7 +87,6 @@ export function MatchScoresDayControl({
               key={String(p.id)}
               action={retriggerOverlayAction}
               data-testid={`v2-msd-part-form-${p.id}`}
-              onSubmit={() => previewPart(p.id)}
             >
               <input type="hidden" name="sessionId" value={sessionId} />
               <input
@@ -91,6 +109,7 @@ export function MatchScoresDayControl({
                   size="sm"
                   className="w-full"
                   data-testid={`v2-msd-part-${p.id}`}
+                  onClick={() => previewPart(p.id)}
                 >
                   {p.label}
                   <span className="ml-1 text-[8px] text-[var(--chalk-3)]">
@@ -103,6 +122,7 @@ export function MatchScoresDayControl({
                   size="sm"
                   className="w-full"
                   data-testid={`v2-msd-part-${p.id}`}
+                  onClick={() => previewPart(p.id)}
                 >
                   {p.label}
                   <span className="ml-1 text-[8px] text-[var(--primary-ink)]/70">
@@ -120,6 +140,8 @@ export function MatchScoresDayControl({
           sessionId={sessionId}
           active={active}
           triggerLabel="Trigger (Show all)"
+          onOptimisticTrigger={optimisticTriggerAll}
+          onOptimisticHide={optimisticHide}
           payloadFields={
             <input
               type="hidden"

@@ -75,6 +75,24 @@ export function UpNextBugControl({
       new Date(Date.now() + 10 * 60_000).toISOString(),
   });
 
+  // Optimistic — postMessage the v2-mockup-shape payload (player1 +
+  // player2) synchronously on Trigger click so the entry animation fires
+  // instantly before the server round-trip lands.
+  const optimisticTrigger = useCallback(() => {
+    if (!selected) return;
+    postToFrame(iframeRef.current, {
+      type: "show",
+      data: {
+        player1: { name: selected.homeName },
+        player2: { name: selected.awayName },
+      },
+    });
+  }, [selected]);
+
+  const optimisticHide = useCallback(() => {
+    postToFrame(iframeRef.current, { type: "hide" });
+  }, []);
+
   return (
     <ControlCard
       overlayKey="10-up-next-bug"
@@ -116,6 +134,8 @@ export function UpNextBugControl({
           sessionId={sessionId}
           active={active}
           canTrigger={upcoming.length > 0}
+          onOptimisticTrigger={optimisticTrigger}
+          onOptimisticHide={optimisticHide}
           payloadFields={
             <input type="hidden" name="payload" value={payloadJson} />
           }
