@@ -1488,28 +1488,60 @@
         tailStrip.innerHTML = html;
       }
 
+      /**
+       * Pull a scorers row list out of the message payload, regardless
+       * of which shape arrived:
+       *   - `{scorers: [...]}` (legacy postMessage relay)
+       *   - `{rows: [...]}` (Realtime direct shape)
+       *   - `{payload: {rows: [...]}}` (initial-fetch from
+       *     /api/broadcast/sessions/<id>/top-scorers — server returns
+       *     `{payload: TopScorersPayload {rows: [{rank, displayName,
+       *     goals, photoUrl?}]}, seasonId, channel}`)
+       */
+      function readScorers(data) {
+        if (!data) return null;
+        if (Array.isArray(data.scorers)) return data.scorers;
+        if (Array.isArray(data.rows)) return data.rows;
+        if (data.payload && typeof data.payload === 'object') {
+          if (Array.isArray(data.payload.scorers)) return data.payload.scorers;
+          if (Array.isArray(data.payload.rows)) return data.payload.rows;
+        }
+        return null;
+      }
+
       function update(data) {
         if (!data) return;
-        if (Array.isArray(data.scorers)) {
-          console.info('[overlay/14-top-scorers] scorers[]', data.scorers.length);
-          var pods = ['p1', 'p2', 'p3'];
-          for (var i = 0; i < Math.min(3, data.scorers.length); i++) {
-            var entry = data.scorers[i];
-            if (!entry) continue;
-            var goalsEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-goals');
-            if (goalsEl && typeof entry.goals === 'number') {
-              goalsEl.dataset.target = String(entry.goals);
-              goalsEl.textContent = String(entry.goals);
-            }
-            var nameEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-name');
-            if (nameEl && entry.name) nameEl.textContent = entry.name;
-            if (entry.photoUrl) {
-              var img = document.querySelector('.pod-card--' + pods[i] + ' .pod-photo img');
-              if (img) img.src = entry.photoUrl;
-            }
+        var scorers = readScorers(data);
+        if (!scorers) return;
+        // Normalize server shape (rank/displayName/goals/photoUrl) into the
+        // overlay's expected shape (rank/name/slug/goals/photoUrl).
+        var normalized = scorers.map(function(r){
+          return {
+            rank: r.rank,
+            name: r.name || r.displayName || r.player_name || '',
+            slug: r.slug,
+            goals: typeof r.goals === 'number' ? r.goals : 0,
+            photoUrl: r.photoUrl
+          };
+        });
+        console.info('[overlay/14-top-scorers] scorers[]', normalized.length);
+        var pods = ['p1', 'p2', 'p3'];
+        for (var i = 0; i < Math.min(3, normalized.length); i++) {
+          var entry = normalized[i];
+          if (!entry) continue;
+          var goalsEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-goals');
+          if (goalsEl && typeof entry.goals === 'number') {
+            goalsEl.dataset.target = String(entry.goals);
+            goalsEl.textContent = String(entry.goals);
           }
-          if (data.scorers.length > 3) rebuildTail(data.scorers);
+          var nameEl = document.querySelector('.pod-card--' + pods[i] + ' .pod-name');
+          if (nameEl && entry.name) nameEl.textContent = entry.name;
+          if (entry.photoUrl) {
+            var img = document.querySelector('.pod-card--' + pods[i] + ' .pod-photo img');
+            if (img) img.src = entry.photoUrl;
+          }
         }
+        if (normalized.length > 3) rebuildTail(normalized);
       }
       function show() {
         document.body.classList.remove('cade-exiting');

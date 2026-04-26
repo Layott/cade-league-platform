@@ -1078,12 +1078,62 @@
 
     function rerender(standings) {
       if (!rowsContainer || !Array.isArray(standings)) return;
+      if (standings.length === 0) {
+        // Empty payload — clear the table rather than leaking the static
+        // sample data the file ships with for designer-preview.
+        rowsContainer.innerHTML = '';
+        return;
+      }
       rowsContainer.innerHTML = standings.map(buildRow).join('');
+    }
+
+    /**
+     * Pull a standings row list out of the message payload, regardless
+     * of which shape arrived:
+     *   - `{standings: [...]}` (legacy postMessage relay)
+     *   - `{rows: [...]}` (Realtime `standings.changed` direct shape)
+     *   - `{payload: {rows: [...], topN}}` (initial-fetch from
+     *     /api/broadcast/sessions/<id>/leaderboard)
+     *   - `{payload: {standings: [...]}}` (defensive)
+     */
+    function readStandings(data) {
+      if (!data) return null;
+      if (Array.isArray(data.standings)) return data.standings;
+      if (Array.isArray(data.rows)) return data.rows;
+      if (data.payload && typeof data.payload === 'object') {
+        if (Array.isArray(data.payload.standings)) return data.payload.standings;
+        if (Array.isArray(data.payload.rows)) return data.payload.rows;
+      }
+      return null;
     }
 
     function update(data) {
       if (!data) return;
-      if (Array.isArray(data.standings)) rerender(data.standings);
+      var rows = readStandings(data);
+      // Map server shapes (rank/displayName/pts/gd) into the buildRow
+      // expected shape (pos/playerId/name/p/w/d/l/gf/ga/gd/pts/sanctions).
+      if (rows) {
+        var normalized = rows.map(function(r){
+          return {
+            playerId: r.playerId || r.player_id || r.slug,
+            slug: r.slug,
+            name: r.name || r.displayName || r.player_name || '',
+            photoUrl: r.photoUrl,
+            orgLogoUrl: r.orgLogoUrl,
+            p: r.p != null ? r.p : (r.matches_played != null ? r.matches_played : 0),
+            w: r.w != null ? r.w : (r.wins || 0),
+            d: r.d != null ? r.d : (r.draws || 0),
+            l: r.l != null ? r.l : (r.losses || 0),
+            gf: r.gf != null ? r.gf : (r.goals_for || 0),
+            ga: r.ga != null ? r.ga : (r.goals_against || 0),
+            gd: r.gd != null ? r.gd : (r.goal_difference || 0),
+            pts: r.pts != null ? r.pts : (r.points || 0),
+            sanctions: r.sanctions || '',
+            delta: r.delta || 0
+          };
+        });
+        rerender(normalized);
+      }
     }
 
     function show() {

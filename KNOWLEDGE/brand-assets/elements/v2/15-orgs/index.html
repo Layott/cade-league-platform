@@ -1038,6 +1038,11 @@
 
       function rerender(orgs) {
         if (!grid || !Array.isArray(orgs)) return;
+        if (orgs.length === 0) {
+          // Empty payload — clear the static sample rather than leaking it.
+          grid.innerHTML = '';
+          return;
+        }
         var html = '';
         for (var i = 0; i < orgs.length; i++) {
           var o = orgs[i] || {};
@@ -1045,7 +1050,16 @@
           var logoHtml = pending
             ? '<div class="card-logo pending"><span class="qmark">?</span><span class="pending-label">Org TBD</span></div>'
             : '<div class="card-logo"><img src="' + o.logoUrl + '" alt="' + (o.name||'') + '" /></div>';
-          var players = Array.isArray(o.players) ? o.players : [];
+          // Server shape: players[] = {playerId, displayName, gamerTag, avatarUrl}
+          // Local chip() expects {name, photoUrl, slug}. Normalize.
+          var rawPlayers = Array.isArray(o.players) ? o.players : [];
+          var players = rawPlayers.map(function(p){
+            return {
+              name: p.name || p.displayName || p.gamerTag || '',
+              photoUrl: p.photoUrl || p.avatarUrl,
+              slug: p.slug
+            };
+          });
           var chipsHtml = '<div class="card-players">' + players.map(chip).join('') + '</div>';
           html += '<article class="card' + (pending ? ' pending' : '') + '">' +
             logoHtml +
@@ -1056,9 +1070,25 @@
         grid.innerHTML = html;
       }
 
+      /**
+       * Pull orgs list out of the message payload, regardless of shape:
+       *   - `{orgs: [...]}` (legacy postMessage relay)
+       *   - `{payload: {orgs: [...]}}` (initial-fetch from
+       *     /api/broadcast/v2/sessions/<id>/orgs).
+       */
+      function readOrgs(data) {
+        if (!data) return null;
+        if (Array.isArray(data.orgs)) return data.orgs;
+        if (data.payload && typeof data.payload === 'object') {
+          if (Array.isArray(data.payload.orgs)) return data.payload.orgs;
+        }
+        return null;
+      }
+
       function update(data) {
         if (!data) return;
-        if (Array.isArray(data.orgs)) rerender(data.orgs);
+        var orgs = readOrgs(data);
+        if (orgs) rerender(orgs);
       }
 
       function show() {

@@ -161,10 +161,25 @@ export default function OverlayDataInjector({
         if (cancelled || !data) return;
         const iframe = iframeRef.current;
         if (!iframe || !iframe.contentWindow) return;
-        // Send the entire response as the initial payload — overlay HTML
-        // can pick `payload`, `rows`, etc. via its own message handler.
+        // 2026-04-26 contract refresh (CLAUDE.md §14):
+        //   - `update` re-renders data WITHOUT changing visibility class.
+        //   - `show` adds cade-visible (the overlay becomes visible on
+        //     stream).
+        //
+        // The initial fetch only fires when `active=true` (server has a
+        // row in overlay_events / overlay_active_instances), which means
+        // the overlay IS currently triggered on stream. We therefore
+        // send BOTH `update` (so the iframe renders the latest data) AND
+        // `show` (so the iframe surfaces the design). Without `show`,
+        // mini-previews after a page refresh would render the iframe
+        // hidden even though the overlay is live on stream — operator
+        // confusion.
         iframe.contentWindow.postMessage(
-          { type: "update", event: "initial.fetch", payload: data },
+          { type: "update", event: "initial.fetch", payload: data, data: data },
+          "*",
+        );
+        iframe.contentWindow.postMessage(
+          { type: "show", event: "initial.fetch", payload: data, data: data },
           "*",
         );
       })

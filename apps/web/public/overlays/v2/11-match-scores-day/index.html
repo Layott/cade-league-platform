@@ -1158,19 +1158,71 @@
       function rebuildRows(matches) {
         var wrap = document.querySelector('.rows-wrap');
         if (!wrap || !Array.isArray(matches)) return;
+        if (matches.length === 0) {
+          // Empty payload — clear the static sample rather than leaking it.
+          wrap.innerHTML = '';
+          return;
+        }
         wrap.innerHTML = matches.map(buildRow).join('');
+      }
+
+      /**
+       * Pull matches list out of the message payload, regardless of which
+       * shape arrived:
+       *   - `{matches: [...]}` (legacy postMessage relay)
+       *   - `{rows: [...]}` (Realtime direct shape)
+       *   - `{payload: {rows: [{home, away, homeScore, awayScore, status}]}}`
+       *     (initial-fetch from /api/broadcast/sessions/<id>/match-scores-day
+       *     — server returns `{payload: MatchScoresDayPayload, seasonId,
+       *     channels}` per route.ts).
+       */
+      function readMatches(data) {
+        if (!data) return null;
+        if (Array.isArray(data.matches)) return data.matches;
+        if (Array.isArray(data.rows)) return data.rows;
+        if (data.payload && typeof data.payload === 'object') {
+          if (Array.isArray(data.payload.matches)) return data.payload.matches;
+          if (Array.isArray(data.payload.rows)) return data.payload.rows;
+        }
+        return null;
       }
 
       function update(data) {
         if (!data) return;
-        if (Array.isArray(data.matches)) {
-          console.info('[overlay/11-match-scores-day] matches[]', data.matches.length);
-          rebuildRows(data.matches);
+        var matches = readMatches(data);
+        if (matches) {
+          console.info('[overlay/11-match-scores-day] matches[]', matches.length);
+          // Normalize server shape (home/away/homeScore/awayScore) into the
+          // overlay's expected shape (p1Name/p2Name/score1/score2).
+          var normalized = matches.map(function(m){
+            // Server shape: {home, away, homeScore, awayScore, status}
+            // where home/away can be a string name OR an object {name, slug, photoUrl}.
+            var homeName = typeof m.home === 'string' ? m.home : (m.home && m.home.name) || m.p1Name || '';
+            var awayName = typeof m.away === 'string' ? m.away : (m.away && m.away.name) || m.p2Name || '';
+            var homePhoto = typeof m.home === 'object' && m.home ? m.home.photoUrl : m.p1PhotoUrl;
+            var awayPhoto = typeof m.away === 'object' && m.away ? m.away.photoUrl : m.p2PhotoUrl;
+            return {
+              p1Name: homeName,
+              p2Name: awayName,
+              p1PhotoUrl: homePhoto,
+              p2PhotoUrl: awayPhoto,
+              score1: m.homeScore != null ? m.homeScore : (m.score1 != null ? m.score1 : 0),
+              score2: m.awayScore != null ? m.awayScore : (m.score2 != null ? m.score2 : 0),
+              status: m.status || 'tbd'
+            };
+          });
+          rebuildRows(normalized);
         }
         if (typeof data.partRange === 'string') applyPartRange(data.partRange);
-        if (typeof data.matchDay === 'number') {
+        // Match-day label can come as `matchDay` (legacy number) OR
+        // `matchDayLabel` (server payload shape) OR
+        // `payload.matchDayLabel`.
+        var label = data.matchDayLabel ||
+          (data.payload && data.payload.matchDayLabel) ||
+          (typeof data.matchDay === 'number' ? 'MATCH DAY ' + data.matchDay + ' RESULTS' : null);
+        if (label) {
           var titleEl = document.querySelector('.title, .matchday-title, h1');
-          if (titleEl) titleEl.textContent = 'MATCH DAY ' + data.matchDay + ' RESULTS';
+          if (titleEl) titleEl.textContent = label;
         }
       }
 
