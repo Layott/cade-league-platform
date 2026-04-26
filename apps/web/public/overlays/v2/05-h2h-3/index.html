@@ -1392,5 +1392,18 @@
   new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
 })();
 </script>
+<script data-tag="cade-demo-mode">
+(function(){
+  if (new URLSearchParams(location.search).get('demo') !== '1') return;
+  function fire(type){ window.dispatchEvent(new MessageEvent('message', { data: { type: type } })); }
+  // Initial show after a tiny tick so the gate observer is wired.
+  setTimeout(function(){ fire('show'); }, 200);
+  // Loop: show 5s, hide 3s, repeat.
+  setInterval(function(){ fire('hide'); }, 8000);
+  setTimeout(function(){
+    setInterval(function(){ fire('show'); }, 8000);
+  }, 8000 - 5000); // offset so show fires 5s after each hide
+})();
+</script>
 </body>
 </html>
