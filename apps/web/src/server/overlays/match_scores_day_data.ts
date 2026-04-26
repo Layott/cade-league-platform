@@ -42,6 +42,14 @@ export type MatchScoreRow = {
   match_id: string;
   home: string;
   away: string;
+  /**
+   * Canonical headshot slug for the home / away player, derived from
+   * `players.gamer_tag` (or display-name fallback). Used by the
+   * `11-match-scores-day` overlay HTML to resolve `processed/<slug>/`
+   * folder. Empty string when no slug can be derived.
+   */
+  home_slug: string;
+  away_slug: string;
   home_score: number | null;
   away_score: number | null;
   status: "scheduled" | "in_progress" | "completed";
@@ -109,6 +117,48 @@ type MatchDayRow = {
 function pickName(p: MatchRowDb["home_player"]): string {
   if (!p) return "—";
   return p.users?.display_name ?? p.gamer_tag ?? "—";
+}
+
+/**
+ * Map a player's display name OR gamer_tag to the canonical asset-folder
+ * slug under `KNOWLEDGE/brand-assets/players/processed/<slug>/`. Mirrors
+ * the per-overlay NAME_TO_SLUG tables in the static HTMLs so server +
+ * client agree on the headshot URL.
+ */
+const NAME_TO_SLUG: Readonly<Record<string, string>> = {
+  ADEFOLA: "adefola",
+  ANIFE: "anife",
+  "BAJI JNR": "baji_jnr",
+  DADABOI: "dadaboi",
+  FARUK: "faruk",
+  GURU: "guru",
+  KAYKAY: "kaykay",
+  "KILLER FREAK": "killer_freak",
+  "KING NONEX": "kingnonex",
+  KINGNONEX: "kingnonex",
+  MITCH: "mitch",
+  "MR OGA": "mr_oga",
+  "MR. OGA": "mr_oga",
+  TACTICAL: "tactical",
+  WOLEVATION: "wolevation",
+};
+const SLUG_ALIAS: Readonly<Record<string, string>> = {
+  king_nonex: "kingnonex",
+};
+function pickSlug(p: MatchRowDb["home_player"]): string {
+  if (!p) return "";
+  // Prefer gamer_tag (already slug-shaped), then map display_name via
+  // NAME_TO_SLUG. Apply SLUG_ALIAS so `king_nonex` → `kingnonex`.
+  const rawTag = (p.gamer_tag ?? "").toString().trim().toLowerCase();
+  if (rawTag) {
+    const compact = rawTag.replace(/[^a-z0-9]/g, "");
+    if (SLUG_ALIAS[compact]) return SLUG_ALIAS[compact];
+    if (SLUG_ALIAS[rawTag]) return SLUG_ALIAS[rawTag];
+    return rawTag.replace(/[^a-z0-9]+/g, "_");
+  }
+  const rawName = (p.users?.display_name ?? "").toString().trim().toUpperCase();
+  if (rawName && NAME_TO_SLUG[rawName]) return NAME_TO_SLUG[rawName];
+  return "";
 }
 
 function pickResult(
@@ -230,6 +280,8 @@ export async function fetchMatchScoresDayData(
       match_id: m.id,
       home: pickName(m.home_player),
       away: pickName(m.away_player),
+      home_slug: pickSlug(m.home_player),
+      away_slug: pickSlug(m.away_player),
       home_score: r ? r.home_score : null,
       away_score: r ? r.away_score : null,
       status,
@@ -293,6 +345,8 @@ export function toMatchScoresDayPayload(
     rows: data.rows.map((r) => ({
       home: r.home,
       away: r.away,
+      homeSlug: r.home_slug || undefined,
+      awaySlug: r.away_slug || undefined,
       homeScore: r.home_score,
       awayScore: r.away_score,
       status: r.status,

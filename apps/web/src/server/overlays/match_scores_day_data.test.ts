@@ -300,7 +300,7 @@ describe("fetchMatchScoresDayDataBySession", () => {
 });
 
 describe("toMatchScoresDayPayload", () => {
-  it("produces a schema-valid payload", () => {
+  it("produces a schema-valid payload (with optional slug fields)", () => {
     const payload = toMatchScoresDayPayload({
       matchDayId: MATCH_DAY,
       seasonId: SEASON,
@@ -312,6 +312,8 @@ describe("toMatchScoresDayPayload", () => {
           match_id: "m1",
           home: "Faruk",
           away: "Adefola",
+          home_slug: "faruk",
+          away_slug: "adefola",
           home_score: 3,
           away_score: 1,
           status: "completed",
@@ -327,10 +329,38 @@ describe("toMatchScoresDayPayload", () => {
     expect(payload.rows[0]).toEqual({
       home: "Faruk",
       away: "Adefola",
+      homeSlug: "faruk",
+      awaySlug: "adefola",
       homeScore: 3,
       awayScore: 1,
       status: "completed",
     });
+  });
+
+  it("omits slug fields from output when row slugs are empty (legacy seed)", () => {
+    const payload = toMatchScoresDayPayload({
+      matchDayId: MATCH_DAY,
+      seasonId: SEASON,
+      matchDate: null,
+      venueName: null,
+      label: "No Slug Day",
+      rows: [
+        {
+          match_id: "m1",
+          home: "—",
+          away: "—",
+          home_slug: "",
+          away_slug: "",
+          home_score: null,
+          away_score: null,
+          status: "scheduled",
+          scheduled_time: null,
+        },
+      ],
+      channels: { standings: null, session: null },
+    });
+    expect(payload.rows[0].homeSlug).toBeUndefined();
+    expect(payload.rows[0].awaySlug).toBeUndefined();
   });
 
   it("handles empty rows (schema default)", () => {
@@ -344,5 +374,71 @@ describe("toMatchScoresDayPayload", () => {
       channels: { standings: null, session: null },
     });
     expect(payload.rows).toEqual([]);
+  });
+});
+
+describe("pickSlug (via fetchMatchScoresDayData)", () => {
+  it("canonicalizes king_nonex gamer_tag to kingnonex", async () => {
+    const matchDayRow = {
+      id: MATCH_DAY,
+      match_date: "2026-05-02",
+      venue_name: null,
+      season_id: SEASON,
+    };
+    const matchRows = [
+      {
+        id: "m1",
+        scheduled_time: null,
+        status: "scheduled",
+        home_player: {
+          gamer_tag: "king_nonex",
+          users: { display_name: "King Nonex" },
+        },
+        away_player: {
+          gamer_tag: "FARUK",
+          users: { display_name: "Faruk" },
+        },
+        match_results: [],
+      },
+    ];
+    const sb = mkSb({
+      match_days: chain({ data: matchDayRow, error: null }),
+      matches: chain({ data: matchRows, error: null }),
+    });
+    const out = await fetchMatchScoresDayData(sb as never, MATCH_DAY);
+    expect(out.rows[0].home_slug).toBe("kingnonex");
+    expect(out.rows[0].away_slug).toBe("faruk");
+  });
+
+  it("falls back to NAME_TO_SLUG when gamer_tag is empty but display_name matches", async () => {
+    const matchDayRow = {
+      id: MATCH_DAY,
+      match_date: "2026-05-02",
+      venue_name: null,
+      season_id: SEASON,
+    };
+    const matchRows = [
+      {
+        id: "m1",
+        scheduled_time: null,
+        status: "scheduled",
+        home_player: {
+          gamer_tag: null,
+          users: { display_name: "BAJI JNR" },
+        },
+        away_player: {
+          gamer_tag: "",
+          users: { display_name: "Mr Oga" },
+        },
+        match_results: [],
+      },
+    ];
+    const sb = mkSb({
+      match_days: chain({ data: matchDayRow, error: null }),
+      matches: chain({ data: matchRows, error: null }),
+    });
+    const out = await fetchMatchScoresDayData(sb as never, MATCH_DAY);
+    expect(out.rows[0].home_slug).toBe("baji_jnr");
+    expect(out.rows[0].away_slug).toBe("mr_oga");
   });
 });

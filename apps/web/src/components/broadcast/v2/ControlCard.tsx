@@ -101,6 +101,14 @@ export type ControlCardProps = {
    * a session repaint the preview correctly.
    */
   active?: boolean;
+  /**
+   * 2026-04-26 lower-third slot isolation — when this card is one of the
+   * 3 simultaneous lower-third slots, pass `slot=1|2|3` so the preview
+   * URL gets `?slot=N`. The HTML hides the other 2 anchors + drops any
+   * incoming postMessage / realtime that targets a different slot. Live
+   * (OBS) URLs are unaffected — copy-URL emits the URL without slot.
+   */
+  previewSlot?: 1 | 2 | 3;
 };
 
 export function ControlCard({
@@ -114,6 +122,7 @@ export function ControlCard({
   labelOverride,
   instanceSuffix,
   active = false,
+  previewSlot,
 }: ControlCardProps) {
   const previewUrl = v2OverlayUrl(
     overlayKey,
@@ -121,7 +130,11 @@ export function ControlCard({
     viewToken,
     true,
     active,
+    previewSlot ?? null,
   );
+  // Live URL for clipboard / open-in-new-tab — never carries `slot`
+  // (OBS browser source needs the multi-slot HTML to render all 3
+  // simultaneous anchors per the legacy contract).
   const liveUrl = v2OverlayUrl(overlayKey, sessionId, viewToken, false);
   const idSuffix = instanceSuffix ? `${overlayKey}-${instanceSuffix}` : overlayKey;
 

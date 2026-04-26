@@ -513,9 +513,26 @@
       'MITCH': 'mitch', 'MR OGA': 'mr_oga', 'MR. OGA': 'mr_oga',
       'TACTICAL': 'tactical', 'WOLEVATION': 'wolevation'
     };
-
+    // 2026-04-26 — V2_PLAYER_SLUGS in TS uses `king_nonex` (underscore)
+    // but the asset folder is `kingnonex`. Map known aberrant variants.
+    var SLUG_ALIAS = {
+      'kingnonex': 'kingnonex',
+      'king_nonex': 'kingnonex'
+    };
+    // Pose override per slug (default = '01'). kingnonex pose 01 has
+    // face_detected:false in the manifest — pin to pose 03 (face).
+    var POSE_FOR_SLUG = { 'kingnonex': '03' };
+    function canonSlug(s) {
+      if (!s) return '';
+      var lower = String(s).toLowerCase();
+      if (SLUG_ALIAS[lower]) return SLUG_ALIAS[lower];
+      return lower.replace(/[^a-z0-9]+/g, '_');
+    }
     function photoUrl(slug) {
-      return '/overlays/v2/_assets/players/processed/' + slug + '/headshot_01_nobg.png';
+      var c = canonSlug(slug);
+      if (!c) return '';
+      var pose = POSE_FOR_SLUG[c] || '01';
+      return '/overlays/v2/_assets/players/processed/' + c + '/headshot_' + pose + '_nobg.png';
     }
 
     /**
@@ -596,7 +613,7 @@
       if (!p) return null;
       // Plan 51 schema sends gamerTag (canonical slug), legacy sends slug.
       var rawSlug = p.slug || p.gamerTag || '';
-      var slug = rawSlug.toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      var slug = canonSlug(rawSlug);
       var rawName = p.displayName || p.name || '';
       // upNextBugSchema only carries displayName — fall back to NAME_TO_SLUG so the
       // headshot resolves correctly without a slug field on the payload.

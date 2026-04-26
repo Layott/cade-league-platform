@@ -14,13 +14,15 @@ beforeEach(() => {
   cleanup();
 });
 
-describe("MatchScoresDayControl", () => {
-  it("renders 4 part buttons (1, 2, 3, all) + a footer Trigger + Hide pair", () => {
+describe("MatchScoresDayControl (2026-04-26 single-page redesign)", () => {
+  it("renders the Trigger + Hide footer pair (no part buttons)", () => {
     render(<MatchScoresDayControl sessionId="S" viewToken="T" />);
-    expect(screen.getByTestId("v2-msd-part-1")).toBeTruthy();
-    expect(screen.getByTestId("v2-msd-part-2")).toBeTruthy();
-    expect(screen.getByTestId("v2-msd-part-3")).toBeTruthy();
-    expect(screen.getByTestId("v2-msd-part-all")).toBeTruthy();
+    // The 3-part split was retired — the operator now triggers the
+    // full-day grid with one button.
+    expect(screen.queryByTestId("v2-msd-part-1")).toBeNull();
+    expect(screen.queryByTestId("v2-msd-part-2")).toBeNull();
+    expect(screen.queryByTestId("v2-msd-part-3")).toBeNull();
+    expect(screen.queryByTestId("v2-msd-part-all")).toBeNull();
     expect(
       screen.getByTestId("v2-retrigger-form-11-match-scores-day"),
     ).toBeTruthy();
@@ -29,26 +31,22 @@ describe("MatchScoresDayControl", () => {
     ).toBeTruthy();
   });
 
-  it("each part button form includes the matching partRange in the payload", () => {
+  it("payload carries matchDayLabel (no partRange)", () => {
     const { container } = render(
       <MatchScoresDayControl sessionId="S" viewToken="T" />,
     );
-    for (const id of [1, 2, 3, "all"] as const) {
-      const form = container.querySelector(
-        `[data-testid="v2-msd-part-form-${id}"]`,
-      ) as HTMLFormElement;
-      expect(form).toBeTruthy();
-      const payload = (
-        form.querySelector('input[name="payload"]') as HTMLInputElement
-      ).value;
-      const parsed = JSON.parse(payload);
-      expect(parsed.partRange).toBe(id);
-      // matchDayLabel must satisfy the legacy Zod min(1) requirement.
-      expect(parsed.matchDayLabel.length).toBeGreaterThan(0);
-    }
+    const form = container.querySelector(
+      '[data-testid="v2-retrigger-form-11-match-scores-day"]',
+    ) as HTMLFormElement;
+    const payload = (
+      form.querySelector('input[name="payload"]') as HTMLInputElement
+    ).value;
+    const parsed = JSON.parse(payload);
+    expect(parsed.matchDayLabel.length).toBeGreaterThan(0);
+    expect(parsed.partRange).toBeUndefined();
   });
 
-  it("footer Trigger button label stays constant; Hide is enabled only when active", () => {
+  it("footer Trigger label is constant; Hide is enabled only when active", () => {
     const { rerender } = render(
       <MatchScoresDayControl sessionId="S" viewToken="T" active={false} />,
     );
@@ -58,7 +56,7 @@ describe("MatchScoresDayControl", () => {
     const hideBtn1 = screen.getByTestId(
       "v2-hide-btn-11-match-scores-day",
     ) as HTMLButtonElement;
-    expect(triggerBtn1.textContent?.trim()).toBe("Trigger (Show all)");
+    expect(triggerBtn1.textContent?.trim()).toBe("Trigger");
     expect(hideBtn1.disabled).toBe(true);
 
     rerender(
@@ -70,7 +68,7 @@ describe("MatchScoresDayControl", () => {
     const hideBtn2 = screen.getByTestId(
       "v2-hide-btn-11-match-scores-day",
     ) as HTMLButtonElement;
-    expect(triggerBtn2.textContent?.trim()).toBe("Trigger (Show all)");
+    expect(triggerBtn2.textContent?.trim()).toBe("Trigger");
     expect(hideBtn2.disabled).toBe(false);
   });
 

@@ -78,6 +78,7 @@ export function v2OverlayUrl(
   viewToken: string | null,
   preview = false,
   active = false,
+  slot: 1 | 2 | 3 | null = null,
 ): string {
   const params = new URLSearchParams();
   params.set("session", sessionId);
@@ -87,5 +88,11 @@ export function v2OverlayUrl(
     // Only mini-previews carry the active flag — see jsdoc above.
     params.set("active", active ? "1" : "0");
   }
+  // 2026-04-26 lower-third slot isolation — broadcast control mounts
+  // 3 mini-preview iframes (one per slot 1..3) for `08-lower-third`.
+  // Each card passes its slot via this param so the static HTML can
+  // hide the other 2 slots + drop incoming postMessages targeting other
+  // slots. Live (OBS) URLs leave slot null so all 3 anchors render.
+  if (slot != null) params.set("slot", String(slot));
   return `/overlay/v2/${key}?${params.toString()}`;
 }

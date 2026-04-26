@@ -203,6 +203,7 @@ export function LowerThirdControl({
       instanceSuffix={`slot-${slot}`}
       onIframeReady={onIframeReady}
       liveBadge={active}
+      previewSlot={slot}
       editPanel={
         <div
           className="rounded-sm border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/40 p-2"

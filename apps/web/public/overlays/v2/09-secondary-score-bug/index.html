@@ -545,7 +545,7 @@
   // ============================================================
   const state = {
     playerA: { name: 'BAJI JNR',   slug: 'baji_jnr',  score: 3 },
-    playerB: { name: 'KING NONEX', slug: 'kingnonex', score: 1 },
+    playerB: { name: 'KING NONEX', slug: 'kingnonex', score: 1 }, // pose 03 via override
   };
 
   // ============================================================
@@ -574,14 +574,63 @@
 
   // ============================================================
   // PHOTO LOADING (with fallback to initials)
+  //
+  // Slug normalization (2026-04-26 fix):
+  //   - The control panel sends slugs from V2_PLAYER_SLUGS, which include
+  //     `king_nonex` (underscore) — but the asset folder is `kingnonex`.
+  //     SLUG_ALIAS maps known aberrant variants to the canonical folder.
+  //   - When only a display name arrives (e.g. legacy h2h shape), fall
+  //     back to NAME_TO_SLUG so headshots still resolve.
+  //
+  // Pose override:
+  //   - kingnonex pose 01 is back-facing (face_detected:false in the
+  //     manifest). Pin to pose 03 (face_detected:true) for that one
+  //     player. All others default to pose 01.
   // ============================================================
+  const SLUG_ALIAS = {
+    'kingnonex': 'kingnonex',
+    'king_nonex': 'kingnonex',
+    'kingNonex': 'kingnonex',
+    'baji_jnr': 'baji_jnr',
+    'bajijnr': 'baji_jnr',
+    'mr_oga': 'mr_oga',
+    'mroga': 'mr_oga',
+    'killer_freak': 'killer_freak',
+    'killerfreak': 'killer_freak'
+  };
+  const NAME_TO_SLUG = {
+    'ADEFOLA': 'adefola', 'ANIFE': 'anife', 'BAJI JNR': 'baji_jnr',
+    'DADABOI': 'dadaboi', 'FARUK': 'faruk', 'GURU': 'guru',
+    'KAYKAY': 'kaykay', 'KILLER FREAK': 'killer_freak',
+    'KING NONEX': 'kingnonex', 'KINGNONEX': 'kingnonex',
+    'MITCH': 'mitch', 'MR OGA': 'mr_oga', 'MR. OGA': 'mr_oga',
+    'TACTICAL': 'tactical', 'WOLEVATION': 'wolevation'
+  };
+  const POSE_FOR_SLUG = { 'kingnonex': '03' };
+  function canonSlug(rawSlug, rawName) {
+    if (rawSlug) {
+      var s = String(rawSlug).toLowerCase();
+      if (SLUG_ALIAS[s]) return SLUG_ALIAS[s];
+      var compact = s.replace(/[^a-z0-9]/g, '');
+      if (SLUG_ALIAS[compact]) return SLUG_ALIAS[compact];
+      return s.replace(/[^a-z0-9]+/g, '_');
+    }
+    if (rawName) {
+      var upper = String(rawName).trim().toUpperCase();
+      if (NAME_TO_SLUG[upper]) return NAME_TO_SLUG[upper];
+    }
+    return '';
+  }
   function photoUrl(slug) {
-    return `/overlays/v2/_assets/players/processed/${slug}/headshot_01_nobg.png`;
+    if (!slug) return '';
+    var pose = POSE_FOR_SLUG[slug] || '01';
+    return `/overlays/v2/_assets/players/processed/${slug}/headshot_${pose}_nobg.png`;
   }
 
   function setPhoto(imgEl, fallbackEl, slug, name) {
     fallbackEl.textContent = (name || '?').trim().charAt(0).toUpperCase();
-    if (!slug) {
+    var canonical = canonSlug(slug, name);
+    if (!canonical) {
       imgEl.classList.add('hidden');
       fallbackEl.classList.remove('hidden');
       return;
@@ -590,7 +639,7 @@
     imgEl.classList.remove('hidden');
     fallbackEl.classList.add('hidden');
 
-    const url = photoUrl(slug);
+    const url = photoUrl(canonical);
     // Clear handlers first to avoid leaks when src changes mid-flight
     imgEl.onload  = () => {
       imgEl.classList.remove('hidden');

@@ -1204,25 +1204,63 @@
         return null;
       }
 
+      // 2026-04-26 — slug normalization so server-supplied gamer_tag
+      // (e.g. `king_nonex`) resolves to the canonical asset folder
+      // (`kingnonex`). Mirrors the maps in 09-secondary-score-bug + 10-up-next-bug.
+      var SLUG_ALIAS = { 'kingnonex': 'kingnonex', 'king_nonex': 'kingnonex' };
+      var NAME_TO_SLUG = {
+        'ADEFOLA': 'adefola', 'ANIFE': 'anife', 'BAJI JNR': 'baji_jnr',
+        'DADABOI': 'dadaboi', 'FARUK': 'faruk', 'GURU': 'guru',
+        'KAYKAY': 'kaykay', 'KILLER FREAK': 'killer_freak',
+        'KING NONEX': 'kingnonex', 'KINGNONEX': 'kingnonex',
+        'MITCH': 'mitch', 'MR OGA': 'mr_oga', 'MR. OGA': 'mr_oga',
+        'TACTICAL': 'tactical', 'WOLEVATION': 'wolevation'
+      };
+      // Pose override per slug — kingnonex pose 01 is back-facing.
+      var POSE_FOR_SLUG = { 'kingnonex': '03' };
+      function canonSlug(rawSlug, rawName) {
+        if (rawSlug) {
+          var s = String(rawSlug).toLowerCase();
+          if (SLUG_ALIAS[s]) return SLUG_ALIAS[s];
+          var compact = s.replace(/[^a-z0-9]/g, '');
+          if (SLUG_ALIAS[compact]) return SLUG_ALIAS[compact];
+          return s.replace(/[^a-z0-9]+/g, '_');
+        }
+        if (rawName) {
+          var upper = String(rawName).trim().toUpperCase();
+          if (NAME_TO_SLUG[upper]) return NAME_TO_SLUG[upper];
+        }
+        return '';
+      }
+      function resolvePhotoUrl(rawSlug, rawName, override) {
+        if (override) return override;
+        var c = canonSlug(rawSlug, rawName);
+        if (!c) return '';
+        var pose = POSE_FOR_SLUG[c] || '01';
+        return '/overlays/v2/_assets/players/processed/' + c + '/headshot_' + pose + '_nobg.png';
+      }
+
       function update(data) {
         if (!data) return;
         var matches = readMatches(data);
         if (matches) {
           console.info('[overlay/11-match-scores-day] matches[]', matches.length);
-          // Normalize server shape (home/away/homeScore/awayScore) into the
-          // overlay's expected shape (p1Name/p2Name/score1/score2).
+          // Normalize server shape (home/away/homeScore/awayScore/homeSlug/awaySlug)
+          // into the overlay's expected shape (p1Name/p2Name/score1/score2/p*PhotoUrl).
           var normalized = matches.map(function(m){
-            // Server shape: {home, away, homeScore, awayScore, status}
-            // where home/away can be a string name OR an object {name, slug, photoUrl}.
+            // Server shape: {home, away, homeSlug, awaySlug, homeScore, awayScore, status}
+            // where home/away can be a string name OR a legacy object {name, slug, photoUrl}.
             var homeName = typeof m.home === 'string' ? m.home : (m.home && m.home.name) || m.p1Name || '';
             var awayName = typeof m.away === 'string' ? m.away : (m.away && m.away.name) || m.p2Name || '';
-            var homePhoto = typeof m.home === 'object' && m.home ? m.home.photoUrl : m.p1PhotoUrl;
-            var awayPhoto = typeof m.away === 'object' && m.away ? m.away.photoUrl : m.p2PhotoUrl;
+            var homeRawSlug = m.homeSlug || (typeof m.home === 'object' && m.home ? m.home.slug : '') || '';
+            var awayRawSlug = m.awaySlug || (typeof m.away === 'object' && m.away ? m.away.slug : '') || '';
+            var homePhotoOverride = (typeof m.home === 'object' && m.home ? m.home.photoUrl : '') || m.p1PhotoUrl || '';
+            var awayPhotoOverride = (typeof m.away === 'object' && m.away ? m.away.photoUrl : '') || m.p2PhotoUrl || '';
             return {
               p1Name: homeName,
               p2Name: awayName,
-              p1PhotoUrl: homePhoto,
-              p2PhotoUrl: awayPhoto,
+              p1PhotoUrl: resolvePhotoUrl(homeRawSlug, homeName, homePhotoOverride),
+              p2PhotoUrl: resolvePhotoUrl(awayRawSlug, awayName, awayPhotoOverride),
               score1: m.homeScore != null ? m.homeScore : (m.score1 != null ? m.score1 : 0),
               score2: m.awayScore != null ? m.awayScore : (m.score2 != null ? m.score2 : 0),
               status: m.status || 'tbd'
@@ -1230,7 +1268,10 @@
           });
           rebuildRows(normalized);
         }
-        if (typeof data.partRange === 'string') applyPartRange(data.partRange);
+        // 2026-04-26 — partRange filter retired per user brief: always show
+        // ALL matches on one page. The control panel may still send a
+        // partRange field but we ignore it (no-op).
+        // if (typeof data.partRange === 'string') applyPartRange(data.partRange);
         // Match-day label can come as `matchDay` (legacy number) OR
         // `matchDayLabel` (server payload shape) OR
         // `payload.matchDayLabel`.

@@ -404,27 +404,38 @@
     box-shadow:
       inset 0 0 0 1.5px var(--row-border),
       inset 0 0 24px rgba(107,205,6,0.06);
+    /* row reorder transition (when standings update mid-show); the
+       initial entrance animation overrides this on first paint. */
     transition: transform 0.55s cubic-bezier(0.7, 0.0, 0.2, 1);
-    will-change: transform;
+    will-change: transform, opacity;
     opacity: 0;
-    animation: row-fade-in 0.7s ease-out forwards;
   }
-  .row:nth-child(1)  { animation-delay: 0.10s; }
-  .row:nth-child(2)  { animation-delay: 0.16s; }
-  .row:nth-child(3)  { animation-delay: 0.22s; }
-  .row:nth-child(4)  { animation-delay: 0.28s; }
-  .row:nth-child(5)  { animation-delay: 0.34s; }
-  .row:nth-child(6)  { animation-delay: 0.40s; }
-  .row:nth-child(7)  { animation-delay: 0.46s; }
-  .row:nth-child(8)  { animation-delay: 0.52s; }
-  .row:nth-child(9)  { animation-delay: 0.58s; }
-  .row:nth-child(10) { animation-delay: 0.64s; }
-  .row:nth-child(11) { animation-delay: 0.70s; }
-  .row:nth-child(12) { animation-delay: 0.76s; }
-  .row:nth-child(13) { animation-delay: 0.82s; }
-  @keyframes row-fade-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+  /* 2026-04-26 — switched from row-fade-in (opacity only) to
+     row-slide-in (transform-driven) per user brief. Each row slides
+     in from the left with an 80ms stagger so all 13 rows sequence
+     "drop into place" rather than fading together. The keyframe
+     drives BOTH opacity (0 → 1) AND transform (-72px → 0) — the
+     gate-observer below was tweaked to skip `.row` so this animation
+     is the single source of truth on entrance. */
+  body.cade-visible .row {
+    animation: row-slide-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  body.cade-visible .row:nth-child(1)  { animation-delay: 0ms;   }
+  body.cade-visible .row:nth-child(2)  { animation-delay: 80ms;  }
+  body.cade-visible .row:nth-child(3)  { animation-delay: 160ms; }
+  body.cade-visible .row:nth-child(4)  { animation-delay: 240ms; }
+  body.cade-visible .row:nth-child(5)  { animation-delay: 320ms; }
+  body.cade-visible .row:nth-child(6)  { animation-delay: 400ms; }
+  body.cade-visible .row:nth-child(7)  { animation-delay: 480ms; }
+  body.cade-visible .row:nth-child(8)  { animation-delay: 560ms; }
+  body.cade-visible .row:nth-child(9)  { animation-delay: 640ms; }
+  body.cade-visible .row:nth-child(10) { animation-delay: 720ms; }
+  body.cade-visible .row:nth-child(11) { animation-delay: 800ms; }
+  body.cade-visible .row:nth-child(12) { animation-delay: 880ms; }
+  body.cade-visible .row:nth-child(13) { animation-delay: 960ms; }
+  @keyframes row-slide-in {
+    from { opacity: 0; transform: translateX(-72px); }
+    to   { opacity: 1; transform: translateX(0); }
   }
 
   /* leader (pos 1) — heavier glow + gold mark */
@@ -1205,7 +1216,10 @@
   var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.col-headers,.headline,.matchday-mark,.partners,.rows,.season-mark,.table-wrap,.top-band';
   // Inner row internals — when the row's own entrance animation has
   // burnt out before cade-visible, force-set opacity 1.
-  var INNER_SEL = '.row,.pos-num,.photo-wrap,.org-wrap,.player-name,.player-name-text,.move-chip,.stat,.stat-wdl,.stat-gd,.sanctions-cell,.pts,.gold-mark,.title,.title-rule';
+  // NB: `.row` itself is omitted (2026-04-26) — its slide-in animation
+  // animates opacity 0 → 1 + translateX -72 → 0; if the observer
+  // forced inline opacity:1 the keyframe couldn't run.
+  var INNER_SEL = '.pos-num,.photo-wrap,.org-wrap,.player-name,.player-name-text,.move-chip,.stat,.stat-wdl,.stat-gd,.sanctions-cell,.pts,.gold-mark,.title,.title-rule';
   function apply() {
     var b = document.body;
     if (!b) return;

@@ -130,6 +130,10 @@
     opacity: 0;
     pointer-events: none;
     will-change: opacity, transform;
+    /* Smooth fade between entering / exiting / cleared baseline so
+       removing the .exiting class after the bar animation completes
+       does not cause a 1-frame jump-cut. */
+    transition: opacity 280ms ease-out;
   }
 
   /* Slot positioning */
@@ -142,6 +146,23 @@
 
   /* When exiting: animations play in reverse */
   .lt.exiting  { opacity: 1; }
+
+  /* === Per-slot iframe filter (mini-preview isolation) ===
+     When the control room mounts a mini-preview iframe per slot it
+     appends `?slot=N` to the URL so each card only renders ITS slot.
+     A small init script below adds `body.cade-only-slot-N` based on
+     this query string; the rules below hide the other 2 slots so
+     events fired on other slots cannot leak into this card's preview.
+     The OBS / live overlay never sets this class (no slot query) so
+     all 3 slots remain free to render simultaneously on stream. */
+  body.cade-only-slot-1 .lt[data-slot="2"],
+  body.cade-only-slot-1 .lt[data-slot="3"],
+  body.cade-only-slot-2 .lt[data-slot="1"],
+  body.cade-only-slot-2 .lt[data-slot="3"],
+  body.cade-only-slot-3 .lt[data-slot="1"],
+  body.cade-only-slot-3 .lt[data-slot="2"] {
+    display: none !important;
+  }
 
   /* ===== Pre-tip accent (thin green stroke ahead of bar) ===== */
   .pretip {
@@ -544,6 +565,26 @@
 (function () {
   'use strict';
 
+  /* === SLOT-FILTER MODE (mini-preview isolation) ===
+     If the URL has `?slot=N` (1..3) the control-room is mounting this
+     iframe scoped to a single slot card. We:
+       a) tag <body> with `cade-only-slot-N` so CSS hides the other 2 .lt
+          elements (see CSS rule above);
+       b) ignore postMessages whose `slot` field is set AND does not match
+          our scope (slot routing leaks via shared realtime channel —
+          without this filter, slot 1 trigger would render in slot-2 +
+          slot-3 mini-previews too).
+     OBS / live overlay never gets `?slot=` so all 3 slots stay live. */
+  var SCOPE_SLOT = (function () {
+    try {
+      var n = Number(new URLSearchParams(location.search).get('slot'));
+      return (n === 1 || n === 2 || n === 3) ? n : 0;
+    } catch (e) { return 0; }
+  })();
+  if (SCOPE_SLOT) {
+    document.body.classList.add('cade-only-slot-' + SCOPE_SLOT);
+  }
+
   // ====== Per-slot state (1, 2, 3) ======
   var slots = {};
   var SLOT_IDS = [1, 2, 3];
@@ -676,6 +717,10 @@
     if (msg.type !== 'show' && msg.type !== 'update' && msg.type !== 'hide') return;
 
     var slotId = resolveSlot(msg);
+    // SLOT-FILTER: when scoped to one slot via `?slot=N`, drop messages
+    // for other slots so card 1's mini-preview ignores slot 2 + 3 events.
+    // No slot in payload defaults to 1 (legacy) — accepted by all scopes.
+    if (SCOPE_SLOT && msg.slot != null && Number(msg.slot) !== SCOPE_SLOT) return;
     var state = slots[slotId];
     if (!state) return;
 
@@ -729,6 +774,15 @@
   'use strict';
   var SLOT_IDS = [1, 2, 3];
   var slotVisible = { 1: false, 2: false, 3: false };
+  // Match the per-iframe scope from the main script — when `?slot=N` is
+  // present, ignore postMessages targeting other slots so the gate state
+  // only reflects this slot's visibility.
+  var SCOPE_SLOT = (function () {
+    try {
+      var n = Number(new URLSearchParams(location.search).get('slot'));
+      return (n === 1 || n === 2 || n === 3) ? n : 0;
+    } catch (e) { return 0; }
+  })();
   function resolveSlot(msg) {
     var n = Number(msg && msg.slot);
     if (n === 1 || n === 2 || n === 3) return n;
@@ -748,6 +802,7 @@
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
     if (msg.type !== 'show' && msg.type !== 'update' && msg.type !== 'hide') return;
+    if (SCOPE_SLOT && msg.slot != null && Number(msg.slot) !== SCOPE_SLOT) return;
     var slotId = resolveSlot(msg);
     if (msg.type === 'show' || msg.type === 'update') {
       slotVisible[slotId] = true;

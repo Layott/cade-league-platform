@@ -362,6 +362,12 @@ export const matchScoresDaySchema = z.object({
       z.object({
         home: z.string().trim().min(1).max(80),
         away: z.string().trim().min(1).max(80),
+        // Optional canonical headshot folder slugs (2026-04-26). Server
+        // populates these from `players.gamer_tag` (or display-name
+        // fallback). The static HTML uses them to resolve
+        // `/overlays/v2/_assets/players/processed/<slug>/headshot_*_nobg.png`.
+        homeSlug: z.string().trim().min(1).max(40).optional(),
+        awaySlug: z.string().trim().min(1).max(40).optional(),
         homeScore: z.coerce.number().int().min(0).max(99).nullable(),
         awayScore: z.coerce.number().int().min(0).max(99).nullable(),
         status: z.enum(["scheduled", "in_progress", "completed"]),

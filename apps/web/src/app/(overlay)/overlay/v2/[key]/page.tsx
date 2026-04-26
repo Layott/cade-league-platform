@@ -71,6 +71,7 @@ type SearchParams = {
   season?: string;
   preview?: string;
   active?: string;
+  slot?: string;
 };
 
 export default async function OverlayV2Page({
@@ -81,7 +82,7 @@ export default async function OverlayV2Page({
   searchParams: Promise<SearchParams>;
 }): Promise<ReactElement> {
   const { key } = await params;
-  const { session, token, season, preview, active } = await searchParams;
+  const { session, token, season, preview, active, slot } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) redirect("/overlay/v2/01-brb");
 
   // Derive season server-side when only session is supplied (OBS URLs
@@ -102,6 +103,16 @@ export default async function OverlayV2Page({
   const isPreview = preview === "1";
   const isActive = !isPreview ? true : active === "1";
 
+  // 2026-04-26 lower-third slot isolation — broadcast control mounts
+  // 3 mini-preview iframes (one per slot 1..3). Each card passes
+  // `?slot=N` so the static HTML can hide the other anchors + drop
+  // postMessages / realtime targeting other slots. OBS URLs leave it
+  // null so all 3 anchors render simultaneously on stream.
+  const slotParsed = (() => {
+    const n = Number(slot);
+    return n === 1 || n === 2 || n === 3 ? (n as 1 | 2 | 3) : null;
+  })();
+
   return (
     <OverlayDataInjector
       overlayKey={key}
@@ -109,6 +120,7 @@ export default async function OverlayV2Page({
       token={token}
       seasonId={resolvedSeason ?? undefined}
       active={isActive}
+      slot={slotParsed}
     />
   );
 }

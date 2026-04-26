@@ -113,6 +113,17 @@ export type OverlayDataInjectorProps = {
    * state change mid-session repaints the iframe.
    */
   active?: boolean;
+  /**
+   * 2026-04-26 lower-third slot isolation — when set (1..3), the
+   * injector:
+   *   1. appends `?slot=N` to the static HTML iframe URL so the HTML
+   *      hides the other 2 slot anchors + filters its own postMessages.
+   *   2. drops realtime / parent-relay messages whose `slot` field is
+   *      set AND does not match (so card 1's mini-preview never sees
+   *      slot 2's `instance.triggered` event).
+   * Live (OBS) routes leave this null so all 3 anchors render.
+   */
+  slot?: 1 | 2 | 3 | null;
 };
 
 export default function OverlayDataInjector({
@@ -121,6 +132,7 @@ export default function OverlayDataInjector({
   token,
   seasonId,
   active = true,
+  slot = null,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -259,6 +271,12 @@ export default function OverlayDataInjector({
         payload?: Record<string, unknown>;
         instanceSlot?: number;
       };
+      // 2026-04-26 slot-filter: when this injector is scoped to a single
+      // slot (mini-preview cards), drop realtime events targeting other
+      // slots so card 1's iframe never renders slot 2's trigger.
+      if (slot != null && m.instanceSlot != null && m.instanceSlot !== slot) {
+        return;
+      }
       postToInner({
         type: "show",
         slot: m.instanceSlot ?? null,
@@ -274,6 +292,10 @@ export default function OverlayDataInjector({
     channel.on("broadcast", { event: "instance.cleared" }, (msg) => {
       if (!isForThisOverlay(msg.payload)) return;
       const m = msg.payload as { instanceSlot?: number };
+      // Same slot-filter guard as instance.triggered.
+      if (slot != null && m.instanceSlot != null && m.instanceSlot !== slot) {
+        return;
+      }
       postToInner({ type: "hide", slot: m.instanceSlot ?? null });
     });
 
@@ -286,7 +308,7 @@ export default function OverlayDataInjector({
         /* best-effort */
       }
     };
-  }, [overlayKey, sessionId]);
+  }, [overlayKey, sessionId, slot]);
 
   /* --------------------------------------------------------------- *
    * 1b. Data feed — public:standings:<seasonId> (existing behaviour) *
@@ -334,17 +356,27 @@ export default function OverlayDataInjector({
       if (e.source === iframe.contentWindow) return;
       // Only forward plain-object messages — ignores random extension noise.
       if (typeof e.data !== "object" || e.data === null) return;
+      // 2026-04-26 slot-filter: when scoped to a single slot, drop
+      // relayed messages whose `slot` field is set AND does not match.
+      if (slot != null) {
+        const data = e.data as { slot?: number };
+        if (data.slot != null && Number(data.slot) !== slot) return;
+      }
       iframe.contentWindow.postMessage(e.data, "*");
     }
     window.addEventListener("message", relay);
     return () => window.removeEventListener("message", relay);
-  }, []);
+  }, [slot]);
 
   // Pass session + token in the iframe URL so HTML-side handlers that opt
   // into auth can grab them via `URLSearchParams`. They're optional.
   const params = new URLSearchParams();
   if (sessionId) params.set("session", sessionId);
   if (token) params.set("token", token);
+  // 2026-04-26 lower-third slot isolation — when scoped to a single
+  // slot, the static HTML reads `?slot=N` to hide the other anchors +
+  // filter postMessages. Live (OBS) URLs leave it unset.
+  if (slot != null) params.set("slot", String(slot));
   const qs = params.toString();
   const src = `/overlays/v2/${overlayKey}/index.html${qs ? `?${qs}` : ""}`;
 
