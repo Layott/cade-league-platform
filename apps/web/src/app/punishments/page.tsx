@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/public/PageHeader";
 import { EmptyState } from "@/components/public/EmptyState";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
 export const metadata = { title: "Discipline" };

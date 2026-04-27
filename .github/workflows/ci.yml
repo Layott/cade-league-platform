@@ -17,4 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test
-      - run: npm run build
+      # Type check only — full `next build` requires runtime env vars
+      # (Supabase URL, service-role key) for prerender; Vercel handles
+      # the real production build with those secrets in scope.
+      - run: npx --workspace apps/web tsc --noEmit
