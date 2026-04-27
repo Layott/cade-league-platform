@@ -70,10 +70,9 @@ describe("overlay payload schemas", () => {
     expect(p.stats?.pts).toBe(10);
   });
 
-  it("standings_widget rows required non-empty, max 20", () => {
-    expect(() =>
-      standingsWidgetSchema.parse({ topN: 3, rows: [] }),
-    ).toThrow();
+  it("standings_widget allows empty rows (TBD stub) and max 20", () => {
+    const empty = standingsWidgetSchema.parse({ topN: 3, rows: [] });
+    expect(empty.rows.length).toBe(0);
     const rows = Array.from({ length: 20 }, (_, i) => ({
       rank: i + 1,
       displayName: `P${i}`,
@@ -82,6 +81,9 @@ describe("overlay payload schemas", () => {
     }));
     const ok = standingsWidgetSchema.parse({ topN: 20, rows });
     expect(ok.rows.length).toBe(20);
+    expect(() =>
+      standingsWidgetSchema.parse({ topN: 20, rows: [...rows, rows[0]] }),
+    ).toThrow();
   });
 
   it("player_card accepts no photoUrl", () => {
