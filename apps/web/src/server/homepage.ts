@@ -9,6 +9,7 @@ export type HomeMatchDay = {
   match_start_time: string;
   venue_name: string | null;
   fixture_count: number;
+  status: string;
 };
 
 export type HomeAnnouncement = {
@@ -49,10 +50,11 @@ export async function getHomepageData(
     sb
       .from("match_days")
       .select(
-        "id, match_date, arrival_cutoff_time, match_start_time, venue_name, matches:matches(count)",
+        "id, match_date, arrival_cutoff_time, match_start_time, venue_name, status, matches:matches(count)",
       )
-      .eq("status", "scheduled")
+      .in("status", ["scheduled", "in_progress"])
       .is("deleted_at", null)
+      .not("published_at", "is", null)
       .gte("match_date", today)
       .order("match_date", { ascending: true })
       .limit(1)
@@ -69,6 +71,7 @@ export async function getHomepageData(
       arrival_cutoff_time: string;
       match_start_time: string;
       venue_name: string | null;
+      status: string;
       matches: { count: number }[] | null;
     };
     nextMatchDay = {
@@ -78,6 +81,7 @@ export async function getHomepageData(
       match_start_time: md.match_start_time,
       venue_name: md.venue_name,
       fixture_count: md.matches?.[0]?.count ?? 0,
+      status: md.status,
     };
   }
 

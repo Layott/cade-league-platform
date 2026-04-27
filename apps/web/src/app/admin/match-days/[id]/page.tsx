@@ -11,8 +11,10 @@ import {
   editResultAction,
   editMatchAction,
   enterResultAction,
+  markMatchDayCompleteAction,
   publishMatchDayAction,
   removeMatchAction,
+  reopenMatchDayAction,
   reorderMatchAction,
   unpublishMatchDayAction,
   unvoidMatchAction,
@@ -134,6 +136,21 @@ export default async function MatchDayDetailPage({
                 <input type="hidden" name="matchDayId" value={matchDay.id} />
                 <PrimaryButton type="submit" data-testid="publish-md-btn">
                   Publish to players
+                </PrimaryButton>
+              </form>
+            )}
+            {matchDay.status === "completed" ? (
+              <form action={reopenMatchDayAction}>
+                <input type="hidden" name="matchDayId" value={matchDay.id} />
+                <SecondaryButton type="submit" data-testid="reopen-md-btn">
+                  Reopen match day
+                </SecondaryButton>
+              </form>
+            ) : (
+              <form action={markMatchDayCompleteAction}>
+                <input type="hidden" name="matchDayId" value={matchDay.id} />
+                <PrimaryButton type="submit" data-testid="complete-md-btn">
+                  Mark complete
                 </PrimaryButton>
               </form>
             )}

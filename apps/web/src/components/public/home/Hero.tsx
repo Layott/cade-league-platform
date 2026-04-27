@@ -75,7 +75,7 @@ export function Hero({ seasonYearRange, divisionName }: Props) {
               Fixture&nbsp;// Identifier
             </div>
             <div className="mt-2 font-display text-lg font-bold leading-tight text-[var(--chalk-0)]">
-              Elite eFootball · PS5
+              Elite EAFC · PS5
             </div>
             <dl className="mt-4 space-y-2 text-xs">
               <MetaRow label="Format" value="Round robin + playoffs" />

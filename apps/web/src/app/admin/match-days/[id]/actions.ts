@@ -13,6 +13,7 @@ import {
 import {
   publishMatchDay,
   unpublishMatchDay,
+  setMatchDayStatus,
 } from "@/server/matches/match-days";
 import {
   enterResult,
@@ -278,6 +279,35 @@ export async function unpublishMatchDayAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
+}
+
+// Mark a match day as completed — drops it from the homepage "Upcoming"
+// card and flips the public fixtures badge to "Final". Re-uses the
+// match_days.publish permission (admin + loc).
+export async function markMatchDayCompleteAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  const { userId, roles } = await requirePermInline("match_days.publish");
+  const sb = getServiceRoleSupabase();
+  await setMatchDayStatus(sb, { userId, roles }, matchDayId, "completed");
+  await pingFixtures(sb, matchDayId, "match_day_published");
+  revalidatePath(`/admin/match-days/${matchDayId}`);
+  revalidatePath("/admin/match-days");
+  revalidatePath("/fixtures");
+  revalidatePath("/");
+}
+
+// Reopen a previously-completed match day (back to scheduled). Used when
+// admin completed prematurely and still needs to enter or correct results.
+export async function reopenMatchDayAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  const { userId, roles } = await requirePermInline("match_days.publish");
+  const sb = getServiceRoleSupabase();
+  await setMatchDayStatus(sb, { userId, roles }, matchDayId, "scheduled");
+  await pingFixtures(sb, matchDayId, "match_day_published");
+  revalidatePath(`/admin/match-days/${matchDayId}`);
+  revalidatePath("/admin/match-days");
+  revalidatePath("/fixtures");
+  revalidatePath("/");
 }
 
 /**

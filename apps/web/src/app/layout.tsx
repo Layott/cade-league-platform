@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     template: "%s · CADE League",
   },
   description:
-    "CADE Esports League — Division 1 Elite. Nigeria's eFootball competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
+    "CADE Esports League — Division 1 Elite. Nigeria's EAFC competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CADE League — Division 1 Elite · 2025-2026",
     description:
-      "CADE Esports League — Division 1 Elite. Nigeria's eFootball competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
+      "CADE Esports League — Division 1 Elite. Nigeria's EAFC competition. Live standings, fixtures, and discipline for the 2025-2026 season.",
     images: [{ url: PRIMARY_LOGOS.cade }],
     type: "website",
   },

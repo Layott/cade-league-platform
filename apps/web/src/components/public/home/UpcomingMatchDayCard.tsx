@@ -11,6 +11,17 @@ function formatCutoff(t: string): string {
   return `${h}:${m}`;
 }
 
+const STATUS_LABEL: Record<string, { label: string; hint: string }> = {
+  scheduled: { label: "Scheduled", hint: "Locked" },
+  in_progress: { label: "Live", hint: "On air" },
+  completed: { label: "Final", hint: "Played" },
+  cancelled: { label: "Cancelled", hint: "Pulled" },
+};
+
+function statusDisplay(status: string): { label: string; hint: string } {
+  return STATUS_LABEL[status] ?? { label: "Scheduled", hint: "Locked" };
+}
+
 export function UpcomingMatchDayCard({
   matchDay,
 }: {
@@ -91,7 +102,11 @@ export function UpcomingMatchDayCard({
           value={String(matchDay.fixture_count).padStart(2, "0")}
           hint={matchDay.fixture_count === 1 ? "match" : "matches"}
         />
-        <Stat label="Status" value="Scheduled" hint="Locked" />
+        <Stat
+          label="Status"
+          value={statusDisplay(matchDay.status).label}
+          hint={statusDisplay(matchDay.status).hint}
+        />
       </dl>
 
       <Link

@@ -196,3 +196,27 @@ export async function unpublishMatchDay(
     .is("deleted_at", null);
   if (error) throw new Error(`unpublishMatchDay failed: ${error.message}`);
 }
+
+/**
+ * Transition a match day's status to `completed` so the public homepage
+ * "Upcoming match day" card stops surfacing it and the public fixtures
+ * page renders the final-score badge. Re-uses the `match_days.publish`
+ * permission (same role set: admin + loc).
+ *
+ * Status values match the DB check constraint:
+ *   ('scheduled','in_progress','completed','cancelled')
+ */
+export async function setMatchDayStatus(
+  sb: SupabaseClient,
+  actor: Actor,
+  id: string,
+  status: "scheduled" | "in_progress" | "completed" | "cancelled",
+): Promise<void> {
+  await requirePermAsync(sb, actor, "match_days.publish");
+  const { error } = await sb
+    .from("match_days")
+    .update({ status })
+    .eq("id", id)
+    .is("deleted_at", null);
+  if (error) throw new Error(`setMatchDayStatus failed: ${error.message}`);
+}
