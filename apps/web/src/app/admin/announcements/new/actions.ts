@@ -1,8 +1,24 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { create, publishNow, schedulePublish } from "@/server/announcements";
+
+const announcementSubmitSchema = z.object({
+  mode: z.enum(["draft", "publish_now", "schedule"]).default("draft"),
+  title: z.string().trim().min(1).max(200),
+  body_md: z.string().trim().min(1).max(20_000),
+  priority: z.enum(["info", "important", "urgent"]).default("info"),
+  is_public: z.boolean().default(false),
+  channels: z.array(z.enum(["in_app", "email"])).min(1).max(2),
+  audience_type: z
+    .enum(["all", "role", "users", "players_in_season"])
+    .default("all"),
+  audience_role: z.string().trim().max(50).nullable(),
+  audience_user_ids: z.array(z.string().uuid()).max(1000).nullable(),
+  scheduled_publish_at: z.string().datetime().nullable(),
+});
 
 function parseChannels(formData: FormData): string[] {
   const channels: string[] = [];
@@ -52,37 +68,43 @@ export async function submitAnnouncement(formData: FormData) {
   const publisherId = await currentPublicUserId(sb);
   if (!publisherId) throw new Error("not authenticated");
 
-  const mode = String(formData.get("mode") ?? "draft"); // 'publish_now' | 'schedule' | 'draft'
-  const title = String(formData.get("title") ?? "").trim();
-  const body_md = String(formData.get("body_md") ?? "");
-  const priority = String(formData.get("priority") ?? "info") as
-    | "info"
-    | "important"
-    | "urgent";
-  const is_public = formData.get("is_public") === "on";
-  const channels = parseChannels(formData);
   const audience = parseAudience(formData);
   const scheduled_raw = String(formData.get("scheduled_publish_at") ?? "").trim();
   const scheduled_publish_at = scheduled_raw ? new Date(scheduled_raw).toISOString() : null;
 
-  if (!title) throw new Error("title required");
-  if (channels.length === 0) throw new Error("at least one channel required");
-
-  const { id } = await create(sb, {
-    title,
-    body_md,
-    priority,
-    is_public,
-    channels,
-    scheduled_publish_at: mode === "schedule" ? scheduled_publish_at : null,
-    ...audience,
+  const parsed = announcementSubmitSchema.parse({
+    mode: String(formData.get("mode") ?? "draft"),
+    title: String(formData.get("title") ?? ""),
+    body_md: String(formData.get("body_md") ?? ""),
+    priority: String(formData.get("priority") ?? "info"),
+    is_public: formData.get("is_public") === "on",
+    channels: parseChannels(formData),
+    audience_type: audience.audience_type,
+    audience_role: audience.audience_role,
+    audience_user_ids: audience.audience_user_ids,
+    scheduled_publish_at,
   });
 
-  if (mode === "publish_now") {
+  const { id } = await create(sb, {
+    title: parsed.title,
+    body_md: parsed.body_md,
+    priority: parsed.priority,
+    is_public: parsed.is_public,
+    channels: parsed.channels,
+    scheduled_publish_at:
+      parsed.mode === "schedule" ? parsed.scheduled_publish_at : null,
+    audience_type: parsed.audience_type,
+    audience_role: parsed.audience_role,
+    audience_user_ids: parsed.audience_user_ids,
+  });
+
+  if (parsed.mode === "publish_now") {
     await publishNow(sb, id, publisherId);
-  } else if (mode === "schedule") {
-    if (!scheduled_publish_at) throw new Error("scheduled_publish_at required for schedule mode");
-    await schedulePublish(sb, id, scheduled_publish_at);
+  } else if (parsed.mode === "schedule") {
+    if (!parsed.scheduled_publish_at) {
+      throw new Error("scheduled_publish_at required for schedule mode");
+    }
+    await schedulePublish(sb, id, parsed.scheduled_publish_at);
   }
 
   redirect(`/admin/announcements/${id}`);

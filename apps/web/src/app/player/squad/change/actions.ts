@@ -2,10 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requestChange } from "@/server/squads";
 import { publishSquadStatusChanged } from "@/server/squads/realtime";
 import type { SquadChangeSubmitPayload } from "@/components/squads/SquadChangeEditor";
+
+const submissionIdSchema = z.string().uuid();
 
 /**
  * Plan 10 extension — accepts the structured change payload from
@@ -16,6 +19,7 @@ export async function requestChangeAction(
   submissionId: string,
   payload: SquadChangeSubmitPayload,
 ): Promise<void> {
+  const safeSubmissionId = submissionIdSchema.parse(submissionId);
   const sb = await getServerSupabase();
   const {
     data: { user },
@@ -28,8 +32,12 @@ export async function requestChangeAction(
     .single();
   if (!pub) throw new Error("no public user row");
 
+  // requestChange() invokes changeSchema.safeParse(input) at server fn
+  // boundary (apps/web/src/server/squads/change.ts:32), so payload is
+  // fully validated downstream. We only enforce UUID at the action
+  // entrypoint as defense-in-depth.
   await requestChange(sb, {
-    submissionId,
+    submissionId: safeSubmissionId,
     newFormation: payload.newFormation,
     newSlotPlan: payload.newSlotPlan,
     playerOutItemId: payload.playerOutItemId,

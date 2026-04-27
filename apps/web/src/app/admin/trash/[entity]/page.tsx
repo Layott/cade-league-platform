@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { requirePermAsync } from "@/lib/perms-db";
 import { listDeleted } from "@/server/trash";
 import { TRASH_ENTITIES, isTrashEntityType } from "@/server/trash/entities";
 import { RestoreButton } from "@/components/admin/RestoreButton";
@@ -32,8 +34,28 @@ export default async function TrashEntityPage({
   const { entity } = await params;
   if (!isTrashEntityType(entity)) notFound();
 
+  // Perm gate. Middleware admits multiple staff roles to /admin/*; only
+  // those holding `trash.restore` should see deleted rows (which include
+  // PII for users / players / disciplinary cases).
+  const userSb = await getServerSupabase();
+  const { data: auth } = await userSb.auth.getUser();
+  if (!auth?.user) notFound();
+  const { data: pub } = await userSb
+    .from("users")
+    .select("id")
+    .eq("supabase_auth_id", auth.user.id)
+    .maybeSingle();
+  if (!pub) notFound();
+  const { data: roleRows } = await userSb
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", pub.id)
+    .is("deleted_at", null);
+  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+
   const def = TRASH_ENTITIES[entity];
   const sb = getServiceRoleSupabase();
+  await requirePermAsync(sb, { userId: pub.id, roles }, "trash.restore");
   const { rows, missingTable } = await listDeleted(sb, entity);
 
   return (

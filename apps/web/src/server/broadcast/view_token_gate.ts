@@ -1,5 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { timingSafeEqual } from "crypto";
+
+/**
+ * Constant-time view-token comparison. Length mismatch returns false
+ * before reaching `timingSafeEqual` (which throws on length mismatch).
+ */
+function tokensMatch(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 /**
  * Plan 39 M3 — shared view_token gate for the unauthenticated per-session
@@ -50,7 +62,7 @@ export async function checkViewToken(
   }
 
   const provided = extractProvidedToken(req);
-  if (provided !== expected) {
+  if (provided === null || !tokensMatch(provided, expected)) {
     return {
       ok: false,
       response: NextResponse.json({ error: "invalid_token" }, { status: 401 }),

@@ -70,6 +70,22 @@ function defaultLandingForRoles(roles: readonly string[]): string {
   return "/profile";
 }
 
+/**
+ * Open-redirect guard for the post-login `?next=` query param.
+ * Accept ONLY same-origin paths: must start with a single "/", must not
+ * begin with "//" or "/\\" (protocol-relative URL), must not contain
+ * scheme delimiters, must not embed CR/LF (header injection).
+ */
+function isSafeNextPath(value: string): boolean {
+  if (!value) return false;
+  if (value.length > 512) return false;
+  if (!value.startsWith("/")) return false;
+  if (value.startsWith("//") || value.startsWith("/\\")) return false;
+  if (/[\r\n\t]/.test(value)) return false;
+  if (/^\/+[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+  return true;
+}
+
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
@@ -112,7 +128,7 @@ export async function login(formData: FormData) {
     acceptLanguage: h.get("accept-language") ?? "",
   });
 
-  if (nextParam) {
+  if (nextParam && isSafeNextPath(nextParam)) {
     redirect(nextParam);
   }
   const { data: roleRows } = await svc
