@@ -25,6 +25,7 @@ type ResultJoin = {
   away_score: number;
   confirmed_at: string | null;
   result_type: string;
+  deleted_at: string | null;
 };
 
 type MatchJoin = {
@@ -32,6 +33,7 @@ type MatchJoin = {
   status: string;
   scheduled_time: string | null;
   match_order: number | null;
+  deleted_at: string | null;
   home_player: PlayerJoin | PlayerJoin[] | null;
   away_player: PlayerJoin | PlayerJoin[] | null;
   result: ResultJoin | ResultJoin[] | null;
@@ -79,10 +81,10 @@ export default async function FixturesPage({
         `
         id, match_date, venue_name, match_start_time, arrival_cutoff_time, status,
         matches:matches (
-          id, status, scheduled_time, match_order,
+          id, status, scheduled_time, match_order, deleted_at,
           home_player:home_player_id ( id, gamer_tag, jersey_number, users:users!players_user_id_fkey ( id, display_name ) ),
           away_player:away_player_id ( id, gamer_tag, jersey_number, users:users!players_user_id_fkey ( id, display_name ) ),
-          result:match_results ( home_score, away_score, confirmed_at, result_type )
+          result:match_results ( home_score, away_score, confirmed_at, result_type, deleted_at )
         )
         `,
       )
@@ -94,11 +96,12 @@ export default async function FixturesPage({
 
     for (const md of ((data ?? []) as unknown as MatchDayJoin[])) {
       const fixtures: FixtureRow[] = (md.matches ?? [])
-        .filter((m) => m != null)
+        .filter((m) => m != null && !m.deleted_at)
         .map((m) => {
           const home = firstOrNull(m.home_player);
           const away = firstOrNull(m.away_player);
-          const r = firstOrNull(m.result);
+          const rawResult = firstOrNull(m.result);
+          const r = rawResult && !rawResult.deleted_at ? rawResult : null;
           const scoreShown = r && r.confirmed_at && r.result_type !== "void";
           return {
             id: m.id,
