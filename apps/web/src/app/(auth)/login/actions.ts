@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { recordLogin } from "@/server/auth/sessions";
+import { authLimiter } from "@/lib/rate-limit";
 
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 const LOCKOUT_THRESHOLD = 5;
@@ -87,12 +88,38 @@ function isSafeNextPath(value: string): boolean {
 }
 
 export async function login(formData: FormData) {
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const nextParam = String(formData.get("next") ?? "");
 
   const sb = await getServerSupabase();
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
 
+  // Rate-limit gate (Redis-backed via Upstash). Two parallel keys so an
+  // attacker that rotates IPs against one account still hits the email
+  // budget, AND so a shared-IP party can't be locked out by one bad
+  // actor sharing their NAT. Both must succeed; whichever exhausts
+  // first triggers the 15-min cool-down.
+  if (email.length > 0) {
+    const ipEmailRes = await authLimiter.limit(`${ip}:${email}`);
+    const emailRes = await authLimiter.limit(`email:${email}`);
+    if (!ipEmailRes.success || !emailRes.success) {
+      // Best-effort forensic log even when blocked.
+      try {
+        await recordFailure(sb, email, "rate_limited");
+      } catch {
+        // ignore
+      }
+      redirect(
+        `/login?error=${encodeURIComponent(
+          "Too many failed attempts. Try again in 15 minutes.",
+        )}`,
+      );
+    }
+  }
+
+  // DB-backed defense-in-depth (works when Redis is unreachable).
   if (await isLockedOut(email)) {
     redirect(
       `/login?error=${encodeURIComponent(
@@ -120,10 +147,9 @@ export async function login(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent("Account not provisioned")}`);
   }
 
-  const h = await headers();
   await recordLogin(svc, {
     publicUserId: pub.id,
-    ipAddress: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0",
+    ipAddress: ip,
     userAgent: h.get("user-agent") ?? "",
     acceptLanguage: h.get("accept-language") ?? "",
   });

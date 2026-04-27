@@ -20,6 +20,8 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "@types/sanitize-html": "^2.16.1",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.37.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "docx": "^9.6.1",

@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { authLimiter } from "@/lib/rate-limit";
 import { assignRole, removeRole } from "@/server/roles";
 import { assignRoleSchema, removeRoleSchema } from "@/server/roles/schemas";
 import {
@@ -84,8 +86,19 @@ export async function removeRoleAction(formData: FormData) {
 
 // ---------- Plan 34 — full CRUD ----------
 
+async function authRateGate(actorUserId: string, op: string): Promise<void> {
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
+  // 5 attempts per 15min per (admin user, operation, ip).
+  const res = await authLimiter.limit(`${op}:${actorUserId}:${ip}`);
+  if (!res.success) {
+    throw new Error("Rate limit exceeded — try again in 15 minutes");
+  }
+}
+
 export async function createUserAction(formData: FormData) {
   const { sb, actor } = await resolveActor();
+  await authRateGate(actor.userId as string, "createUser");
 
   const email = String(formData.get("email") ?? "").trim();
   const display_name = String(formData.get("display_name") ?? "").trim();
@@ -140,6 +153,7 @@ export async function updateUserAction(formData: FormData) {
 
 export async function resetPasswordAction(formData: FormData) {
   const { sb, actor } = await resolveActor();
+  await authRateGate(actor.userId as string, "resetPassword");
   const input = resetUserPasswordSchema.parse({
     id: String(formData.get("id") ?? ""),
     newPassword: String(formData.get("new_password") ?? ""),
