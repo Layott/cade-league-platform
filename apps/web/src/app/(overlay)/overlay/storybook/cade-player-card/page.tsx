@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
@@ -45,7 +45,16 @@ async function resolveAdmin() {
   }
 }
 
-export default async function CadePlayerCardStoryPage() {
+export default async function CadePlayerCardStoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dev?: string }>;
+}) {
+  // Audit Slice 1 (2026-04-28) — dev-only gate. Returns 404 unless `?dev=1`
+  // is passed so the route is hidden from anyone scanning the URL space.
+  const { dev } = await searchParams;
+  if (dev !== "1") notFound();
+
   await resolveAdmin();
   const players = listPlayerSlugs().map((slug) => ({
     slug,
