@@ -33,11 +33,16 @@ const PUBLIC_LINKS: LinkRow[] = [
 // self-view under the (auth) group). `/player/profile` still exists as
 // a redirect stub for stale bookmarks but the nav drawer skips the hop.
 // Audit 2026-04-24 stub-page sweep.
+//
+// UI Audit Slice 2 (2026-04-28) — Disputes + Appeals collapsed into a
+// single "Cases" link pointing at /player/cases (segmented control
+// inside). Old /player/disputes + /player/appeals 307 to
+// /player/cases?tab=… so any external/email deep link still lands on
+// the correct segment.
 const PLAYER_LINKS: LinkRow[] = [
   { href: "/player/squad", label: "Squad" },
+  { href: "/player/cases", label: "Cases" },
   { href: "/profile", label: "Profile" },
-  { href: "/player/appeals", label: "Appeals" },
-  { href: "/player/disputes", label: "Disputes" },
 ];
 
 const STAFF_LINKS: LinkRow[] = [

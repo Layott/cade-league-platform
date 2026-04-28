@@ -44,7 +44,12 @@ export async function submitAppealAction(formData: FormData): Promise<void> {
     // best-effort
   }
 
+  // UI Audit Slice 2 (2026-04-28) — list view moved to
+  // /player/cases?tab=appeals. Old /player/appeals 307s here, but we
+  // redirect straight at the new path to avoid the hop. Still
+  // revalidate the old path so any stale bookmark cache invalidates.
+  revalidatePath("/player/cases");
   revalidatePath("/player/appeals");
   revalidatePath("/admin/appeals");
-  redirect("/player/appeals");
+  redirect("/player/cases?tab=appeals");
 }

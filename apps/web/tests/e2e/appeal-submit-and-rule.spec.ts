@@ -209,7 +209,15 @@ async function teardownContext(ctx: Ctx | null) {
   }
 }
 
-async function loginAs(page: Page, email: string, password: string, nextPath = "/player/appeals") {
+async function loginAs(
+  page: Page,
+  email: string,
+  password: string,
+  nextPath = "/player/cases?tab=appeals",
+) {
+  // UI Audit Slice 2 (2026-04-28) — /player/appeals + /player/disputes
+  // collapsed into /player/cases?tab=… . Default landing for the
+  // appeals scenario is the appeals segment.
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
@@ -254,9 +262,13 @@ test("player submits appeal → admin assigns 3-member panel → rules → statu
     "The sanction was issued after a contested replay. I have footage showing the incident was misidentified.";
   await playerPage.getByTestId("appeal-grounds-input").fill(grounds);
   await playerPage.getByTestId("appeal-submit-btn").click();
-  await playerPage.waitForURL(/\/player\/appeals(\?|$)/);
+  // UI Audit Slice 2 (2026-04-28) — submit redirects to the merged
+  // /player/cases?tab=appeals page (was /player/appeals). The list
+  // testId stays the same so the original assertion still works.
+  await playerPage.waitForURL(/\/player\/(appeals|cases)(\?|$)/);
 
-  // Assert appeal row shows in player list.
+  // Assert appeal row shows in player list (merged page reuses the
+  // same `player-appeals-list` testId on the appeals segment).
   await expect(playerPage.getByTestId("player-appeals-list")).toBeVisible();
   await playerCtx.close();
 

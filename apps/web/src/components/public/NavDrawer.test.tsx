@@ -82,7 +82,12 @@ describe("NavDrawer (Plan 46)", () => {
     renderOpen({ authenticated: true, roles: ["player"] });
     expect(screen.getByTestId("nav-drawer-group-player")).toBeTruthy();
     expect(screen.getByTestId("nav-drawer-link-/player/squad")).toBeTruthy();
-    expect(screen.getByTestId("nav-drawer-link-/player/appeals")).toBeTruthy();
+    // UI Audit Slice 2 (2026-04-28) — disputes + appeals merged into
+    // a single /player/cases entry. Old /player/appeals + /player/disputes
+    // links are removed from the drawer (paths still 307 to the new route).
+    expect(screen.getByTestId("nav-drawer-link-/player/cases")).toBeTruthy();
+    expect(screen.queryByTestId("nav-drawer-link-/player/appeals")).toBeNull();
+    expect(screen.queryByTestId("nav-drawer-link-/player/disputes")).toBeNull();
   });
 
   it("hides Staff group when isStaff is false", () => {

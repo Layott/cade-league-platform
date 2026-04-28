@@ -17,16 +17,34 @@ import { usePathname } from "next/navigation";
  * self-view under the (auth) group). `/player/profile` is preserved as a
  * redirect stub for stale deep links but the subnav skips the hop.
  * Audit 2026-04-24 stub-page sweep.
+ *
+ * UI Audit Slice 2 (2026-04-28) — collapsed Disputes + Appeals into
+ * a single "Cases" tab pointing at /player/cases (segmented control
+ * inside). Subnav drops 4 → 3 tabs. Old /player/disputes +
+ * /player/appeals 307 to /player/cases?tab=… so any deep link still
+ * lands on the right segment.
  */
 
 const TABS = [
   { href: "/player/squad", label: "Squad" },
-  { href: "/player/disputes", label: "Disputes" },
-  { href: "/player/appeals", label: "Appeals" },
+  { href: "/player/cases", label: "Cases" },
   { href: "/profile", label: "Profile" },
 ];
 
 function matches(pathname: string, href: string) {
+  // /player/cases is "active" for both ?tab=disputes and ?tab=appeals,
+  // and for the legacy /player/disputes + /player/appeals paths in the
+  // brief window between server-rendering and the 307 redirect.
+  if (href === "/player/cases") {
+    return (
+      pathname === "/player/cases" ||
+      pathname.startsWith("/player/cases/") ||
+      pathname === "/player/disputes" ||
+      pathname.startsWith("/player/disputes/") ||
+      pathname === "/player/appeals" ||
+      pathname.startsWith("/player/appeals/")
+    );
+  }
   return pathname === href || pathname.startsWith(href + "/");
 }
 

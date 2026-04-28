@@ -47,8 +47,13 @@ export async function submitDisputeAction(formData: FormData): Promise<void> {
     // best-effort
   }
 
+  // UI Audit Slice 2 (2026-04-28) — list view moved to
+  // /player/cases?tab=disputes. Old /player/disputes 307s here, but
+  // we redirect straight at the new path to avoid the hop. Still
+  // revalidate the old path so any stale bookmark cache invalidates.
+  revalidatePath("/player/cases");
   revalidatePath("/player/disputes");
   revalidatePath("/admin/disputes");
   revalidatePath("/admin");
-  redirect("/player/disputes");
+  redirect("/player/cases?tab=disputes");
 }
