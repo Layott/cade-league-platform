@@ -68,6 +68,43 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "17-penalties",
 ]);
 
+/**
+ * Friendly aliases for muscle-memory + spec/brief keys without the
+ * numeric prefix. Resolves to the canonical numeric route. If the
+ * caller's key is in this map, redirect once to the canonical URL so
+ * downstream code (`isOverlayActive`, demo deep-links, OBS bookmarks)
+ * always sees the prefixed form. Added 2026-04-28 after a UI grind
+ * agent flagged the divergence.
+ */
+const KEY_ALIASES: Record<string, string> = {
+  brb: "01-brb",
+  "be-right-back": "01-brb",
+  timer: "02-timer",
+  "h2h-2": "04-h2h-2",
+  "h2h-3": "05-h2h-3",
+  "h2h-5": "06-h2h-5",
+  leaderboard: "07-leaderboard",
+  "leaderboard-animated": "07-leaderboard",
+  "standings-widget": "07-leaderboard",
+  "lower-third": "08-lower-third",
+  "score-bug": "09-secondary-score-bug",
+  "secondary-score-bug": "09-secondary-score-bug",
+  "up-next-bug": "10-up-next-bug",
+  "up-next": "10-up-next-bug",
+  "match-scores-day": "11-match-scores-day",
+  "starting-soon": "12-starting-soon",
+  "starting-soon-basic": "12-starting-soon",
+  "stream-ended": "13-stream-ended",
+  outro: "13-stream-ended",
+  "top-scorers": "14-top-scorers",
+  orgs: "15-orgs",
+  "orgs-roster": "15-orgs",
+  coaches: "16-coaches",
+  "coach-intros": "16-coaches",
+  penalties: "17-penalties",
+  "player-penalties": "17-penalties",
+};
+
 type SearchParams = {
   session?: string;
   token?: string;
@@ -86,7 +123,11 @@ export default async function OverlayV2Page({
 }): Promise<ReactElement> {
   const { key } = await params;
   const { session, token, season, preview, active, slot } = await searchParams;
-  if (!ALLOWED_KEYS.has(key)) redirect("/overlay/v2/01-brb");
+  if (!ALLOWED_KEYS.has(key)) {
+    const alias = KEY_ALIASES[key];
+    if (alias) redirect(`/overlay/v2/${alias}`);
+    redirect("/overlay/v2/01-brb");
+  }
 
   // Ambient-session resolve (2026-04-26):
   //

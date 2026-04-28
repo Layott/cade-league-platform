@@ -4,7 +4,15 @@ import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { StatusPill } from "@/components/admin/StatusPill";
-import { PrimaryButton } from "@/components/admin/buttons";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  DangerButton,
+} from "@/components/admin/buttons";
+import {
+  publishNowFromDetail,
+  unpublishFromDetail,
+} from "./[id]/actions";
 
 type Row = {
   id: string;
@@ -93,6 +101,39 @@ export default async function AnnouncementsListPage() {
             no
           </span>
         ),
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      align: "right",
+      render: (r) => (
+        <div className="flex items-center justify-end gap-2">
+          <Link href={`/admin/announcements/${r.id}`}>
+            <SecondaryButton type="button">Open</SecondaryButton>
+          </Link>
+          {r.published_at ? (
+            <form action={unpublishFromDetail}>
+              <input type="hidden" name="id" value={r.id} />
+              <DangerButton
+                type="submit"
+                data-testid={`unpublish-row-${r.id}`}
+              >
+                Unpublish
+              </DangerButton>
+            </form>
+          ) : (
+            <form action={publishNowFromDetail}>
+              <input type="hidden" name="id" value={r.id} />
+              <PrimaryButton
+                type="submit"
+                data-testid={`publish-row-${r.id}`}
+              >
+                Publish
+              </PrimaryButton>
+            </form>
+          )}
+        </div>
+      ),
     },
   ];
 
