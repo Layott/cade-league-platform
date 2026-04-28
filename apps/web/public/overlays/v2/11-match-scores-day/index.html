@@ -770,6 +770,7 @@
   .marquee-group .partner--pride    { height: 80px; }
   .marquee-group .partner--africa   { height: 80px; }
   .marquee-group .partner--trace    { height: 80px; }
+  .marquee-group .partner--oas      { height: 80px; }
   @keyframes footer-loop {
     0%   { opacity: 0; transform: translateY(20px); }
     7%   { opacity: 1; transform: translateY(0); }
@@ -818,7 +819,7 @@
     </div>
 
     <!-- Up to 12 match rows in a 2-column grid (6 left + 6 right) -->
-    <!-- data-static-sample="1" marks the inline JOSH/ANIFE/etc rows below
+    <!-- data-static-sample="1" marks the inline FARUK/ANIFE/etc rows below
          as the unedited static sample. The first non-empty `update`
          flips this to "0" so subsequent empty Trigger payloads do not
          wipe the live data. See rebuildRows() guard. -->
@@ -1091,18 +1092,21 @@
             <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
             <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
             <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
+            <img class="partner partner--oas"     src="/overlays/v2/_assets/logos/processed/OAS%20esport_strip.png" alt="OAS esport" />
           </div>
           <div class="marquee-group" aria-hidden="true">
             <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="" />
             <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="" />
             <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="" />
             <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="" />
+            <img class="partner partner--oas"     src="/overlays/v2/_assets/logos/processed/OAS%20esport_strip.png" alt="" />
           </div>
           <div class="marquee-group" aria-hidden="true">
             <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="" />
             <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="" />
             <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="" />
             <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="" />
+            <img class="partner partner--oas"     src="/overlays/v2/_assets/logos/processed/OAS%20esport_strip.png" alt="" />
           </div>
         </div>
       </div>
@@ -1185,18 +1189,10 @@
           // rows: []}` to fire the entry animation) MUST NOT clear the
           // existing rendered rows. Without this guard, triggering the
           // overlay AFTER the initial-fetch populated the grid would
-          // wipe the live data and the operator would see an empty
-          // canvas. We only clear if no rows have ever been rendered
-          // (the static sample is still in the DOM) AND we're in a
-          // fresh-mount context — the initial-fetch effect is the
-          // only path that should land non-empty data first.
-          //
-          // To preserve the original "don't leak the static sample"
-          // intent for OBS-without-session smoke previews, we keep the
-          // clear behaviour ONLY when `wrap` still contains the static
-          // sample marker (data-static-sample). After the first
-          // non-empty rebuild we strip that marker, so subsequent
-          // empty payloads no-op.
+          // wipe the live data. We only clear when the static sample
+          // is still in the DOM — after the first non-empty rebuild
+          // we flip data-static-sample="0" and subsequent empty
+          // payloads no-op.
           if (wrap.dataset.staticSample === '1') {
             wrap.innerHTML = '';
             wrap.dataset.staticSample = '0';

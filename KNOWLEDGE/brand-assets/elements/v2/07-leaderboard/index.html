@@ -1,34 +1,36 @@
 <!DOCTYPE html>
 <!--
-  CADE ELITE LEAGUE — OVERLAY #07-LEADERBOARD — "ANIMATED STANDINGS" (V2 PILOT SYSTEM)
-  Full league table for 13 elite players, animated FLIP swap from Snapshot A → Snapshot B.
-  Pilot system inherited: halftone bg + top CADE/ProLeague logos + side chevrons + bottom partner marquee.
-  Center: 13-row gamer-UI HUD-frame table (Pos | Photo | Org | Name | P | W-D-L | GF-GA | GD | Sanctions | Pts).
+  CADE ELITE LEAGUE — OVERLAY #07-LEADERBOARD — "TWO-COLUMN ELITE TABLE"
+  Two-column standings: rows 1-6 LEFT, rows 7-13 RIGHT.
+  Columns: POS · PLAYER · MP · W · L · D · GD · PTS.
+  Top-2 of each column (1, 2 + 7, 8) highlighted with green-fill chip.
 
-  Animation orchestration:
-    Phase 1 (0-1.5s)   table renders Snapshot A (OLD positions) — fade-in
-    Phase 2 (1.5-2s)   "POSITIONS UPDATING" tag flashes
-    Phase 3 (2-7s)     rows reorder to Snapshot B in BATCHES OF 2 with 500ms pauses between batches
-                       (7 batches: pairs 1-2, 3-4, 5-6, 7-8, 9-10, 11-12, then row 13; transform: translateY)
-    Phase 4 (7-10s)    final state holds; movement arrows up-N (green) / down-N (pink) flash next to moved
-                       rows, fading out after 3000ms
+  DATA CONTRACT (per CLAUDE.md §14):
+    postMessage envelope { type: 'show'|'hide'|'update', data, slot? }
+    data shape supports any of:
+      - { rows: [{pos, name, mp, w, l, d, gd, pts}] }
+      - { standings: [...] }
+      - { payload: { rows: [...] } }
+    server feed at /api/broadcast/sessions/[id]/leaderboard returns
+      { rows: [{rank, player_name, displayName, slug, matches_played, wins, draws, losses, goals_for, goals_against, goal_difference, points}] }
+    so we map server snake_case + display* fields into the local view.
 
-  Sanctions column treatment: dedicated 11th column between GD and Pts. Empty by default; when populated
-  with a string like "-3 PTS" or "-2 GD" it renders inside a small pink-outlined HUD chip. Currently:
-  KILLER FREAK has "-1 GD", WOLEVATION has "-3 PTS", everyone else empty (the chip slot is reserved width
-  even when empty so column alignment never shifts).
-
-  DATA WIRES: snapshotA, snapshotB (each = players[] with sanctions field), batchSize=2, batchPauseMs=500, arrowFadeMs=3000
+  GATE CONTRACT:
+    body default = no cade-visible class. Inner gated via CSS rule
+    `body:not(.cade-visible):not(.cade-exiting) .gated { opacity: 0 }`.
+    cade-visible-gate-observer-v2 forces inline opacity:1 on cade-visible
+    so Chrome cross-origin iframe stuck-transition cannot leave anything
+    at 0. Demo loop fires only with ?demo=1.
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="color-scheme" content="dark" />
   <meta name="viewport" content="width=1920, initial-scale=1" />
-  <title>CADE — Animated Leaderboard</title>
+  <title>CADE — Elite League Leaderboard</title>
 
 <style>
-  /* REAL BRAND FONTS (inherited from pilot) */
+  /* REAL BRAND FONTS */
   @font-face {
     font-family: 'Agharti';
     src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
@@ -78,32 +80,15 @@
   :root {
     --green:        #6bcd06;
     --green-glow:   rgba(107, 205, 6, 0.55);
-    --green-faint:  rgba(107, 205, 6, 0.18);
+    --green-deep:   #5cb305;
+    --green-bright: #82e018;
     --pink:         #fe036d;
     --pink-glow:    rgba(254, 3, 109, 0.55);
-    --pink-faint:   rgba(254, 3, 109, 0.18);
-    --gold:         #e6c832;
-    --gold-glow:    rgba(230, 200, 50, 0.55);
     --black:        #050505;
-    --row-bg:       rgba(8, 12, 8, 0.78);
-    --row-border:   rgba(107, 205, 6, 0.30);
     --ink:          #ffffff;
-    --ink-muted:    rgba(255,255,255,0.72);
+    --ink-muted:    rgba(255, 255, 255, 0.78);
     --display:      'Agharti', 'Impact', sans-serif;
     --accent:       'Quedora', 'Inter', sans-serif;
-    /* 2026-04-26 list-style brief: rows boosted from 46→56px (max that
-       still fits 13 rows + headers + partner marquee in 1080p budget),
-       with a 4px gap so each row reads as its own list item. Striped
-       alternate-row backgrounds reinforce that. The big visual win is
-       the per-row slide-in animation (was broken — see comment on
-       `.row` keyframe — rows now stagger in from the left @ 80ms). */
-    --row-h:        44px;
-    --row-gap:      3px;
-    /* Tier colors for position numbers — gold #1, silver #2, bronze #3. */
-    --silver:       #c9d4dd;
-    --silver-glow:  rgba(201, 212, 221, 0.55);
-    --bronze:       #d68a45;
-    --bronze-glow:  rgba(214, 138, 69, 0.55);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,18 +100,17 @@
     font-family: var(--accent);
     -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
   }
-  /* === SPLIT GATE (Category B full-canvas):
-     Body always opacity 1 — bg-image stays visible.
-     Inner content shells hidden until cade-visible. === */
   body { opacity: 1 !important; }
-  body:not(.cade-visible):not(.cade-exiting) .bg-image,
+
+  /* Gate inner content until cade-visible. Background stays gated too
+     so the green wall doesn't leak when the overlay is dormant. */
+  body:not(.cade-visible):not(.cade-exiting) .bg-fill,
+  body:not(.cade-visible):not(.cade-exiting) .bg-halftone,
   body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
-  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
-  body:not(.cade-visible):not(.cade-exiting) .chevrons,
+  body:not(.cade-visible):not(.cade-exiting) .corner-badge,
   body:not(.cade-visible):not(.cade-exiting) .headline,
-  body:not(.cade-visible):not(.cade-exiting) .updating-tag,
-  body:not(.cade-visible):not(.cade-exiting) .table-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .table-block,
   body:not(.cade-visible):not(.cade-exiting) .col-headers,
   body:not(.cade-visible):not(.cade-exiting) .rows,
   body:not(.cade-visible):not(.cade-exiting) .row,
@@ -135,33 +119,18 @@
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
   }
-  body:not(.cade-visible):not(.cade-exiting) .top-band,
-  body:not(.cade-visible):not(.cade-exiting) .chevrons,
-  body:not(.cade-visible):not(.cade-exiting) .headline,
-  body:not(.cade-visible):not(.cade-exiting) .table-wrap,
-  body:not(.cade-visible):not(.cade-exiting) .partners,
-  body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
-  body:not(.cade-visible):not(.cade-exiting) .season-mark {
-    animation-name: none !important;
-  }
-  body.cade-exiting .bg-image,
+  body.cade-exiting .bg-fill,
+  body.cade-exiting .bg-halftone,
   body.cade-exiting .bg-vignette,
-  body.cade-exiting .bg-grain {
-    opacity: 0 !important;
-    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
-  }
   body.cade-exiting .top-band,
-  body.cade-exiting .chevrons,
+  body.cade-exiting .corner-badge,
   body.cade-exiting .headline,
-  body.cade-exiting .table-wrap,
+  body.cade-exiting .table-block,
   body.cade-exiting .partners,
   body.cade-exiting .matchday-mark,
   body.cade-exiting .season-mark {
-    animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
-  }
-  @keyframes cade-fade-out {
-    0%   { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-8px); }
+    opacity: 0 !important;
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
 
   /* TRANSPARENT canvas */
@@ -173,354 +142,207 @@
     isolation: isolate;
   }
 
-  /* halftone-green stadium texture */
-  .bg-image {
-    position: absolute; inset: -3% -3%;
-    background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png');
-    background-size: cover; background-position: center; background-repeat: no-repeat;
-    transform-origin: 50% 50%;
-    animation: bg-drift 20s ease-in-out infinite alternate,
-               bg-breathe 6s ease-in-out infinite;
+  /* ============================================================
+     BACKGROUND — bright lime-green wall + halftone-dot texture.
+  ============================================================ */
+  .bg-fill {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, var(--green-bright) 0%, var(--green) 32%, var(--green-deep) 100%);
     z-index: 0;
   }
-  @keyframes bg-drift {
-    0%   { transform: scale(1.00) translate(0, 0); }
-    100% { transform: scale(1.04) translate(-1.2%, -0.6%); }
+  .bg-halftone {
+    position: absolute; inset: -2%;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.42) 1.4px, transparent 1.7px);
+    background-size: 14px 14px;
+    background-position: 0 0;
+    opacity: 0.65;
+    mix-blend-mode: multiply;
+    z-index: 1;
+    pointer-events: none;
+    /* slow drift so the dot field doesn't read as a static wallpaper */
+    animation: halftone-drift 28s ease-in-out infinite alternate;
   }
-  @keyframes bg-breathe {
-    0%, 100% { filter: brightness(1.00) saturate(1.00); }
-    50%      { filter: brightness(1.02) saturate(1.05); }
+  @keyframes halftone-drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-12px, -8px) scale(1.04); }
   }
   .bg-vignette {
     position: absolute; inset: 0;
     background:
-      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
-      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
-    z-index: 1; pointer-events: none;
-  }
-  .bg-grain {
-    position: absolute; inset: 0;
-    background-image: repeating-linear-gradient(
-      to bottom,
-      rgba(255,255,255,0.012) 0 1px,
-      transparent 1px 3px
-    );
-    z-index: 2; pointer-events: none; mix-blend-mode: overlay;
+      radial-gradient(ellipse at 50% 38%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.05) 55%, rgba(0,0,0,0.28) 100%),
+      linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 65%, rgba(0,0,0,0.20) 100%);
+    z-index: 2;
+    pointer-events: none;
   }
 
-  /* TOP HEADER BAND (CADE | PRO LEAGUE) */
+  /* ============================================================
+     TOP HEADER BAND — CADE Esports logo (left) + League badge (right)
+  ============================================================ */
   .top-band {
-    position: absolute; top: 14px; left: 0; right: 0; height: 110px;
-    display: flex; align-items: center; justify-content: center; gap: 38px;
+    position: absolute;
+    top: 30px;
+    left: 0; right: 0;
+    height: 130px;
     z-index: 10;
   }
-  .top-band .logo {
-    height: 92px; width: auto; display: block;
-    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  .top-band .logo-cade {
+    position: absolute;
+    top: 8px; left: 50px;
+    height: 116px; width: auto;
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
   }
-  .top-band .logo--cade { height: 84px; }
-  .top-band .logo--pro  { height: 100px; }
-  .top-band .divider {
-    width: 2px; height: 88px;
-    background: linear-gradient(
-      to bottom,
-      rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 20%,
-      rgba(255,255,255,0.85) 50%, rgba(255,255,255,0.55) 80%,
-      rgba(255,255,255,0) 100%
-    );
-    border-radius: 1px;
+  .corner-badge {
+    position: absolute;
+    top: 28px; right: 56px;
+    z-index: 10;
   }
-
-  /* SIDE CHEVRONS */
-  .chevrons {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    display: flex; flex-direction: column; gap: 38px;
-    z-index: 5; pointer-events: none;
-  }
-  .chevrons--left  { left: 30px; }
-  .chevrons--right { right: 30px; }
-  .chevron {
-    width: 60px; height: 44px;
-    color: var(--green); opacity: 0.45;
-    animation: chev-pulse 4.2s ease-in-out infinite;
-  }
-  .chevron svg { width: 100%; height: 100%; display: block; }
-  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
-  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
-  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
-  .chevrons--left  .chevron:nth-child(4) { animation-delay: 1.2s;  }
-  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
-  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
-  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
-  .chevrons--right .chevron:nth-child(4) { animation-delay: 1.8s;  }
-  @keyframes chev-pulse {
-    0%, 100% { opacity: 0.25; transform: translateX(0); }
-    50%      { opacity: 0.75; transform: translateX(6px); }
-  }
-  .chevrons--right .chevron { animation-name: chev-pulse-right; }
-  @keyframes chev-pulse-right {
-    0%, 100% { opacity: 0.25; transform: translateX(0); }
-    50%      { opacity: 0.75; transform: translateX(-6px); }
+  .corner-badge img {
+    height: 100px; width: auto;
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
   }
 
-  /* HEADLINE BLOCK */
+  /* ============================================================
+     HEADLINE — "ELITE LEAGUE" small + "LEADERBOARD" giant
+  ============================================================ */
   .headline {
     position: absolute;
-    top: 130px;
-    left: 50%; transform: translateX(-50%);
-    width: 1480px;
-    text-align: center;
-    z-index: 15;
-  }
-  .title {
-    font-family: var(--display);
-    font-weight: 900; font-stretch: 75%;
-    font-size: 70px; line-height: 0.92;
-    letter-spacing: -0.005em; color: var(--ink);
-    text-transform: uppercase;
-    margin: 0 0 4px;
-    text-shadow:
-      0 0 1px rgba(255,255,255,0.85),
-      0 4px 16px rgba(0,0,0,0.65),
-      0 0 28px rgba(107,205,6,0.16);
-  }
-  .title em {
-    font-style: normal;
-    color: var(--green);
-    text-shadow:
-      0 0 1px rgba(107,205,6,0.85),
-      0 4px 16px rgba(0,0,0,0.65),
-      0 0 38px var(--green-glow);
-  }
-  .title-rule {
-    width: 180px; height: 4px;
-    margin: 6px auto 0;
-    background: var(--pink);
-    border-radius: 3px;
-    box-shadow: 0 0 14px var(--pink-glow), 0 0 28px rgba(254,3,109,0.30);
-  }
-
-  /* updating tag — phase 2 flash */
-  .updating-tag {
-    position: absolute;
-    top: 218px;
-    left: 50%; transform: translateX(-50%);
-    font-family: var(--accent);
-    font-weight: 700; font-size: 16px;
-    letter-spacing: 0.32em; color: var(--green);
-    text-transform: uppercase;
-    padding: 6px 18px;
-    border: 1.5px solid var(--green);
-    border-radius: 3px;
-    background: rgba(8,16,4,0.78);
-    box-shadow: 0 0 20px var(--green-glow), inset 0 0 12px rgba(107,205,6,0.18);
-    opacity: 0;
-    z-index: 30;
-  }
-  .updating-tag::before {
-    content: '';
-    display: inline-block;
-    width: 8px; height: 8px;
-    background: var(--green);
-    border-radius: 50%;
-    margin-right: 10px; transform: translateY(-1px);
-    box-shadow: 0 0 8px var(--green-glow);
-    animation: tag-dot 0.8s ease-in-out infinite;
-  }
-  @keyframes tag-dot {
-    0%, 100% { opacity: 0.5; transform: translateY(-1px) scale(1); }
-    50%      { opacity: 1.0; transform: translateY(-1px) scale(1.4); }
-  }
-  .updating-tag.flash {
-    animation: tag-flash 1.2s ease-out forwards;
-  }
-  @keyframes tag-flash {
-    0%   { opacity: 0; transform: translateX(-50%) translateY(8px); }
-    18%  { opacity: 1; transform: translateX(-50%) translateY(0); }
-    82%  { opacity: 1; transform: translateX(-50%) translateY(0); }
-    100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-  }
-
-  /* TABLE BLOCK */
-  .table-wrap {
-    position: absolute;
-    top: 220px;
+    top: 70px;
     left: 50%;
     transform: translateX(-50%);
-    width: 1480px;
-    z-index: 14;
+    width: 1100px;
+    text-align: center;
+    z-index: 12;
+  }
+  .headline .eyebrow {
+    font-family: var(--display);
+    font-weight: 900; font-stretch: 75%;
+    font-size: 64px; line-height: 0.92;
+    letter-spacing: 0.012em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255, 255, 255, 0.55),
+      0 4px 18px rgba(0, 0, 0, 0.30);
+    margin-bottom: -8px;
+  }
+  .headline .title {
+    font-family: var(--display);
+    font-weight: 900; font-stretch: 75%;
+    font-size: 158px; line-height: 0.86;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255, 255, 255, 0.85),
+      0 6px 22px rgba(0, 0, 0, 0.45),
+      0 0 36px rgba(255, 255, 255, 0.18);
   }
 
-  /* Hide partner strip on leaderboard (user request 2026-04-26) */
-  .partners { display: none !important; }
-
-  /* column header strip — grid columns must match `.row` exactly. */
+  /* ============================================================
+     TABLE BLOCK — TWO COLUMNS (1-6 LEFT, 7-13 RIGHT)
+  ============================================================ */
+  .table-block {
+    position: absolute;
+    top: 320px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1820px;
+    z-index: 14;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 56px;
+    row-gap: 0;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  /* Column header strip — must match `.row` grid exactly */
   .col-headers {
     display: grid;
     grid-template-columns:
-      72px           /* Pos */
-      60px           /* Photo */
-      54px           /* Org */
-      1fr            /* Name */
-      56px           /* P */
-      130px          /* W-D-L */
-      120px          /* GF-GA */
-      80px           /* GD */
-      130px          /* Sanctions */
-      88px;          /* Pts */
-    gap: 12px;
-    align-items: center;
-    padding: 0 26px;
-    height: 36px;
-    margin-bottom: 8px;
-    font-family: var(--accent);
-    font-weight: 700;
-    font-size: 14px;
-    letter-spacing: 0.28em;
-    color: rgba(255,255,255,0.78);
+      62px      /* POS */
+      1fr       /* PLAYER NAME */
+      54px      /* MP */
+      54px      /* W */
+      54px      /* L */
+      54px      /* D */
+      72px      /* GD */
+      78px;     /* PTS */
+    column-gap: 6px;
+    align-items: end;
+    padding: 0 14px 8px;
+    height: 38px;
+    font-family: var(--display);
+    font-weight: 700; font-stretch: 75%;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
     text-transform: uppercase;
-    border-bottom: 1px solid rgba(107,205,6,0.30);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   }
   .col-headers .h--name { text-align: left; padding-left: 4px; }
   .col-headers .h--center { text-align: center; }
-  .col-headers .h--pts { text-align: center; color: var(--green); letter-spacing: 0.36em; }
+  .col-headers .h--pts { text-align: center; }
 
-  /* table track — relative positioning context for absolute rows.
-     Height = 13 rows * (row-h + row-gap). */
+  /* Row track */
   .rows {
-    position: relative;
-    height: calc(13 * (var(--row-h) + var(--row-gap)));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
-  /* ROW: gamer-UI HUD frame — list-style 2026-04-26.
-     Each row is its own list item: 72px tall, separated by 8px gap, with
-     a thin pink top-border on rows 2-13 (separator) so the list reads
-     scannable at a glance. Position via translateY using CSS variable
-     `--row-y` so the keyframe can compose translate(X, Y) without
-     clobbering vertical layout. */
+  /* ROW
+     The card is a black HUD strip with angled corner cuts. Top-2 rows
+     in each column get a green-fill chip via .is-top class.
+     `--row-y` not used for two-column layout (rows are in flow). */
   .row {
-    position: absolute;
-    left: 0; right: 0;
-    height: var(--row-h);
     display: grid;
     grid-template-columns:
-      72px 60px 54px 1fr 56px 130px 120px 80px 130px 88px;
-    gap: 12px;
+      62px 1fr 54px 54px 54px 54px 72px 78px;
+    column-gap: 6px;
     align-items: center;
-    padding: 0 26px;
-    /* angled corner cuts via clip-path (left + right notches) */
+    padding: 0 14px;
+    height: 56px;
+    background: rgba(8, 12, 8, 0.92);
+    color: var(--ink);
+    /* angled corner cuts (chevron-tab on the LEFT — matches the
+       reference image's leading-edge accent) */
     clip-path: polygon(
-      14px 0,
-      calc(100% - 14px) 0,
-      100% 14px,
-      100% calc(100% - 14px),
-      calc(100% - 14px) 100%,
-      14px 100%,
-      0 calc(100% - 14px),
-      0 14px
+      18px 0,
+      100% 0,
+      100% 100%,
+      18px 100%,
+      0 50%
     );
-    background: var(--row-bg);
     box-shadow:
-      inset 0 0 0 1.5px var(--row-border),
-      inset 0 0 28px rgba(107,205,6,0.06);
-    /* row reorder transition (when standings update mid-show); the
-       initial entrance animation overrides this on first paint. */
-    transition: transform 0.55s cubic-bezier(0.7, 0.0, 0.2, 1);
-    will-change: transform, opacity;
-    opacity: 0;
-    /* Default Y position — overridden by inline style.setProperty('--row-y'). */
-    --row-y: 0px;
-    transform: translate(0, var(--row-y));
-  }
-  /* Striped alternate rows — even indexes get a darker shade so the list
-     reads as discrete items even when scanned quickly. */
-  .row:nth-child(even) {
-    background: rgba(4, 8, 4, 0.86);
-  }
-  /* 2026-04-26 — slide-in keyframe COMPOSES with translateY so rows
-     keep their vertical position while sliding in from the left.
-     Without `var(--row-y)` in the keyframe, the animation overrides
-     the inline `transform: translateY(Npx)` that the JS row-builder
-     sets, collapsing every row to y=0 (the "all players on one line"
-     bug the user reported). Each row slides in with an 80ms stagger
-     so all 13 rows sequence "drop into place" rather than fading
-     together. The gate-observer below skips `.row` so this animation
-     is the single source of truth on entrance. */
-  body.cade-visible .row {
-    /* Use transition not animation — Chrome cross-origin iframe lifecycle
-       eats keyframe animations on dynamically-inserted rows. The gate
-       observer sets opacity:1 inline !important on cade-visible; transition
-       animates the flip. translateX shift driven by body.cade-visible class. */
-    opacity: 0;
+      inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 4px 14px rgba(0, 0, 0, 0.22);
     transition: opacity 360ms ease-out, transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  body.cade-visible .row:nth-child(1)  { transition-delay: 0ms;   }
-  body.cade-visible .row:nth-child(2)  { transition-delay: 30ms;  }
-  body.cade-visible .row:nth-child(3)  { transition-delay: 60ms;  }
-  body.cade-visible .row:nth-child(4)  { transition-delay: 90ms;  }
-  body.cade-visible .row:nth-child(5)  { transition-delay: 120ms; }
-  body.cade-visible .row:nth-child(6)  { transition-delay: 150ms; }
-  body.cade-visible .row:nth-child(7)  { transition-delay: 180ms; }
-  body.cade-visible .row:nth-child(8)  { transition-delay: 210ms; }
-  body.cade-visible .row:nth-child(9)  { transition-delay: 240ms; }
-  body.cade-visible .row:nth-child(10) { transition-delay: 270ms; }
-  body.cade-visible .row:nth-child(11) { transition-delay: 300ms; }
-  body.cade-visible .row:nth-child(12) { transition-delay: 330ms; }
-  body.cade-visible .row:nth-child(13) { transition-delay: 360ms; }
-  body.cade-visible .row { opacity: 1; }
-  @keyframes row-slide-in {
-    from { opacity: 0; transform: translate(-80px, var(--row-y)); }
-    to   { opacity: 1; transform: translate(0, var(--row-y)); }
+    will-change: opacity, transform;
   }
 
-  /* leader (pos 1) — heavier glow + gold mark */
-  .row.is-leader {
+  /* Top 2 in each column — green-fill highlight (per reference) */
+  .row.is-top {
+    background: var(--green);
+    color: var(--black);
     box-shadow:
-      inset 0 0 0 2px var(--green),
-      inset 0 0 36px rgba(107,205,6,0.20),
-      0 0 26px rgba(107,205,6,0.30);
-    background: linear-gradient(
-      90deg,
-      rgba(107,205,6,0.18) 0%,
-      rgba(8,12,8,0.85) 36%,
-      rgba(8,12,8,0.85) 100%
-    );
+      inset 0 0 0 1px rgba(0, 0, 0, 0.18),
+      0 4px 14px rgba(0, 0, 0, 0.30);
   }
-  .row.is-leader .pos-num { color: var(--gold); text-shadow: 0 0 12px var(--gold-glow); }
+  .row.is-top .pos-num,
+  .row.is-top .player-name,
+  .row.is-top .stat,
+  .row.is-top .pts {
+    color: var(--black);
+    text-shadow: none;
+  }
+  .row.is-top .stat-gd.pos { color: rgba(0, 0, 0, 0.78); }
+  .row.is-top .stat-gd.neg { color: rgba(0, 0, 0, 0.62); }
 
-  /* gold corner mark — top-left tiny triangle */
-  .gold-mark {
-    position: absolute;
-    top: 4px; left: 4px;
-    width: 16px; height: 16px;
-    pointer-events: none;
-  }
-  .gold-mark::before {
-    content: '';
-    position: absolute; top: 0; left: 0;
-    width: 0; height: 0;
-    border-top: 14px solid var(--gold);
-    border-right: 14px solid transparent;
-    filter: drop-shadow(0 0 6px var(--gold-glow));
-  }
-
-  /* tail (pos 13) — pink accent */
-  .row.is-tail {
-    box-shadow:
-      inset 0 0 0 1.5px var(--pink),
-      inset 0 0 24px rgba(254,3,109,0.16);
-    background: linear-gradient(
-      90deg,
-      rgba(254,3,109,0.18) 0%,
-      rgba(8,12,8,0.85) 36%,
-      rgba(8,12,8,0.85) 100%
-    );
-  }
-  .row.is-tail .pos-num { color: var(--pink); text-shadow: 0 0 12px var(--pink-glow); }
-
-  /* ROW INTERNALS — 2026-04-26: position number boosted to 42px and
-     tier-colored (gold #1, silver #2, bronze #3, white rest) so the
-     leader's place reads instantly at a glance. */
+  /* ROW INTERNALS */
   .pos-num {
     font-family: var(--display);
     font-weight: 900; font-stretch: 75%;
@@ -528,257 +350,118 @@
     color: var(--ink);
     text-align: center;
     letter-spacing: -0.02em;
-  }
-  .row[data-pos="2"] .pos-num {
-    color: var(--silver);
-    text-shadow: 0 0 12px var(--silver-glow);
-  }
-  .row[data-pos="3"] .pos-num {
-    color: var(--bronze);
-    text-shadow: 0 0 12px var(--bronze-glow);
-  }
-
-  .photo-wrap {
-    width: 42px; height: 42px;
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid rgba(107,205,6,0.55);
-    background: rgba(15, 22, 12, 0.85);
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto;
-    box-shadow: 0 0 10px rgba(107,205,6,0.20);
-  }
-  .row.is-leader .photo-wrap {
-    border-color: var(--gold);
-    box-shadow: 0 0 12px var(--gold-glow);
-  }
-  .row.is-tail .photo-wrap {
-    border-color: var(--pink);
-    box-shadow: 0 0 8px rgba(254,3,109,0.40);
-  }
-  .photo-wrap img {
-    width: 100%; height: 100%; object-fit: cover; object-position: center 18%;
-    display: block;
-  }
-
-  .org-wrap {
-    width: 34px; height: 34px;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto;
-  }
-  .org-wrap img {
-    max-width: 100%; max-height: 100%;
-    object-fit: contain; display: block;
-    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55));
-  }
-  .org-empty {
-    color: rgba(255,255,255,0.32);
-    font-family: var(--accent);
-    font-weight: 500;
-    font-size: 16px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
 
   .player-name {
     font-family: var(--display);
     font-weight: 900; font-stretch: 75%;
-    font-size: 22px; line-height: 1;
+    font-size: 26px; line-height: 1;
     color: var(--ink);
     text-transform: uppercase;
-    letter-spacing: 0.005em;
+    letter-spacing: 0.012em;
     text-align: left;
     padding-left: 6px;
-    position: relative;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
 
-  /* movement arrow chip — appears in phase 4 */
-  .move-chip {
-    display: inline-block;
-    margin-left: 12px;
-    font-family: var(--accent);
-    font-weight: 700; font-size: 14px;
-    letter-spacing: 0.06em;
-    padding: 2px 8px;
-    border-radius: 3px;
-    vertical-align: 4px;
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  .move-chip.up   {
-    color: var(--green);
-    background: rgba(107,205,6,0.14);
-    border: 1px solid rgba(107,205,6,0.55);
-    box-shadow: 0 0 10px rgba(107,205,6,0.30);
-  }
-  .move-chip.down {
-    color: var(--pink);
-    background: rgba(254,3,109,0.14);
-    border: 1px solid rgba(254,3,109,0.55);
-    box-shadow: 0 0 10px rgba(254,3,109,0.30);
-  }
-  .move-chip.show {
-    animation: chip-flash 3.3s ease-out forwards;
-  }
-  @keyframes chip-flash {
-    0%   { opacity: 0; transform: translateY(-2px) scale(0.85); }
-    8%   { opacity: 1; transform: translateY(0) scale(1.08); }
-    14%  { transform: translateY(0) scale(1); }
-    78%  { opacity: 1; transform: translateY(0) scale(1); }
-    100% { opacity: 0; transform: translateY(-3px) scale(0.95); }
-  }
-
-  /* numeric stat cells — 2026-04-26 distance-readability pass:
-     boosted from 17/18px → 26/28px so W/D/L/GF/GA/GD/PTS read clearly
-     on stream at 1080p when the leaderboard is small in frame. */
+  /* Numeric stat cells (MP / W / L / D / GD / PTS) */
   .stat {
     font-family: var(--display);
     font-weight: 800; font-stretch: 100%;
-    font-size: 22px;
-    color: #fff;
+    font-size: 24px; line-height: 1;
+    color: var(--ink);
     text-align: center;
-    letter-spacing: 0.01em;
-    text-shadow: 0 0 1px rgba(255,255,255,0.5);
+    letter-spacing: 0.005em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
-  .stat-wdl {
-    font-family: var(--display);
-    font-weight: 800; font-stretch: 100%;
-    font-size: 20px;
-    color: #fff;
-    text-align: center;
-    letter-spacing: 0.04em;
-    text-shadow: 0 0 1px rgba(255,255,255,0.5);
-  }
-  .stat-wdl em {
-    font-style: normal;
-    color: rgba(255,255,255,0.55);
-    padding: 0 4px;
-    font-weight: 500;
-  }
-  .stat-gd.pos { color: var(--green); text-shadow: 0 0 8px rgba(107,205,6,0.35); }
-  .stat-gd.neg { color: var(--pink); text-shadow: 0 0 8px rgba(254,3,109,0.35); }
-
-  /* sanctions chip */
-  .sanction {
-    display: inline-block;
-    font-family: var(--accent);
-    font-weight: 700; font-size: 11px;
-    letter-spacing: 0.10em;
-    color: var(--pink);
-    padding: 3px 8px;
-    border: 1px solid rgba(254,3,109,0.65);
-    border-radius: 3px;
-    background: rgba(254,3,109,0.10);
-    box-shadow: inset 0 0 8px rgba(254,3,109,0.10);
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-  .sanction-empty {
-    color: rgba(255,255,255,0.20);
-    font-family: var(--accent);
-    font-weight: 400;
-    font-size: 16px;
-  }
-  .sanctions-cell { text-align: center; }
+  .stat-gd.pos { color: var(--green-bright); }
+  .stat-gd.neg { color: #ffb6cf; }
 
   .pts {
     font-family: var(--display);
     font-weight: 900; font-stretch: 100%;
-    font-size: 22px; line-height: 1;
-    color: var(--green);
+    font-size: 26px; line-height: 1;
+    color: var(--ink);
     text-align: center;
-    text-shadow: 0 0 14px rgba(107,205,6,0.30);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
-  .row.is-leader .pts { color: var(--gold); text-shadow: 0 0 14px var(--gold-glow); }
-  .row.is-tail   .pts { color: var(--pink); text-shadow: 0 0 14px var(--pink-glow); }
 
-  /* BOTTOM PARTNER STRIP (MARQUEE) */
+  /* ============================================================
+     STAGGERED ENTRANCE
+     Each row slides in from the left when body.cade-visible.
+     The gate observer sets opacity:1 inline; transition handles the flip.
+  ============================================================ */
+  body:not(.cade-visible) .row { opacity: 0; transform: translateX(-32px); }
+  body.cade-visible .row { opacity: 1; transform: translateX(0); }
+  body.cade-visible .col-left .row:nth-child(1)  { transition-delay: 60ms;   }
+  body.cade-visible .col-left .row:nth-child(2)  { transition-delay: 120ms;  }
+  body.cade-visible .col-left .row:nth-child(3)  { transition-delay: 180ms;  }
+  body.cade-visible .col-left .row:nth-child(4)  { transition-delay: 240ms;  }
+  body.cade-visible .col-left .row:nth-child(5)  { transition-delay: 300ms;  }
+  body.cade-visible .col-left .row:nth-child(6)  { transition-delay: 360ms;  }
+  body.cade-visible .col-right .row:nth-child(1) { transition-delay: 90ms;   }
+  body.cade-visible .col-right .row:nth-child(2) { transition-delay: 150ms;  }
+  body.cade-visible .col-right .row:nth-child(3) { transition-delay: 210ms;  }
+  body.cade-visible .col-right .row:nth-child(4) { transition-delay: 270ms;  }
+  body.cade-visible .col-right .row:nth-child(5) { transition-delay: 330ms;  }
+  body.cade-visible .col-right .row:nth-child(6) { transition-delay: 390ms;  }
+  body.cade-visible .col-right .row:nth-child(7) { transition-delay: 450ms;  }
+
+  /* ============================================================
+     PARTNER STRIP — bottom row, 5 logos (added OAS esport)
+  ============================================================ */
   .partners {
     position: absolute;
-    left: 0; right: 0; bottom: 24px;
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    left: 0; right: 0;
+    bottom: 36px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 64px;
     z-index: 12;
+    padding: 14px 40px;
   }
-  .partners-label {
-    /* 2026-04-26: hide the "OFFICIAL PARTNERS" label per user request —
-       saves vertical space + lets the partner logos own the strip cleanly. */
-    display: none;
-    font-family: var(--accent);
-    font-weight: 500; font-size: 10px;
-    letter-spacing: 0.42em; color: rgba(255,255,255,0.65);
-    text-transform: uppercase;
-  }
-  .marquee {
-    position: relative;
-    width: 980px; max-width: 90%;
-    overflow: hidden;
-    padding: 8px 0;
-    background: rgba(8,8,8,0.55);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
-            mask-image: linear-gradient(to right, transparent 0, #000 60px, #000 calc(100% - 60px), transparent 100%);
-  }
-  .marquee-track {
-    display: flex; width: max-content;
-    animation: marquee-scroll 40s linear infinite;
-    will-change: transform;
-  }
-  @keyframes marquee-scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-33.3333%); }
-  }
-  .marquee-group {
-    display: flex; align-items: center; justify-content: center;
-    gap: 60px; padding: 0 30px; flex-shrink: 0;
-  }
-  .marquee-group .partner {
-    /* 2026-04-26: shrunk from 80px → 56px for a more refined strip
-       (user feedback: logos were dominating the frame). */
-    height: 56px; width: auto; display: block;
+  .partners .partner {
+    height: 58px; width: auto;
     object-fit: contain;
-    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+    filter:
+      drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))
+      drop-shadow(0 0 1px rgba(0, 0, 0, 0.20));
   }
-  .marquee-group .partner--gameevo  { height: 56px; }
-  .marquee-group .partner--pride    { height: 56px; }
-  .marquee-group .partner--africa   { height: 56px; }
-  .marquee-group .partner--trace    { height: 56px; }
-
-  /* CORNER WATERMARK */
-  .season-mark {
-    position: absolute;
-    top: 24px; right: 32px;
-    font-family: var(--accent);
-    font-weight: 700; font-size: 11px;
-    letter-spacing: 0.40em; color: rgba(255,255,255,0.55);
-    text-transform: uppercase;
-    z-index: 12;
-  }
-  .season-mark::before {
-    content: '';
-    display: inline-block;
-    width: 8px; height: 8px;
-    background: var(--green);
-    border-radius: 50%;
-    margin-right: 10px; transform: translateY(-1px);
-    box-shadow: 0 0 10px var(--green-glow);
-    animation: dot-pulse 1.6s ease-in-out infinite;
-  }
-  @keyframes dot-pulse {
-    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
-    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  /* OAS logo on a green bg looks washed: lift it slightly with a backdrop chip */
+  .partners .partner--oas {
+    height: 58px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 6px;
+    padding: 6px 16px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
   }
 
-  /* match-day pill — left top */
+  /* ============================================================
+     CORNER WATERMARKS
+  ============================================================ */
   .matchday-mark {
     position: absolute;
-    top: 24px; left: 32px;
+    bottom: 16px; left: 36px;
     font-family: var(--accent);
-    font-weight: 700; font-size: 11px;
-    letter-spacing: 0.40em; color: rgba(255,255,255,0.55);
+    font-weight: 700; font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(0, 0, 0, 0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark {
+    position: absolute;
+    bottom: 16px; right: 36px;
+    font-family: var(--accent);
+    font-weight: 700; font-size: 12px;
+    letter-spacing: 0.40em;
+    color: rgba(0, 0, 0, 0.55);
     text-transform: uppercase;
     z-index: 12;
   }
@@ -787,332 +470,93 @@
 <body>
   <main class="stage">
 
-    <!-- BG halftone + vignette + grain -->
-    <div class="bg-image" aria-hidden="true"></div>
+    <!-- BG : green wall + halftone dots + soft vignette -->
+    <div class="bg-fill" aria-hidden="true"></div>
+    <div class="bg-halftone" aria-hidden="true"></div>
     <div class="bg-vignette" aria-hidden="true"></div>
-    <div class="bg-grain" aria-hidden="true"></div>
 
     <!-- Corner marks -->
     <div class="matchday-mark">Live Update</div>
     <div class="season-mark">Elite League &middot; Season 2</div>
 
-    <!-- Top header: CADE | Pro League -->
+    <!-- Top header: CADE Esports left, League badge right -->
     <header class="top-band">
-      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
-      <span class="divider" aria-hidden="true"></span>
-      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+      <img class="logo-cade"
+           src="/overlays/v2/_assets/logos/1cade%20esport.png"
+           alt="CADE Esports" />
     </header>
-
-    <!-- Left chevrons -->
-    <div class="chevrons chevrons--left" aria-hidden="true">
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    </div>
-
-    <!-- Right chevrons (mirrored) -->
-    <div class="chevrons chevrons--right" aria-hidden="true">
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="corner-badge">
+      <img src="/overlays/v2/_assets/logos/pro%20league%20.png"
+           alt="National E-Soccer Pro League" />
     </div>
 
     <!-- Headline -->
     <section class="headline">
-      <h1 class="title">LEAGUE <em>STANDINGS</em></h1>
-      <div class="title-rule" aria-hidden="true"></div>
+      <div class="eyebrow">Elite League</div>
+      <h1 class="title">Leaderboard</h1>
     </section>
 
-    <!-- Updating tag -->
-    <div id="updating-tag" class="updating-tag">Positions Updating</div>
-
-    <!-- TABLE -->
-    <section class="table-wrap">
-      <div class="col-headers" aria-hidden="true">
-        <div class="h--center">Pos</div>
-        <div class="h--center"></div>
-        <div class="h--center">Org</div>
-        <div class="h--name">Player</div>
-        <div class="h--center">P</div>
-        <div class="h--center">W-D-L</div>
-        <div class="h--center">GF-GA</div>
-        <div class="h--center">GD</div>
-        <div class="h--center">Sanctions</div>
-        <div class="h--pts">Pts</div>
-      </div>
-      <div id="rows" class="rows"></div>
-    </section>
-
-    <!-- Partner marquee -->
-    <footer class="partners">
-      <span class="partners-label">Official Partners</span>
-      <div class="marquee" aria-label="Official partners ticker">
-        <div class="marquee-track">
-          <div class="marquee-group" aria-hidden="false">
-            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports" />
-            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
-            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
-            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
-          </div>
-          <div class="marquee-group" aria-hidden="true">
-            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="" />
-            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="" />
-            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="" />
-            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="" />
-          </div>
-          <div class="marquee-group" aria-hidden="true">
-            <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="" />
-            <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="" />
-            <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="" />
-            <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="" />
-          </div>
+    <!-- TABLE — TWO COLUMNS -->
+    <section class="table-block">
+      <div class="col col-left">
+        <div class="col-headers" aria-hidden="true">
+          <div class="h--center">Pos</div>
+          <div class="h--name">Player Name</div>
+          <div class="h--center">MP</div>
+          <div class="h--center">W</div>
+          <div class="h--center">L</div>
+          <div class="h--center">D</div>
+          <div class="h--center">GD</div>
+          <div class="h--pts">PTS</div>
         </div>
+        <div class="rows" id="rows-left"></div>
       </div>
+      <div class="col col-right">
+        <div class="col-headers" aria-hidden="true">
+          <div class="h--center">Pos</div>
+          <div class="h--name">Player Name</div>
+          <div class="h--center">MP</div>
+          <div class="h--center">W</div>
+          <div class="h--center">L</div>
+          <div class="h--center">D</div>
+          <div class="h--center">GD</div>
+          <div class="h--pts">PTS</div>
+        </div>
+        <div class="rows" id="rows-right"></div>
+      </div>
+    </section>
+
+    <!-- Partner strip — GameEvo, Gamepride, ESN, TRACE + OAS esport -->
+    <footer class="partners" aria-label="Official Partners">
+      <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20Black_strip.png" alt="GameEvo Esports" />
+      <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
+      <img class="partner partner--esn"     src="/overlays/v2/_assets/logos/processed/eSports%20Federation%20of%20Nigeria-1_strip.png" alt="eSports Federation of Nigeria" />
+      <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
+      <img class="partner partner--oas"     src="/overlays/v2/_assets/logos/processed/OAS%20esport_strip.png" alt="OAS esport" />
     </footer>
 
   </main>
 
 <script>
-  // DATA WIRES
-  // batchSize=2, batchPauseMs=500, arrowFadeMs=3000
-  // 2026-04-26 list-style update: row geometry now matches CSS vars
-  // --row-h (56px) + --row-gap (4px). Y position is written to a CSS
-  // variable `--row-y` (not inline transform) so the slide-in keyframe
-  // can compose translate(X, Y) without clobbering vertical position.
-  const ROW_HEIGHT  = 44;   // matches CSS --row-h
-  const ROW_GAP     = 3;    // matches CSS --row-gap
-  const STEP        = ROW_HEIGHT + ROW_GAP;
-  const BATCH_SIZE      = 2;
-  const BATCH_PAUSE_MS  = 500;
-  const ARROW_FADE_MS   = 3000;
+  /* ============================================================
+     DATA + RENDER — postMessage listener (data-feed driven).
+     CONTRACT (per CLAUDE.md §14):
+       show   → render data + add cade-visible
+       hide   → swap cade-visible → cade-exiting
+       update → re-render with new data, NO class change
 
-  // Phase timings (ms from t=0)
-  const T_PHASE2_START   = 1500;  // updating tag flashes
-  const T_PHASE3_START   = 2000;  // begin row reorder batches
-
-  // Player + org assets
-  const PLAYERS = {
-    adefola:        { name: 'ADEFOLA',       slug: 'adefola',       org: '/overlays/v2/_assets/Orgs/cade%20esport%20-%20ADEFOLA.png' },
-    anife:          { name: 'ANIFE',         slug: 'anife',         org: '/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg' },
-    baji_jnr:       { name: 'BAJI JNR',      slug: 'baji_jnr',      org: '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20BAJI%20JNR.png' },
-    dadaboi:        { name: 'DADABOI',       slug: 'dadaboi',       org: '/overlays/v2/_assets/Orgs/OUTLAWS%20%28WHITE0%20-%20DADABOI.png' },
-    faruk:          { name: 'FARUK',         slug: 'faruk',         org: '/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png' },
-    guru:           { name: 'GURU',          slug: 'guru',          org: '/overlays/v2/_assets/Orgs/YAKABU%20GLOBAL%20ENTERPRISE%20LIMITED%20-%20GURU.jpg' },
-    kaykay:         { name: 'KAYKAY',        slug: 'kaykay',        org: '/overlays/v2/_assets/Orgs/LUMO%20LABS%20-%20KAYKAY.png' },
-    killer_freak:   { name: 'KILLER FREAK',  slug: 'killer_freak',  org: '/overlays/v2/_assets/Orgs/GameEvo%20Esports%20White%20-%20KILLER%20FREAK.png' },
-    kingnonex:      { name: 'KING NONEX',    slug: 'kingnonex',     org: '/overlays/v2/_assets/Orgs/SOLAR%20FLARE%20-%20KING%20NONEX.png' },
-    mitch:          { name: 'MITCH',         slug: 'mitch',         org: '/overlays/v2/_assets/Orgs/PHOENIX%20ESPORTS%20-%20MITCH.png' },
-    mr_oga:         { name: 'MR OGA',        slug: 'mr_oga',        org: null },
-    tactical:       { name: 'TACTICAL',      slug: 'tactical',      org: '/overlays/v2/_assets/Orgs/FUNQUEST%20ESPORTS%20-%20TACTICAL.jpeg' },
-    wolevation:     { name: 'WOLEVATION',    slug: 'wolevation',    org: '/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg' }
-  };
-
-  // Snapshot A — OLD positions (1..13)
-  const snapshotA = [
-    'mr_oga', 'faruk', 'kaykay', 'adefola', 'anife',
-    'tactical', 'baji_jnr', 'guru', 'mitch', 'killer_freak',
-    'dadaboi', 'kingnonex', 'wolevation'
-  ];
-
-  // Snapshot B — NEW positions (1..13)
-  const snapshotB = [
-    'faruk', 'mr_oga', 'adefola', 'kaykay', 'anife',
-    'tactical', 'mitch', 'baji_jnr', 'guru', 'killer_freak',
-    'wolevation', 'dadaboi', 'kingnonex'
-  ];
-
-  // Stats keyed by player id (Snapshot B values)
-  const STATS = {
-    faruk:        { p: 5, w: 4, d: 1, l: 0, gf: 19, ga: 6,  gd:  13, pts: 13, sanctions: '' },
-    mr_oga:       { p: 5, w: 4, d: 0, l: 1, gf: 22, ga: 5,  gd:  17, pts: 12, sanctions: '' },
-    adefola:      { p: 5, w: 3, d: 2, l: 0, gf: 15, ga: 8,  gd:   7, pts: 11, sanctions: '' },
-    kaykay:       { p: 5, w: 3, d: 1, l: 1, gf: 14, ga: 9,  gd:   5, pts: 10, sanctions: '' },
-    anife:        { p: 5, w: 3, d: 0, l: 2, gf: 12, ga: 10, gd:   2, pts:  9, sanctions: '' },
-    tactical:     { p: 5, w: 2, d: 2, l: 1, gf: 11, ga: 10, gd:   1, pts:  8, sanctions: '' },
-    mitch:        { p: 5, w: 2, d: 1, l: 2, gf: 10, ga: 11, gd:  -1, pts:  7, sanctions: '' },
-    baji_jnr:     { p: 5, w: 2, d: 0, l: 3, gf:  9, ga: 11, gd:  -2, pts:  6, sanctions: '' },
-    guru:         { p: 5, w: 1, d: 2, l: 2, gf:  8, ga: 11, gd:  -3, pts:  5, sanctions: '' },
-    killer_freak: { p: 5, w: 1, d: 1, l: 3, gf:  7, ga: 13, gd:  -6, pts:  4, sanctions: '-1 GD' },
-    wolevation:   { p: 5, w: 1, d: 0, l: 4, gf:  6, ga: 14, gd:  -8, pts:  3, sanctions: '-3 PTS' },
-    dadaboi:      { p: 5, w: 0, d: 2, l: 3, gf:  4, ga: 12, gd:  -8, pts:  2, sanctions: '' },
-    kingnonex:    { p: 5, w: 0, d: 1, l: 4, gf:  3, ga: 15, gd: -12, pts:  1, sanctions: '' }
-  };
-
-  // ROW BUILDER
-  function fmtSigned(n) {
-    if (n > 0) return '+' + n;
-    if (n < 0) return String(n);
-    return '0';
-  }
-
-  function buildRow(pid, posIdx) {
-    const player = PLAYERS[pid];
-    const s = STATS[pid];
-    const pos = posIdx + 1;
-    const isLeader = pos === 1;
-    const isTail   = pos === 13;
-
-    const photoSrc = '/overlays/v2/_assets/players/processed/' + player.slug + '/headshot_01_nobg.png';
-
-    const orgHtml = player.org
-      ? '<img src="' + player.org + '" alt="" />'
-      : '<span class="org-empty">&mdash;</span>';
-
-    const sanctionHtml = s.sanctions
-      ? '<span class="sanction">' + s.sanctions + '</span>'
-      : '<span class="sanction-empty">&mdash;</span>';
-
-    const gdClass = s.gd > 0 ? 'pos' : (s.gd < 0 ? 'neg' : '');
-
-    const goldMark = isLeader ? '<div class="gold-mark" aria-hidden="true"></div>' : '';
-
-    const klass = ['row'];
-    if (isLeader) klass.push('is-leader');
-    if (isTail)   klass.push('is-tail');
-
-    const row = document.createElement('div');
-    row.className = klass.join(' ');
-    row.id = 'pid-' + pid;
-    // Use CSS variable instead of inline `transform` so the slide-in
-    // keyframe (translate -80→0, var(--row-y)) doesn't clobber vertical
-    // position. Setting `transform` directly would lose the Y when the
-    // animation runs — that's the "all on one line" bug.
-    row.style.setProperty('--row-y', (posIdx * STEP) + 'px');
-    row.setAttribute('data-pos', String(pos));
-    row.innerHTML =
-      goldMark +
-      '<div class="pos-num">' + pos + '</div>' +
-      '<div class="photo-wrap"><img src="' + photoSrc + '" alt="" /></div>' +
-      '<div class="org-wrap">' + orgHtml + '</div>' +
-      '<div class="player-name">' +
-        '<span class="player-name-text">' + player.name + '</span>' +
-        '<span class="move-chip" data-chip-for="' + pid + '"></span>' +
-      '</div>' +
-      '<div class="stat">' + s.p + '</div>' +
-      '<div class="stat-wdl">' + s.w + '<em>-</em>' + s.d + '<em>-</em>' + s.l + '</div>' +
-      '<div class="stat-wdl">' + s.gf + '<em>:</em>' + s.ga + '</div>' +
-      '<div class="stat stat-gd ' + gdClass + '">' + fmtSigned(s.gd) + '</div>' +
-      '<div class="sanctions-cell">' + sanctionHtml + '</div>' +
-      '<div class="pts">' + s.pts + '</div>';
-    return row;
-  }
-
-  // INITIAL RENDER (Snapshot A)
-  const rowsContainer = document.getElementById('rows');
-  const rowEls = {};
-  snapshotA.forEach(function (pid, i) {
-    const row = buildRow(pid, i);
-    rowsContainer.appendChild(row);
-    rowEls[pid] = row;
-  });
-
-  // PHASE ORCHESTRATION
-
-  // Phase 2 + 3 are deferred — only fire after a {type:'show'} message lands.
-  // See window.__cadeLeaderboardOrchestrate below.
-  function startPhase2() {
-    setTimeout(function () {
-      const tag = document.getElementById('updating-tag');
-      if (tag) tag.classList.add('flash');
-    }, T_PHASE2_START);
-  }
-
-  // Phase 3: batched FLIP swap. We swap rows pair-by-pair to their final B positions,
-  // displacing the player currently sitting at the target Y back to the swapping player's old Y.
-  function runReorderBatches() {
-    const aIndex = {};  // pid -> A index
-    const bIndex = {};  // pid -> B index
-    snapshotA.forEach(function (pid, i) { aIndex[pid] = i; });
-    snapshotB.forEach(function (pid, i) { bIndex[pid] = i; });
-
-    // Build batches of FINAL position indices (size 2) → batches of [0,1], [2,3], ..., [12]
-    const batches = [];
-    for (let i = 0; i < 13; i += BATCH_SIZE) {
-      const slice = [];
-      for (let k = 0; k < BATCH_SIZE && (i + k) < 13; k++) {
-        slice.push(i + k);
-      }
-      batches.push(slice);
-    }
-
-    // Track current visual order so we know who sits where as we go
-    const currentVisualOrder = snapshotA.slice();
-
-    function animateBatch(batchIdx) {
-      const slice = batches[batchIdx];
-
-      // For each final pos p in this batch, swap target pid into place,
-      // pushing whoever's there now to target's previous Y.
-      slice.forEach(function (p) {
-        const targetPid = snapshotB[p];
-        const currentPos = currentVisualOrder.indexOf(targetPid);
-        if (currentPos === p) return;  // already in place
-
-        const displacedPid = currentVisualOrder[p];
-
-        // swap in the visual order array
-        currentVisualOrder[p] = targetPid;
-        currentVisualOrder[currentPos] = displacedPid;
-
-        // animate via the same `--row-y` channel as the initial render
-        // so the row stays put on X (slide-in already complete) and
-        // moves on Y. The .row CSS rule's `transform: translate(0, var(--row-y))`
-        // composes the new Y, and CSS transition on transform animates
-        // the swap.
-        rowEls[targetPid].style.setProperty('--row-y', (p * STEP) + 'px');
-        rowEls[displacedPid].style.setProperty('--row-y', (currentPos * STEP) + 'px');
-      });
-    }
-
-    // Schedule batches
-    let cursorMs = T_PHASE3_START;
-    const SWAP_MS = 600;  // CSS transition is 0.55s; pad to 0.6s
-    batches.forEach(function (slice, bi) {
-      setTimeout(function () { animateBatch(bi); }, cursorMs);
-      cursorMs += SWAP_MS + BATCH_PAUSE_MS;
-    });
-
-    // After the last batch lands, fire arrow chips
-    const lastBatchEnd = T_PHASE3_START + (batches.length * SWAP_MS) + ((batches.length - 1) * BATCH_PAUSE_MS);
-    setTimeout(function () { fireArrowChips(aIndex, bIndex); }, lastBatchEnd);
-  }
-
-  function fireArrowChips(aIndex, bIndex) {
-    Object.keys(PLAYERS).forEach(function (pid) {
-      const delta = aIndex[pid] - bIndex[pid];   // +N = moved up N positions, -N = moved down N
-      if (delta === 0) return;
-      const chip = document.querySelector('[data-chip-for="' + pid + '"]');
-      if (!chip) return;
-      const isUp = delta > 0;
-      chip.textContent = isUp ? ('↑' + delta) : ('↓' + Math.abs(delta));
-      chip.classList.add(isUp ? 'up' : 'down');
-      void chip.offsetWidth;
-      chip.classList.add('show');
-    });
-  }
-
-  // Defer the demo orchestration until first {type:'show'} message lands.
-  window.__cadeLeaderboardOrchestrate = function () {
-    startPhase2();
-    runReorderBatches();
-  };
-</script>
-
-<script>
-  /* LIVE DATA — postMessage listener (data-feed driven).
-     Accepts: { type:'update', data:{ standings:[
-       {playerId, name, slug, photoUrl, orgLogoUrl, p, w, d, l, gf, ga, gd, pts, sanctions, delta}
-     ] } }
-     Full DOM rerender of #rows; arrow chips fire from `delta` when present. */
+     Accepts:
+       { type:'update', data:{ rows: [{pos,name,mp,w,l,d,gd,pts}] } }
+       { type:'update', data:{ standings: [...] } }
+       { type:'update', data:{ payload:{ rows: [...] } } }
+     Server feed normalization:
+       rank/displayName → pos/name
+       matches_played/wins/draws/losses → mp/w/l/d
+       goal_difference/points → gd/pts
+  ============================================================ */
   (function () {
-    var stage = document.querySelector('.stage') || document.body;
-    var rowsContainer = document.getElementById('rows');
-    // 2026-04-26 — sync with CSS --row-h (44) + --row-gap (3).
-    var ROW_HEIGHT_LOCAL = 44;
-    var ROW_GAP_LOCAL    = 3;
-    var STEP_LOCAL       = ROW_HEIGHT_LOCAL + ROW_GAP_LOCAL;
+    var rowsLeft  = document.getElementById('rows-left');
+    var rowsRight = document.getElementById('rows-right');
 
     function fmtSigned(n) {
       n = Number(n) || 0;
@@ -1121,68 +565,60 @@
       return '0';
     }
 
-    function buildRow(s, i) {
+    function buildRow(s, posIdx, isTop) {
       s = s || {};
-      var pos = i + 1;
-      var isLeader = pos === 1;
-      var isTail   = pos === 13;
-      var photo = s.photoUrl
-        ? '<img src="' + s.photoUrl + '" alt="' + (s.name || '') + '" />'
-        : '';
-      var orgHtml = s.orgLogoUrl
-        ? '<img src="' + s.orgLogoUrl + '" alt="" />'
-        : '<span class="org-empty">&mdash;</span>';
-      var sancHtml = s.sanctions
-        ? '<span class="sanction">' + s.sanctions + '</span>'
-        : '<span class="sanction-empty">&mdash;</span>';
-      var gd = Number(s.gd) || 0;
+      var pos = posIdx + 1;
+      var gd = Number(s.gd != null ? s.gd : (s.goal_difference != null ? s.goal_difference : 0));
       var gdClass = gd > 0 ? 'pos' : (gd < 0 ? 'neg' : '');
-      var goldMark = isLeader ? '<div class="gold-mark" aria-hidden="true"></div>' : '';
+      var name = s.name || s.displayName || s.player_name || '—';
+      var mp   = (s.mp != null ? s.mp : (s.matches_played != null ? s.matches_played : (s.p != null ? s.p : 0)));
+      var w    = (s.w  != null ? s.w  : (s.wins   || 0));
+      var l    = (s.l  != null ? s.l  : (s.losses || 0));
+      var d    = (s.d  != null ? s.d  : (s.draws  || 0));
+      var pts  = (s.pts != null ? s.pts : (s.points != null ? s.points : 0));
       var klass = ['row'];
-      if (isLeader) klass.push('is-leader');
-      if (isTail) klass.push('is-tail');
-      var delta = Number(s.delta) || 0;
-      var chipText = delta === 0 ? '' : (delta > 0 ? ('↑' + delta) : ('↓' + Math.abs(delta)));
-      var chipKlass = delta === 0 ? '' : (delta > 0 ? 'up show' : 'down show');
-      // Use `--row-y` CSS variable instead of inline transform so the
-      // slide-in keyframe can compose translate(X, Y). Setting transform
-      // directly would clobber Y when the animation runs.
-      return '<div class="' + klass.join(' ') + '" id="pid-' + (s.playerId || s.slug || ('row' + i)) + '" data-pos="' + pos + '" style="--row-y: ' + (i * STEP_LOCAL) + 'px;">' +
-        goldMark +
+      if (isTop) klass.push('is-top');
+      var pid = s.playerId || s.player_id || s.slug || ('row' + posIdx);
+      return '<div class="' + klass.join(' ') + '" id="pid-' + pid + '" data-pos="' + pos + '">' +
         '<div class="pos-num">' + pos + '</div>' +
-        '<div class="photo-wrap">' + photo + '</div>' +
-        '<div class="org-wrap">' + orgHtml + '</div>' +
-        '<div class="player-name">' +
-          '<span class="player-name-text">' + (s.name || '—') + '</span>' +
-          '<span class="move-chip ' + chipKlass + '">' + chipText + '</span>' +
-        '</div>' +
-        '<div class="stat">' + (s.p != null ? s.p : 0) + '</div>' +
-        '<div class="stat-wdl">' + (s.w || 0) + '<em>-</em>' + (s.d || 0) + '<em>-</em>' + (s.l || 0) + '</div>' +
-        '<div class="stat-wdl">' + (s.gf || 0) + '<em>:</em>' + (s.ga || 0) + '</div>' +
+        '<div class="player-name">' + name + '</div>' +
+        '<div class="stat">' + mp + '</div>' +
+        '<div class="stat">' + w  + '</div>' +
+        '<div class="stat">' + l  + '</div>' +
+        '<div class="stat">' + d  + '</div>' +
         '<div class="stat stat-gd ' + gdClass + '">' + fmtSigned(gd) + '</div>' +
-        '<div class="sanctions-cell">' + sancHtml + '</div>' +
-        '<div class="pts">' + (s.pts != null ? s.pts : 0) + '</div>' +
+        '<div class="pts">' + pts + '</div>' +
       '</div>';
     }
 
     function rerender(standings) {
-      if (!rowsContainer || !Array.isArray(standings)) return;
+      if (!rowsLeft || !rowsRight || !Array.isArray(standings)) return;
       // Empty rows (or single TBD stub) means "trigger visibility, don't
       // override data" — real data from initial fetch / Realtime stays.
       if (standings.length === 0) return;
       if (standings.length === 1) {
         var only = standings[0];
-        var name = (only && (only.displayName || only.name)) || '';
-        if (String(name).trim().toUpperCase() === 'TBD') return;
+        var nm = (only && (only.displayName || only.name)) || '';
+        if (String(nm).trim().toUpperCase() === 'TBD') return;
       }
-      rowsContainer.innerHTML = standings.map(buildRow).join('');
+      // Top-2 of each column (positions 1-2 in left, 7-8 in right).
+      var leftHtml  = standings.slice(0, 6).map(function (s, i) {
+        return buildRow(s, i, i < 2);
+      }).join('');
+      var rightHtml = standings.slice(6, 13).map(function (s, i) {
+        return buildRow(s, i + 6, i < 2);
+      }).join('');
+      rowsLeft.innerHTML  = leftHtml;
+      rowsRight.innerHTML = rightHtml;
+
       // Force-show new rows when body is cade-visible (gate observer
       // doesn't pick up dynamically inserted rows; Chrome iframe
       // stuck-transition bug otherwise leaves them at opacity 0).
       if (document.body.classList.contains('cade-visible')) {
-        rowsContainer.querySelectorAll('.row').forEach(function(el){
+        document.querySelectorAll('.rows .row').forEach(function (el) {
           el.style.setProperty('opacity', '1', 'important');
           el.style.setProperty('visibility', 'visible', 'important');
+          el.style.removeProperty('transform');
         });
       }
     }
@@ -1190,11 +626,11 @@
     /**
      * Pull a standings row list out of the message payload, regardless
      * of which shape arrived:
-     *   - `{standings: [...]}` (legacy postMessage relay)
-     *   - `{rows: [...]}` (Realtime `standings.changed` direct shape)
-     *   - `{payload: {rows: [...], topN}}` (initial-fetch from
+     *   - {standings: [...]} (legacy postMessage relay)
+     *   - {rows: [...]} (Realtime `standings.changed` direct shape)
+     *   - {payload: {rows: [...], topN}} (initial-fetch from
      *     /api/broadcast/sessions/<id>/leaderboard)
-     *   - `{payload: {standings: [...]}}` (defensive)
+     *   - {payload: {standings: [...]}} (defensive)
      */
     function readStandings(data) {
       if (!data) return null;
@@ -1210,26 +646,20 @@
     function update(data) {
       if (!data) return;
       var rows = readStandings(data);
-      // Map server shapes (rank/displayName/pts/gd) into the buildRow
-      // expected shape (pos/playerId/name/p/w/d/l/gf/ga/gd/pts/sanctions).
       if (rows) {
-        var normalized = rows.map(function(r){
+        var normalized = rows.map(function (r) {
           return {
             playerId: r.playerId || r.player_id || r.slug,
             slug: r.slug,
             name: r.name || r.displayName || r.player_name || '',
-            photoUrl: r.photoUrl,
-            orgLogoUrl: r.orgLogoUrl,
-            p: r.p != null ? r.p : (r.matches_played != null ? r.matches_played : 0),
-            w: r.w != null ? r.w : (r.wins || 0),
-            d: r.d != null ? r.d : (r.draws || 0),
-            l: r.l != null ? r.l : (r.losses || 0),
-            gf: r.gf != null ? r.gf : (r.goals_for || 0),
-            ga: r.ga != null ? r.ga : (r.goals_against || 0),
-            gd: r.gd != null ? r.gd : (r.goal_difference || 0),
-            pts: r.pts != null ? r.pts : (r.points || 0),
-            sanctions: r.sanctions || '',
-            delta: r.delta || 0
+            mp:  r.mp  != null ? r.mp  : (r.matches_played != null ? r.matches_played : (r.p != null ? r.p : 0)),
+            w:   r.w   != null ? r.w   : (r.wins   || 0),
+            d:   r.d   != null ? r.d   : (r.draws  || 0),
+            l:   r.l   != null ? r.l   : (r.losses || 0),
+            gf:  r.gf  != null ? r.gf  : (r.goals_for     || 0),
+            ga:  r.ga  != null ? r.ga  : (r.goals_against || 0),
+            gd:  r.gd  != null ? r.gd  : (r.goal_difference || 0),
+            pts: r.pts != null ? r.pts : (r.points || 0)
           };
         });
         rerender(normalized);
@@ -1239,39 +669,35 @@
     function show() {
       document.body.classList.remove('cade-exiting');
       document.body.classList.add('cade-visible');
-      // restart entry animations on every show by reflowing animated nodes
-      // 2026-04-26 — added `.row` so the staggered slide-in re-fires on
-      // every cade-visible (e.g. demo loop, or live re-show after hide).
-      if (stage) {
-        var animated = stage.querySelectorAll(
-          '.top-band, .header-row, .lb-row, .partners, .table-headers, .row'
-        );
-        animated.forEach(function (el) {
-          var orig = el.style.animation;
-          el.style.animation = 'none';
-          void el.offsetHeight;
-          el.style.animation = orig || '';
-        });
-      }
-      // Kick off the demo reorder orchestration (only on first show)
-      if (typeof window.__cadeLeaderboardOrchestrate === 'function') {
-        var fn = window.__cadeLeaderboardOrchestrate;
-        window.__cadeLeaderboardOrchestrate = null;
-        setTimeout(fn, 50);
-      }
     }
     function hide() {
       document.body.classList.remove('cade-visible');
       document.body.classList.add('cade-exiting');
     }
+
+    /* DEMO data — used both for ?demo=1 and as a first-paint fallback so
+       the overlay reads sensibly even before live data arrives. */
+    var DEMO_ROWS = [
+      { pos: 1,  name: 'BAJI JNR',     mp: 2, w: 2, l: 0, d: 0, gd: 11, pts: 6 },
+      { pos: 2,  name: 'TACTICAL',     mp: 2, w: 2, l: 0, d: 0, gd:  6, pts: 6 },
+      { pos: 3,  name: 'KAYKAY',       mp: 2, w: 1, l: 1, d: 0, gd: 15, pts: 3 },
+      { pos: 4,  name: 'MITCH',        mp: 2, w: 1, l: 1, d: 0, gd: 10, pts: 3 },
+      { pos: 5,  name: 'KING NONEX',   mp: 2, w: 1, l: 1, d: 0, gd:  5, pts: 3 },
+      { pos: 6,  name: 'GURU',         mp: 2, w: 1, l: 1, d: 0, gd:  8, pts: 3 },
+      { pos: 7,  name: 'ADEFOLA',      mp: 2, w: 1, l: 1, d: 1, gd: -1, pts: 3 },
+      { pos: 8,  name: 'WOLEVATION',   mp: 2, w: 1, l: 1, d: 1, gd: -1, pts: 3 },
+      { pos: 9,  name: 'FARUK',        mp: 0, w: 0, l: 0, d: 0, gd:  0, pts: 0 },
+      { pos: 10, name: 'MR OGA',       mp: 1, w: 0, l: 1, d: 0, gd: -3, pts: 0 },
+      { pos: 11, name: 'KILLER FREAK', mp: 2, w: 0, l: 2, d: 0, gd: -5, pts: 0 },
+      { pos: 12, name: 'ANIFE',        mp: 1, w: 0, l: 1, d: 0, gd: -7, pts: 0 },
+      { pos: 13, name: 'DADABOI',      mp: 2, w: 0, l: 2, d: 0, gd: -12, pts: 0 }
+    ];
+    rerender(DEMO_ROWS);
+
     window.addEventListener('message', function (ev) {
       var msg = ev && ev.data;
       if (!msg || typeof msg !== 'object') return;
       console.info('[overlay/07-leaderboard] message', msg.type || msg.event || '?', msg.payload || msg.data);
-      // CONTRACT (per CLAUDE.md §14):
-      //   show   → render data + add cade-visible
-      //   hide   → swap cade-visible → cade-exiting
-      //   update → re-render with new data, NO class change (no auto-show)
       if (msg.type === 'show') {
         update(msg.data || msg.payload || {});
         show();
@@ -1283,28 +709,31 @@
     }, false);
   })();
 </script>
+
 <script data-tag="cade-visible-gate-observer-v2">
-(function(){
-  // Top-level gated containers — these must be hidden by CSS rule when no
-  // cade-visible class on body. Force-set to opacity:1 on cade-visible so
-  // Chrome cross-origin iframe stuck-transition bug cannot leave them at 0.
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.col-headers,.headline,.matchday-mark,.partners,.row,.rows,.season-mark,.table-wrap,.top-band';
-  // Inner row internals — when the row's own entrance animation has
-  // burnt out before cade-visible, force-set opacity 1.
-  // NB: `.row` itself is omitted (2026-04-26) — its slide-in animation
-  // animates opacity 0 → 1 + translateX -72 → 0; if the observer
-  // forced inline opacity:1 the keyframe couldn't run.
-  var INNER_SEL = '.pos-num,.photo-wrap,.org-wrap,.player-name,.player-name-text,.move-chip,.stat,.stat-wdl,.stat-gd,.sanctions-cell,.pts,.gold-mark,.title,.title-rule';
+(function () {
+  /* Top-level gated containers — these must be hidden by CSS rule when no
+     cade-visible class on body. Force-set to opacity:1 on cade-visible so
+     Chrome cross-origin iframe stuck-transition bug cannot leave them at 0. */
+  var SEL = '.bg-fill,.bg-halftone,.bg-vignette,.col-headers,.headline,.matchday-mark,.partners,.row,.rows,.season-mark,.table-block,.top-band,.corner-badge';
+  /* Inner row internals — when the row's own entrance transition has
+     burnt out before cade-visible, force-set opacity 1.
+     NB: `.row` itself is omitted — its slide-in transition animates
+     opacity 0 → 1 + translateX(-32px → 0); if the observer forced inline
+     opacity:1 the transition couldn't run. */
+  var INNER_SEL = '.pos-num,.player-name,.stat,.stat-gd,.pts,.eyebrow,.title,.logo-cade';
   function apply() {
     var b = document.body;
     if (!b) return;
     var vis = b.classList.contains('cade-visible');
     var exit = b.classList.contains('cade-exiting');
-    document.querySelectorAll(SEL).forEach(function(el){
-      if (!el.dataset.cadeTransition) { el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out'; el.dataset.cadeTransition = '1'; }
+    document.querySelectorAll(SEL).forEach(function (el) {
+      if (!el.dataset.cadeTransition) {
+        el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+        el.dataset.cadeTransition = '1';
+      }
       if (vis) {
         el.style.setProperty('opacity', '1', 'important');
-        el.style.removeProperty('transform');
         el.style.setProperty('visibility', 'visible', 'important');
       } else if (exit) {
         el.style.setProperty('opacity', '0', 'important');
@@ -1312,8 +741,11 @@
         el.style.setProperty('opacity', '0', 'important');
       }
     });
-    document.querySelectorAll(INNER_SEL).forEach(function(el){
-      if (!el.dataset.cadeTransition) { el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out'; el.dataset.cadeTransition = '1'; }
+    document.querySelectorAll(INNER_SEL).forEach(function (el) {
+      if (!el.dataset.cadeTransition) {
+        el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+        el.dataset.cadeTransition = '1';
+      }
       if (vis) {
         el.style.setProperty('opacity', '1', 'important');
       } else if (!exit) {
@@ -1322,20 +754,23 @@
     });
   }
   apply();
-  new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+  new MutationObserver(apply).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 })();
 </script>
+
 <script data-tag="cade-demo-mode">
-(function(){
+(function () {
   if (new URLSearchParams(location.search).get('demo') !== '1') return;
-  function fire(type){ window.dispatchEvent(new MessageEvent('message', { data: { type: type } })); }
+  function fire(type) {
+    window.dispatchEvent(new MessageEvent('message', { data: { type: type } }));
+  }
   // Initial show after a tiny tick so the gate observer is wired.
-  setTimeout(function(){ fire('show'); }, 200);
-  // Loop: show 5s, hide 3s, repeat.
-  setInterval(function(){ fire('hide'); }, 8000);
-  setTimeout(function(){
-    setInterval(function(){ fire('show'); }, 8000);
-  }, 8000 - 5000); // offset so show fires 5s after each hide
+  setTimeout(function () { fire('show'); }, 200);
+  // Loop: show 8s, hide 4s, repeat.
+  setInterval(function () { fire('hide'); }, 12000);
+  setTimeout(function () {
+    setInterval(function () { fire('show'); }, 12000);
+  }, 12000 - 8000); // offset so show fires 8s after each hide
 })();
 </script>
 </body>
