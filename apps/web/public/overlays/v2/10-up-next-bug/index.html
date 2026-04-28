@@ -55,6 +55,20 @@
     font-display: block;
   }
 
+  /* ── Phase 2 design tokens (admin-tunable via CSS variables) ── */
+  :root {
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: "Agharti", "Oswald", "Bebas Neue", "Impact", sans-serif;
+    --overlay-font-body: "Quedora", "Rajdhani", "Saira Condensed", sans-serif;
+    --overlay-scale: 1;
+    --overlay-pos-x: 0px;
+    --overlay-pos-y: 60px;
+    --overlay-pattern: none;
+    --overlay-partner-strip-show: flex;
+  }
+
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -63,8 +77,8 @@
     overflow: hidden;
     background: transparent !important;
     color-scheme: dark;
-    font-family: "Agharti", "Oswald", "Bebas Neue", "Impact", sans-serif;
-    color: #fff;
+    font-family: var(--overlay-font-display);
+    color: var(--overlay-text-color);
   }
   /* === SPLIT GATE (Category A small anchored bug):
      Body always opacity 1 (transparent canvas, only .bug visible).
@@ -84,12 +98,13 @@
      ------------------------------------------------------------ */
   .bug {
     position: absolute;
-    left: 50%;
-    bottom: 60px;
+    left: calc(50% + var(--overlay-pos-x, 0px));
+    bottom: var(--overlay-pos-y, 60px);
     /* width is set inline by JS to fit names; default starting state */
     width: auto;
     height: 180px;
-    transform: translateX(-50%);
+    transform: translateX(-50%) scale(var(--overlay-scale, 1));
+    transform-origin: 50% 100%;
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
@@ -104,14 +119,14 @@
     animation: bugExit 0.5s cubic-bezier(.77,.0,.18,1) forwards;
   }
   @keyframes bugEnter {
-    0%   { transform: translateX(-50%) translateY(260px); opacity: 0; }
-    50%  { transform: translateX(-50%) translateY(260px); opacity: 0; }
-    85%  { transform: translateX(-50%) translateY(-14px); opacity: 1; }  /* overshoot */
-    100% { transform: translateX(-50%) translateY(0);     opacity: 1; }  /* land */
+    0%   { transform: translateX(-50%) translateY(260px) scale(var(--overlay-scale, 1)); opacity: 0; }
+    50%  { transform: translateX(-50%) translateY(260px) scale(var(--overlay-scale, 1)); opacity: 0; }
+    85%  { transform: translateX(-50%) translateY(-14px) scale(var(--overlay-scale, 1)); opacity: 1; }  /* overshoot */
+    100% { transform: translateX(-50%) translateY(0)     scale(var(--overlay-scale, 1)); opacity: 1; }  /* land */
   }
   @keyframes bugExit {
-    0%   { transform: translateX(-50%) translateY(0)  scaleX(1);    opacity: 1; }
-    100% { transform: translateX(-50%) translateY(0)  scaleX(0.05); opacity: 0; }
+    0%   { transform: translateX(-50%) translateY(0) scale(var(--overlay-scale, 1)) scaleX(1);    opacity: 1; }
+    100% { transform: translateX(-50%) translateY(0) scale(var(--overlay-scale, 1)) scaleX(0.05); opacity: 0; }
   }
 
   /* ------------------------------------------------------------
@@ -177,7 +192,7 @@
     width: 100%;
     height: 150px;
     background: linear-gradient(180deg, #0d0d0d 0%, #000 100%);
-    border: 2px solid rgba(107, 205, 6, 0.9);
+    border: 2px solid var(--overlay-accent-color, #6bcd06);
     box-shadow:
       0 0 0 1px rgba(0,0,0,0.8) inset,
       0 0 24px rgba(107, 205, 6, 0.35),

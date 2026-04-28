@@ -93,7 +93,21 @@
 
   /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
   :root {
-    --green:        #6bcd06;
+    /* Phase 2 admin-tunable tokens (CSS-variable contract) */
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti', 'Impact', sans-serif;
+    --overlay-font-body: 'Quedora', 'Inter', sans-serif;
+    --overlay-scale: 1;
+    --overlay-pos-x: 0px;
+    --overlay-pos-y: 0px;
+    --overlay-pattern: halftone;
+    --overlay-partner-strip-show: flex;
+    --overlay-row-highlight-count: 3;
+
+    /* Brand vars derived from tokens (legacy-compatible) */
+    --green:        var(--overlay-accent-color, #6bcd06);
     --green-hi:     #93f01a;
     --green-glow:   rgba(107, 205, 6, 0.55);
     --green-faint:  rgba(107, 205, 6, 0.18);
@@ -103,10 +117,10 @@
     --gold-hi:      #f8e27a;
     --gold-lo:      #9e8410;
     --gold-glow:    rgba(230, 200, 50, 0.60);
-    --black:        #050505;
-    --ink:          #ffffff;
-    --display:      'Agharti', 'Impact', sans-serif;
-    --accent:       'Quedora', 'Inter', sans-serif;
+    --black:        var(--overlay-bg-color, #050505);
+    --ink:          var(--overlay-text-color, #ffffff);
+    --display:      var(--overlay-font-display, 'Agharti', 'Impact', sans-serif);
+    --accent:       var(--overlay-font-body, 'Quedora', 'Inter', sans-serif);
 
     /* Loop timing: entry 2.4s + hold 10s + exit 1.0s + gap 1.6s = 15s loop */
     --dur-cycle: 15s;
@@ -194,6 +208,8 @@
     overflow: hidden;
     background: transparent;
     isolation: isolate;
+    transform: translate(var(--overlay-pos-x, 0px), var(--overlay-pos-y, 0px)) scale(var(--overlay-scale, 1));
+    transform-origin: 50% 50%;
   }
 
   /* ── BG: halftone-green stadium texture ─────────────────────── */
@@ -1040,7 +1056,7 @@
     left: 0;
     right: 0;
     bottom: 24px;
-    display: flex;
+    display: var(--overlay-partner-strip-show, flex);
     flex-direction: column;
     align-items: center;
     gap: 6px;

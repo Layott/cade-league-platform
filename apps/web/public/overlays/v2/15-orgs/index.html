@@ -96,15 +96,28 @@
 
   /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
   :root {
-    --green:        #6bcd06;
+    /* Phase 2 admin-tunable tokens (CSS-variable contract) */
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti', 'Impact', sans-serif;
+    --overlay-font-body: 'Quedora', 'Inter', sans-serif;
+    --overlay-scale: 1;
+    --overlay-pos-x: 0px;
+    --overlay-pos-y: 0px;
+    --overlay-pattern: halftone;
+    --overlay-partner-strip-show: flex;
+
+    /* Brand vars derived from tokens (legacy-compatible) */
+    --green:        var(--overlay-accent-color, #6bcd06);
     --green-glow:   rgba(107, 205, 6, 0.55);
     --green-faint:  rgba(107, 205, 6, 0.18);
     --pink:         #fe036d;
     --pink-glow:    rgba(254, 3, 109, 0.55);
-    --black:        #050505;
-    --ink:          #ffffff;
-    --display:      'Agharti', 'Impact', sans-serif;
-    --accent:       'Quedora', 'Inter', sans-serif;
+    --black:        var(--overlay-bg-color, #050505);
+    --ink:          var(--overlay-text-color, #ffffff);
+    --display:      var(--overlay-font-display, 'Agharti', 'Impact', sans-serif);
+    --accent:       var(--overlay-font-body, 'Quedora', 'Inter', sans-serif);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -189,6 +202,8 @@
     overflow: hidden;
     background: transparent !important;
     isolation: isolate;
+    transform: translate(var(--overlay-pos-x, 0px), var(--overlay-pos-y, 0px)) scale(var(--overlay-scale, 1));
+    transform-origin: 50% 50%;
     /* NO auto-loop — operator drives show/hide via postMessage. The legacy
        `animation: stage-loop 18s ease-in-out infinite;` was removed because
        it caused the entire overlay to fade in/out forever in production
@@ -683,7 +698,7 @@
     left: 0;
     right: 0;
     bottom: 24px;
-    display: flex;
+    display: var(--overlay-partner-strip-show, flex);
     flex-direction: column;
     align-items: center;
     gap: 6px;
