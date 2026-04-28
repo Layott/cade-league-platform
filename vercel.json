@@ -4,5 +4,5 @@
   "buildCommand": "cd apps/web && npm run build",
   "installCommand": "npm install",
   "outputDirectory": "apps/web/.next",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/web ./KNOWLEDGE/brand-assets/elements/v2"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/web ./KNOWLEDGE/brand-assets/elements/v2 ./KNOWLEDGE/brand-assets/logos ./KNOWLEDGE/brand-assets/Orgs ./KNOWLEDGE/brand-assets/players ./KNOWLEDGE/brand-assets/designsample ./KNOWLEDGE/brand-assets/fonts"
 }
