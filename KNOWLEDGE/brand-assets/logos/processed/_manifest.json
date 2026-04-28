@@ -1,0 +1,109 @@
+{
+  "canvas": [
+    600,
+    300
+  ],
+  "target_gm": 240,
+  "logos": [
+    {
+      "file": "1cade esport.png",
+      "raw": "6720x4200",
+      "trimmed": "5602x1616",
+      "placed": "447x129",
+      "ratio": 3.467,
+      "gm": 240.1,
+      "fill_h%": 43.0,
+      "fill_w%": 74.5
+    },
+    {
+      "file": "ESPORTS AFRICA NEWS BLACK.png",
+      "raw": "1280x1280",
+      "trimmed": "1202x722",
+      "placed": "310x186",
+      "ratio": 1.665,
+      "gm": 240.1,
+      "fill_h%": 62.0,
+      "fill_w%": 51.7
+    },
+    {
+      "file": "ESPORTS AFRICA NEWS WHITE.png",
+      "raw": "250x250",
+      "trimmed": "236x142",
+      "placed": "309x186",
+      "ratio": 1.662,
+      "gm": 239.7,
+      "fill_h%": 62.0,
+      "fill_w%": 51.5
+    },
+    {
+      "file": "GameEvo Esports Black.png",
+      "raw": "3000x3000",
+      "trimmed": "2923x743",
+      "placed": "476x121",
+      "ratio": 3.934,
+      "gm": 240.0,
+      "fill_h%": 40.3,
+      "fill_w%": 79.3
+    },
+    {
+      "file": "GameEvo Esports White.png",
+      "raw": "3000x3000",
+      "trimmed": "2923x743",
+      "placed": "476x121",
+      "ratio": 3.934,
+      "gm": 240.0,
+      "fill_h%": 40.3,
+      "fill_w%": 79.3
+    },
+    {
+      "file": "Gamepride Green-01.png",
+      "raw": "2000x487",
+      "trimmed": "2000x487",
+      "placed": "486x118",
+      "ratio": 4.107,
+      "gm": 239.5,
+      "fill_h%": 39.3,
+      "fill_w%": 81.0
+    },
+    {
+      "file": "TRACE_2010_logo.svg.png",
+      "raw": "1280x280",
+      "trimmed": "1280x279",
+      "placed": "514x112",
+      "ratio": 4.588,
+      "gm": 239.9,
+      "fill_h%": 37.3,
+      "fill_w%": 85.7
+    },
+    {
+      "file": "Trace_TV_Logo.svg.png",
+      "raw": "1280x328",
+      "trimmed": "1280x328",
+      "placed": "474x121",
+      "ratio": 3.902,
+      "gm": 239.5,
+      "fill_h%": 40.3,
+      "fill_w%": 79.0
+    },
+    {
+      "file": "eSports Federation of Nigeria-1.png",
+      "raw": "2134x975",
+      "trimmed": "2078x926",
+      "placed": "360x160",
+      "ratio": 2.244,
+      "gm": 240.0,
+      "fill_h%": 53.3,
+      "fill_w%": 60.0
+    },
+    {
+      "file": "pro league .png",
+      "raw": "4918x4590",
+      "trimmed": "3825x3187",
+      "placed": "263x219",
+      "ratio": 1.2,
+      "gm": 240.0,
+      "fill_h%": 73.0,
+      "fill_w%": 43.8
+    }
+  ]
+}
