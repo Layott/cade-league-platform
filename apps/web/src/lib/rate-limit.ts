@@ -49,8 +49,13 @@ function warnNoRedisOnce(): void {
 }
 
 function getRedis(): Redis | null {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Vercel Marketplace Upstash provisions vars under the KV_* prefix
+  // (KV_REST_API_URL, KV_REST_API_TOKEN). Self-hosted Upstash exposes
+  // them as UPSTASH_REDIS_REST_*. Accept both.
+  const url =
+    process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const token =
+    process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {
     warnNoRedisOnce();
     return null;
