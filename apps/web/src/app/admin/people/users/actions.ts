@@ -89,10 +89,11 @@ export async function removeRoleAction(formData: FormData) {
 async function authRateGate(actorUserId: string, op: string): Promise<void> {
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
-  // 5 attempts per 15min per (admin user, operation, ip).
+  // 5 attempts per 1min per (admin user, operation, ip). Window
+  // narrowed from 15min to 1min on 2026-04-28 to match login flow.
   const res = await authLimiter.limit(`${op}:${actorUserId}:${ip}`);
   if (!res.success) {
-    throw new Error("Rate limit exceeded — try again in 15 minutes");
+    throw new Error("Rate limit exceeded — try again in 1 minute");
   }
 }
 

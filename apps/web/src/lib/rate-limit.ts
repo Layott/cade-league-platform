@@ -12,10 +12,14 @@ import { Redis } from "@upstash/redis";
  *
  * Three named limiters wrap the shared Redis instance:
  *
- *   `authLimiter` — 5 attempts per 15 min. Used for login, password
+ *   `authLimiter` — 5 attempts per 1 min. Used for login, password
  *     reset, account creation. Bound on a compound `${ip}:${email}` key
  *     so an attacker can't trivially bypass by rotating IPs against
- *     one account.
+ *     one account. Window narrowed from 15 min to 1 min on
+ *     2026-04-28 — recovery friction was outweighing brute-force
+ *     defense for this use case (small known roster, all-trusted
+ *     accounts; bigger shoulder-tap attack surface = social, not
+ *     credential-stuffing).
  *
  *   `authedWriteLimiter` — 30 writes per minute, keyed on the
  *     authenticated public user id. Defense against rage-clicks and
@@ -97,7 +101,7 @@ function makeLimiter(
 export const authLimiter = makeLimiter("auth", (r) =>
   new Ratelimit({
     redis: r,
-    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    limiter: Ratelimit.slidingWindow(5, "1 m"),
     analytics: true,
     prefix: "rl:auth",
   }),

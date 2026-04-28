@@ -7,7 +7,7 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { recordLogin } from "@/server/auth/sessions";
 import { authLimiter } from "@/lib/rate-limit";
 
-const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+const LOCKOUT_WINDOW_MS = 60 * 1000; // 1 min (was 15 min, narrowed 2026-04-28)
 const LOCKOUT_THRESHOLD = 5;
 const GENERIC_AUTH_ERROR = "Invalid email or password";
 
@@ -15,7 +15,7 @@ const GENERIC_AUTH_ERROR = "Invalid email or password";
  * Plan 39 (M2) — failed-login lockout.
  *
  * If the user identified by `email` already has ≥5 `login_failed` rows in
- * the last 15 minutes, deny the attempt before calling Supabase Auth.
+ * the last 1 minute, deny the attempt before calling Supabase Auth.
  * Read goes via the service-role client so we can scan auth_events
  * regardless of RLS posture (Plan 39 C3 enables RLS on the table).
  */
@@ -100,7 +100,7 @@ export async function login(formData: FormData) {
   // attacker that rotates IPs against one account still hits the email
   // budget, AND so a shared-IP party can't be locked out by one bad
   // actor sharing their NAT. Both must succeed; whichever exhausts
-  // first triggers the 15-min cool-down.
+  // first triggers the 1-min cool-down.
   if (email.length > 0) {
     const ipEmailRes = await authLimiter.limit(`${ip}:${email}`);
     const emailRes = await authLimiter.limit(`email:${email}`);
@@ -113,7 +113,7 @@ export async function login(formData: FormData) {
       }
       redirect(
         `/login?error=${encodeURIComponent(
-          "Too many failed attempts. Try again in 15 minutes.",
+          "Too many failed attempts. Try again in 1 minute.",
         )}`,
       );
     }
@@ -123,7 +123,7 @@ export async function login(formData: FormData) {
   if (await isLockedOut(email)) {
     redirect(
       `/login?error=${encodeURIComponent(
-        "Too many failed attempts. Try again in 15 minutes.",
+        "Too many failed attempts. Try again in 1 minute.",
       )}`,
     );
   }
