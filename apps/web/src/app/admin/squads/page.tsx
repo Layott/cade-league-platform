@@ -6,16 +6,23 @@ import {
   listSubmissionsForWeek,
   weekStartThursday,
   getSquadWindowOverride,
+  getMatchDayWindow,
+  resolveSquadWindowForMatchDay,
   listPlayerSquadOverridesForWeek,
   type SubmissionRow,
   type PlayerSquadOverride,
 } from "@/server/squads";
+import { listMatchDays } from "@/server/matches/match-days";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SecondaryButton } from "@/components/admin/buttons";
 import { SquadWindowControls } from "@/components/admin/SquadWindowControls";
+import {
+  SquadMatchDayWindowControls,
+  type AdminMatchDayRow,
+} from "@/components/admin/SquadMatchDayWindowControls";
 import { PlayerOverrideControls } from "@/components/admin/PlayerOverrideControls";
 import { SquadSubmissionsLiveRefresh } from "@/components/admin/SquadSubmissionsLiveRefresh";
 import {
@@ -23,6 +30,10 @@ import {
   forceCloseSquadWindowAction,
   clearSquadWindowOverrideAction,
 } from "./window-actions";
+import {
+  setMatchDayWindowAction,
+  clearMatchDayWindowAction,
+} from "./match_day_window_actions";
 import {
   banPlayerForWeekAction,
   forceOpenPlayerForWeekAction,
@@ -113,6 +124,32 @@ export default async function AdminSquadsListPage({
     playerOverrides.map((o) => [o.playerId, o]),
   );
   const submittedPlayerIds = new Set(rows.map((r) => r.player_id));
+
+  // Per-match-day override panel data. Only build when the user has the
+  // window perm — same gate as the weekly panel.
+  let matchDayRows: AdminMatchDayRow[] = [];
+  if (canManageWindow && season) {
+    const days = await listMatchDays(svc, season.id);
+    const now = new Date();
+    matchDayRows = await Promise.all(
+      days.map(async (d) => {
+        const [override, resolution] = await Promise.all([
+          getMatchDayWindow(svc, d.id),
+          resolveSquadWindowForMatchDay(svc, d.id, { now }),
+        ]);
+        return {
+          id: d.id,
+          matchDate: d.match_date,
+          venueName: d.venue_name,
+          status: d.status,
+          matchCount: d.match_count,
+          override,
+          resolvedOpen: resolution.open,
+          resolvedReason: resolution.reason,
+        };
+      }),
+    );
+  }
 
   const columns: DataTableColumn<SubmissionRow>[] = [
     {
@@ -205,6 +242,14 @@ export default async function AdminSquadsListPage({
           forceOpen={forceOpenSquadWindowAction}
           forceClose={forceCloseSquadWindowAction}
           clearOverride={clearSquadWindowOverrideAction}
+        />
+      ) : null}
+
+      {canManageWindow ? (
+        <SquadMatchDayWindowControls
+          rows={matchDayRows}
+          setAction={setMatchDayWindowAction}
+          clearAction={clearMatchDayWindowAction}
         />
       ) : null}
 

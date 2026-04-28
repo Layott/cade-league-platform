@@ -72,6 +72,10 @@ export async function requestUploadUrlAction(input: {
 
 export type SubmitPickerActionPayload = {
   weekStartDate: string;
+  // Optional admin-controlled per-match-day window. When supplied, the
+  // submission is stamped with this match_day_id and the window check
+  // uses the per-match-day resolver.
+  matchDayId?: string;
   futbinScreenshotPath: string;
   slots: Array<{
     slotIndex: number;
@@ -98,6 +102,7 @@ export async function submitPickerAction(
     seasonId,
     playerId,
     weekStartDate: payload.weekStartDate,
+    matchDayId: payload.matchDayId ?? null,
     futbinScreenshotPath: payload.futbinScreenshotPath,
     slots: payload.slots,
   });

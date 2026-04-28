@@ -61,6 +61,10 @@ export const createSubmissionSchema = z.object({
   seasonId: z.string().uuid(),
   playerId: z.string().uuid(),
   weekStartDate: ymd,
+  // Per-match-day window mode (admin-controlled override). When set, the
+  // submission is stamped with this match_day_id so the admin queue can
+  // group by match day. Plan 10 weekly submissions leave it null.
+  matchDayId: z.string().uuid().nullable().optional(),
   // Plan 39 sanitize — `..` traversal in a storage path lets a poisoned
   // upload escape the bucket sub-tree. Reject parent-path token + back-
   // slash. Cap at 500 chars (matches other storage path schemas).

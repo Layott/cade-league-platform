@@ -3,6 +3,7 @@ import { createSubmissionSchema, type CreateSubmissionInput } from "./schemas";
 import { ConflictError, ValidationError } from "./errors";
 import { thursdayDeadline, weekStartThursday } from "./week";
 import { getSquadWindowOverride } from "./window_override";
+import { resolveSquadWindowForMatchDay } from "./match_day_window";
 import { getPlayerSquadOverride } from "./player_override";
 import { getRuleForSeason } from "./rules";
 import { evaluateRules, type ItemForValidation } from "./validate";
@@ -34,41 +35,77 @@ export async function createSubmission(
   const v = parsed.data;
 
   const now = opts.now ?? new Date();
-  const expectedWeek = weekStartThursday(now);
-  if (v.weekStartDate !== expectedWeek) {
-    throw new ValidationError(
-      `weekStartDate ${v.weekStartDate} does not match current week anchor ${expectedWeek}`,
-    );
+  // In weekly mode the weekStartDate must equal the Thursday anchor of NOW.
+  // In per-match-day mode the admin may reopen submissions for a future or
+  // past match day — in that case the weekStartDate is anchored to the
+  // match day's date, not `now`. We re-derive the expected anchor from the
+  // match_days row inside the per-match-day branch below; here we only
+  // enforce the "current week" rule when matchDayId is absent.
+  if (!v.matchDayId) {
+    const expectedWeek = weekStartThursday(now);
+    if (v.weekStartDate !== expectedWeek) {
+      throw new ValidationError(
+        `weekStartDate ${v.weekStartDate} does not match current week anchor ${expectedWeek}`,
+      );
+    }
   }
 
   // Resolve the current squad-window state for this player + week. Order of
   // precedence (strictest deny → strictest allow):
   //   1. Player ban              → deny outright.
-  //   2. League force_close      → deny.
-  //   3. Player force_open       → allow regardless of time.
-  //   4. League force_open       → allow regardless of time.
-  //   5. Default: allow iff now < Thursday 10:00 WAT deadline.
-  const [leagueOverride, playerOverride] = await Promise.all([
-    getSquadWindowOverride(sb, v.weekStartDate),
-    getPlayerSquadOverride(sb, v.playerId, v.weekStartDate),
-  ]);
-  const deadline = thursdayDeadline(v.weekStartDate);
-  const beforeDeadline = now.getTime() < deadline.getTime();
+  //   2. Per-match-day override  → if `matchDayId` is set, the per-match-day
+  //                                 resolver wins outright (force_open or
+  //                                 force_close). Player force_open still
+  //                                 over-rides a per-match-day force_close.
+  //   3. League force_close      → deny.
+  //   4. Player force_open       → allow regardless of time.
+  //   5. League force_open       → allow regardless of time.
+  //   6. Default: allow iff now < Thursday 10:00 WAT deadline.
+  const playerOverride = await getPlayerSquadOverride(
+    sb,
+    v.playerId,
+    v.weekStartDate,
+  );
 
   if (playerOverride?.state === "ban") {
     throw new ConflictError(
       `player ${v.playerId} is banned from submitting for week ${v.weekStartDate}`,
     );
   }
-  if (leagueOverride?.state === "force_close" && playerOverride?.state !== "force_open") {
-    throw new ConflictError(
-      `squad window is closed for week ${v.weekStartDate}`,
-    );
+
+  let windowOpen: boolean;
+  if (v.matchDayId) {
+    // Per-match-day window mode — the resolver bakes in match-day override
+    // + falls through to the weekly resolver. Player force_open keeps the
+    // submission alive even if the match-day window is force-closed,
+    // matching the existing weekly precedence.
+    const resolution = await resolveSquadWindowForMatchDay(sb, v.matchDayId, {
+      now,
+    });
+    if (!resolution.open && playerOverride?.state !== "force_open") {
+      throw new ConflictError(
+        `squad window is closed for match day ${v.matchDayId} (${resolution.reason})`,
+      );
+    }
+    windowOpen = resolution.open || playerOverride?.state === "force_open";
+  } else {
+    // Plan 10 weekly mode — unchanged.
+    const leagueOverride = await getSquadWindowOverride(sb, v.weekStartDate);
+    const deadline = thursdayDeadline(v.weekStartDate);
+    const beforeDeadline = now.getTime() < deadline.getTime();
+    if (
+      leagueOverride?.state === "force_close" &&
+      playerOverride?.state !== "force_open"
+    ) {
+      throw new ConflictError(
+        `squad window is closed for week ${v.weekStartDate}`,
+      );
+    }
+    windowOpen =
+      playerOverride?.state === "force_open" ||
+      leagueOverride?.state === "force_open" ||
+      beforeDeadline;
   }
-  const windowOpen =
-    playerOverride?.state === "force_open" ||
-    leagueOverride?.state === "force_open" ||
-    beforeDeadline;
 
   // Check for an existing live submission.
   const { data: existing } = await sb
@@ -151,6 +188,7 @@ export async function createSubmission(
       season_id: v.seasonId,
       player_id: v.playerId,
       week_start_date: v.weekStartDate,
+      match_day_id: v.matchDayId ?? null,
       futbin_screenshot_path: v.futbinScreenshotPath,
       validation_status: "pending",
     })

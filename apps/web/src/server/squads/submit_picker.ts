@@ -30,6 +30,10 @@ export const submitPickerInputSchema = z.object({
   seasonId: z.string().uuid(),
   playerId: z.string().uuid(),
   weekStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // Per-match-day window mode (admin override). When supplied, the
+  // resulting squad_submissions row is stamped with this match_day_id.
+  // Plan 10 weekly mode submissions leave it null.
+  matchDayId: z.string().uuid().nullable().optional(),
   // Plan 39 sanitize — block `..` traversal + backslash so a poisoned
   // path can't escape the squad-screenshots bucket sub-tree.
   futbinScreenshotPath: z
@@ -219,6 +223,7 @@ export async function submitPickerSquad(
       seasonId: v.seasonId,
       playerId: v.playerId,
       weekStartDate: v.weekStartDate,
+      matchDayId: v.matchDayId ?? null,
       futbinScreenshotPath: v.futbinScreenshotPath,
       items,
     },

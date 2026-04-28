@@ -18,6 +18,16 @@ export {
 } from "./window_override";
 export type { SquadWindowOverride, SquadWindowState } from "./window_override";
 export {
+  getMatchDayWindow,
+  setMatchDayWindow,
+  clearMatchDayWindow,
+  resolveSquadWindowForMatchDay,
+} from "./match_day_window";
+export type {
+  SquadMatchDayWindow,
+  SquadWindowResolution,
+} from "./match_day_window";
+export {
   getPlayerSquadOverride,
   setPlayerSquadOverride,
   clearPlayerSquadOverride,
