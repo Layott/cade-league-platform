@@ -5,6 +5,12 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { getActiveSession } from "@/server/broadcast/active_session";
 import { isOverlayActive } from "@/server/broadcast/v2/overlay_active_state";
 import type { V2OverlayKey } from "@/components/broadcast/v2/overlay-keys";
+import { resolveTokens } from "@/server/overlays/design/tokens";
+import { getActiveTemplateVariant } from "@/server/overlays/design/templates";
+import {
+  decodePreviewTokens,
+  escapeCssValue,
+} from "@/server/overlays/design/preview";
 
 /**
  * Resolve the active season for a given broadcast session via
@@ -112,7 +118,24 @@ type SearchParams = {
   preview?: string;
   active?: string;
   slot?: string;
+  variant?: string;
+  previewTokens?: string;
 };
+
+/**
+ * Build a `:root { --overlay-X: value; ... }` CSS string from a token
+ * map. Values are escaped through `escapeCssValue` (defence-in-depth on
+ * top of the validation already done in `resolveTokens` /
+ * `decodePreviewTokens`).
+ */
+function buildCssVarRule(tokens: Record<string, string>): string {
+  const entries: string[] = [];
+  for (const [k, v] of Object.entries(tokens)) {
+    if (typeof v !== "string") continue;
+    entries.push(`--overlay-${k}: ${escapeCssValue(v)};`);
+  }
+  return `:root{${entries.join(" ")}}`;
+}
 
 export default async function OverlayV2Page({
   params,
@@ -122,12 +145,46 @@ export default async function OverlayV2Page({
   searchParams: Promise<SearchParams>;
 }): Promise<ReactElement> {
   const { key } = await params;
-  const { session, token, season, preview, active, slot } = await searchParams;
+  const {
+    session,
+    token,
+    season,
+    preview,
+    active,
+    slot,
+    variant,
+    previewTokens: previewTokensRaw,
+  } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) {
     const alias = KEY_ALIASES[key];
     if (alias) redirect(`/overlay/v2/${alias}`);
     redirect("/overlay/v2/01-brb");
   }
+
+  // Phase 3 — overlay design system token injection.
+  //
+  // Resolve persisted DB tokens for this overlay (merged over hard-coded
+  // defaults). The `?variant=<id>` param picks a non-default template
+  // variant; omitted = the variant flagged `active=true` for the overlay.
+  // `decodePreviewTokens` handles the admin live-preview path and is
+  // null-safe (malformed input returns null silently).
+  let designTokens: Record<string, string> = {};
+  let activeVariantId: string | null = null;
+  try {
+    const sbDesign = getServiceRoleSupabase();
+    const variantRow = variant
+      ? await getActiveTemplateVariant(sbDesign, key, variant)
+      : await getActiveTemplateVariant(sbDesign, key);
+    activeVariantId = variantRow?.variantId ?? "default";
+    designTokens = await resolveTokens(sbDesign, key, activeVariantId);
+  } catch {
+    // Token resolution failure must not break the overlay route. Fall
+    // back to the canonical HTML defaults.
+    designTokens = {};
+  }
+  const previewTokens = await decodePreviewTokens(previewTokensRaw);
+  const cssVarRule = buildCssVarRule(designTokens);
+  const previewVarRule = previewTokens ? buildCssVarRule(previewTokens) : null;
 
   // Ambient-session resolve (2026-04-26):
   //
@@ -227,14 +284,26 @@ export default async function OverlayV2Page({
   const ambient = !isPreview;
 
   return (
-    <OverlayDataInjector
-      overlayKey={key}
-      sessionId={resolvedSession}
-      token={resolvedToken}
-      seasonId={resolvedSeason ?? undefined}
-      active={isActive}
-      slot={slotParsed}
-      ambient={ambient}
-    />
+    <>
+      <style
+        id="overlay-design-tokens"
+        dangerouslySetInnerHTML={{ __html: cssVarRule }}
+      />
+      {previewVarRule ? (
+        <style
+          id="preview-tokens"
+          dangerouslySetInnerHTML={{ __html: previewVarRule }}
+        />
+      ) : null}
+      <OverlayDataInjector
+        overlayKey={key}
+        sessionId={resolvedSession}
+        token={resolvedToken}
+        seasonId={resolvedSeason ?? undefined}
+        active={isActive}
+        slot={slotParsed}
+        ambient={ambient}
+      />
+    </>
   );
 }

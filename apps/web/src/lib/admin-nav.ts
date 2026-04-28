@@ -254,6 +254,12 @@ export const ADMIN_HUBS: readonly AdminHub[] = [
         perm: "broadcast.v2.read",
       },
       {
+        key: "design",
+        label: "Design",
+        href: "/admin/broadcast/v2/design",
+        perm: "broadcast.v2.read",
+      },
+      {
         key: "branding",
         label: "Branding",
         href: "/admin/broadcast/v2/branding",

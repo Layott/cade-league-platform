@@ -63,6 +63,35 @@ const SELECT_COLS =
   "id, overlay_key, variant_id, label, description, html_path, thumbnail_path, active";
 
 /**
+ * Get the active template variant for a given overlay_key. Used by the
+ * SSR overlay route to pick which HTML to render. If `variantId` is
+ * supplied AND a non-soft-deleted row matches, we return THAT variant
+ * regardless of `active` (admin/preview override). Otherwise we return
+ * the row with `active=true and deleted_at is null` (the partial unique
+ * index guarantees at most one). Returns null if nothing matches —
+ * caller can fall back to BASE_DEFAULTS / the canonical HTML.
+ */
+export async function getActiveTemplateVariant(
+  sb: SupabaseClient,
+  overlayKey: string,
+  variantId?: string,
+): Promise<TemplateVariant | null> {
+  const base = sb
+    .from("overlay_template_variants")
+    .select(SELECT_COLS)
+    .eq("overlay_key", overlayKey)
+    .is("deleted_at", null);
+  if (variantId) {
+    const { data, error } = await base.eq("variant_id", variantId).maybeSingle();
+    if (error) throw new Error(`getActiveTemplateVariant: ${error.message}`);
+    return data ? toVariant(data as Row) : null;
+  }
+  const { data, error } = await base.eq("active", true).maybeSingle();
+  if (error) throw new Error(`getActiveTemplateVariant: ${error.message}`);
+  return data ? toVariant(data as Row) : null;
+}
+
+/**
  * List template variants. Filter by `overlayKey` for the gallery view;
  * omit to list all variants across overlays. Excludes soft-deleted
  * rows. Sorted by overlay_key then variant_id for stable rendering.
