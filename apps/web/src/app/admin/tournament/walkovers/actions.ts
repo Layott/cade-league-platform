@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   confirmRefPendingWalkover,
   triggerAdminWalkover,
@@ -87,6 +88,9 @@ export async function confirmPendingWalkoverAction(
     };
   }
 
+  const limited = await enforceAuthedWrite(ctx.userId);
+  if (limited) return { ok: false, error: "rate_limited" };
+
   try {
     await confirmRefPendingWalkover(parsed, ctx.svc, ctx.userId);
   } catch (e) {
@@ -143,6 +147,9 @@ export async function triggerWalkoverAction(
       error: e instanceof Error ? e.message : "Forbidden",
     };
   }
+
+  const limited = await enforceAuthedWrite(ctx.userId);
+  if (limited) return { ok: false, error: "rate_limited" };
 
   try {
     await triggerAdminWalkover(

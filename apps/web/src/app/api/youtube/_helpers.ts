@@ -5,6 +5,7 @@ import {
   requirePermAsync,
   PermissionError,
 } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 
 /**
  * Plan 44 — shared auth + perm gate for /api/youtube/* routes.
@@ -23,6 +24,7 @@ export type AuthCtx = {
 
 export async function gateYoutubeRequest(
   perm: string = "broadcast.match_control",
+  opts: { rateLimit?: boolean } = { rateLimit: true },
 ): Promise<{ ok: true; ctx: AuthCtx } | { ok: false; res: NextResponse }> {
   const userClient = await getServerSupabase();
   const { data: auth } = await userClient.auth.getUser();
@@ -52,6 +54,16 @@ export async function gateYoutubeRequest(
       return { ok: false, res: new NextResponse("Forbidden", { status: 403 }) };
     }
     throw err;
+  }
+  // Plan 39 hardening — write paths go through the per-user 30/min cap.
+  // Read paths (e.g. `/api/youtube/chat` polling at 5–10s intervals) opt
+  // out via { rateLimit: false } so the chat poll isn't throttled by the
+  // write budget. Returns the 429 response for the caller to forward.
+  if (opts.rateLimit !== false) {
+    const limited = await enforceAuthedWrite(pub.id);
+    if (limited) {
+      return { ok: false, res: limited };
+    }
   }
   return {
     ok: true,

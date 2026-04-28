@@ -1,6 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { openAutoCase, type AttendanceStatus } from "./penalty";
 import { applyForfeitMatchResult } from "@/server/punishments";
+
+// Plan 39 sanitize — alnum/hyphen/underscore guard for `.or()` filter
+// interpolation. See server/profile/h2h.ts for rationale.
+const safeIdRegex = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "id contains forbidden characters");
 
 export type MarkInput = {
   matchDayId: string;
@@ -72,11 +81,16 @@ async function doMark(
   // 3a. Apply auto-forfeit if the ladder demands it (absence). Find the
   //     player's scheduled match on this match day; if found, apply 3-0.
   if (auto?.outcome.autoForfeit) {
+    // Plan 39 sanitize — alnum/hyphen/underscore-only validate before
+    // composing into a `.or()` filter. PostgREST punctuation (comma,
+    // dot, paren, equals) is rejected so the playerId can't break out
+    // of the filter expression.
+    const safePlayerId = safeIdRegex.parse(input.playerId);
     const { data: match } = await sb
       .from("matches")
       .select("id")
       .eq("match_day_id", input.matchDayId)
-      .or(`home_player_id.eq.${input.playerId},away_player_id.eq.${input.playerId}`)
+      .or(`home_player_id.eq.${safePlayerId},away_player_id.eq.${safePlayerId}`)
       .is("deleted_at", null)
       .limit(1)
       .maybeSingle();

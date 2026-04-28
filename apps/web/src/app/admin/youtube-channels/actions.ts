@@ -5,11 +5,17 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   createChannel,
   deleteChannel,
   promoteToDefault,
 } from "@/server/youtube/channels";
+
+// Plan 39 sanitize — handle must look like a YouTube handle. Strict
+// regex on the post-`@`-prefix form. displayLabel capped at 80 chars to
+// match the brand-asset label limit.
+const YT_HANDLE_RE = /^@[A-Za-z0-9._-]{3,30}$/;
 
 async function gate(): Promise<{
   sb: ReturnType<typeof getServiceRoleSupabase>;
@@ -43,6 +49,8 @@ async function gate(): Promise<{
     }
     throw e;
   }
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
   return { sb, publicUserId: pub.id };
 }
 
@@ -53,6 +61,14 @@ export async function createChannelAction(formData: FormData) {
 
   // Accept either "@foo" or "foo" from the UI — normalize here.
   const handle = handleRaw.startsWith("@") ? handleRaw : `@${handleRaw}`;
+  if (!YT_HANDLE_RE.test(handle)) {
+    throw new Error(
+      "handle must match @[A-Za-z0-9._-]{3,30} after the '@' prefix",
+    );
+  }
+  if (displayLabel.length > 80) {
+    throw new Error("displayLabel must be at most 80 characters");
+  }
 
   const { sb, publicUserId } = await gate();
   await createChannel(sb, {

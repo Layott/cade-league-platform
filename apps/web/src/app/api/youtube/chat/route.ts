@@ -21,7 +21,11 @@ export const runtime = "nodejs";
  *   502 — upstream YouTube failure
  */
 export async function GET(req: NextRequest) {
-  const gate = await gateYoutubeRequest();
+  // chat is the only read path on this gate — opt out of the write
+  // budget so the 5–10s poll doesn't burn through it.
+  const gate = await gateYoutubeRequest("broadcast.match_control", {
+    rateLimit: false,
+  });
   if (!gate.ok) return gate.res;
 
   const sessionId = req.nextUrl.searchParams.get("sessionId");

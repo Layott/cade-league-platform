@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { markAllRead } from "@/server/announcements";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ export async function POST() {
     .is("deleted_at", null)
     .maybeSingle();
   if (!pub) return new NextResponse("Unauthorized", { status: 401 });
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return limited;
 
   await markAllRead(sb, pub.id);
   return new NextResponse(null, { status: 204 });

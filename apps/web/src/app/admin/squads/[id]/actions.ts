@@ -12,6 +12,7 @@ import {
 } from "@/server/squads";
 import { publishSquadStatusChanged } from "@/server/squads/realtime";
 import { notify } from "@/server/notifications";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import type { Actor } from "@/perms";
 import { reopenSubmissionSchema } from "./schemas";
 
@@ -104,6 +105,8 @@ async function loadActor(sb: Awaited<ReturnType<typeof getServerSupabase>>): Pro
 export async function approveAction(submissionId: string): Promise<void> {
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
   await approveSubmission(sb, actor, submissionId);
   await pingPlayerAfterReview(submissionId, "approved");
 
@@ -139,6 +142,8 @@ export async function rejectAction(formData: FormData): Promise<void> {
   if (!submissionId) throw new Error("missing submissionId");
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
   await rejectSubmission(sb, actor, submissionId, reason);
   await pingPlayerAfterReview(submissionId, "rejected");
 
@@ -193,6 +198,8 @@ export async function acceptFcdbCandidateAction(
   }
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
   const svc = getServiceRoleSupabase();
   await acceptFcdbCandidate(svc, actor, itemId, fcPlayerId);
   if (submissionId) revalidatePath(`/admin/squads/${submissionId}`);
@@ -210,6 +217,8 @@ export async function reopenSubmissionAction(
   const parsed = reopenSubmissionSchema.parse({ submissionId });
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
   await reopenSubmission(sb, actor, parsed.submissionId);
   await pingPlayerAfterReview(parsed.submissionId, "reopened");
   revalidatePath(`/admin/squads/${parsed.submissionId}`);

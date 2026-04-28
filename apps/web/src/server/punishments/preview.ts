@@ -1,4 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+
+// Plan 39 sanitize — guard for `.or()` interpolation. Allow only safe
+// id characters (alnum + hyphen + underscore), reject any PostgREST
+// punctuation that could break out of the filter expression: comma,
+// dot, parens, equals, semicolon, quotes, whitespace, etc. Permissive
+// on length so non-UUID test fixtures (e.g. "p-1") still pass — the
+// real security gate is the character class.
+const safeIdRegex = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "id contains forbidden characters");
 
 export type PreviewedMatch = {
   matchId: string;
@@ -28,6 +41,11 @@ export async function previewSuspensionVoids(
 ): Promise<PreviewedMatch[]> {
   if (!effectiveFrom || !effectiveUntil || effectiveUntil < effectiveFrom) return [];
 
+  // Plan 39 sanitize — alnum/hyphen/underscore-only validate before
+  // composing into a `.or()` filter. PostgREST punctuation (comma,
+  // dot, paren, equals) is rejected so the playerId can't break out
+  // of the filter expression.
+  const safePlayerId = safeIdRegex.parse(playerId);
   const { data, error } = await sb
     .from("matches")
     .select(
@@ -39,7 +57,7 @@ export async function previewSuspensionVoids(
       `,
     )
     .is("deleted_at", null)
-    .or(`home_player_id.eq.${playerId},away_player_id.eq.${playerId}`)
+    .or(`home_player_id.eq.${safePlayerId},away_player_id.eq.${safePlayerId}`)
     .gte("match_days.match_date", effectiveFrom)
     .lte("match_days.match_date", effectiveUntil);
   if (error) throw new Error(`previewSuspensionVoids: ${error.message}`);

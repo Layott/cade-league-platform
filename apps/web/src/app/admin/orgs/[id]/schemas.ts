@@ -7,14 +7,20 @@ import { z } from "zod";
  * org-logos signed upload).
  */
 
+// Plan 39 sanitize — `..` / backslash guard on any storage path.
+const NO_TRAVERSAL = (v: string | undefined) =>
+  !v || (!v.includes("..") && !v.includes("\\"));
+
 export const updateOrgFormSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(1).max(200).optional(),
   logoPath: z
     .string()
     .trim()
+    .max(500)
     .optional()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .refine(NO_TRAVERSAL, "logoPath must not contain '..' or backslashes"),
   contactRepUserId: z
     .string()
     .trim()

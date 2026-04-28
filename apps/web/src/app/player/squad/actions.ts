@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   buildScreenshotPath,
   createSignedUpload,
@@ -57,7 +58,9 @@ async function loadPlayerContext() {
 export async function requestUploadUrlAction(input: {
   extension: "png" | "jpg" | "webp";
 }): Promise<{ path: string; signedUrl: string; token?: string; weekStartDate: string }> {
-  const { playerId, seasonId } = await loadPlayerContext();
+  const { userId, playerId, seasonId } = await loadPlayerContext();
+  const limited = await enforceAuthedWrite(userId);
+  if (limited) throw new Error("rate_limited");
   const weekStartDate = weekStartThursday(new Date());
   const filename = `${randomUUID()}.${input.extension}`;
   const path = buildScreenshotPath({ seasonId, playerId, weekStartDate, filename });
@@ -80,7 +83,9 @@ export type SubmitPickerActionPayload = {
 export async function submitPickerAction(
   payload: SubmitPickerActionPayload,
 ): Promise<void> {
-  const { sb, playerId, seasonId } = await loadPlayerContext();
+  const { sb, userId, playerId, seasonId } = await loadPlayerContext();
+  const limited = await enforceAuthedWrite(userId);
+  if (limited) throw new Error("rate_limited");
 
   if (!payload.futbinScreenshotPath || !payload.weekStartDate) {
     throw new Error("missing screenshot path or week");

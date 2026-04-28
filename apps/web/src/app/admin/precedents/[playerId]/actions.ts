@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { adjustPrecedent, AdjustPrecedentError } from "@/server/precedents";
 
 export async function adjustPrecedentAction(formData: FormData) {
@@ -27,6 +28,8 @@ export async function adjustPrecedentAction(formData: FormData) {
 
   const sb = getServiceRoleSupabase();
   await requirePermAsync(sb, { userId: pub.id, roles }, "punishments.edit");
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
 
   const playerId = String(formData.get("playerId") ?? "");
   const category = String(formData.get("category") ?? "");

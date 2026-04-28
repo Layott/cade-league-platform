@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { getActiveSeason } from "@/server/seasons";
 import { confirmResult, enterResult, editResult } from "@/server/matches/results";
 import { publishStandingsChanged } from "@/server/standings/realtime";
@@ -68,6 +69,9 @@ export async function submitMatchResultAction(
   } catch (e) {
     return { status: "error", error: e instanceof Error ? e.message : "perm" };
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return { status: "error", error: "rate_limited" };
 
   let parsed: z.infer<typeof submitSchema>;
   try {

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -50,5 +51,11 @@ export async function gate(action: string): Promise<AuthedActor> {
     }
     throw e;
   }
+  // Plan 39 hardening — every authenticated mutation routed through
+  // gate() also goes through the per-user write limiter (30 writes/min).
+  // Limit is enforced AFTER perm check so unauthenticated/forbidden
+  // callers don't burn rate-limit budget on a 403.
+  const limited = await enforceAuthedWrite(actor.userId);
+  if (limited) throw new Error("rate_limited");
   return actor;
 }

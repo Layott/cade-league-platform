@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { upsertRule } from "@/server/squads";
 import type { Actor } from "@/perms";
 
@@ -40,6 +41,8 @@ export async function saveRuleAction(formData: FormData): Promise<void> {
 
   const sb = await getServerSupabase();
   const actor = await loadActor(sb);
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
   await upsertRule(sb, actor, {
     seasonId,
     maxBudgetCoins,

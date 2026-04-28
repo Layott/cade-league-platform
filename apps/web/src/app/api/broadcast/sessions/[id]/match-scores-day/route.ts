@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
+import { enforcePublicRead } from "@/lib/api-rate-limit";
 import {
   fetchMatchScoresDayDataBySession,
   toMatchScoresDayPayload,
@@ -21,6 +22,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const limited = await enforcePublicRead(req);
+  if (limited) return limited;
+
   const { id } = await params;
   const sb = getServiceRoleSupabase();
 

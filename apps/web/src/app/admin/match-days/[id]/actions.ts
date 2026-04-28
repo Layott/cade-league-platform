@@ -22,6 +22,7 @@ import {
   unvoidMatchResult,
 } from "@/server/matches/results";
 import { requirePermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { syncScoreToLiveSessions } from "@/server/broadcast/match_sync";
 import {
   publishFixturesChanged,
@@ -59,6 +60,8 @@ async function currentPublicUserId(): Promise<string> {
     .eq("supabase_auth_id", auth.user.id)
     .maybeSingle();
   if (!pub) throw new Error("public.users row missing");
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
   return pub.id;
 }
 
@@ -84,6 +87,8 @@ async function requirePermInline(perm: string): Promise<{ userId: string; roles:
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
   const svc = getServiceRoleSupabase();
   await requirePermAsync(svc, { userId: pub.id, roles }, perm);
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
   return { userId: pub.id, roles };
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { triggerOverlay } from "@/server/broadcast/events";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,9 @@ export async function POST(req: NextRequest) {
     }
     throw err;
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => null)) as {
     sessionId?: string;

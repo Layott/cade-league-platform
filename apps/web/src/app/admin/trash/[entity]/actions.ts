@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { restore } from "@/server/trash";
 import { isTrashEntityType } from "@/server/trash/entities";
 
@@ -45,6 +46,8 @@ export async function restoreAction(formData: FormData) {
 
   const svc = getServiceRoleSupabase();
   await requirePermAsync(svc, { userId: pub.id, roles }, "trash.restore");
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
 
   await restore(svc, entityType, id, auth.user.id);
 

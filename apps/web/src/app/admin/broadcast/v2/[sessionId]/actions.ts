@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   triggerOverlay,
   clearOverlay,
@@ -75,6 +76,8 @@ async function gateTrigger(): Promise<{
     }
     throw e;
   }
+  const limited = await enforceAuthedWrite(publicUserId);
+  if (limited) throw new Error("rate_limited");
   return { sb, publicUserId };
 }
 
@@ -102,6 +105,8 @@ async function gateManage(): Promise<{
     }
     throw e;
   }
+  const limited = await enforceAuthedWrite(publicUserId);
+  if (limited) throw new Error("rate_limited");
   return { sb, publicUserId };
 }
 

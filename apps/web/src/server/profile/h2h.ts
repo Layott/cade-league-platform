@@ -1,4 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
+
+// Plan 39 sanitize — guard PostgREST `.or()` interpolations against
+// punctuation that would break out of the filter expression. Allow
+// only alnum + hyphen + underscore (the chars used in real UUIDs +
+// test fixture ids like `p-1`); reject comma, dot, parens, equals,
+// semicolon, quotes, whitespace.
+const safeIdRegex = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "id contains forbidden characters");
 
 /**
  * Plan 41 §3.2 — Head-to-head grid.
@@ -68,6 +80,11 @@ export async function getH2HGrid(
   playerId: string,
   seasonId: string,
 ): Promise<H2HRow[]> {
+  // Plan 39 sanitize — alnum/hyphen/underscore-only validate before
+  // composing into a `.or()` filter. Rejects PostgREST punctuation
+  // (comma, dot, paren, equals) that would break out of the filter
+  // syntax.
+  const safePlayerId = safeIdRegex.parse(playerId);
   const { data, error } = await sb
     .from("matches")
     .select(
@@ -80,7 +97,7 @@ export async function getH2HGrid(
     )
     .eq("season_id", seasonId)
     .is("deleted_at", null)
-    .or(`home_player_id.eq.${playerId},away_player_id.eq.${playerId}`);
+    .or(`home_player_id.eq.${safePlayerId},away_player_id.eq.${safePlayerId}`);
   if (error) throw new Error(`getH2HGrid: ${error.message}`);
 
   const rows = (data ?? []) as unknown as MatchRow[];

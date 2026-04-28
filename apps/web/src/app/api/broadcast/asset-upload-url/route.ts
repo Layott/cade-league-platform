@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   requestOverlayUploadUrl,
   AssetUploadError,
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
     .eq("user_id", pub.id)
     .is("deleted_at", null);
   const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => null)) as {
     kind?: string;

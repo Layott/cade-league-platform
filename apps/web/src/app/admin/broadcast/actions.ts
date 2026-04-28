@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { startSession, endSession } from "@/server/broadcast/sessions";
 import {
   triggerOverlay,
@@ -79,6 +80,11 @@ async function gate(action: string): Promise<{
     }
     throw e;
   }
+  // Plan 39 hardening — broadcast actions can be rage-clicked by an
+  // operator, so the per-user 30/min cap is enforced here too. Limit
+  // is AFTER the perm check so 403s don't burn budget.
+  const limited = await enforceAuthedWrite(publicUserId);
+  if (limited) throw new Error("rate_limited");
   return { sb, publicUserId };
 }
 

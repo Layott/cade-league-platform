@@ -18,7 +18,7 @@ export const issueSchema = z
       "other",
     ]),
     sanctionType: z.enum(["warning", "point_deduction", "gd_deduction", "forfeit", "ban"]),
-    magnitude: z.coerce.number().int().min(0).default(0),
+    magnitude: z.coerce.number().int().min(0).max(99).default(0),
     effectiveFrom: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -132,7 +132,7 @@ export const updateSchema = z
       "forfeit",
       "ban",
     ]),
-    magnitude: z.coerce.number().int().min(0).default(0),
+    magnitude: z.coerce.number().int().min(0).max(99).default(0),
     effectiveFrom: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)

@@ -61,7 +61,17 @@ export const createSubmissionSchema = z.object({
   seasonId: z.string().uuid(),
   playerId: z.string().uuid(),
   weekStartDate: ymd,
-  futbinScreenshotPath: z.string().min(1),
+  // Plan 39 sanitize — `..` traversal in a storage path lets a poisoned
+  // upload escape the bucket sub-tree. Reject parent-path token + back-
+  // slash. Cap at 500 chars (matches other storage path schemas).
+  futbinScreenshotPath: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(
+      (v) => !v.includes("..") && !v.includes("\\"),
+      "futbinScreenshotPath must not contain '..' or backslashes",
+    ),
   items: z.array(itemSchema).min(1).max(23),
 });
 

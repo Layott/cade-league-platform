@@ -1,7 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { publish } from "./realtime";
 import { REALTIME } from "@/server/overlays/registry";
 import { triggerOverlay, listActiveOverlays } from "./events";
+
+// Plan 39 sanitize — alnum/hyphen/underscore guard for `.or()` filter
+// interpolation. See server/profile/h2h.ts for rationale.
+const safeIdRegex = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "id contains forbidden characters");
 
 /**
  * Slice 2 of the leaderboard / broadcast linking audit
@@ -73,12 +82,18 @@ export async function findLiveSessionSlotsForMatch(
   sb: SupabaseClient,
   matchId: string,
 ): Promise<LiveSessionSlot[]> {
+  // Plan 39 sanitize — alnum/hyphen/underscore-only validate before
+  // composing into a `.or()` filter. Punctuation that could escape the
+  // filter expression is rejected.
+  const safeMatchId = safeIdRegex.parse(matchId);
   // One round-trip: OR-filter on both slot columns. `.or(...)` syntax
   // matches supabase-js v2.
   const { data, error } = await sb
     .from("stream_sessions")
     .select("id, primary_match_id, secondary_match_id")
-    .or(`primary_match_id.eq.${matchId},secondary_match_id.eq.${matchId}`)
+    .or(
+      `primary_match_id.eq.${safeMatchId},secondary_match_id.eq.${safeMatchId}`,
+    )
     .is("ended_at", null)
     .is("deleted_at", null);
   if (error) {

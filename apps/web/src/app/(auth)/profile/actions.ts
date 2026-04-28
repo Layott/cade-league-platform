@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import type { Actor } from "@/perms";
 import {
   updateOwnProfileSchema,
@@ -105,6 +106,8 @@ async function writeProfileFields(
 export async function updateOwnProfileAction(formData: FormData) {
   const { sb, actor } = await resolveActor();
   await requirePermAsync(sb, actor, "profile.edit.own");
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
 
   const raw = parseProfileFormData(formData);
   const input = updateOwnProfileSchema.parse(raw);
@@ -120,6 +123,8 @@ export async function updateOtherProfileAction(
 ) {
   const { sb, actor } = await resolveActor();
   await requirePermAsync(sb, actor, "users.edit.any");
+  const limited = await enforceAuthedWrite(actor.userId as string);
+  if (limited) throw new Error("rate_limited");
 
   const raw = parseProfileFormData(formData);
   const input = updateOtherProfileSchema.parse({ userId, ...raw });

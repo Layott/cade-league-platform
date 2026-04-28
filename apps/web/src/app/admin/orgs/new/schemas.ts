@@ -8,6 +8,12 @@ import { z } from "zod";
  * URL by the action before persisting.
  */
 
+// Plan 39 sanitize — `..` traversal in any storage path lets a poisoned
+// upload escape the bucket sub-tree. Reject the parent-path token + any
+// backslash (Windows separator).
+const NO_TRAVERSAL = (v: string | undefined) =>
+  !v || (!v.includes("..") && !v.includes("\\"));
+
 export const createOrgFormSchema = z.object({
   name: z.string().trim().min(1, "name required").max(200),
   logoPath: z
@@ -15,7 +21,8 @@ export const createOrgFormSchema = z.object({
     .trim()
     .max(500)
     .nullish()
-    .transform((v) => (v && v.length > 0 ? v : undefined)),
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .refine(NO_TRAVERSAL, "logoPath must not contain '..' or backslashes"),
   contactRepUserId: z
     .string()
     .trim()

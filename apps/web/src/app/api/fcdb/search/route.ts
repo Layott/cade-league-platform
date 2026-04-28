@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { searchCards, searchCardsInputSchema } from "@/server/fcdb/search";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
   if (!roles.some((r) => ALLOWED_ROLES.has(r))) {
     return new NextResponse("Forbidden", { status: 403 });
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => null)) as {
     q?: string;

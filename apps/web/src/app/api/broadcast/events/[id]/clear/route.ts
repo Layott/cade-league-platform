@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { clearOverlay } from "@/server/broadcast/events";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,9 @@ export async function POST(
     }
     throw err;
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return limited;
 
   try {
     await clearOverlay(sb, id, pub.id);

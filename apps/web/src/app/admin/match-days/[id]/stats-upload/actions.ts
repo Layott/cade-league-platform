@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   buildStoragePath,
   downloadBuffer,
@@ -55,6 +56,9 @@ async function requireActor(perm: PermName) {
   if (!(await hasPermAsync(sb, { userId: pub.id, roles }, perm))) {
     throw new Error("forbidden");
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
 
   return { sb, actorUserId: pub.id as string };
 }

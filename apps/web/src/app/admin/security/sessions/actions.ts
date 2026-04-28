@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 
 /**
  * Plan 39 C4 — per-action perm re-check.
@@ -36,6 +37,8 @@ export async function revokeSession(formData: FormData) {
 
   const svc = getServiceRoleSupabase();
   await requirePermAsync(svc, { userId: pub.id, roles }, "sessions.revoke");
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
 
   await svc
     .from("sessions")

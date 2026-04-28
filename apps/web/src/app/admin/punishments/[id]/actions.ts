@@ -2,11 +2,15 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
-import { revoke, softDelete, update, unrevoke } from "@/server/punishments";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
+import { revoke, softDelete, update, unrevoke, updateSchema } from "@/server/punishments";
 import { notify } from "@/server/notifications";
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Resolve the player_id that owns a given disciplinary_action, so we can
@@ -89,6 +93,8 @@ export async function revokeAction(formData: FormData) {
     { userId: ctx.pub.id, roles: ctx.roles },
     "punishments.edit",
   );
+  const limited = await enforceAuthedWrite(ctx.pub.id);
+  if (limited) throw new Error("rate_limited");
 
   await revoke(ctx.service, actionId, reason);
   const playerId = await playerIdForAction(ctx.service, actionId);
@@ -129,24 +135,36 @@ export async function updateAction(formData: FormData) {
     { userId: ctx.pub.id, roles: ctx.roles },
     "punishments.edit",
   );
+  const limited = await enforceAuthedWrite(ctx.pub.id);
+  if (limited) throw new Error("rate_limited");
 
-  const actionId = String(formData.get("actionId") ?? "");
-  if (!actionId) return;
+  const actionId = z
+    .string()
+    .uuid()
+    .parse(String(formData.get("actionId") ?? ""));
 
-  await update(ctx.service, {
+  // Sanitize: parse the optional ISO dates BEFORE handing them to the
+  // shared updateSchema (which only allows a strict YYYY-MM-DD format,
+  // null, or undefined — no `as`-cast strings).
+  const efRaw = String(formData.get("effectiveFrom") ?? "").trim();
+  const euRaw = String(formData.get("effectiveUntil") ?? "").trim();
+  const effectiveFrom = efRaw
+    ? z.string().regex(ISO_DATE_RE).parse(efRaw)
+    : null;
+  const effectiveUntil = euRaw
+    ? z.string().regex(ISO_DATE_RE).parse(euRaw)
+    : null;
+
+  const updateInput = updateSchema.parse({
     actionId,
-    sanctionType: formData.get("sanctionType") as
-      | "warning"
-      | "point_deduction"
-      | "gd_deduction"
-      | "forfeit"
-      | "ban",
-    magnitude: Number(formData.get("magnitude") ?? 0),
-    effectiveFrom: (formData.get("effectiveFrom") as string) || null,
-    effectiveUntil: (formData.get("effectiveUntil") as string) || null,
+    sanctionType: String(formData.get("sanctionType") ?? ""),
+    magnitude: formData.get("magnitude") ?? 0,
+    effectiveFrom,
+    effectiveUntil,
     publicVisible: formData.get("publicVisible") === "on",
     notes: (formData.get("notes") as string) || null,
   });
+  await update(ctx.service, updateInput);
 
   const playerId = await playerIdForAction(ctx.service, actionId);
   revalidatePath("/admin/punishments");
@@ -173,6 +191,8 @@ export async function unrevokeAction(formData: FormData) {
     { userId: ctx.pub.id, roles: ctx.roles },
     "punishments.edit",
   );
+  const limited = await enforceAuthedWrite(ctx.pub.id);
+  if (limited) throw new Error("rate_limited");
 
   const actionId = String(formData.get("actionId") ?? "");
   if (!actionId) return;
@@ -202,6 +222,8 @@ export async function deleteAction(formData: FormData) {
     { userId: ctx.pub.id, roles: ctx.roles },
     "punishments.edit",
   );
+  const limited = await enforceAuthedWrite(ctx.pub.id);
+  if (limited) throw new Error("rate_limited");
 
   const actionId = String(formData.get("actionId") ?? "");
   if (!actionId) return;

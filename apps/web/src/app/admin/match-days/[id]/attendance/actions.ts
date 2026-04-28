@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { markPresent, markLate, markAbsent, editMark } from "@/server/attendance";
 
 type PermName = "attendance.mark" | "attendance.edit";
@@ -35,6 +36,9 @@ async function requireActor(perm: PermName) {
   if (!(await hasPermAsync(sb, { userId: pub.id, roles }, perm))) {
     throw new Error("forbidden");
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
 
   // Use service-role client for the mutation path so we control audit context
   // and are not gated by RLS on attendance_marks / disciplinary_* tables.

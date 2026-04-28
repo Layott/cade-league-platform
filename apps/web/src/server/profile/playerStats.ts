@@ -1,5 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { listStandings } from "@/server/standings/read";
+
+// Plan 39 sanitize — alnum/hyphen/underscore guard for `.or()` filter
+// interpolation. See server/profile/h2h.ts for rationale.
+const safeIdRegex = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "id contains forbidden characters");
 
 /**
  * Plan 41 §3.2 — player stats server module.
@@ -147,6 +156,10 @@ async function readPlayerMatches(
   playerId: string,
   seasonId: string,
 ): Promise<RawMatchRow[]> {
+  // Plan 39 sanitize — alnum/hyphen/underscore-only validate before
+  // composing into a `.or()` PostgREST filter string. Punctuation
+  // that could escape the filter expression is rejected.
+  const safePlayerId = safeIdRegex.parse(playerId);
   const { data, error } = await sb
     .from("matches")
     .select(
@@ -160,7 +173,7 @@ async function readPlayerMatches(
     )
     .eq("season_id", seasonId)
     .is("deleted_at", null)
-    .or(`home_player_id.eq.${playerId},away_player_id.eq.${playerId}`);
+    .or(`home_player_id.eq.${safePlayerId},away_player_id.eq.${safePlayerId}`);
   if (error) throw new Error(`readPlayerMatches: ${error.message}`);
 
   const rows = (data ?? []) as unknown as RawMatchRow[];

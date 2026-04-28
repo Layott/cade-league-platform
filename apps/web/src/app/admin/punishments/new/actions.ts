@@ -2,11 +2,15 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
-import { issue } from "@/server/punishments";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
+import { issue, issueSchema } from "@/server/punishments";
 import { notify } from "@/server/notifications";
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function createPunishment(formData: FormData) {
   const sb = await getServerSupabase();
@@ -33,40 +37,41 @@ export async function createPunishment(formData: FormData) {
     { userId: pub.id, roles },
     "punishments.issue",
   );
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
 
-  const playerId = String(formData.get("playerId"));
-  const sanctionType = formData.get("sanctionType") as
-    | "warning"
-    | "point_deduction"
-    | "gd_deduction"
-    | "forfeit"
-    | "ban";
-  const incidentType = formData.get("incidentType") as
-    | "late_arrival"
-    | "absent"
-    | "forfeit"
-    | "equipment"
-    | "social_media"
-    | "unauthorized_access"
-    | "betting"
-    | "match_fixing"
-    | "dress_code"
-    | "other";
-  const magnitude = Number(formData.get("magnitude") ?? 0);
-  const effectiveFrom = (formData.get("effectiveFrom") as string) || undefined;
-  const effectiveUntil = (formData.get("effectiveUntil") as string) || null;
+  // Parse + validate every payload value via Zod (no `as`-casts on enum
+  // strings — Plan 39 sanitize hardening). The shared issueSchema enforces
+  // enum membership, magnitude.max(99), and the effective_* ISO regex; we
+  // also re-validate the date strings here so optional fields short-circuit
+  // before hitting the schema's optional().
+  const playerId = z.string().uuid().parse(String(formData.get("playerId") ?? ""));
+  const matchIdRaw = String(formData.get("matchId") ?? "").trim();
+  const matchId = matchIdRaw ? z.string().uuid().parse(matchIdRaw) : null;
 
-  const { actionId } = await issue(service, pub.id, {
+  const effectiveFromRaw = String(formData.get("effectiveFrom") ?? "").trim();
+  const effectiveUntilRaw = String(formData.get("effectiveUntil") ?? "").trim();
+  const effectiveFrom = effectiveFromRaw
+    ? z.string().regex(ISO_DATE_RE).parse(effectiveFromRaw)
+    : undefined;
+  const effectiveUntil = effectiveUntilRaw
+    ? z.string().regex(ISO_DATE_RE).parse(effectiveUntilRaw)
+    : null;
+
+  const issueInput = issueSchema.parse({
     playerId,
-    matchId: (formData.get("matchId") as string) || null,
-    incidentType,
-    sanctionType,
-    magnitude,
+    matchId,
+    incidentType: String(formData.get("incidentType") ?? ""),
+    sanctionType: String(formData.get("sanctionType") ?? ""),
+    magnitude: formData.get("magnitude") ?? 0,
     effectiveFrom,
     effectiveUntil,
     publicVisible: formData.get("publicVisible") === "on",
     notes: (formData.get("notes") as string) || undefined,
   });
+  const { sanctionType, incidentType, magnitude } = issueInput;
+
+  const { actionId } = await issue(service, pub.id, issueInput);
 
   // Notify the player. Bans get a richer body mentioning the window.
   try {

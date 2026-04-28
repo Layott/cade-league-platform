@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { getActiveSeason } from "@/server/seasons";
 import { publishStandingsChanged } from "@/server/standings/realtime";
 
@@ -85,6 +86,9 @@ export async function saveTiebreakerOrderAction(
       error: e instanceof Error ? e.message : "Forbidden",
     };
   }
+
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) return { ok: false, error: "rate_limited" };
 
   // Dedupe while preserving order so JSONB stays clean.
   const seen = new Set<string>();

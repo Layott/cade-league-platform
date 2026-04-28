@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
@@ -83,10 +84,19 @@ export default async function UserDetailPage({
     (r) => !currentRoles.includes(r),
   );
 
+  // Plan 39 sanitize — alnum/hyphen/underscore-only validate before
+  // composing into a `.or()` filter. Punctuation rejected so the id
+  // can't escape the filter expression.
+  const safeUserId = z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/, "id contains forbidden characters")
+    .parse(id);
   const { data: auditRows } = await sb
     .from("audit_events")
     .select("id, action, entity_type, entity_id, created_at, actor_user_id")
-    .or(`entity_id.eq.${id},actor_user_id.eq.${id}`)
+    .or(`entity_id.eq.${safeUserId},actor_user_id.eq.${safeUserId}`)
     .order("created_at", { ascending: false })
     .limit(20);
 

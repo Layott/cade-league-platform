@@ -2,15 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   upsertBrandSettings,
   upsertBrandAsset,
   setBrandAssetVisible,
   deleteBrandAsset,
 } from "@/server/branding/write";
+
+const HEX6_RE = /^#[0-9a-fA-F]{6}$/;
 
 async function resolveAuthed(): Promise<{
   publicUserId: string;
@@ -52,12 +56,24 @@ async function gate(): Promise<{
     }
     throw e;
   }
+  const limited = await enforceAuthedWrite(publicUserId);
+  if (limited) throw new Error("rate_limited");
   return { sb, publicUserId };
 }
 
 export async function saveBrandColorsAction(formData: FormData) {
   const primary = String(formData.get("primaryColor") ?? "").trim();
   const secondary = String(formData.get("secondaryColor") ?? "").trim();
+  // Plan 39 sanitize — both fields land in CSS via the brand-settings
+  // overlay/page injection, so anything other than a strict #RRGGBB
+  // hex is rejected. Empty string => "no change", which falls through
+  // as undefined to the server upsert.
+  if (primary && !HEX6_RE.test(primary)) {
+    throw new Error("primaryColor must be #RRGGBB hex");
+  }
+  if (secondary && !HEX6_RE.test(secondary)) {
+    throw new Error("secondaryColor must be #RRGGBB hex");
+  }
   const { sb, publicUserId } = await gate();
   await upsertBrandSettings(sb, {
     primaryColor: primary || undefined,
@@ -75,17 +91,20 @@ export async function saveBrandAssetAction(formData: FormData) {
   const visible = formData.get("visible") !== "off";
   if (!slot) throw new Error("slot required");
   if (!storagePath) throw new Error("storagePath required");
-
-  const displayOrder = Number(displayOrderRaw);
-  if (!Number.isFinite(displayOrder)) {
-    throw new Error("displayOrder must be numeric");
+  // Plan 39 sanitize — `..` traversal in a storage path lets a poisoned
+  // upload escape the bucket sub-tree. Reject any segment containing the
+  // parent-path token. Forward + back slash both checked.
+  if (storagePath.includes("..") || storagePath.includes("\\")) {
+    throw new Error("storagePath must not contain '..' or backslashes");
   }
+
+  const displayOrderParsed = z.coerce.number().int().min(0).max(9999).parse(displayOrderRaw);
   const { sb, publicUserId } = await gate();
   await upsertBrandAsset(sb, {
     slot,
     storagePath,
     label,
-    displayOrder,
+    displayOrder: displayOrderParsed,
     visible,
     userId: publicUserId,
   });

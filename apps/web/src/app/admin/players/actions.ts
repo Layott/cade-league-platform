@@ -2,9 +2,47 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
+
+// Plan 39 sanitize — strict schema for the player-edit endpoint. Caps
+// every text field so a wedge upload can't blow past the DB column
+// length, and forces photoUrl through a URL parse with a scheme allow-
+// list (`http`/`https` only — no `javascript:` / `data:` exfiltration
+// vectors).
+const PHOTO_URL_SCHEMES = new Set(["http:", "https:"]);
+const updatePlayerSchema = z.object({
+  playerId: z.string().uuid(),
+  displayName: z.string().trim().max(80).optional(),
+  gamerTag: z.string().trim().max(80).optional(),
+  psnId: z.string().trim().max(64).nullable().optional(),
+  jerseyNumber: z.number().int().min(1).max(99).nullable().optional(),
+  bio: z.string().trim().max(1000).nullable().optional(),
+  photoUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .nullable()
+    .optional()
+    .refine(
+      (v) => {
+        if (!v) return true;
+        try {
+          const u = new URL(v);
+          return PHOTO_URL_SCHEMES.has(u.protocol);
+        } catch {
+          return false;
+        }
+      },
+      { message: "photoUrl must be a valid http/https URL" },
+    ),
+  organizationId: z.string().uuid().nullable().optional(),
+  coachId: z.string().uuid().nullable().optional(),
+  teamManagerId: z.string().uuid().nullable().optional(),
+});
 
 async function gate(): Promise<{
   sb: ReturnType<typeof getServiceRoleSupabase>;
@@ -34,28 +72,49 @@ async function gate(): Promise<{
     }
     throw e;
   }
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
   return { sb, publicUserId: pub.id };
 }
 
 export async function updatePlayerAction(formData: FormData) {
-  const playerId = String(formData.get("playerId") ?? "");
-  if (!playerId) throw new Error("playerId required");
+  const playerIdRaw = String(formData.get("playerId") ?? "");
+  if (!playerIdRaw) throw new Error("playerId required");
 
-  const displayName = String(formData.get("displayName") ?? "").trim();
-  const gamerTag = String(formData.get("gamerTag") ?? "").trim();
-  const psnId = String(formData.get("psnId") ?? "").trim() || null;
   const jerseyRaw = String(formData.get("jerseyNumber") ?? "").trim();
-  const bio = String(formData.get("bio") ?? "").trim() || null;
-  const photoUrl = String(formData.get("photoUrl") ?? "").trim() || null;
-  const orgId = String(formData.get("organizationId") ?? "").trim() || null;
-  const coachId = String(formData.get("coachId") ?? "").trim() || null;
-  const teamManagerId =
-    String(formData.get("teamManagerId") ?? "").trim() || null;
+  const orgRaw = String(formData.get("organizationId") ?? "").trim();
+  const coachRaw = String(formData.get("coachId") ?? "").trim();
+  const tmRaw = String(formData.get("teamManagerId") ?? "").trim();
+  const psnRaw = String(formData.get("psnId") ?? "").trim();
+  const bioRaw = String(formData.get("bio") ?? "").trim();
+  const photoRaw = String(formData.get("photoUrl") ?? "").trim();
+  const dnRaw = String(formData.get("displayName") ?? "").trim();
+  const tagRaw = String(formData.get("gamerTag") ?? "").trim();
 
-  const jersey = jerseyRaw ? Number(jerseyRaw) : null;
-  if (jersey !== null && (!Number.isInteger(jersey) || jersey < 1)) {
-    throw new Error("jerseyNumber must be a positive integer");
-  }
+  // Single Zod parse covers length caps + photoUrl scheme + UUID shape.
+  const parsed = updatePlayerSchema.parse({
+    playerId: playerIdRaw,
+    displayName: dnRaw || undefined,
+    gamerTag: tagRaw || undefined,
+    psnId: psnRaw || null,
+    jerseyNumber: jerseyRaw ? Number(jerseyRaw) : null,
+    bio: bioRaw || null,
+    photoUrl: photoRaw || null,
+    organizationId: orgRaw || null,
+    coachId: coachRaw || null,
+    teamManagerId: tmRaw || null,
+  });
+
+  const playerId = parsed.playerId;
+  const displayName = parsed.displayName ?? "";
+  const gamerTag = parsed.gamerTag ?? "";
+  const psnId = parsed.psnId ?? null;
+  const bio = parsed.bio ?? null;
+  const photoUrl = parsed.photoUrl ?? null;
+  const orgId = parsed.organizationId ?? null;
+  const coachId = parsed.coachId ?? null;
+  const teamManagerId = parsed.teamManagerId ?? null;
+  const jersey = parsed.jerseyNumber ?? null;
 
   const { sb } = await gate();
 

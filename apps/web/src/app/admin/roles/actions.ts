@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import { bulkSaveMatrix } from "@/server/roles";
 import { bulkSaveMatrixSchema } from "@/server/roles/schemas";
 
@@ -30,6 +31,8 @@ async function resolveAdminActor() {
   const sb = getServiceRoleSupabase();
   // Second gate — never trust the page gate alone (spec §8 Risk 3).
   await requirePermAsync(sb, { userId: pub.id, roles }, "roles.edit");
+  const limited = await enforceAuthedWrite(pub.id);
+  if (limited) throw new Error("rate_limited");
   return { sb, actorUserId: pub.id as string };
 }
 

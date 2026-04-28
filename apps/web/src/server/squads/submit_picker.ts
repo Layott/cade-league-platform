@@ -30,7 +30,16 @@ export const submitPickerInputSchema = z.object({
   seasonId: z.string().uuid(),
   playerId: z.string().uuid(),
   weekStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  futbinScreenshotPath: z.string().min(1),
+  // Plan 39 sanitize — block `..` traversal + backslash so a poisoned
+  // path can't escape the squad-screenshots bucket sub-tree.
+  futbinScreenshotPath: z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(
+      (v) => !v.includes("..") && !v.includes("\\"),
+      "futbinScreenshotPath must not contain '..' or backslashes",
+    ),
   slots: z.array(pickerSlotSchema).min(1).max(23),
 });
 
