@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatWat } from "@/lib/time";
 import { renderMarkdownToSafeHtml } from "@/server/announcements/render";
-import { publishNowFromDetail } from "./actions";
+import { publishNowFromDetail, unpublishFromDetail } from "./actions";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
-import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
+import { PrimaryButton, SecondaryButton, DangerButton } from "@/components/admin/buttons";
 
 export default async function AnnouncementDetail({
   params,
@@ -132,7 +132,30 @@ export default async function AnnouncementDetail({
             <PrimaryButton type="submit">Publish now</PrimaryButton>
           </div>
         </form>
-      ) : null}
+      ) : (
+        <form
+          action={unpublishFromDetail}
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--flare)]">
+            Retract
+          </div>
+          <p className="mt-1 text-xs text-[var(--chalk-3)]">
+            Pull this briefing back to draft. Already-delivered
+            notifications stay in recipient inboxes — only the public
+            list + future fan-out are affected.
+          </p>
+          <input type="hidden" name="id" value={ann.id} />
+          <div className="mt-4">
+            <DangerButton
+              type="submit"
+              data-testid="unpublish-announcement-btn"
+            >
+              Unpublish
+            </DangerButton>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

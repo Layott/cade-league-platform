@@ -50,6 +50,31 @@ export async function schedulePublish(
   if (error) throw new Error(`announcements.schedulePublish failed: ${error.message}`);
 }
 
+/**
+ * Pull a previously-published announcement back to draft state.
+ * Mirrors the match-day publish/unpublish toggle (Plan 27) — admins +
+ * production roles need a way to retract a briefing without deleting
+ * it. Notifications already delivered remain in the recipient inbox
+ * (don't try to "unsend" past pushes); this only stops future readers
+ * from seeing the announcement on the public list and resets the
+ * publisher metadata so the next publish re-fans-out cleanly.
+ */
+export async function unpublish(
+  sb: SupabaseClient,
+  announcementId: string,
+): Promise<void> {
+  const { error } = await sb
+    .from("announcements")
+    .update({
+      published_at: null,
+      published_by: null,
+      scheduled_publish_at: null,
+    })
+    .eq("id", announcementId)
+    .is("deleted_at", null);
+  if (error) throw new Error(`announcements.unpublish failed: ${error.message}`);
+}
+
 export async function publishNow(
   sb: SupabaseClient,
   announcementId: string,
