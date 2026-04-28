@@ -34,8 +34,15 @@ export type AdminSubtab = {
   href: string;
   /** optional perm gate; falls back to hub.perm */
   perm?: string;
-  /** optional regex matcher for active-state — defaults to startsWith(href) */
-  segmentMatcher?: RegExp;
+  /**
+   * Optional regex matcher for active-state — defaults to startsWith(href).
+   * Stored as a STRING (regex source) not a RegExp object so the hub config
+   * is serializable across the server → client boundary. React Server
+   * Components can't serialize RegExp instances; passing one as a prop to
+   * a "use client" component throws a server-side render error
+   * (digest 3068007190 caught on /admin/announcements 2026-04-28).
+   */
+  segmentMatcher?: string;
 };
 
 export type AdminHub = {
@@ -217,7 +224,7 @@ export const ADMIN_HUBS: readonly AdminHub[] = [
         href: "/admin/announcements?tab=drafts",
         perm: "announcements.read",
         // /admin/announcements + ?tab=drafts is the default view
-        segmentMatcher: /^\/admin\/announcements(\/?$|\?|$)/,
+        segmentMatcher: "^/admin/announcements(/?$|\\?|$)",
       },
       {
         key: "published",
@@ -324,7 +331,7 @@ export function findSubtabByPath(
   );
   for (const tab of sorted) {
     if (tab.segmentMatcher) {
-      if (tab.segmentMatcher.test(pathname)) return tab;
+      if (new RegExp(tab.segmentMatcher).test(pathname)) return tab;
       continue;
     }
     // Strip query string from comparison href so /announcements?tab=drafts
