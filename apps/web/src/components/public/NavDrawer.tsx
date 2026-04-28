@@ -45,9 +45,16 @@ const PLAYER_LINKS: LinkRow[] = [
   { href: "/profile", label: "Profile" },
 ];
 
+// UI Audit Slice 3 (2026-04-28) — Branding, YouTube Channels, and
+// Stingers were dropped from the Staff group and re-mounted as
+// sub-tabs of the Broadcast hub at /admin/broadcast/v2/{branding,
+// youtube,stingers}. The single Broadcast link below is the entry point
+// to all four (Sessions + Stingers + Branding + YouTube). The old
+// /admin/branding + /admin/youtube-channels + /admin/broadcast/stingers
+// paths still resolve via 307 redirects so any external/email deep
+// link still lands correctly.
 const STAFF_LINKS: LinkRow[] = [
   { href: "/admin", label: "Site Manager" },
-  { href: "/admin/branding", label: "Branding" },
   { href: "/admin/players", label: "Players" },
   { href: "/admin/match-days", label: "Match Days" },
   { href: "/admin/squads", label: "Squads" },
@@ -55,8 +62,6 @@ const STAFF_LINKS: LinkRow[] = [
   // resolves via 307 redirect but pointing the nav at the canonical URL
   // avoids the address-bar hop / flash (lessons.md entry 484).
   { href: "/admin/broadcast/v2", label: "Broadcast" },
-  { href: "/admin/broadcast/stingers", label: "Stingers" },
-  { href: "/admin/youtube-channels", label: "YouTube Channels" },
   { href: "/admin/punishments", label: "Punishments" },
   { href: "/admin/stats-review", label: "Stats Review" },
   { href: "/admin/appeals", label: "Appeals" },

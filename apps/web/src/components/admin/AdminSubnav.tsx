@@ -17,7 +17,6 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "Dashboard", exact: true },
-  { href: "/admin/branding", label: "Branding" },
   { href: "/admin/players", label: "Players" },
   { href: "/admin/match-days", label: "Match days" },
   { href: "/admin/punishments", label: "Punishments" },
@@ -31,8 +30,14 @@ const TABS = [
   // promoted v2 control room). The old /admin/broadcast paths still
   // resolve via 307 redirects; updating the href avoids the address-bar
   // hop / flash described in `tasks/lessons.md` (lesson 484).
+  //
+  // UI Audit Slice 3 (2026-04-28) — Branding, YouTube and Stingers
+  // were dropped from the top-level subnav and re-mounted as sub-tabs
+  // of the Broadcast hub at /admin/broadcast/v2/{branding,youtube,
+  // stingers}. The old /admin/branding + /admin/youtube-channels +
+  // /admin/broadcast/stingers paths now 307-redirect to their new
+  // siblings.
   { href: "/admin/broadcast/v2", label: "Broadcast" },
-  { href: "/admin/youtube-channels", label: "YouTube" },
   { href: "/admin/roles", label: "Roles" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/trash", label: "Trash" },

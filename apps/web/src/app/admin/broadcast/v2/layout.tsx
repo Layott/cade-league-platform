@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync } from "@/lib/perms-db";
+import { BroadcastHubTabs } from "./BroadcastHubTabs";
 
 /**
  * Plan 51 — /admin/broadcast/v2/* layout.
@@ -15,6 +16,11 @@ import { requirePermAsync } from "@/lib/perms-db";
  * broadcast surface — each child page renders its own header so we
  * avoid double headers (the legacy `/admin/broadcast` index used to
  * have its own header and the v2 layout duplicated it on top).
+ *
+ * UI Audit Slice 3 (2026-04-28) — Branding, YouTube and Stingers
+ * collapsed under the broadcast hub. The layout now renders a
+ * `BroadcastHubTabs` strip so producers can pivot between Sessions,
+ * Stingers, Branding, and YouTube without leaving the broadcast tab.
  */
 
 export const dynamic = "force-dynamic";
@@ -47,6 +53,7 @@ export default async function BroadcastV2Layout({
 
   return (
     <div className="space-y-6" data-testid="broadcast-v2-shell">
+      <BroadcastHubTabs />
       {children}
     </div>
   );

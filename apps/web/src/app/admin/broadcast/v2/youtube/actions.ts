@@ -77,7 +77,7 @@ export async function createChannelAction(formData: FormData) {
     isDefault,
     userId: publicUserId,
   });
-  revalidatePath("/admin/youtube-channels");
+  revalidatePath("/admin/broadcast/v2/youtube");
 }
 
 export async function deleteChannelAction(formData: FormData) {
@@ -85,7 +85,7 @@ export async function deleteChannelAction(formData: FormData) {
   if (!id) throw new Error("id required");
   const { sb, publicUserId } = await gate();
   await deleteChannel(sb, id, publicUserId);
-  revalidatePath("/admin/youtube-channels");
+  revalidatePath("/admin/broadcast/v2/youtube");
 }
 
 export async function promoteChannelAction(formData: FormData) {
@@ -93,5 +93,5 @@ export async function promoteChannelAction(formData: FormData) {
   if (!id) throw new Error("id required");
   const { sb, publicUserId } = await gate();
   await promoteToDefault(sb, id, publicUserId);
-  revalidatePath("/admin/youtube-channels");
+  revalidatePath("/admin/broadcast/v2/youtube");
 }

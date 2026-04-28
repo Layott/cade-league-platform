@@ -19,9 +19,15 @@ import { hasPermAsync } from "@/lib/perms-db";
  */
 
 // List of every tab href registered in AdminSubnav.tsx.
+//
+// UI Audit Slice 3 (2026-04-28) — Branding + YouTube top-level entries
+// were dropped (consolidated under the Broadcast hub at
+// /admin/broadcast/v2/{branding,youtube}). The Broadcast tab still
+// keys on broadcast.v2.read; producers who lack branding.manage will
+// still see the Broadcast tab but the sub-tab pages re-check perms
+// inline.
 const TAB_PERMS: Array<{ href: string; perm: string }> = [
   { href: "/admin", perm: "audit.read" },
-  { href: "/admin/branding", perm: "branding.manage" },
   { href: "/admin/players", perm: "users.edit" },
   { href: "/admin/match-days", perm: "matches.read" },
   { href: "/admin/punishments", perm: "punishments.read" },
@@ -38,7 +44,6 @@ const TAB_PERMS: Array<{ href: string; perm: string }> = [
   // session-level edits inside the control room (start session, change
   // match-day, end session).
   { href: "/admin/broadcast/v2", perm: "broadcast.v2.read" },
-  { href: "/admin/youtube-channels", perm: "branding.manage" },
   { href: "/admin/roles", perm: "roles.manage" },
   { href: "/admin/users", perm: "users.manage" },
   { href: "/admin/trash", perm: "trash.restore" },

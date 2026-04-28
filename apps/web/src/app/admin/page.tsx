@@ -207,13 +207,6 @@ export default async function AdminHome() {
 
   const allTiles: TileDef[] = [
     {
-      href: "/admin/branding",
-      label: "Branding",
-      description: "Logos, palette, partner marks.",
-      perm: "branding.manage",
-      icon: <Icon d={I.brand} />,
-    },
-    {
       href: "/admin/players",
       label: "Players",
       description: "Roster, gamer tags, photos, orgs.",
@@ -284,10 +277,16 @@ export default async function AdminHome() {
     // control room. The legacy /admin/broadcast tile (gated on
     // broadcast.manage) was merged here; the route still exists as a
     // 307 redirect to /admin/broadcast/v2.
+    //
+    // UI Audit Slice 3 (2026-04-28) — Branding, YouTube and Stingers
+    // tiles were merged into this Broadcast tile. They live as sub-tabs
+    // under /admin/broadcast/v2/{branding,youtube,stingers} and are
+    // reachable via the broadcast hub's tab strip. Description is
+    // expanded to call out the consolidated scope.
     {
       href: "/admin/broadcast/v2",
       label: "Broadcast",
-      description: "Stream sessions, overlay control room.",
+      description: "Sessions, stingers, branding, YouTube channels.",
       perm: "broadcast.v2.read",
       icon: <Icon d={I.broadcast} />,
       tone: hero.activeSessionId ? "signal" : undefined,
@@ -298,20 +297,6 @@ export default async function AdminHome() {
       description: "Standings, fixtures, results, walkovers.",
       perm: "tournament.read",
       icon: <Icon d={I.trophy} />,
-    },
-    {
-      href: "/admin/youtube-channels",
-      label: "YouTube channels",
-      description: "Live chat source registry.",
-      perm: "branding.manage",
-      icon: <Icon d={I.youtube} />,
-    },
-    {
-      href: "/admin/broadcast/stingers",
-      label: "Stingers",
-      description: "One-click transition clips.",
-      perm: "broadcast.trigger",
-      icon: <Icon d={I.stingers} />,
     },
     {
       href: "/admin/roles",

@@ -80,7 +80,7 @@ export async function saveBrandColorsAction(formData: FormData) {
     secondaryColor: secondary || undefined,
     userId: publicUserId,
   });
-  revalidatePath("/admin/branding");
+  revalidatePath("/admin/broadcast/v2/branding");
 }
 
 export async function saveBrandAssetAction(formData: FormData) {
@@ -108,7 +108,7 @@ export async function saveBrandAssetAction(formData: FormData) {
     visible,
     userId: publicUserId,
   });
-  revalidatePath("/admin/branding");
+  revalidatePath("/admin/broadcast/v2/branding");
 }
 
 export async function toggleBrandAssetVisibleAction(formData: FormData) {
@@ -117,7 +117,7 @@ export async function toggleBrandAssetVisibleAction(formData: FormData) {
   if (!id) throw new Error("id required");
   const { sb, publicUserId } = await gate();
   await setBrandAssetVisible(sb, id, next, publicUserId);
-  revalidatePath("/admin/branding");
+  revalidatePath("/admin/broadcast/v2/branding");
 }
 
 export async function deleteBrandAssetAction(formData: FormData) {
@@ -125,5 +125,5 @@ export async function deleteBrandAssetAction(formData: FormData) {
   if (!id) throw new Error("id required");
   const { sb, publicUserId } = await gate();
   await deleteBrandAsset(sb, id, publicUserId);
-  revalidatePath("/admin/branding");
+  revalidatePath("/admin/broadcast/v2/branding");
 }
