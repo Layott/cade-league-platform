@@ -78,18 +78,41 @@
     font-weight: 900; font-style: normal; font-display: block;
   }
 
+  /* ============================================================
+     DESIGN TOKENS (consumed via CSS variables) — Phase 2 of overlay
+     design system. SSR may inject `:root { --overlay-* }` overrides
+     above this declaration; fallbacks here keep first-deploy a no-op.
+     See docs/superpowers/specs/2026-04-29-overlay-design-system.md §3.2.
+  ============================================================ */
   :root {
-    --green:        #6bcd06;
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-secondary-color: #fe036d;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti';
+    --overlay-font-body: 'Quedora';
+    --overlay-row-highlight-count: 2;
+    --overlay-pattern: halftone;
+    --overlay-partner-strip-show: flex;
+  }
+
+  /* ── LOCAL BRAND TOKENS ─────────────────────────────────────
+     Local aliases consume the spec-level overlay tokens above so
+     existing `var(--green)` / `var(--pink)` / `var(--ink)` consumers
+     flow through to the design system. Hex fallbacks keep visual
+     defaults unchanged when no SSR token override is injected. */
+  :root {
+    --green:        var(--overlay-accent-color, #6bcd06);
     --green-glow:   rgba(107, 205, 6, 0.55);
     --green-deep:   #5cb305;
     --green-bright: #82e018;
-    --pink:         #fe036d;
+    --pink:         var(--overlay-secondary-color, #fe036d);
     --pink-glow:    rgba(254, 3, 109, 0.55);
-    --black:        #050505;
-    --ink:          #ffffff;
+    --black:        var(--overlay-bg-color, #050505);
+    --ink:          var(--overlay-text-color, #ffffff);
     --ink-muted:    rgba(255, 255, 255, 0.78);
-    --display:      'Agharti', 'Impact', sans-serif;
-    --accent:       'Quedora', 'Inter', sans-serif;
+    --display:      var(--overlay-font-display, 'Agharti'), 'Impact', sans-serif;
+    --accent:       var(--overlay-font-body, 'Quedora'), 'Inter', sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -420,7 +443,7 @@
     position: absolute;
     left: 0; right: 0;
     bottom: 36px;
-    display: flex;
+    display: var(--overlay-partner-strip-show, flex);
     justify-content: center;
     align-items: center;
     gap: 64px;

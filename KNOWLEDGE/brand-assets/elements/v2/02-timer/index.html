@@ -13,14 +13,32 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-  /* ---------- BRAND TOKENS ---------- */
+  /* ============================================================
+     DESIGN TOKENS (consumed via CSS variables) — Phase 2 of overlay
+     design system. SSR may inject `:root { --overlay-* }` overrides
+     above this declaration; fallbacks here keep first-deploy a no-op.
+     See docs/superpowers/specs/2026-04-29-overlay-design-system.md §3.2.
+  ============================================================ */
+  :root {
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-secondary-color: #fe036d;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti';
+    --overlay-font-body: 'Quedora';
+  }
+
+  /* ---------- LOCAL BRAND TOKENS ----------
+     Local aliases consume the spec-level overlay tokens above so existing
+     `var(--green)` / `var(--pink)` / `var(--white)` consumers flow through
+     to the design system. Hex fallbacks keep the visual default unchanged. */
   :root{
-    --green:       #6bcd06;
+    --green:       var(--overlay-accent-color, #6bcd06);
     --green-hot:   #8fff1a;
-    --pink:        #fe036d;
+    --pink:        var(--overlay-secondary-color, #fe036d);
     --pink-hot:    #ff3d8a;
     --black:       #0a0a0a;
-    --white:       #ffffff;
+    --white:       var(--overlay-text-color, #ffffff);
     --ink-dim:     rgba(255,255,255,.72);
     --shadow-green: 0 0 36px rgba(107,205,6,.55), 0 6px 24px rgba(0,0,0,.45);
     --shadow-pink:  0 0 36px rgba(254,3,109,.65), 0 6px 24px rgba(0,0,0,.45);
@@ -102,7 +120,7 @@
     width:1920px; height:1080px;
     overflow:hidden;
     background: transparent !important;  /* OVERLAY — transparent canvas (force) */
-    font-family: "Quedora","Rajdhani",system-ui,sans-serif;
+    font-family: var(--overlay-font-body, 'Quedora'),"Rajdhani",system-ui,sans-serif;
     color: var(--white);
     -webkit-font-smoothing: antialiased;
   }
@@ -174,7 +192,7 @@
     mix-blend-mode: overlay;
   }
   .timer__flag-label{
-    font-family:"Agharti","Oswald",sans-serif;
+    font-family: var(--overlay-font-display, 'Agharti'),"Oswald",sans-serif;
     font-weight:700;
     font-size: 22px;
     letter-spacing: .22em;
@@ -230,7 +248,7 @@
 
   .timer__kicker{
     position: relative;
-    font-family:"Agharti","Oswald",sans-serif;
+    font-family: var(--overlay-font-display, 'Agharti'),"Oswald",sans-serif;
     font-weight: 600;
     font-size: 16px;
     letter-spacing: .28em;
@@ -257,7 +275,7 @@
 
   .timer__display{
     position: relative;
-    font-family: "Agharti","Oswald","JetBrains Mono",monospace;
+    font-family: var(--overlay-font-display, 'Agharti'),"Oswald","JetBrains Mono",monospace;
     font-weight: 700;
     font-size: 60px;
     line-height: .95;

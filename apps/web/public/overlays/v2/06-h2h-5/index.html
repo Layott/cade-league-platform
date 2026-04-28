@@ -88,24 +88,43 @@
     font-weight: 900; font-style: normal; font-display: block;
   }
 
-  /* ── DESIGN TOKENS ──────────────────────────────────────────── */
+  /* ============================================================
+     DESIGN TOKENS (consumed via CSS variables) — Phase 2 of overlay
+     design system. SSR may inject `:root { --overlay-* }` overrides
+     above this declaration; fallbacks here keep first-deploy a no-op.
+     See docs/superpowers/specs/2026-04-29-overlay-design-system.md §3.2.
+  ============================================================ */
   :root {
-    --green:        #6bcd06;
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-secondary-color: #fe036d;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti';
+    --overlay-font-body: 'Quedora';
+  }
+
+  /* ── DESIGN TOKENS ──────────────────────────────────────────────
+     Local aliases consume the spec-level overlay tokens above so
+     existing `var(--green)` / `var(--pink)` / `var(--ink)` consumers
+     flow through to the design system. Hex fallbacks keep visual
+     defaults unchanged when no SSR token override is injected. */
+  :root {
+    --green:        var(--overlay-accent-color, #6bcd06);
     --green-soft:   #8eff14;
     --green-glow:   rgba(107, 205, 6, 0.55);
     --green-faint:  rgba(107, 205, 6, 0.18);
-    --pink:         #fe036d;
+    --pink:         var(--overlay-secondary-color, #fe036d);
     --pink-soft:    #ff3b91;
     --pink-glow:    rgba(254, 3, 109, 0.55);
     --pink-faint:   rgba(254, 3, 109, 0.18);
-    --black:        #050505;
-    --ink:          #ffffff;
+    --black:        var(--overlay-bg-color, #050505);
+    --ink:          var(--overlay-text-color, #ffffff);
     --muted:        rgba(255,255,255,0.62);
     --hairline:     rgba(255,255,255,0.10);
     --panel:        rgba(8,10,12,0.78);
     --panel-deep:   rgba(3,5,7,0.92);
-    --display:      'Agharti', 'Impact', sans-serif;
-    --accent:       'Quedora', 'Inter', sans-serif;
+    --display:      var(--overlay-font-display, 'Agharti'), 'Impact', sans-serif;
+    --accent:       var(--overlay-font-body, 'Quedora'), 'Inter', sans-serif;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

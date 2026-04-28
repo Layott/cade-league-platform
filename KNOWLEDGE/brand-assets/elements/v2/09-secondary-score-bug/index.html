@@ -75,6 +75,23 @@
     font-display: block;
   }
 
+  /* ============================================================
+     DESIGN TOKENS (consumed via CSS variables) — Phase 2 of overlay
+     design system. SSR may inject `:root { --overlay-* }` overrides
+     above this declaration; fallbacks here keep first-deploy a no-op.
+     See docs/superpowers/specs/2026-04-29-overlay-design-system.md §3.2.
+  ============================================================ */
+  :root {
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-secondary-color: #fe036d;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti';
+    --overlay-font-body: 'Quedora';
+    --overlay-pos-x: 40;
+    --overlay-pos-y: 40;
+  }
+
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -83,7 +100,7 @@
     overflow: hidden;
     background: transparent !important;
     color-scheme: dark;
-    font-family: "Agharti", "Oswald", "Rajdhani", sans-serif;
+    font-family: var(--overlay-font-display, 'Agharti'), "Oswald", "Rajdhani", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -107,8 +124,8 @@
      ========================================================= */
   .bug-mount {
     position: absolute;
-    top: 40px;
-    right: 40px;
+    top: calc(var(--overlay-pos-y, 40) * 1px);
+    right: calc(var(--overlay-pos-x, 40) * 1px);
     width: 760px;             /* JS overrides per-render */
     height: 152px;
     transform-origin: top right;
@@ -162,13 +179,13 @@
     display: flex;
     align-items: center;
     gap: 9px;
-    background: linear-gradient(90deg, #fe036d 0%, #c9025a 100%);
+    background: linear-gradient(90deg, var(--overlay-secondary-color, #fe036d) 0%, #c9025a 100%);
     clip-path: polygon(0 0, 100% 0, calc(100% - 11px) 100%, 11px 100%);
-    font-family: "Quedora", "Rajdhani", "Oswald", sans-serif;
+    font-family: var(--overlay-font-body, 'Quedora'), "Rajdhani", "Oswald", sans-serif;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 2.6px;
-    color: #fff;
+    color: var(--overlay-text-color, #ffffff);
     text-transform: uppercase;
     box-shadow: 0 2px 8px rgba(254, 3, 109, 0.4);
     z-index: 5;
@@ -178,7 +195,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--overlay-text-color, #ffffff);
     box-shadow: 0 0 8px rgba(255,255,255,0.9);
     animation: liveBlink 1.2s ease-in-out infinite;
   }
@@ -231,7 +248,7 @@
     position: absolute;
     top: 0; bottom: 0; left: 0;
     width: 5px;
-    background: linear-gradient(180deg, #6bcd06 0%, #4a9004 100%);
+    background: linear-gradient(180deg, var(--overlay-accent-color, #6bcd06) 0%, #4a9004 100%);
     box-shadow: 0 0 12px rgba(107, 205, 6, 0.65);
   }
 
@@ -241,7 +258,7 @@
     position: absolute;
     top: 0; bottom: 0; right: 0;
     width: 5px;
-    background: linear-gradient(180deg, #fe036d 0%, #b8024f 100%);
+    background: linear-gradient(180deg, var(--overlay-secondary-color, #fe036d) 0%, #b8024f 100%);
     box-shadow: 0 0 12px rgba(254, 3, 109, 0.65);
   }
 
@@ -320,10 +337,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: "Agharti", "Oswald", sans-serif;
+    font-family: var(--overlay-font-display, 'Agharti'), "Oswald", sans-serif;
     font-size: 30px;
     font-weight: 900;
-    color: #fff;
+    color: var(--overlay-text-color, #ffffff);
     letter-spacing: 0;
     text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   }
@@ -337,11 +354,11 @@
 
   /* Name block */
   .name {
-    font-family: "AghartiCondensed", "Agharti", "Oswald", "Rajdhani", sans-serif;
+    font-family: "AghartiCondensed", var(--overlay-font-display, 'Agharti'), "Oswald", "Rajdhani", sans-serif;
     font-size: 30px;
     font-weight: 700;
     letter-spacing: 1.3px;
-    color: #fff;
+    color: var(--overlay-text-color, #ffffff);
     text-transform: uppercase;
     line-height: 1;
     white-space: nowrap;          /* never wrap */
@@ -377,8 +394,8 @@
     height: 2px;
     background: linear-gradient(90deg,
       transparent 0%,
-      #6bcd06 25%,
-      #fe036d 75%,
+      var(--overlay-accent-color, #6bcd06) 25%,
+      var(--overlay-secondary-color, #fe036d) 75%,
       transparent 100%);
     opacity: 0.6;
   }
@@ -392,11 +409,11 @@
      JS only sets the strip's translateY. */
   .score {
     position: relative;
-    font-family: "Agharti", "Oswald", "Rajdhani", sans-serif;
+    font-family: var(--overlay-font-display, 'Agharti'), "Oswald", "Rajdhani", sans-serif;
     font-size: 64px;
     font-weight: 900;
     line-height: 1;
-    color: #fff;
+    color: var(--overlay-text-color, #ffffff);
     text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85);
     width: 56px;
     height: 72px;
@@ -437,8 +454,8 @@
     display: block;
   }
 
-  .score-a { color: #fff; }
-  .score-b { color: #fff; }
+  .score-a { color: var(--overlay-text-color, #ffffff); }
+  .score-b { color: var(--overlay-text-color, #ffffff); }
 
   /* Brief pop accent on the entire score viewport when a digit lands */
   .score.pop {
@@ -456,7 +473,7 @@
 
   /* Dash between scores */
   .dash {
-    font-family: "Quedora", "Rajdhani", sans-serif;
+    font-family: var(--overlay-font-body, 'Quedora'), "Rajdhani", sans-serif;
     font-size: 38px;
     font-weight: 300;
     color: rgba(255, 255, 255, 0.40);
