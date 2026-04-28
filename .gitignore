@@ -50,6 +50,7 @@ KNOWLEDGE/brand-assets/fonts/*.zip
 
 # Futbin live-price scraper — state + cookies + unmatched dump (regenerated per run)
 KNOWLEDGE/extracted/_scrape_tmp/
+KNOWLEDGE/extracted/_scrape_logs/
 KNOWLEDGE/extracted/futbin_scrape_state.json
 KNOWLEDGE/extracted/futbin_unmatched.json
 
@@ -91,3 +92,4 @@ KNOWLEDGE/brand-assets/players/*.png
 # HTML files at apps/web/public/overlays/v2/<key>/index.html ARE committed
 # (small, change-tracked). Bulk assets (fonts/logos/Orgs/players) are NOT.
 apps/web/public/overlays/v2/_assets/
+.env*.local
