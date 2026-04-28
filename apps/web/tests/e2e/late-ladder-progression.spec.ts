@@ -148,7 +148,7 @@ test("late-ladder progression: 3 lates → offense 1, 2, 3 with right ladder out
   await expect(page.getByTestId(`att-status-${playerId}`)).toHaveText("late");
 
   // Precedents page should show count=1.
-  await page.goto(`/admin/precedents/${playerId}`);
+  await page.goto(`/admin/discipline/precedents/${playerId}`);
   await expect(page.getByTestId("precedents-table")).toContainText("late_arrival");
   let { data: rows } = await sb
     .from("disciplinary_precedents")

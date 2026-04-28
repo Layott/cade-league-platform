@@ -2,28 +2,26 @@ import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
-import { requirePermAsync } from "@/lib/perms-db";
-import { BroadcastHubTabs } from "./BroadcastHubTabs";
+import { hasPermAsync, requirePermAsync } from "@/lib/perms-db";
+import { ADMIN_HUBS } from "@/lib/admin-nav";
+import { HubSubnav } from "@/components/admin/HubSubnav";
+import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 
 /**
  * Plan 51 — /admin/broadcast/v2/* layout.
  *
+ * UI Audit Slice 4 (2026-04-28) — migrated from per-hub BroadcastHubTabs
+ * to the shared HubSubnav driven by `lib/admin-nav.ts`. Adds
+ * breadcrumbs.
+ *
  * Area gate (requires `broadcast.v2.read`). Per-action perms (e.g.
  * `broadcast.v2.trigger`) are re-checked inside the session control
  * surface.
- *
- * The shared SectionHeader was removed once v2 became the canonical
- * broadcast surface — each child page renders its own header so we
- * avoid double headers (the legacy `/admin/broadcast` index used to
- * have its own header and the v2 layout duplicated it on top).
- *
- * UI Audit Slice 3 (2026-04-28) — Branding, YouTube and Stingers
- * collapsed under the broadcast hub. The layout now renders a
- * `BroadcastHubTabs` strip so producers can pivot between Sessions,
- * Stingers, Branding, and YouTube without leaving the broadcast tab.
  */
 
 export const dynamic = "force-dynamic";
+
+const HUB = ADMIN_HUBS.find((h) => h.key === "broadcast")!;
 
 export default async function BroadcastV2Layout({
   children,
@@ -49,11 +47,21 @@ export default async function BroadcastV2Layout({
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
 
   const svc = getServiceRoleSupabase();
-  await requirePermAsync(svc, { userId: pub.id, roles }, "broadcast.v2.read");
+  const actor = { userId: pub.id, roles };
+  await requirePermAsync(svc, actor, HUB.perm);
+
+  const checks = await Promise.all(
+    HUB.subtabs?.map(async (t) => ({
+      tab: t,
+      ok: await hasPermAsync(svc, actor, t.perm ?? HUB.perm),
+    })) ?? [],
+  );
+  const visibleSubtabsResolved = checks.filter((c) => c.ok).map((c) => c.tab);
 
   return (
     <div className="space-y-6" data-testid="broadcast-v2-shell">
-      <BroadcastHubTabs />
+      <Breadcrumbs />
+      <HubSubnav hub={HUB} visibleSubtabs={visibleSubtabsResolved} />
       {children}
     </div>
   );

@@ -120,7 +120,7 @@ export default async function AdjustmentsPage() {
       </header>
 
       <Link
-        href="/admin/punishments"
+        href="/admin/discipline/punishments"
         className="block rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 transition-colors hover:border-[var(--signal)] hover:bg-[var(--ink-3)]"
         data-testid="adjustments-cta"
       >
@@ -137,7 +137,7 @@ export default async function AdjustmentsPage() {
             </p>
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--signal)]">
-            /admin/punishments
+            /admin/discipline/punishments
           </span>
         </div>
       </Link>

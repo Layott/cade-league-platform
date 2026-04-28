@@ -147,8 +147,8 @@ test("suspension voids both scheduled matches; revoke un-voids", async ({ page }
 
   await login(page);
 
-  // Issue a suspension via /admin/punishments/new covering both match dates.
-  await page.goto("/admin/punishments/new");
+  // Issue a suspension via /admin/discipline/punishments/new covering both match dates.
+  await page.goto("/admin/discipline/punishments/new");
   await page.locator('select[name="playerId"]').selectOption(pQ!.id as string);
   await page.locator('select[name="incidentType"]').selectOption("other");
   await page.locator('select[name="sanctionType"]').selectOption("ban");

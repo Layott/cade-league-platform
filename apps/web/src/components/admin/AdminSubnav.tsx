@@ -2,80 +2,67 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ADMIN_HUBS, findHubByPath } from "@/lib/admin-nav";
 
 /**
- * AdminSubnav renders the cross-console tab strip. Active route is
+ * AdminSubnav renders the cross-console hub strip. Active hub is
  * highlighted with a signal-green underline + chalk-0 label, others fade
  * to chalk-2. Rendered client-side so `usePathname` determines active
  * state without server-round-trip.
  *
- * Plan 13B — tab visibility is pre-resolved by the parent layout against
- * `hasPermAsync` and passed as `visibleTabs: string[]` (list of hrefs).
- * Omit the prop to show every tab (back-compat for callers who haven't
- * wired perms yet; admin wildcard perm makes this a no-op in practice).
+ * UI Audit Slice 4 (2026-04-28) — collapsed from 16 hard-coded tabs to
+ * the 8 hubs in `lib/admin-nav.ts`. Visibility is pre-resolved by the
+ * parent layout against `hasPermAsync` and passed as `visibleHubs`
+ * (list of hub keys). Omit the prop to show every hub (back-compat for
+ * callers that haven't wired perms yet; admin wildcard makes this a
+ * no-op in practice).
  */
 
-const TABS = [
-  { href: "/admin", label: "Dashboard", exact: true },
-  { href: "/admin/players", label: "Players" },
-  { href: "/admin/match-days", label: "Match days" },
-  { href: "/admin/punishments", label: "Punishments" },
-  { href: "/admin/squads", label: "Squads" },
-  { href: "/admin/orgs", label: "Orgs" },
-  { href: "/admin/disputes", label: "Disputes" },
-  { href: "/admin/appeals", label: "Appeals" },
-  { href: "/admin/announcements", label: "Announcements" },
-  { href: "/admin/tournament", label: "Tournament" },
-  // Plan 52 — Broadcast tab now points at /admin/broadcast/v2 (the
-  // promoted v2 control room). The old /admin/broadcast paths still
-  // resolve via 307 redirects; updating the href avoids the address-bar
-  // hop / flash described in `tasks/lessons.md` (lesson 484).
-  //
-  // UI Audit Slice 3 (2026-04-28) — Branding, YouTube and Stingers
-  // were dropped from the top-level subnav and re-mounted as sub-tabs
-  // of the Broadcast hub at /admin/broadcast/v2/{branding,youtube,
-  // stingers}. The old /admin/branding + /admin/youtube-channels +
-  // /admin/broadcast/stingers paths now 307-redirect to their new
-  // siblings.
-  { href: "/admin/broadcast/v2", label: "Broadcast" },
-  { href: "/admin/roles", label: "Roles" },
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/trash", label: "Trash" },
-  { href: "/admin/security/sessions", label: "Sessions" },
-];
-
-function matches(pathname: string, href: string, exact?: boolean) {
-  if (exact) return pathname === href;
-  // Plan 52 — light the Broadcast tab for both the v2 path (canonical)
-  // and the legacy /admin/broadcast paths so a producer who lands on a
-  // stale bookmark still sees the tab highlighted while the redirect
-  // resolves.
-  if (href === "/admin/broadcast/v2" && pathname.startsWith("/admin/broadcast")) {
-    return true;
-  }
-  return pathname === href || pathname.startsWith(href + "/");
-}
-
 export function AdminSubnav({
-  visibleTabs,
+  visibleHubs,
 }: {
-  visibleTabs?: readonly string[];
+  visibleHubs?: readonly string[];
 }) {
   const pathname = usePathname() ?? "/admin";
-  const allowed = visibleTabs ? new Set(visibleTabs) : null;
-  const tabs = allowed ? TABS.filter((t) => allowed.has(t.href)) : TABS;
+  const allowed = visibleHubs ? new Set(visibleHubs) : null;
+  const hubs = allowed
+    ? ADMIN_HUBS.filter((h) => allowed.has(h.key))
+    : ADMIN_HUBS;
+  const activeHub = findHubByPath(pathname);
+  const onDashboard = pathname === "/admin";
+
   return (
     <nav
       aria-label="Admin sections"
       className="flex flex-wrap items-center gap-1 border-b border-[var(--ink-4)] bg-[var(--ink-1)]/80 px-1 pt-1"
       data-testid="admin-subnav"
     >
-      {tabs.map((tab) => {
-        const active = matches(pathname, tab.href, tab.exact);
+      <Link
+        href="/admin"
+        className={
+          "relative px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors " +
+          (onDashboard
+            ? "text-[var(--chalk-0)]"
+            : "text-[var(--chalk-3)] hover:text-[var(--chalk-0)]")
+        }
+        aria-current={onDashboard ? "page" : undefined}
+        data-testid="admin-subnav-tab-dashboard"
+      >
+        Dashboard
+        <span
+          aria-hidden
+          className={
+            "pointer-events-none absolute inset-x-3 -bottom-[1px] h-[2px] transition-all " +
+            (onDashboard ? "bg-[var(--signal)]" : "bg-transparent")
+          }
+        />
+      </Link>
+      {hubs.map((hub) => {
+        const active = activeHub?.key === hub.key;
         return (
           <Link
-            key={tab.href}
-            href={tab.href}
+            key={hub.key}
+            href={hub.href}
             className={
               "relative px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors " +
               (active
@@ -83,15 +70,14 @@ export function AdminSubnav({
                 : "text-[var(--chalk-3)] hover:text-[var(--chalk-0)]")
             }
             aria-current={active ? "page" : undefined}
+            data-testid={`admin-subnav-tab-${hub.key}`}
           >
-            {tab.label}
+            {hub.label}
             <span
               aria-hidden
               className={
                 "pointer-events-none absolute inset-x-3 -bottom-[1px] h-[2px] transition-all " +
-                (active
-                  ? "bg-[var(--signal)]"
-                  : "bg-transparent group-hover:bg-[var(--ink-5)]")
+                (active ? "bg-[var(--signal)]" : "bg-transparent")
               }
             />
           </Link>

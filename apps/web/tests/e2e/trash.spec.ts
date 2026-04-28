@@ -94,7 +94,7 @@ test.describe.serial("admin trash: players soft-delete → restore roundtrip", (
     await adminLogin(page);
 
     // Trash page shows the deleted row.
-    await page.goto("/admin/trash/players");
+    await page.goto("/admin/system/trash/players");
     const trashTable = page.getByTestId("trash-table");
     await expect(trashTable).toBeVisible();
     const targetRow = trashTable
@@ -106,7 +106,7 @@ test.describe.serial("admin trash: players soft-delete → restore roundtrip", (
     await targetRow.getByTestId("restore-button").click();
 
     // After Restore, row disappears from the trash list.
-    await expect(page).toHaveURL(/\/admin\/trash\/players/);
+    await expect(page).toHaveURL(/\/admin\/system\/trash\/players/);
     await expect(
       page.getByTestId("trash-table").locator("tr", {
         hasText: TARGET_GAMER_TAG,
@@ -137,7 +137,7 @@ test.describe.serial("admin trash: players soft-delete → restore roundtrip", (
     await setPlayerDeletedAt(TARGET_GAMER_TAG, new Date().toISOString());
     try {
       await adminLogin(page);
-      await page.goto("/admin/trash/players");
+      await page.goto("/admin/system/trash/players");
       const purge = page.getByTestId("purge-button-stub").first();
       await expect(purge).toBeVisible();
       await expect(purge).toBeDisabled();
@@ -151,15 +151,15 @@ test.describe.serial("admin trash: players soft-delete → restore roundtrip", (
   });
 });
 
-test("unauthenticated user is redirected or 403 from /admin/trash", async ({
+test("unauthenticated user is redirected or 403 from /admin/system/trash", async ({
   page,
   context,
 }) => {
   await context.clearCookies();
-  const res = await page.goto("/admin/trash/players");
+  const res = await page.goto("/admin/system/trash/players");
   const isBlocked =
     res?.status() === 403 ||
     page.url().includes("/login") ||
-    page.url().includes("/admin/trash/players") === false;
+    page.url().includes("/admin/system/trash/players") === false;
   expect(isBlocked).toBeTruthy();
 });

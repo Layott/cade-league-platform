@@ -436,7 +436,7 @@ export default async function MatchDayDetailPage({
                           voided by ban
                         </span>
                         <Link
-                          href={`/admin/punishments/${result!.voided_by_action_id}`}
+                          href={`/admin/discipline/punishments/${result!.voided_by_action_id}`}
                           className="font-mono text-[11px] text-[var(--signal)] underline decoration-dotted hover:no-underline"
                           data-testid={`voided-by-ban-link-${m.id}`}
                         >

@@ -50,6 +50,6 @@ export async function submitAppealAction(formData: FormData): Promise<void> {
   // revalidate the old path so any stale bookmark cache invalidates.
   revalidatePath("/player/cases");
   revalidatePath("/player/appeals");
-  revalidatePath("/admin/appeals");
+  revalidatePath("/admin/discipline/appeals");
   redirect("/player/cases?tab=appeals");
 }

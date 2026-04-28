@@ -4,51 +4,17 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync } from "@/lib/perms-db";
+import { ADMIN_HUBS } from "@/lib/admin-nav";
 
 /**
- * /admin/* layout. Resolves `visibleTabs` once per request using
- * `hasPermAsync` so the client-side AdminSubnav can render only the tabs
- * the viewer can use. Admin wildcard perm ⇒ all tabs; moderator sees most;
- * narrow-scope roles (idc, loc, referee) see only their subset.
+ * /admin/* layout.
  *
- * Permission map per Plan 13B §4.3 for the plan-13 tabs, plus the
- * historical tab set (Dashboard, Match days, Punishments, etc.) which
- * uses `audit.read` as a reasonable visibility proxy for LOC/moderator
- * (every existing admin-reachable role either has audit.read or is
- * admin wildcard).
+ * UI Audit Slice 4 (2026-04-28) — visibility is now resolved per HUB
+ * (the 8 ADMIN_HUBS), not per legacy tab href. Each hub's `perm` is
+ * the READ gate; sub-tab visibility is resolved inside each hub's
+ * own layout. Admin wildcard ⇒ all hubs; moderator/loc/idc/referee
+ * see the subset their seeded perms allow.
  */
-
-// List of every tab href registered in AdminSubnav.tsx.
-//
-// UI Audit Slice 3 (2026-04-28) — Branding + YouTube top-level entries
-// were dropped (consolidated under the Broadcast hub at
-// /admin/broadcast/v2/{branding,youtube}). The Broadcast tab still
-// keys on broadcast.v2.read; producers who lack branding.manage will
-// still see the Broadcast tab but the sub-tab pages re-check perms
-// inline.
-const TAB_PERMS: Array<{ href: string; perm: string }> = [
-  { href: "/admin", perm: "audit.read" },
-  { href: "/admin/players", perm: "users.edit" },
-  { href: "/admin/match-days", perm: "matches.read" },
-  { href: "/admin/punishments", perm: "punishments.read" },
-  { href: "/admin/squads", perm: "squads.validate" },
-  { href: "/admin/orgs", perm: "orgs.read" },
-  { href: "/admin/disputes", perm: "disputes.read" },
-  { href: "/admin/appeals", perm: "appeals.read" },
-  { href: "/admin/announcements", perm: "announcements.read" },
-  { href: "/admin/tournament", perm: "tournament.read" },
-  // Plan 52 — Broadcast v2 promoted to be THE broadcast surface; the
-  // old /admin/broadcast hrefs redirect to /admin/broadcast/v2. Tab
-  // visibility now keys off `broadcast.v2.read` (the perm that gates
-  // the v2 layout). `broadcast.manage` is still required for the
-  // session-level edits inside the control room (start session, change
-  // match-day, end session).
-  { href: "/admin/broadcast/v2", perm: "broadcast.v2.read" },
-  { href: "/admin/roles", perm: "roles.manage" },
-  { href: "/admin/users", perm: "users.manage" },
-  { href: "/admin/trash", perm: "trash.restore" },
-  { href: "/admin/security/sessions", perm: "security.sessions.read" },
-];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const userClient = await getServerSupabase();
@@ -72,12 +38,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const svc = getServiceRoleSupabase();
   const actor = { userId: pub.id, roles };
   const checks = await Promise.all(
-    TAB_PERMS.map(async (t) => ({
-      href: t.href,
-      visible: await hasPermAsync(svc, actor, t.perm),
+    ADMIN_HUBS.map(async (h) => ({
+      key: h.key,
+      visible: await hasPermAsync(svc, actor, h.perm),
     })),
   );
-  const visibleTabs = checks.filter((c) => c.visible).map((c) => c.href);
+  const visibleHubKeys = checks.filter((c) => c.visible).map((c) => c.key);
 
-  return <AdminShell visibleTabs={visibleTabs}>{children}</AdminShell>;
+  return <AdminShell visibleHubs={visibleHubKeys}>{children}</AdminShell>;
 }

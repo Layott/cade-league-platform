@@ -139,7 +139,7 @@ export default async function AttendancePage({
                     </div>
                   ) : null}
                   <Link
-                    href={`/admin/precedents/${row.player_id}`}
+                    href={`/admin/discipline/precedents/${row.player_id}`}
                     className="mt-1 inline-block text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)] hover:text-[var(--signal)]"
                     data-testid={`att-precedents-${row.player_id}`}
                   >

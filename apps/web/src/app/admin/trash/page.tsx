@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
-import { TRASH_ENTITY_KEYS } from "@/server/trash/entities";
 
-export default function TrashIndexPage() {
-  const first = TRASH_ENTITY_KEYS[0];
-  redirect(`/admin/trash/${first}`);
+/** UI Audit Slice 4 (2026-04-28) — moved under System hub. */
+
+export const dynamic = "force-dynamic";
+
+export default async function TrashRedirect() {
+  redirect("/admin/system/trash");
 }

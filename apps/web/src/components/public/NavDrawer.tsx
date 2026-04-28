@@ -4,12 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ADMIN_HUBS } from "@/lib/admin-nav";
 
 /**
  * Plan 46 — global hamburger drawer. Exposed in both desktop header + mobile
  * overflow row. Groups every page a signed-in user (or public viewer) might
  * want to reach. Groups hide automatically based on viewer role +
  * authentication state.
+ *
+ * UI Audit Slice 4 (2026-04-28) — Staff group renders from ADMIN_HUBS so
+ * the drawer cannot drift from the AdminSubnav + dashboard tile grid.
  *
  * Keyboard:
  * - ESC closes the drawer
@@ -45,33 +49,13 @@ const PLAYER_LINKS: LinkRow[] = [
   { href: "/profile", label: "Profile" },
 ];
 
-// UI Audit Slice 3 (2026-04-28) — Branding, YouTube Channels, and
-// Stingers were dropped from the Staff group and re-mounted as
-// sub-tabs of the Broadcast hub at /admin/broadcast/v2/{branding,
-// youtube,stingers}. The single Broadcast link below is the entry point
-// to all four (Sessions + Stingers + Branding + YouTube). The old
-// /admin/branding + /admin/youtube-channels + /admin/broadcast/stingers
-// paths still resolve via 307 redirects so any external/email deep
-// link still lands correctly.
+// UI Audit Slice 4 (2026-04-28) — Staff links collapse to the 8 hubs in
+// ADMIN_HUBS. Sub-tabs render inside each hub's layout, so the drawer
+// only surfaces hub-level entry points. The dashboard root (/admin) is
+// prepended manually so users can hop to the tile grid.
 const STAFF_LINKS: LinkRow[] = [
   { href: "/admin", label: "Site Manager" },
-  { href: "/admin/players", label: "Players" },
-  { href: "/admin/match-days", label: "Match Days" },
-  { href: "/admin/squads", label: "Squads" },
-  // Plan 52 — Broadcast v2 promoted; the legacy /admin/broadcast still
-  // resolves via 307 redirect but pointing the nav at the canonical URL
-  // avoids the address-bar hop / flash (lessons.md entry 484).
-  { href: "/admin/broadcast/v2", label: "Broadcast" },
-  { href: "/admin/punishments", label: "Punishments" },
-  { href: "/admin/stats-review", label: "Stats Review" },
-  { href: "/admin/appeals", label: "Appeals" },
-  { href: "/admin/disputes", label: "Disputes" },
-  { href: "/admin/orgs", label: "Orgs" },
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/roles", label: "Roles" },
-  { href: "/admin/announcements", label: "Announcements" },
-  { href: "/admin/security/sessions", label: "Sessions" },
-  { href: "/admin/trash", label: "Trash" },
+  ...ADMIN_HUBS.map((h) => ({ href: h.href, label: h.label })),
 ];
 
 const REFEREE_LINKS: LinkRow[] = [

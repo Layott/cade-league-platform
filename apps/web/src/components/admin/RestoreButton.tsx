@@ -1,4 +1,4 @@
-import { restoreAction } from "@/app/admin/trash/[entity]/actions";
+import { restoreAction } from "@/app/admin/system/trash/[entity]/actions";
 
 /**
  * Inline server-action form that restores a soft-deleted row.

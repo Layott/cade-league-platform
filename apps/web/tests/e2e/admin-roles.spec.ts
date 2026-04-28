@@ -86,7 +86,7 @@ test.describe.serial("admin/roles — matrix toggle round-trip", () => {
     page,
   }) => {
     await adminLogin(page);
-    await page.goto("/admin/roles");
+    await page.goto("/admin/people/roles");
     await expect(page.getByTestId("role-matrix")).toBeVisible();
 
     const cellId = `cell-${TARGET_ROLE}-${TARGET_PERM}`;
@@ -127,7 +127,7 @@ test.describe.serial("admin/roles — matrix toggle round-trip", () => {
 
   test("admin × * wildcard cell is locked (disabled)", async ({ page }) => {
     await adminLogin(page);
-    await page.goto("/admin/roles");
+    await page.goto("/admin/people/roles");
     const wildcard = page.getByTestId("cell-admin-*");
     await expect(wildcard).toBeDisabled();
     await expect(wildcard).toBeChecked();
@@ -159,7 +159,7 @@ test.describe.serial("admin/users — assign + remove role round-trip", () => {
       .is("deleted_at", null);
 
     await adminLogin(page);
-    await page.goto(`/admin/users/${targetUserId}`);
+    await page.goto(`/admin/people/users/${targetUserId}`);
     await expect(page.getByTestId("current-roles")).toBeVisible();
 
     const addForm = page.getByTestId("add-role-form");

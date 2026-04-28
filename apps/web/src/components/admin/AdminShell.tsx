@@ -6,20 +6,24 @@ import { AdminSubnav } from "./AdminSubnav";
  * AdminShell is the thin wrapper around every /admin/* page. It renders:
  *   - a "← Back to site" return link (muted chalk-3)
  *   - eyebrow tag "ADMIN CONSOLE" in signal green
- *   - the AdminSubnav tab strip
+ *   - the AdminSubnav hub strip
  *   - a full-width dark content surface
  *
  * The global SiteChrome already handles the primary header + bell +
  * log-out, so this shell intentionally stays compact — no duplicate
  * header chrome.
+ *
+ * UI Audit Slice 4 (2026-04-28) — `visibleHubs` is the list of hub
+ * keys the viewer is allowed to see (resolved by the layout from
+ * ADMIN_HUBS perms).
  */
 
 export function AdminShell({
   children,
-  visibleTabs,
+  visibleHubs,
 }: {
   children: ReactNode;
-  visibleTabs?: readonly string[];
+  visibleHubs?: readonly string[];
 }) {
   return (
     <div className="min-h-screen bg-[var(--ink-1)]">
@@ -43,7 +47,7 @@ export function AdminShell({
           </span>
         </div>
         <div className="mt-4">
-          <AdminSubnav visibleTabs={visibleTabs} />
+          <AdminSubnav visibleHubs={visibleHubs} />
         </div>
       </div>
       <main className="mx-auto w-full max-w-6xl px-5 py-8">{children}</main>

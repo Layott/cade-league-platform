@@ -108,7 +108,7 @@ test.describe("Plan 51 — Tournament page UI", () => {
     await expect(page.getByTestId("walkovers-trigger-section")).toBeVisible();
   });
 
-  test("Adjustments tab links to /admin/punishments", async ({ page }) => {
+  test("Adjustments tab links to /admin/discipline/punishments", async ({ page }) => {
     await adminLogin(page);
     await page.goto("/admin/tournament/adjustments");
     await expect(
@@ -116,7 +116,7 @@ test.describe("Plan 51 — Tournament page UI", () => {
     ).toBeVisible();
     const cta = page.getByTestId("adjustments-cta");
     await expect(cta).toBeVisible();
-    await expect(cta).toHaveAttribute("href", /\/admin\/punishments/);
+    await expect(cta).toHaveAttribute("href", /\/admin\/discipline\/punishments/);
   });
 
   test("Tiebreaker drag-rank renders + save round-trip works", async ({

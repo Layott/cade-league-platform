@@ -99,10 +99,14 @@ describe("NavDrawer (Plan 46)", () => {
     renderOpen({ authenticated: true, isStaff: true, roles: ["admin"] });
     expect(screen.getByTestId("nav-drawer-group-staff")).toBeTruthy();
     expect(screen.getByTestId("nav-drawer-link-/admin")).toBeTruthy();
+    // UI Audit Slice 4 (2026-04-28) — Staff group collapsed to 8 hubs.
+    // /admin/match-days remains a hub URL; /admin/trash now lives under
+    // the System hub at /admin/system. Old paths 307 to the new ones.
     expect(
       screen.getByTestId("nav-drawer-link-/admin/match-days"),
     ).toBeTruthy();
-    expect(screen.getByTestId("nav-drawer-link-/admin/trash")).toBeTruthy();
+    expect(screen.getByTestId("nav-drawer-link-/admin/system")).toBeTruthy();
+    expect(screen.queryByTestId("nav-drawer-link-/admin/trash")).toBeNull();
   });
 
   it("shows Referee group for referees, admins, and moderators", () => {

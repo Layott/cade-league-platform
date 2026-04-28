@@ -275,7 +275,7 @@ test("player submits appeal → admin assigns 3-member panel → rules → statu
   // --- Admin context ---
   const adminCtx = await browser.newContext();
   const adminPage = await adminCtx.newPage();
-  await loginAs(adminPage, ADMIN_EMAIL, ADMIN_PASSWORD, "/admin/appeals");
+  await loginAs(adminPage, ADMIN_EMAIL, ADMIN_PASSWORD, "/admin/discipline/appeals");
   await expect(adminPage.getByTestId("appeals-list")).toBeVisible();
 
   // Find the appeal row (most recent for this case).
@@ -292,7 +292,7 @@ test("player submits appeal → admin assigns 3-member panel → rules → statu
   const appealId = (appeal as { id: string }).id;
 
   // Open detail page.
-  await adminPage.goto(`/admin/appeals/${appealId}`);
+  await adminPage.goto(`/admin/discipline/appeals/${appealId}`);
   await expect(adminPage.getByTestId("appeal-panel-form")).toBeVisible();
   await expect(adminPage.getByTestId("appeal-deadline-badge")).toBeVisible();
 

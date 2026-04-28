@@ -89,9 +89,9 @@ test.describe.serial("admin users CRUD", () => {
     await adminLogin(page);
 
     // Step 1: open list, click Add user.
-    await page.goto("/admin/users");
+    await page.goto("/admin/people/users");
     await page.getByTestId("add-user-button").click();
-    await expect(page).toHaveURL(/\/admin\/users\/new/);
+    await expect(page).toHaveURL(/\/admin\/people\/users\/new/);
 
     // Step 2: fill the form.
     await page.getByTestId("new-user-email").fill(TARGET_EMAIL);
@@ -101,7 +101,7 @@ test.describe.serial("admin users CRUD", () => {
     await page.getByTestId("new-user-submit").click();
 
     // Step 3: redirected to /admin/users/<id>.
-    await expect(page).toHaveURL(/\/admin\/users\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/admin\/people\/users\/[0-9a-f-]{36}$/);
     await expect(page.locator("h1")).toContainText(ORIGINAL_NAME);
 
     // Step 4: edit display_name.
@@ -119,13 +119,13 @@ test.describe.serial("admin users CRUD", () => {
     await page.getByTestId("delete-user-confirm").click();
 
     // Step 6: redirected to /admin/users; user no longer in list.
-    await expect(page).toHaveURL(/\/admin\/users\/?$/);
+    await expect(page).toHaveURL(/\/admin\/people\/users\/?$/);
     await expect(
       page.getByTestId("users-table").getByText(TARGET_EMAIL),
     ).toHaveCount(0);
 
     // Step 7: appears in /admin/trash/users.
-    await page.goto("/admin/trash/users");
+    await page.goto("/admin/system/trash/users");
     const trashTable = page.getByTestId("trash-table");
     await expect(trashTable).toBeVisible();
     await expect(trashTable.getByText(TARGET_EMAIL)).toBeVisible();
@@ -135,7 +135,7 @@ test.describe.serial("admin users CRUD", () => {
     await restoreRow.getByTestId("restore-button").click();
 
     // After restore, user appears back on /admin/users.
-    await page.goto("/admin/users");
+    await page.goto("/admin/people/users");
     await expect(
       page.getByTestId("users-table").getByText(TARGET_EMAIL),
     ).toBeVisible();

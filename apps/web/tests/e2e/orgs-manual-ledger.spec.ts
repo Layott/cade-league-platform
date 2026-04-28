@@ -90,14 +90,14 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
   // 1. Navigate to orgs/new. Plan 31 — CAC input is gone; only name +
   // optional logo upload remain. Skip the file upload here so the test
   // remains hermetic.
-  await page.goto("/admin/orgs/new");
+  await page.goto("/admin/people/orgs/new");
   await expect(page.getByTestId("org-create-form")).toBeVisible();
   await page.getByTestId("org-name-input").fill(ORG_NAME);
   await page.getByTestId("org-create-submit").click();
 
   // 2. Landed on detail page. Cold compile of the detail route in dev can
   // eat a chunk of the default 5s.
-  await expect(page).toHaveURL(/\/admin\/orgs\/[0-9a-f-]+/, {
+  await expect(page).toHaveURL(/\/admin\/people\/orgs\/[0-9a-f-]+/, {
     timeout: 30_000,
   });
   const url = page.url();
@@ -110,7 +110,7 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
   for (const p of players!.slice(0, 2)) {
     await page.getByTestId("org-link-player-select").selectOption(p.id);
     await page.getByTestId("org-link-submit").click();
-    await expect(page).toHaveURL(/\/admin\/orgs\/[0-9a-f-]+/);
+    await expect(page).toHaveURL(/\/admin\/people\/orgs\/[0-9a-f-]+/);
   }
 
   // 4. Record first ledger entry: deposit 50_000. Cold-compile of the
@@ -130,7 +130,7 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
   // URL has left `/ledger/new` before asserting on the detail page. Cold
   // compile of the detail route can push this past the default 5s.
   await expect(page).toHaveURL(
-    new RegExp(`/admin/orgs/${orgId}(?:[#?]|$)`),
+    new RegExp(`/admin/people/orgs/${orgId}(?:[#?]|$)`),
     { timeout: 30_000 },
   );
   const ledger = page.getByTestId("org-ledger-table");
@@ -147,7 +147,7 @@ test("admin creates org, records deposit + fine, balance=45,000, ledger append-o
   await page.getByTestId("ledger-reference").fill("forfeit sanction");
   await page.getByTestId("ledger-submit").click();
   await expect(page).toHaveURL(
-    new RegExp(`/admin/orgs/${orgId}(?:[#?]|$)`),
+    new RegExp(`/admin/people/orgs/${orgId}(?:[#?]|$)`),
     { timeout: 30_000 },
   );
 

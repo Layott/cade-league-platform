@@ -35,7 +35,7 @@ test("admin + public punishments pages render rows (post Plan 39 RLS fix)", asyn
     timeout: 15000,
   });
 
-  await page.goto("/admin/punishments");
+  await page.goto("/admin/discipline/punishments");
   await expect(
     page.getByRole("heading", { name: "Punishments" }),
   ).toBeVisible();

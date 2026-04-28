@@ -4,22 +4,24 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { hasPermAsync, requirePermAsync } from "@/lib/perms-db";
 import { SectionHeader } from "@/components/admin/SectionHeader";
-import { TournamentTabs } from "./TournamentTabs";
-import { TOURNAMENT_TABS } from "./tabs.config";
+import { ADMIN_HUBS } from "@/lib/admin-nav";
+import { HubSubnav } from "@/components/admin/HubSubnav";
+import { Breadcrumbs } from "@/components/admin/Breadcrumbs";
 
 /**
  * Plan 51 — /admin/tournament/* layout.
  *
+ * UI Audit Slice 4 (2026-04-28) — migrated from per-hub TournamentTabs
+ * to the shared HubSubnav driven by `lib/admin-nav.ts`. Adds breadcrumbs.
+ *
  * Acts as the area gate (requires `tournament.read`) plus pre-resolves
  * sub-tab visibility against each tab's perm key so the client tab strip
  * only renders the surfaces this viewer is allowed to reach.
- *
- * Sibling agents fill the individual tab pages:
- *   - /standings, /fixtures, /results-entry, /walkovers, /adjustments,
- *     /tiebreaker-config, /h2h-lookup, /win-prob-preview.
  */
 
 export const dynamic = "force-dynamic";
+
+const HUB = ADMIN_HUBS.find((h) => h.key === "tournament")!;
 
 export default async function TournamentLayout({
   children,
@@ -48,15 +50,15 @@ export default async function TournamentLayout({
   const actor = { userId: pub.id, roles };
 
   // Area gate. Per-tab + per-action perms still re-check below + in pages.
-  await requirePermAsync(svc, actor, "tournament.read");
+  await requirePermAsync(svc, actor, HUB.perm);
 
   const checks = await Promise.all(
-    TOURNAMENT_TABS.map(async (t) => ({
-      href: t.href,
-      visible: await hasPermAsync(svc, actor, t.perm),
-    })),
+    HUB.subtabs?.map(async (t) => ({
+      tab: t,
+      ok: await hasPermAsync(svc, actor, t.perm ?? HUB.perm),
+    })) ?? [],
   );
-  const visibleTabs = checks.filter((c) => c.visible).map((c) => c.href);
+  const visibleSubtabsResolved = checks.filter((c) => c.ok).map((c) => c.tab);
 
   return (
     <div className="space-y-6" data-testid="tournament-shell">
@@ -65,7 +67,8 @@ export default async function TournamentLayout({
         title="League console"
         description="Standings, fixtures, results entry, walkovers, manual adjustments, tiebreaker policy, and head-to-head analytics for the active season."
       />
-      <TournamentTabs visibleTabs={visibleTabs} />
+      <Breadcrumbs />
+      <HubSubnav hub={HUB} visibleSubtabs={visibleSubtabsResolved} />
       {children}
     </div>
   );

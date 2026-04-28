@@ -1,40 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { ADMIN_HUBS, findHubByPath } from "@/lib/admin-nav";
 
-// Plan 39 M1 — widened so non-admin staff roles (loc, idc, referee,
-// production) can reach /admin/*. Per-page + per-action perm checks (via
-// requirePermAsync) still gate every individual surface, so this is purely
-// "may you cross the /admin/* threshold." `viewer`, `coach`, `team_manager`,
-// `player`, `design`, `technical` stay out.
-// Plan 51 — design + technical added so they can reach the new
-// /admin/tournament + /admin/broadcast/v2 surfaces. Per-page perm checks
-// still gate the actual sub-routes.
-const ADMIN_ROLES = new Set([
-  "admin",
-  "loc",
-  "idc",
-  "referee",
-  "production",
-  "moderator",
-  "design",
-  "technical",
-]);
-// Plan 51 — sub-area role gates inside /admin. The outer ADMIN_ROLES set
-// is the threshold check; these narrower sets reject early when a user
-// crossed the threshold via some other tab but cannot enter this surface.
-// Per-action perm checks (requirePermAsync) still re-validate.
-const ADMIN_TOURNAMENT_ROLES = new Set([
-  "admin",
-  "loc",
-  "idc",
-  "technical",
-]);
-const ADMIN_BROADCAST_V2_ROLES = new Set([
-  "admin",
-  "technical",
-  "production",
-  "design",
-]);
+/**
+ * UI Audit Slice 4 (2026-04-28) — middleware now derives admin-area
+ * gates from `lib/admin-nav.ts`. Each /admin/<hub>/* segment maps to
+ * its hub's perm string; if the user lacks that perm we redirect to
+ * /profile with an error flag. Per-page `requirePermAsync` still
+ * re-validates inside each page.
+ *
+ * Threshold check: `/admin/*` requires an authenticated user whose
+ * role set has at least ONE permission row (admin wildcard '*'
+ * trivially passes). Hub-level filtering is the second layer.
+ *
+ * Audit P2-010 — collapses three static role sets (ADMIN_ROLES,
+ * ADMIN_TOURNAMENT_ROLES, ADMIN_BROADCAST_V2_ROLES) into one
+ * perm-driven check, eliminating the drift between role lists and
+ * actual `role_permissions` table state.
+ */
+
 const PLAYER_AREA_ROLES = new Set([
   "admin",
   "moderator",
@@ -42,11 +26,23 @@ const PLAYER_AREA_ROLES = new Set([
   "loc",
   "referee",
 ]);
-// Plan 46 — /referee/* is the simplified attendance surface for refs.
-// Admins + moderators keep access for oversight / QA; everyone else is
-// bounced. Per-action perm re-checks (attendance.mark / attendance.edit)
-// still gate the server-action writes.
+
 const REFEREE_AREA_ROLES = new Set(["admin", "moderator", "referee"]);
+
+/** Inline perm-match helper — duplicated from admin-nav.ts because the
+ * Edge runtime can't pull `lib/admin-nav` at module load if it transitively
+ * imports server-only Supabase code. The matchesPerm logic is small. */
+function permsAllow(rules: readonly string[], action: string): boolean {
+  for (const rule of rules) {
+    if (rule === "*") return true;
+    if (rule === action) return true;
+    if (rule.endsWith(".*")) {
+      const prefix = rule.slice(0, -1);
+      if (action.startsWith(prefix)) return true;
+    }
+  }
+  return false;
+}
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -56,10 +52,7 @@ export async function middleware(req: NextRequest) {
   const isOverlayV2 = pathname.startsWith("/overlay/v2");
   const isRoot = pathname === "/";
 
-  // Plan 51 — /overlay/v2/* is public (browser-source pull, no auth) but
-  // is gated by per-overlay view_token validation inside each page. The
-  // matcher includes it so future view_token enforcement can hook in
-  // here without re-touching middleware.config.matcher.
+  // Plan 51 — /overlay/v2/* is public (browser-source pull, no auth).
   if (isOverlayV2) return NextResponse.next();
 
   if (!isAdmin && !isPlayerArea && !isRefereeArea && !isRoot)
@@ -88,8 +81,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Root route: unauthenticated visitors land on /welcome unless they
-  // explicitly opted out with ?nolanding=1 (used by the "Public site" link
-  // on /welcome so signed-out readers can still browse fixtures).
+  // explicitly opted out with ?nolanding=1.
   if (isRoot) {
     if (user) return NextResponse.next();
     const nolanding = req.nextUrl.searchParams.get("nolanding");
@@ -122,21 +114,46 @@ export async function middleware(req: NextRequest) {
   const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
 
   if (isAdmin) {
-    const allowed = roles.some((r) => ADMIN_ROLES.has(r));
-    if (!allowed) {
-      return new NextResponse("Forbidden", { status: 403 });
+    // Threshold: ANY admin-area access requires the user to hold at least
+    // ONE permission row. Wildcard '*' (admin) trivially satisfies. We
+    // resolve perms once + reuse for the per-hub check.
+    if (roles.length === 0) {
+      return NextResponse.redirect(
+        new URL("/profile?error=admin_forbidden", req.url),
+      );
     }
-    // Plan 51 — sub-area gates. Per-page requirePermAsync still re-checks
-    // the actual perm; this is the cheap "may you even see the route"
-    // threshold check so wrong-role staff get a 403 instead of a server
-    // error from a missing perm.
-    if (pathname.startsWith("/admin/tournament")) {
-      const ok = roles.some((r) => ADMIN_TOURNAMENT_ROLES.has(r));
-      if (!ok) return new NextResponse("Forbidden", { status: 403 });
+
+    // Resolve every effective perm rule for this user via PostgREST.
+    // role_permissions is small (12 roles × handful of rows each), so a
+    // single IN-list query is cheap. Edge runtime handles fetch fine.
+    const { data: permRows } = await supabase
+      .from("role_permissions")
+      .select("role, permission")
+      .in("role", roles);
+    const userPerms = ((permRows ?? []) as { permission: string }[]).map(
+      (r) => r.permission,
+    );
+
+    // Threshold (2): at least one perm rule.
+    if (userPerms.length === 0) {
+      return NextResponse.redirect(
+        new URL("/profile?error=admin_forbidden", req.url),
+      );
     }
-    if (pathname.startsWith("/admin/broadcast/v2")) {
-      const ok = roles.some((r) => ADMIN_BROADCAST_V2_ROLES.has(r));
-      if (!ok) return new NextResponse("Forbidden", { status: 403 });
+
+    // /admin (the dashboard root) is allowed for anyone past the threshold.
+    // Hub gating only kicks in for /admin/<hub>/* paths.
+    const hub = findHubByPath(pathname);
+    if (hub) {
+      const allowed = permsAllow(userPerms, hub.perm);
+      if (!allowed) {
+        return NextResponse.redirect(
+          new URL(
+            `/profile?error=hub_forbidden&hub=${encodeURIComponent(hub.key)}`,
+            req.url,
+          ),
+        );
+      }
     }
     return res;
   }
@@ -150,8 +167,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // /player/** — any authenticated user whose roles include player (or an
-  // admin/moderator/ref impersonation path). Admins + refs still need to see
-  // this area for impersonation QA; the server action layer re-checks perms.
+  // admin/moderator/ref impersonation path).
   const allowed = roles.some((r) => PLAYER_AREA_ROLES.has(r));
   if (!allowed) {
     return new NextResponse("Forbidden", { status: 403 });
@@ -166,7 +182,11 @@ export const config = {
     "/player/:path*",
     "/referee/:path*",
     // Plan 51 — overlay v2 routes added so future view_token validation
-    // can hook into middleware. Today the body just NextResponse.next()'s.
+    // can hook into middleware.
     "/overlay/v2/:path*",
   ],
 };
+
+// Re-export ADMIN_HUBS so the hub list is "live" in the Edge bundle (allows
+// future tooling to introspect hub perms without re-importing admin-nav).
+export { ADMIN_HUBS };
