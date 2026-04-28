@@ -192,3 +192,51 @@ When multiple agents land on `main` concurrently:
 - Local dev: daily `supabase db dump` into gitignored `backups/` (rotate 14 days).
 - Production: GitHub Actions cron → `pg_dump` → Backblaze B2 (30 daily + 12 monthly retention).
 - Quarterly restore drill to staging.
+
+## §15 — Overlay Design System (post-2026-04-29)
+
+Producers / designers / admins tune overlay visuals (color, font, scale, position, partner-strip, pattern, template variant) from the admin UI without a redeploy. Tokens flow through SSR-injected CSS variables; the existing postMessage data contract (matches, scores, leaderboard rows) remains FROZEN — this system is purely visual layering.
+
+**Spec:** `docs/superpowers/specs/2026-04-29-overlay-design-system.md` — read for full data model, server module signatures, UI layout, migration sequencing.
+
+**Database tables** (3 new, migration block `20260601000001..00004`):
+- `overlay_template_variants` — one row per (overlay_key, variant_id). Partial unique index enforces one `active=true` per overlay_key. `default` variant seeded for all 16 overlays on initial migration.
+- `overlay_design_tokens` — one row per (overlay_key, variant_id, token_key). Typed via `token_type CHECK IN ('color','font','number','boolean','enum','string')`. Audit trigger attached.
+- `overlay_design_history` — append-only snapshot per save. UPDATE + DELETE blocked via `overlay_design_history_block_mutation()` trigger (mirrors `audit_events` + `caution_ledger_entries` pattern). Used for revert.
+
+**Permission:** writes (save, revert, set-active-template) gate on `overlay.design.manage` (seeded for `admin`, `design`, `production` roles). Reads inherit from `broadcast.v2.read`.
+
+**Admin UI:** `/admin/broadcast/v2/design` — sub-tab on the Broadcast hub (Sessions · Stingers · **Design** · Branding · YouTube). Editor is at `apps/web/src/components/admin/OverlayDesignEditor.tsx`. Form actions live in `apps/web/src/app/admin/broadcast/v2/design/actions.ts` and rate-limit through `enforceAuthedWrite`.
+
+**Token catalog reference:** `apps/web/src/server/overlays/design/defaults.ts`:
+- `BASE_DEFAULTS` — global brand defaults (e.g. `bg-color: #050505`, `accent-color: #6bcd06`, `font-display: Agharti`).
+- `OVERLAY_OVERRIDES` — per-key divergences (e.g. `01-brb` shows partner strip + halftone pattern; `08-lower-third` positions at `pos-y: 880`).
+- `TOKEN_CATALOG` — array of `{ tokenKey, tokenType, label, description? }`. Drives the admin UI knobs.
+- `OVERLAY_KEYS` — canonical list of 16 routable v2 overlays.
+
+**Adding a new token:**
+1. Append `{ tokenKey, tokenType, label }` to `TOKEN_CATALOG` in `defaults.ts`.
+2. Add the default value to `BASE_DEFAULTS` (and any per-overlay overrides to `OVERLAY_OVERRIDES`).
+3. Add a `TokenRow` branch / new widget in `apps/web/src/components/admin/OverlayDesignEditor.tsx` if the existing color / font / number / boolean / enum widgets don't fit.
+4. Reference the new variable in the relevant overlay HTML(s) via `var(--overlay-<token-key>, <fallback>)`.
+5. **No migration needed** — the catalog is code, the DB only stores divergent values.
+
+**Authoring a new template variant:**
+1. Author the HTML at `KNOWLEDGE/brand-assets/elements/v2/<key>/templates/<variant-id>/index.html`. It MUST satisfy CLAUDE.md §14 contract (color-scheme dark, transparent body, observer script, demo guard, brand fonts, asset paths via `/overlays/v2/_assets/...`).
+2. Run `node apps/web/scripts/sync-v2-overlays.mjs` (or equivalent mirror script) to copy into `apps/web/public/overlays/v2/<key>/templates/<variant-id>/index.html`.
+3. INSERT a row in `overlay_template_variants` with `(overlay_key, variant_id, label, html_path, thumbnail_path, active=false)`.
+4. (Optional) Generate a thumbnail at `apps/web/public/overlays/v2/_assets/thumbnails/<key>-<variant>.png` via the headless-screenshot path.
+5. Producer flips Active in `/admin/broadcast/v2/design` → set-active is atomic (partial-unique-index pivot).
+
+**SSR token injection:** the overlay route at `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` resolves the active variant + merged tokens server-side and renders two `<style>` blocks:
+- `<style id="overlay-design-tokens">:root{ --overlay-X: value; ... }</style>` — DB-resolved tokens.
+- `<style id="preview-tokens">:root{ --overlay-X: value; ... }</style>` — admin live-preview overrides (only when `?previewTokens=<base64>` is passed). Higher in cascade than SSR block by source-order placement.
+
+The static HTML keeps `:root { --overlay-X: <hard-coded fallback> }` so OBS browser sources pointed at the bare static file (no SSR layer) still render with brand defaults. The cascade naturally resolves: HTML defaults → SSR DB tokens → preview overrides.
+
+**§14 frozen contract still applies.** Every template variant HTML MUST satisfy the §14 list (color-scheme dark meta, transparent body, observer script, demo guard, brand fonts, asset paths). The design system layers ON TOP of §14 — it does not relax it.
+
+**Smoke / E2E:**
+- E2E: `apps/web/tests/e2e/overlay-design-tokens.spec.ts` — login → save accent token → assert SSR style block on overlay route → revert → assert restored.
+- Smoke (one-shot, deleted after run): pattern lives at `apps/web/scripts/_overlay-design-smoke.mjs` — fetches `/overlay/v2/<key>?demo=1` for all 16 keys against the live Vercel URL and asserts the SSR token block contains `--overlay-bg-color`.
+
