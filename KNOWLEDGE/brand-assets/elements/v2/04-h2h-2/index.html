@@ -146,7 +146,7 @@
       declarations.push('top:' + py + 'px !important');
       declarations.push('bottom:auto !important');
     } else if (anchor.indexOf('bottom') === 0) {
-      declarations.push('bottom:' + (1080 - py) + 'px !important');
+      declarations.push('bottom:' + py + 'px !important');
       declarations.push('top:auto !important');
     } else {
       declarations.push('top:' + py + 'px !important');
@@ -157,7 +157,7 @@
       declarations.push('left:' + px + 'px !important');
       declarations.push('right:auto !important');
     } else if (anchor.indexOf('right') !== -1) {
-      declarations.push('right:' + (1920 - px) + 'px !important');
+      declarations.push('right:' + px + 'px !important');
       declarations.push('left:auto');
     } else {
       declarations.push('left:50% !important');
@@ -974,7 +974,7 @@
     top: 270px;
     left: 50%;
     transform: translateX(-50%);
-    width: 660px;
+    width: 820px;
     height: 600px;
     z-index: 15;
     background: linear-gradient(180deg,

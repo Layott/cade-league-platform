@@ -490,8 +490,12 @@ export type EditorProps = {
 
 const DEFAULT_STRIP_LAYOUT: PartnerStripLayoutRow = {
   visible: true,
+  // positionXPx + positionYPx are DIRECT offsets from the chosen anchor edge
+  // (post 2026-04-30 semantics). 0,60 with bottom-center = strip 60px above
+  // canvas bottom, horizontally centered. For top anchor: positionYPx is
+  // px from top. For right: positionXPx is px from right. Etc.
   positionXPx: 0,
-  positionYPx: 1020,
+  positionYPx: 60,
   anchor: "bottom-center",
   orientation: "horizontal",
   scalePct: 100,
