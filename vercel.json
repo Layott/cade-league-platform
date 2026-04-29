@@ -4,5 +4,13 @@
   "buildCommand": "cd apps/web && npm run build",
   "installCommand": "npm install",
   "outputDirectory": "apps/web/.next",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/web ./KNOWLEDGE/brand-assets/elements/v2 ./KNOWLEDGE/brand-assets/logos"
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/web ./KNOWLEDGE/brand-assets/elements/v2 ./KNOWLEDGE/brand-assets/logos ./vercel.json",
+  "headers": [
+    {
+      "source": "/overlays/v2/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0, must-revalidate" }
+      ]
+    }
+  ]
 }
