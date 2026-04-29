@@ -540,3 +540,72 @@ So I extended Option A: the ambient resolver picks the live session with the mos
 - Server Action serialization across Server → Client component boundary: pass extra args via dedicated props, never wrap in inline arrows. The "Functions cannot be passed directly to Client Components" error reproduces only at runtime — `next build` and unit tests both pass.
 - TS strict-mode `null` vs `undefined`: pick ONE shape per call-graph edge and stay consistent — drift between `string | null` (DB-style) and `string | undefined` (TS-optional) costs a Vercel build cycle.
 
+
+## 2026-04-29 — Wave 2 Stage 1 — review
+
+**Goal:** Backend foundation for Overlay Design Page v2 — text elements, partner-logo manager, per-element animations. **NO UI work in this stage**, no overlay HTML edits — pure server / DB / sanitizer plumbing.
+
+**Spec:** `docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md` §1, §2, §3, §4, §11.
+
+### What landed
+
+**Migrations (8 new, range `20260620000001..08`):**
+- `20260620000001_overlay_text_elements.sql` — table + partial-unique-index + audit + deny-direct RLS.
+- `20260620000002_overlay_partner_strip_layout.sql` — same shape.
+- `20260620000003_overlay_partner_logos.sql` — same shape.
+- `20260620000004_overlay_partner_logo_overrides.sql` — same shape.
+- `20260620000005_overlay_element_animations.sql` — same shape + `easing` regex CHECK + `iteration_count` regex CHECK.
+- `20260620000006_overlay_partner_logos_bucket.sql` — `partner-logos` storage bucket (500KB cap, png+svg+webp, public read, service-role write).
+- `20260620000007_overlay_text_elements_seed.sql` — 166 seed rows across all 16 overlay keys (per spec §8 catalog).
+- `20260620000008_overlay_partner_logos_seed.sql` — 5 seed rows (gameevo, gamepride, esn, trace, oas).
+
+All migrations idempotent (`IF NOT EXISTS` + `ON CONFLICT WHERE deleted_at IS NULL`).
+
+**Server modules (5 new, all `.ts`):**
+- `apps/web/src/server/overlays/_shared/css-validator.ts` + `.test.ts` — `isValidColor`, `isValidElementId`, `isValidFont`, `isValidEasing`, `isValidAlignment`, `escapeCssValue`. 32 tests.
+- `apps/web/src/server/overlays/animations/sanitize_keyframes.ts` + `.test.ts` — keyframes-body sanitizer, allowlists 9 props, rejects `url()` / `expression()` / `@import` / `@font-face` / nested rules / tag injection / oversize input / backslash escape. 39 tests covering attack vectors.
+- `apps/web/src/server/overlays/text/elements.ts` + `.test.ts` — `listTextElements`, `getTextElement`, `upsertTextElement`, `deleteTextElement` (rejects on seed origin), `restoreTextElement`, `resolveTextElements`. 28 tests.
+- `apps/web/src/server/overlays/partners/strip.ts` + `.test.ts` — `getStripLayout`, `upsertStripLayout`, `clearStripLayout`, `resolveStripLayout`. 18 tests.
+- `apps/web/src/server/overlays/partners/logos.ts` + `.test.ts` — `listPartnerLogos`, `getPartnerLogo`, `createPartnerLogo`, `updatePartnerLogo`, `deletePartnerLogo`, `reorderPartnerLogos`, `getOverrides`, `setLogoOverride`, `clearLogoOverride`, `resolvePartnerLogos` (+ `resolveLogosForOverlay` alias), `validateLogoDimensions`. 31 tests.
+- `apps/web/src/server/overlays/animations/elements.ts` + `.test.ts` — `listAnimations`, `getAnimation`, `upsertAnimation`, `deleteAnimation`, `resolveAnimations`, `buildKeyframesBody`. 25 tests.
+
+Every mutating fn gates on `overlay.design.manage` via `requirePermAsync(sb, actor, 'overlay.design.manage')`. Reads unauthenticated at this layer (SSR + admin UI own outer auth gate).
+
+### Verification gate
+
+- `npx vitest run src/server/overlays` — **388 tests pass** (was 232; **+156 new tests**).
+- `npx vitest run` (full suite) — **1966 tests pass**.
+- `npm run lint` — **0 errors**, 14 pre-existing warnings (none introduced by this stage).
+- `npx tsc --noEmit` (`apps/web`) — clean.
+- `npm run db:push` — all 8 migrations applied cleanly.
+- DB verification via `supabase db query --linked`:
+  - `overlay_text_elements` → 166 rows (matches spec §8 catalog count).
+  - `overlay_partner_logos` → 5 rows (gameevo, gamepride, esn, trace, oas).
+  - `overlay_partner_strip_layout`, `overlay_partner_logo_overrides`, `overlay_element_animations` → 0 rows (correct — these populate as admins use the UI).
+  - `storage.buckets` → `partner-logos` exists, public, 500KB cap, png+svg+webp allowed.
+
+### Constraints honored
+
+- DID NOT touch `OverlayDesignEditor.tsx` (Stage 2 scope).
+- DID NOT touch any overlay HTML files (Stage 2/3/4 scope).
+- DID NOT touch `OverlayDataInjector.tsx` or page.tsx (Stage 2/3/4 scope).
+- Migration timestamps `20260620000001..08` claimed (no collision with existing range).
+- Seed migrations both fall back through admin → any user → skip with notice when DB has no users yet.
+- All RLS policies use `USING (false)` deny-direct.
+- All append-only-style mutation paths use upsert with explicit `set_by` + `updated_at` overwrite + `deleted_at: null`.
+
+### Per-spec design notes
+
+- **Empty seed rows (`origin='seed'`, `content=''`, all-null typography)** — first-deploy is a no-op. `resolveTextElements` skips these entirely so the bootstrap script never emits a `<style id="cade-injected-text">` block until an admin actually changes something.
+- **Sanitizer is REJECT-FIRST**: any forbidden token (url, expression, @-rule, tag, backslash, oversize, missing colon, unknown property) raises with a specific error message. Never silently strips — the admin needs feedback.
+- **Logo dimensions**: PNG/WebP enforced 600×300 ±10% (540..660 × 270..330). SVG bypasses (vector — controlled by strip `scale_pct`). Detection by `.svg` extension on `fileUrl`.
+- **`buildKeyframesBody`**: server-side mirror of the bootstrap-side keyframes builder. Pure function — no DB. SSR + smoke tests use it.
+- **Animation phase semantics**: `entry`/`exit`/`continuous`. The resolver emits one `keyframesCss` block + one `animationRule` per (element, phase). Bootstrap will combine these into chained `animation:` declarations gated by `body.cade-visible` / `body.cade-exiting` selectors per spec §6.
+
+### Stage 1 NOT shipping
+
+Per scope discipline (Stage 1 is backend-only):
+- Admin UI tabs (Stage 2/3/4 scope).
+- Overlay HTML `data-element-id` attribute pass + bootstrap script extension (Stage 2 scope per parent plan).
+- E2E tests for the editor flows (Stage 2/3/4 scope).
+- Visual-regression baseline for backward-compat invariant #1 (Stage 2 scope).

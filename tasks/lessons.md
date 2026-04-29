@@ -780,3 +780,25 @@ The duplicate match `63968865-7c26-4c23-a2ed-6bc6c20a314f` had `deleted_at = 202
 2. **Supabase strict types catch the mismatch only at build time.** When you change a `select(...)` clause that feeds a typed return path, ALWAYS run `npm run build` (not just `vitest run`) before declaring done. Vitest mocks are typed as `unknown`/the static `Row` type; build runs the full Supabase typegen-aware narrowing.
 3. **Pre-flight check:** after any `Edit` that touches `.from("squad_submissions").select(...)` (or any other table whose row shape is reused across multiple call sites in one file), grep for `.select(` in that file and eyeball every clause to confirm column-list parity. The same applies to `RETURNING` columns in raw SQL inserts.
 
+
+---
+
+**Date:** 2026-04-29
+**Context:** Wave 2 Stage 1 of Overlay Design Page v2 — building 8 migrations + 6 server modules. The seed migrations 7+8 wanted `INSERT ... ON CONFLICT (...) DO NOTHING` to be idempotent across re-runs, but the unique constraints on `overlay_text_elements` and `overlay_partner_logos` are PARTIAL (`unique (...) where deleted_at is null`) — Postgres requires `ON CONFLICT (col,col) WHERE <predicate>` to match the partial-index predicate exactly when the conflict target is a partial unique index.
+**Mistake:** Wrote the seeds as plain `ON CONFLICT (overlay_key, variant_id, element_id) DO NOTHING`. Postgres planner can't pick a partial unique index for an unqualified ON CONFLICT — would fail at apply-time with "there is no unique or exclusion constraint matching the ON CONFLICT specification." Caught it before push by re-reading the migration text against the existing `20260601000001_overlay_template_variants.sql` pattern (which has a NON-partial UNIQUE) and noticing the spec uses partial uniques.
+**Correction:** `ON CONFLICT (col,col) WHERE deleted_at IS NULL DO NOTHING` — the predicate must match the index's predicate verbatim. Applied to both seed migrations (7 + 8).
+**Rule for future:**
+1. **Partial unique index → ON CONFLICT must include `WHERE <predicate>` matching exactly.** Soft-delete tables use `unique (...) where deleted_at is null` so re-creating with the same business key after a soft-delete is allowed. Any ON CONFLICT clause against such a table MUST include `WHERE deleted_at IS NULL` or Postgres rejects with "no unique or exclusion constraint matching the ON CONFLICT specification."
+2. **Pre-flight for any new soft-delete table seed:** grep the table's CREATE migration for `where deleted_at is null` on the unique index; if present, the seed's ON CONFLICT clause MUST include the same predicate.
+3. **Existing precedent**: `20260601000001_overlay_template_variants.sql` uses NON-partial `unique (overlay_key, variant_id)` so its `ON CONFLICT (overlay_key, variant_id) DO NOTHING` works. New tables introduced for soft-delete-with-key-reuse MUST use the partial form + the matching ON CONFLICT predicate.
+
+---
+
+**Date:** 2026-04-29
+**Context:** Wave 2 Stage 1 — wrote a Vitest mock for `from('overlay_text_elements').update(...)` that handles both `update({deleted_at: <iso>}).eq().eq().eq().is(null)` (delete path) AND `update({deleted_at: null, updated_at: ...}).eq().eq().eq().not('deleted_at', 'is', null).select(...).single()` (restore path). Initial mock used a single `update` chain that didn't differentiate by payload. Test for `restoreTextElement` failed because the mock returned the bulk-update shape instead of the .select().single() shape.
+**Mistake:** Single-shape `update` mock broke the moment two distinct chains coexisted in the SUT. Treated `.update(payload)` as a black-box "first arg is irrelevant" when the SUT actually keys behavior off the payload (deleted_at null vs non-null).
+**Correction:** Extended the mock factory to inspect the `update` payload — if `deleted_at === null` it returns the restore-path chain (with `.not().select().single()`); otherwise it returns the soft-delete-path chain (with `.is().<await>`).
+**Rule for future:**
+1. **Vitest Supabase mocks must mirror call-shape, not just call-name.** When one server fn uses two distinct `.update()` chains (e.g. soft-delete vs restore), the mock MUST inspect the payload to pick which chain to return. Otherwise the test passes for one path and fails for the other and you debug a phantom bug.
+2. **Pre-flight for any module using `.update()` more than once:** read the SUT for every `.update(...)` call; if any two have different chained-method tails (`.is()` vs `.select().single()`), the mock factory needs branch logic.
+3. **Practical pattern**: `update: vi.fn((payload) => { if (payload.deleted_at === null) return restoreChain; return softDeleteChain; })` — branch off the most discriminating payload field.
