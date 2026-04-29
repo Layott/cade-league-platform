@@ -61,6 +61,28 @@ body { opacity: 1 !important; }   /* body itself never hidden — only its child
 }
 ```
 
+### 3a. Design system tokens (added 2026-04-29 Phase A)
+Full-canvas overlays MUST also support runtime overrides from the design system. Reference these via `var(--overlay-X, <fallback>)` so admins can theme via `/admin/broadcast/v2/design`:
+
+```css
+.bg-fill {
+  /* fallback to canonical background; design system can swap via admin upload */
+  background-image: var(--overlay-bg-image, url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png'));
+  background-size: cover;
+  background-position: center;
+}
+.brand-color { color: var(--overlay-accent-color, #6bcd06); }
+.title { font-family: var(--overlay-font-display, 'Agharti'), sans-serif; }
+```
+
+Available tokens (server-side seeded, see `apps/web/src/server/overlays/design/defaults.ts`):
+- `--overlay-bg-color` (color) · `--overlay-bg-image` (image, full-canvas only) · `--overlay-accent-color` (color)
+- `--overlay-text-color` (color) · `--overlay-font-display` (font) · `--overlay-font-body` (font)
+- `--overlay-scale` (number) · `--overlay-pos-x` (number) · `--overlay-pos-y` (number)
+- `--overlay-partner-strip-show` (boolean) · `--overlay-pattern` (enum) · `--overlay-row-highlight-count` (number)
+
+The bootstrap script that decodes `?tokens=<b64>&previewTokens=<b64>` from the iframe URL is auto-injected by the design-system pipeline — do NOT include it in your HTML mockup. The admin live-preview iframe + OBS browser sources both honour these tokens after Phase A.
+
 ## 4. Brand fonts (paste this @font-face block — paths are absolute, served from /public)
 ```css
 @font-face {
