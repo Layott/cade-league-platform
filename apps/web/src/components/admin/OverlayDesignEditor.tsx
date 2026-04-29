@@ -207,9 +207,17 @@ export default function OverlayDesignEditor({
             {overlayKey} · {variantId}
           </span>
         </div>
+        {/*
+         * 2026-04-29 — preview iframe must show the full 1920×1080 overlay
+         * canvas scaled to fit the container width. Previously hard-coded
+         * `scale(0.4)` truncated wide containers and over-shrank narrow ones;
+         * now `100cqi / 1920` (CSS container-query inline-size unit) computes
+         * scale dynamically so the canvas always fills the container exactly.
+         * `aspectRatio: 16/9` keeps height in lockstep with the scaled width.
+         */}
         <div
           className="relative w-full overflow-hidden rounded-sm border border-[var(--ink-4)] bg-black"
-          style={{ aspectRatio: "16 / 9" }}
+          style={{ aspectRatio: "16 / 9", containerType: "inline-size" }}
         >
           <iframe
             src={previewSrc}
@@ -218,7 +226,7 @@ export default function OverlayDesignEditor({
             style={{
               width: "1920px",
               height: "1080px",
-              transform: "scale(0.4)",
+              transform: "scale(calc(100cqi / 1920))",
               transformOrigin: "top left",
               border: "none",
             }}
@@ -227,7 +235,8 @@ export default function OverlayDesignEditor({
         </div>
         <p className="mt-2 text-xs text-[var(--chalk-3)]">
           Iframe renders /overlay/v2/{overlayKey}?demo=1 with your pending
-          tokens applied via the previewTokens param. Save to persist.
+          tokens applied via the previewTokens param. The 1920×1080 canvas
+          is scaled to fit this preview container at 16:9. Save to persist.
         </p>
       </div>
     </div>
