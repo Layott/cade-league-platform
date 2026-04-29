@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
   // on-stream. Production builds never show it anyway; this kills it in
   // dev too.
   devIndicators: false,
+  // Build trigger: 2026-04-29T23:50Z — bump to force Vercel rebuild after
+  // the vercel.json `Cache-Control: no-store` header change (the old
+  // `ignoreCommand` did not watch `vercel.json`, so a config-only commit
+  // was being skipped).
 };
 
 export default nextConfig;
