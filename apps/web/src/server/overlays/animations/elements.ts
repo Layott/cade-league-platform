@@ -241,31 +241,55 @@ export async function upsertAnimation(
   const { sanitizedKeyframes } = validateInput(input);
 
   const nowIso = new Date().toISOString();
-  const { data, error } = await sb
+  const row = {
+    overlay_key: input.overlayKey,
+    variant_id: input.variantId,
+    element_id: input.elementId,
+    anim_phase: input.animPhase,
+    enabled: input.enabled,
+    anim_type: input.animType,
+    duration_ms: input.durationMs,
+    delay_ms: input.delayMs,
+    easing: input.easing,
+    iteration_count: input.iterationCount,
+    custom_css_keyframes: sanitizedKeyframes,
+    set_by: actor.userId,
+    updated_at: nowIso,
+    deleted_at: null,
+  };
+
+  // SELECT-then-INSERT-or-UPDATE workaround for partial unique index
+  // `(overlay_key, variant_id, element_id, anim_phase) WHERE deleted_at
+  // IS NULL` — Supabase JS .upsert() throws PG 42P10 against partial
+  // constraints. Same pattern as setStripLayoutAction (b7b3deff).
+  const { data: existing } = await sb
     .from("overlay_element_animations")
-    .upsert(
-      {
-        overlay_key: input.overlayKey,
-        variant_id: input.variantId,
-        element_id: input.elementId,
-        anim_phase: input.animPhase,
-        enabled: input.enabled,
-        anim_type: input.animType,
-        duration_ms: input.durationMs,
-        delay_ms: input.delayMs,
-        easing: input.easing,
-        iteration_count: input.iterationCount,
-        custom_css_keyframes: sanitizedKeyframes,
-        set_by: actor.userId,
-        updated_at: nowIso,
-        deleted_at: null,
-      },
-      { onConflict: "overlay_key,variant_id,element_id,anim_phase" },
-    )
-    .select(SELECT_COLS)
-    .single();
-  if (error) throw new Error(`upsertAnimation: ${error.message}`);
-  return toAnimation(data as Row);
+    .select("id")
+    .eq("overlay_key", input.overlayKey)
+    .eq("variant_id", input.variantId)
+    .eq("element_id", input.elementId)
+    .eq("anim_phase", input.animPhase)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await sb
+      .from("overlay_element_animations")
+      .update(row)
+      .eq("id", (existing as { id: string }).id)
+      .select(SELECT_COLS)
+      .single();
+    if (error) throw new Error(`upsertAnimation (update): ${error.message}`);
+    return toAnimation(data as Row);
+  } else {
+    const { data, error } = await sb
+      .from("overlay_element_animations")
+      .insert(row)
+      .select(SELECT_COLS)
+      .single();
+    if (error) throw new Error(`upsertAnimation (insert): ${error.message}`);
+    return toAnimation(data as Row);
+  }
 }
 
 export async function deleteAnimation(

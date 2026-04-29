@@ -92,6 +92,10 @@ function rowsTable(rows: Row[]) {
   const upsert = vi.fn(() => ({
     select: vi.fn(() => ({ single: upsertSingle })),
   }));
+  // update() supports two chains:
+  //   1. .update().eq().eq().eq().eq().is() — soft-delete in deleteAnimation
+  //   2. .update().eq().select().single() — upsertAnimation update branch
+  //      (post partial-unique-index workaround b7b3deff pattern)
   const update = vi.fn(() => ({
     eq: vi.fn(() => ({
       eq: vi.fn(() => ({
@@ -101,12 +105,17 @@ function rowsTable(rows: Row[]) {
           })),
         })),
       })),
+      select: vi.fn(() => ({ single: upsertSingle })),
     })),
+  }));
+  const insert = vi.fn(() => ({
+    select: vi.fn(() => ({ single: upsertSingle })),
   }));
   return {
     select,
     upsert,
     update,
+    insert,
     _spies: { isResult, maybeSingleResult, upsertSingle, updateChain },
   };
 }
@@ -340,7 +349,10 @@ describe("upsertAnimation — perm + validation", () => {
     const sb = mkSb([mkRow()]);
     const out = await upsertAnimation(sb as never, ACTOR, VALID_INPUT);
     expect(out.elementId).toBe("title");
-    expect(sb._table.upsert).toHaveBeenCalled();
+    // Post partial-unique-index workaround: upsertAnimation does
+    // SELECT-then-INSERT-or-UPDATE (b7b3deff pattern), not .upsert().
+    // mkSb([mkRow()]) returns existing row → UPDATE branch.
+    expect(sb._table.update).toHaveBeenCalled();
   });
 
   it("sanitizes + persists custom-css", async () => {
