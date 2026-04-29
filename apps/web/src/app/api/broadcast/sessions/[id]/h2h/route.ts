@@ -128,7 +128,19 @@ export async function GET(
   }
 
   try {
-    const cards = await buildH2HCards(sb, md.season_id, ids);
+    const rawCards = await buildH2HCards(sb, md.season_id, ids);
+    // 2026-04-28 fix (Bug #14): `buildH2HCards` returns `winProbPct` as a
+    // FRACTION in [0..1] (e.g. 0.456). The browser-source overlay HTML
+    // (`/overlay/v2/04-h2h-2`, `/05`, `/06`) does `Math.round(value) + '%'`
+    // which floors anything < 0.5 to "0%". Multiply by 100 + round to
+    // integer at the wire boundary so every consumer of the v2 H2H feed
+    // gets the same shape: integer percent in [0..100]. The admin
+    // H2HComparisonCard is updated in the same patch to consume integer
+    // percent — see `H2HComparisonCard.tsx`.
+    const cards = rawCards.map((c) => ({
+      ...c,
+      winProbPct: Math.round(c.winProbPct * 100),
+    }));
     return NextResponse.json(
       {
         cards,

@@ -24,7 +24,13 @@ export type H2HCard = {
   ga: number;
   gd: number;
   pts: number;
-  /** Win probability against the AVERAGE of the other selected players. */
+  /**
+   * Win probability against the AVERAGE of the other selected players.
+   * Integer percent in [0..100] — same shape as the browser-source
+   * overlay payload (`/api/broadcast/sessions/[id]/h2h` +
+   * `/api/tournament/h2h`). 2026-04-28 fix (Bug #14): was previously a
+   * fraction in [0..1]; multiplied by 100 at the endpoint layer.
+   */
   winProbPct: number;
 };
 
@@ -82,13 +88,13 @@ export function H2HComparisonCard({ card }: { card: H2HCard }) {
             className="font-mono text-[14px] font-bold tabular text-[var(--primary)]"
             data-testid="win-prob-pct"
           >
-            {(card.winProbPct * 100).toFixed(1)}%
+            {card.winProbPct.toFixed(1)}%
           </span>
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-[var(--ink-3)]">
           <div
             className="h-full bg-[var(--primary)]"
-            style={{ width: `${Math.min(100, Math.max(0, card.winProbPct * 100))}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, card.winProbPct))}%` }}
           />
         </div>
       </footer>

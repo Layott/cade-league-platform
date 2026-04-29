@@ -204,6 +204,9 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         matchDay: { id: MATCH_DAY_ID, season_id: SEASON_ID },
       }),
     );
+    // 2026-04-28 (Bug #14): `buildH2HCards` returns `winProbPct` as a
+    // FRACTION in [0..1] (e.g. 0.65). The route multiplies by 100 +
+    // rounds at the wire boundary so the response is integer percent.
     buildH2HCardsMock.mockResolvedValue([
       {
         playerId: PLAYER_A,
@@ -218,7 +221,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         ga: 3,
         gd: 9,
         pts: 13,
-        winProbPct: 65,
+        winProbPct: 0.65,
       },
     ]);
 
@@ -231,6 +234,8 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
     expect(body.channel).toBe(`public:standings:${SEASON_ID}`);
     expect(body.cards).toHaveLength(1);
     expect(body.cards[0].name).toBe("FARUK");
+    // Wire-shape contract: integer percent in [0..100] (NOT a fraction).
+    expect(body.cards[0].winProbPct).toBe(65);
     expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
       PLAYER_A,
       PLAYER_B,
@@ -329,6 +334,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         ],
       }),
     );
+    // Mock returns FRACTIONS in [0..1]; route converts to integer percent.
     buildH2HCardsMock.mockResolvedValue([
       {
         playerId: PLAYER_A,
@@ -343,7 +349,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         ga: 3,
         gd: 9,
         pts: 13,
-        winProbPct: 65,
+        winProbPct: 0.65,
       },
       {
         playerId: PLAYER_B,
@@ -358,7 +364,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         ga: 6,
         gd: 3,
         pts: 9,
-        winProbPct: 35,
+        winProbPct: 0.35,
       },
     ]);
 
@@ -368,6 +374,8 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.cards).toHaveLength(2);
+    expect(body.cards[0].winProbPct).toBe(65);
+    expect(body.cards[1].winProbPct).toBe(35);
     expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
       PLAYER_A,
       PLAYER_B,
@@ -419,6 +427,63 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
       PLAYER_A,
       PLAYER_B,
     ]);
+  });
+
+  it("Bug-14 regression — multiplies fraction winProbPct by 100 + rounds to integer percent", async () => {
+    // Pre-fix symptom: `buildH2HCards` returns 0.456 (fraction); the
+    // overlay HTML does `Math.round(value) + '%'` → renders "0%" for any
+    // value < 0.5. Now the endpoint multiplies + rounds so the wire
+    // contract is integer percent in [0..100].
+    checkViewTokenMock.mockResolvedValue({ ok: true, response: null });
+    getServiceRoleSupabaseMock.mockReturnValue(
+      mkSb({
+        session: { id: SESSION_ID, match_day_id: MATCH_DAY_ID },
+        matchDay: { id: MATCH_DAY_ID, season_id: SEASON_ID },
+      }),
+    );
+    buildH2HCardsMock.mockResolvedValue([
+      {
+        playerId: PLAYER_A,
+        name: "X",
+        gamerTag: "X",
+        pos: 9,
+        played: 1,
+        wins: 0,
+        draws: 0,
+        losses: 1,
+        gf: 0,
+        ga: 1,
+        gd: -1,
+        pts: 0,
+        winProbPct: 0.456, // fraction → must arrive at the wire as 46.
+      },
+      {
+        playerId: PLAYER_B,
+        name: "Y",
+        gamerTag: "Y",
+        pos: 4,
+        played: 1,
+        wins: 1,
+        draws: 0,
+        losses: 0,
+        gf: 1,
+        ga: 0,
+        gd: 1,
+        pts: 3,
+        winProbPct: 0.875, // fraction → must arrive at the wire as 88.
+      },
+    ]);
+
+    const res = await GET(mkReq({ ids: `${PLAYER_A},${PLAYER_B}` }), {
+      params: Promise.resolve({ id: SESSION_ID }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.cards[0].winProbPct).toBe(46);
+    expect(body.cards[1].winProbPct).toBe(88);
+    // Other fields untouched.
+    expect(body.cards[0].played).toBe(1);
+    expect(body.cards[0].pts).toBe(0);
   });
 
   it("returns 500 when buildH2HCards throws", async () => {

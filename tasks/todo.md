@@ -938,3 +938,58 @@ Two small bug fixes from the verification pass. Both surgical, single commit, no
 ### Out-of-scope changes left in working tree
 
 The repo had pre-existing modifications from another agent on H2H components + API routes (`H2HComparisonCard.tsx`, `api/broadcast/sessions/[id]/h2h/route.ts`, etc.). Those are NOT in my commit — only the 4 bug-fix files staged.
+
+
+## Bugs #14 + #24 — review (2026-04-28)
+
+### Bug #14 — winProbPct fraction vs percent mismatch
+- **Symptom:** `/api/broadcast/sessions/[id]/h2h` returned `winProbPct: 0.456` (fraction). Overlay HTMLs `04-h2h-2`, `05-h2h-3`, `06-h2h-5` do `Math.round(value) + '%'` → rendered "0%" for any value < 0.5. Admin H2H Comparison Card silently masked the bug by multiplying by 100 in render.
+- **Root cause:** `apps/web/src/server/standings/h2h_view.ts` `buildH2HCards` returns `winProbPct` as fraction in [0..1]. Two endpoints (`/api/broadcast/sessions/[id]/h2h` + `/api/tournament/h2h`) passed it through unchanged, but consumers (overlay HTML vs admin card) disagreed on the unit.
+- **Fix:** unified the wire shape — both endpoints now multiply by 100 + round to integer in `[0..100]`. The calculator (`buildH2HCards`) keeps its fraction shape; conversion happens at the wire boundary so the same unit reaches every consumer.
+  - `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.ts` — post-process `cards` with `Math.round(c.winProbPct * 100)`.
+  - `apps/web/src/app/api/tournament/h2h/route.ts` — same conversion.
+  - `apps/web/src/app/admin/tournament/_components/H2HComparisonCard.tsx` — drop the `* 100` (now consumes integer percent directly). Updated JSDoc on the type.
+- **Tests:**
+  - `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.test.ts` — added "Bug-14 regression" case (0.456 → 46, 0.875 → 88) + updated existing happy-path mocks to use fraction inputs + assert integer outputs.
+  - `apps/web/src/app/api/tournament/h2h/route.test.ts` — NEW file (route had zero tests). Mirrors the broadcast route contract — 401 / 403 / 400 / no-active-season / Bug-14 conversion / 500 paths.
+  - `apps/web/src/app/admin/tournament/_components/H2HComparisonCard.test.tsx` — updated `winProbPct: 0.624` → `winProbPct: 62.4` to match the new wire shape.
+
+### Bug #24 — `/api/broadcast/v2/sessions/[id]/orgs` empty players + null logos
+- **Symptom:** prod endpoint returned 8 orgs but `players: []` + `logoUrl: null` for ALL despite 13 players assigned to orgs visible at `/admin/people/players`. Verification report flagged it as P1 in `tasks/verification-2026-04-29-comprehensive.md`.
+- **Root cause:** the `players` `.select()` referenced THREE non-existent columns:
+  - `org_id` — actual canonical column is `organization_id` (added by migration `20260428000204_players_org_columns.sql`).
+  - `display_name` — does NOT exist on `public.players`; lives on `public.users`. Other server modules embed it via `users:users!players_user_id_fkey ( display_name )`.
+  - `avatar_url` — no such column on either table; player photos are derived from `gamer_tag` via the static manifest at `apps/web/src/lib/player-photos.ts`.
+  The Supabase JS client surfaces the underlying 42703 error in `error`, but the route was wrapped in a bare `try { ... } catch {}` (no `error` check after `.select()`), so destructured `data` was always null + the chain returned `players: []` for every org. The org logos may have been intermittently null because the orgs select itself was working — `logoUrl: null` is also reported for orgs that legitimately have no `logo_url` set yet.
+- **Fix:** `apps/web/src/app/api/broadcast/v2/sessions/[id]/orgs/route.ts`:
+  - Filter on `organization_id` (NOT `org_id`).
+  - Embed `users:users!players_user_id_fkey ( display_name )` for the display name (matches `server/players/index.ts` pattern).
+  - Drop `avatar_url` from the select; resolve via `getPlayerAvatarUrl(p.gamer_tag)` (returns the static manifest URL `/overlays/v2/_assets/players/processed/<slug>/headshot_01_nobg.png`).
+  - Added explicit `error` checks + console-error logging on both reads so future column-name regressions surface in dev logs instead of silently returning `[]`.
+- **Tests:**
+  - `apps/web/src/app/api/broadcast/v2/sessions/[id]/orgs/route.test.ts` — NEW file (route had zero tests). 9 cases:
+    - 401 view-token gate fail; 404 session not found; 404 match_day not found; empty orgs when table is dormant.
+    - **Bug-24 regression lock:** the players `.select()` MUST contain `organization_id` + `users!players_user_id_fkey`, MUST NOT contain literal `org_id` token or `avatar_url`. Filter `.in()` MUST be on column `organization_id`.
+    - Populated orgs + players happy path with avatar URL derived from gamer_tag.
+    - Fallback to gamer_tag when `users.display_name` is null.
+    - Degraded mode when players read errors out — orgs returned with `players: []` so the overlay can render its own placeholder copy.
+    - Orgs with zero players still appear in the response.
+
+### Constraints respected
+- DID NOT touch any overlay HTML (UX overhaul `b80ac174` preserved).
+- DID NOT touch `OverlayDesignEditor.tsx`.
+- Edited only the 4 explicit files + 2 new test files.
+
+### Out of scope (flagged for follow-up)
+- `apps/web/src/app/api/broadcast/v2/sessions/[id]/coaches/route.ts` has the SAME bug shape — it selects `display_name`, `avatar_url`, and uses `coach_id` filter on `players`. `coach_id` is the canonical column (added by `20260428000204`), so that part is OK; but `display_name` + `avatar_url` are wrong columns there too. NOT fixed in this commit (out of scope per brief). Recommend a follow-up: same pattern (embed `users:users!players_user_id_fkey ( display_name )` + `getPlayerAvatarUrl(gamer_tag)`).
+- `/api/tournament/h2h` had zero tests before this commit. The new `route.test.ts` covers the auth + Bug-14 paths. A broader test (full happy path with realistic shape) can be added later.
+
+### Verification
+- `npm run test` — 200 files, 2154 tests pass (was 200/2143 before; +9 orgs tests +6 tournament/h2h tests +1 broadcast h2h regression test = 16 net new tests, partially offset by replacing assertions in existing tests).
+- `npm run lint` — 0 errors. None of the 16 pre-existing warnings touch the edited files.
+- `npm run build` — Compiled successfully in 8.0s. No type errors. No new dynamic-rendering warnings.
+- Prod verification (post-deploy):
+  - `curl https://cade-league.vercel.app/api/broadcast/sessions/8018f9e3-2018-4532-a6c0-6418463be0db/h2h?ids=<a>,<b>&t=<view_token>` → expect `cards[].winProbPct` ∈ {0..100} integers.
+  - `curl https://cade-league.vercel.app/api/broadcast/v2/sessions/8018f9e3-2018-4532-a6c0-6418463be0db/orgs?t=<view_token>` → expect `payload.orgs[].players` populated + `logoUrl` non-null for orgs that have a logo.
+  - Visit `/overlay/v2/04-h2h-2?session=...` + trigger from broadcast control panel → win-prob displays correct integer percent (not "0%").
+  - Visit `/overlay/v2/15-orgs?session=...` → player chips render in each org card (not empty).

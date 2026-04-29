@@ -12,6 +12,9 @@ vi.mock("@/lib/player-photos", () => ({
 
 afterEach(() => cleanup());
 
+// 2026-04-28 (Bug #14): winProbPct is now an INTEGER PERCENT in [0..100]
+// — endpoint pre-multiplies by 100 + rounds. Was previously a fraction
+// (0..1). The card just renders `.toFixed(1)%` directly.
 const CARD: H2HCard = {
   playerId: "p1",
   name: "Alpha",
@@ -25,7 +28,7 @@ const CARD: H2HCard = {
   ga: 6,
   gd: 6,
   pts: 10,
-  winProbPct: 0.624,
+  winProbPct: 62.4,
 };
 
 describe("H2HComparisonCard", () => {

@@ -870,3 +870,34 @@ The duplicate match `63968865-7c26-4c23-a2ed-6bc6c20a314f` had `deleted_at = 202
 **Rule for future:**
 1. **Every URL-param channel needs a "skip if empty" guard at the encoder boundary** — empty maps shouldn't write empty-but-non-trivial params. Otherwise the iframe URL drifts on every overlay+variant combination + breaks any pixel-diff visual-regression baseline.
 2. **The bootstrap script is the LAST defence; the encoder is the FIRST.** If the encoder fires on empty payloads, the bootstrap will receive + decode + skip — but the URL is still drift-y. Fix at the encoder.
+
+
+---
+
+**Date:** 2026-04-28
+**Context:** User reported two backend bugs simultaneously.
+- Bug #14: H2H overlays (`04-h2h-2` / `05` / `06`) rendered "0%" for win-probability on every trigger. The endpoint `/api/broadcast/sessions/[id]/h2h` returned `winProbPct: 0.456` (fraction). The overlay HTML does `Math.round(value) + '%'` → for any value < 0.5 it rounded to 0.
+- Bug #24: `/api/broadcast/v2/sessions/[id]/orgs` returned 8 orgs but `players: []` + `logoUrl: null` for ALL despite 13 active players visible at `/admin/people/players`. Verification report flagged it P1.
+
+**Mistake:**
+1. **Bug #14 — wire shape unit drift between consumers.** `buildH2HCards` returns `winProbPct` in [0..1] (fraction). The admin H2HComparisonCard *also* expected fraction (multiplied by 100 in render). The overlay HTML expected integer percent (0..100). Two consumers, two different units, one shared producer — classic inverted-coupling bug. The unit was implicit in JSDoc (`% number`) which is ambiguous.
+2. **Bug #24 — wrong column names + bare catch hiding the error.** The `players` `.select()` referenced THREE columns that don't exist on the table:
+   - `org_id` (canonical column is `organization_id`, added by migration `20260428000204_players_org_columns.sql`)
+   - `display_name` (lives on `users`, not `players` — must be embedded via `users:users!players_user_id_fkey ( display_name )`)
+   - `avatar_url` (no such column anywhere — photos are derived from `gamer_tag` via the static manifest at `lib/player-photos.ts`)
+   The Supabase JS client surfaces `42703 column does not exist` in `error`. The route was wrapped in a bare `try { ... } catch {}` (no error check after `.select()`), so destructured `data` was always null + the chain returned `players: []` for every org silently. The unit test for this route was MISSING entirely (zero tests).
+
+**Correction (commit TBD this session):**
+- **Bug #14:** Multiply by 100 + `Math.round` at the wire boundary in BOTH endpoints (`/api/broadcast/sessions/[id]/h2h/route.ts` + `/api/tournament/h2h/route.ts`). Update admin `H2HComparisonCard.tsx` to consume integer percent (drop the `* 100` from render). The calculator (`buildH2HCards`) keeps fraction shape internally — conversion happens at the wire only. JSDoc on the H2HCard type explicitly states "Integer percent in [0..100]".
+- **Bug #24:** Fix the `players` `.select()` to:
+  - Use `organization_id` filter (NOT `org_id`).
+  - Embed `users:users!players_user_id_fkey ( display_name )` for the display name.
+  - Drop `avatar_url` from select; derive avatar via `getPlayerAvatarUrl(p.gamer_tag)`.
+  Add explicit `if (orgErr) console.error(...)` + `if (playerErr) console.error(...)` BEFORE the bare `catch` so future column-name regressions surface in logs. Test mocks capture the exact `.select()` string + `.in()` args so the canonical column names are LOCKED — a future regression to `org_id` will fail unit tests.
+
+**Rule for future:**
+1. **Wire-shape units MUST be locked at the endpoint boundary, NOT at consumers.** When a server module returns a value in one unit (fraction) and ANY consumer renders in another (percent), normalize at the wire — multiply, round, etc. — so every consumer sees the same shape. Document the unit in the JSDoc explicitly: "Integer percent in [0..100]" not "% number". Add an integration test that asserts `body.cards[0].winProbPct` is an integer in the expected range — those tests catch unit drift before deploy.
+2. **NEVER write `try { ... } catch {}` around a Supabase `.select()` without checking `error` first.** The Supabase JS client returns `{ data, error }` and a missing column / RLS denial / network error all surface in `error` while `data` is null. The bare catch only fires on thrown exceptions (network, JSON parse) — schema errors are silent. ALWAYS log `error?.code` + `error?.message` so they're visible in Vercel logs. When migrating, prefer `if (error) throw error;` (loud failure) over `try { ... } catch {}` (silent failure).
+3. **Every API route MUST have a unit test that locks the column-name contract.** Use `vi.fn()` to capture the args passed to `.select()` + `.in()` + `.eq()` and assert the canonical column names are present. Pure mocked-supabase tests don't catch column existence (they pass mock data unconditionally), but they DO catch when an agent renames a column reference. The route test pattern: `expect(playersInArg).toHaveBeenCalledWith("organization_id", [orgId])`.
+4. **Pre-flight grep for the column name in migrations BEFORE writing a new `.select()` line.** Cmd: `grep -rn "alter table public\.<table>" supabase/migrations | grep -E "(add column|create table)"`. If the column wasn't added in a migration, it doesn't exist in cloud — even if your IDE autocomplete thinks otherwise. The `players` table did NOT have `display_name` / `avatar_url` / `org_id`, but a TypeScript `.select<string>()` accepts any literal — TS is no help here.
+5. **Verification reports flag bugs as P0/P1/P2 — when one shows up, fix at the same priority.** Bug #24 was caught by the comprehensive verification pass. Skipping these reports because "the build passes" is exactly how silent-failure bugs reach prod. The verification report file is the authoritative bug list, not just the build output.

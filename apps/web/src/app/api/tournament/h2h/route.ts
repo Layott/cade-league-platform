@@ -66,7 +66,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const cards = await buildH2HCards(svc, season.id, ids);
+    const rawCards = await buildH2HCards(svc, season.id, ids);
+    // 2026-04-28 fix (Bug #14): unify wire shape with
+    // `/api/broadcast/sessions/[id]/h2h` — return `winProbPct` as an
+    // integer percent in [0..100]. The admin H2HComparisonCard reads
+    // this same payload and is updated to consume integer percent.
+    const cards = rawCards.map((c) => ({
+      ...c,
+      winProbPct: Math.round(c.winProbPct * 100),
+    }));
     return NextResponse.json(
       { cards, seasonId: season.id },
       { headers: { "Cache-Control": "no-store" } },
