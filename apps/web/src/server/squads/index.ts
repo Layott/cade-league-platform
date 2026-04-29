@@ -49,9 +49,15 @@ export {
   getSubmissionWithItems,
   getApprovedSubmissionForPlayer,
   getCurrentWeekSubmissionForPlayer,
+  listSubmissionsForPlayerInSeason,
+  getSubmissionForPlayerAndMatchDay,
   listChangeAuthorizingRefs,
 } from "./list";
-export type { SubmissionRow, SquadItemRow } from "./list";
+export type {
+  SubmissionRow,
+  SquadItemRow,
+  PlayerSubmissionSummary,
+} from "./list";
 export {
   evaluateRules,
 } from "./validate";

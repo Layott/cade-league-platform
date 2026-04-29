@@ -476,3 +476,19 @@ So I extended Option A: the ambient resolver picks the live session with the mos
 
 **Constraints honored:** No edits to `/api/broadcast/sessions/[id]/h2h/route.ts`, `top_scorers_data.ts`, `OverlayDataInjector.tsx`, `defaults.ts`, or `14-top-scorers/index.html`. Only touched: `active_session.ts` + its test. The match-scores-day endpoint at `/api/broadcast/sessions/[id]/match-scores-day/route.ts` is unchanged — the bug was upstream of it (wrong session id flowing in).
 
+## 2026-04-29 — Player squad — match-day picker
+
+**User report (~15:50 WAT):** "Add a fix on the player login (Faruk, probably the same for all). Players need to be able to select a particular match day to either view the squad they submitted or want to submit a squad for."
+
+### Plan
+
+- [x] Read repo state. `/player/squad` currently only shows admin-force-opened MDs as CTAs. Cannot view past submissions or browse all upcoming MDs.
+- [x] Server: extend `apps/web/src/server/squads/list.ts` with `listSubmissionsForPlayerInSeason(sb, playerId, seasonId)` returning a Map keyed by `match_day_id` (with synthetic key fallback for legacy weekly rows that have null `match_day_id`).
+- [x] Page: rewrite `/player/squad/page.tsx` to ALWAYS list every match day for the active season; classify each as `submitted` / `open` / `closed` / `upcoming`; respect `?matchDay=<id>` to scope to one MD.
+- [x] Component: add `apps/web/src/components/player/SquadMatchDayPicker.tsx` — table/list grouped by Past / This week / Upcoming, status pill + CTA per row.
+- [x] Admin parity: surface `match_day_id` on `/admin/squads/[id]` page header + add a "Match day" column on `/admin/squads` list when set. Keep weekly view as default — match_day_id is OPTIONAL on submissions and pre-existing rows are null.
+- [x] Tests: unit test `listSubmissionsForPlayerInSeason` + RTL test for `SquadMatchDayPicker` (each status renders correct CTA).
+- [x] Tests: extend `apps/web/tests/e2e/squad-picker.spec.ts` (or add new `squad-match-day-picker.spec.ts`) — login as player, see picker, click a past MD with submission, see SquadPitchView; click closed MD without submission, see "Window closed" card.
+- [x] Verify locally — `npm run test --run`, `npm run lint`, `npm run build`.
+- [x] Commit + push + Vercel verify with Claude-in-Chrome.
+

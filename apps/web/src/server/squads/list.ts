@@ -10,6 +10,11 @@ export type SubmissionRow = {
   season_id: string;
   player_id: string;
   week_start_date: string;
+  // Plan 56 — non-null when the submission was filed against an
+  // admin-opened per-match-day window. Plan 10 weekly submissions
+  // leave it null. Surfaced on /admin/squads + /admin/squads/[id] so
+  // the admin can correlate with the match day's per-MD window panel.
+  match_day_id?: string | null;
   futbin_screenshot_path: string;
   submitted_at: string;
   validation_status: "pending" | "approved" | "rejected";
@@ -63,7 +68,8 @@ export async function listSubmissionsForWeek(
   let q = sb
     .from("squad_submissions")
     .select(
-      `id, season_id, player_id, week_start_date, futbin_screenshot_path,
+      `id, season_id, player_id, week_start_date, match_day_id,
+       futbin_screenshot_path,
        submitted_at, validation_status, validated_by, validated_at,
        rejection_reason, notes,
        player:player_id (id, gamer_tag, users:users!players_user_id_fkey (display_name))`,
@@ -105,7 +111,8 @@ export async function getSubmissionWithItems(
   const { data: sub, error: sErr } = await sb
     .from("squad_submissions")
     .select(
-      `id, season_id, player_id, week_start_date, futbin_screenshot_path,
+      `id, season_id, player_id, week_start_date, match_day_id,
+       futbin_screenshot_path,
        submitted_at, validation_status, validated_by, validated_at,
        rejection_reason, notes,
        player:player_id (id, gamer_tag, users:users!players_user_id_fkey (display_name))`,
@@ -190,7 +197,8 @@ export async function getApprovedSubmissionForPlayer(
   const { data: sub, error } = await sb
     .from("squad_submissions")
     .select(
-      `id, season_id, player_id, week_start_date, futbin_screenshot_path,
+      `id, season_id, player_id, week_start_date, match_day_id,
+       futbin_screenshot_path,
        submitted_at, validation_status, validated_by, validated_at,
        rejection_reason, notes`,
     )
@@ -222,6 +230,163 @@ export async function getApprovedSubmissionForPlayer(
   };
 }
 
+/**
+ * Plan 56 — list every live submission a player has filed in the given season,
+ * keyed by `match_day_id`. Used by `/player/squad` to render the match-day
+ * picker (one row per match day showing whether the player submitted yet).
+ *
+ * Legacy weekly submissions (filed before the per-match-day path landed in
+ * Plan 11) carry a NULL `match_day_id`. We surface those under a synthetic
+ * key prefix `week:<YYYY-MM-DD>` so the page can still link them to the
+ * picker row whose `match_date`'s Thursday-anchor matches the legacy
+ * `week_start_date`.
+ *
+ * The starting-XI items are NOT loaded here — the per-MD `?matchDay=<id>`
+ * detail view re-loads them via `getCurrentWeekSubmissionForPlayer` (or a
+ * future `getSubmissionForPlayerAndMatchDay`). Listing all 13×items rows for
+ * an entire season would balloon the page payload. We only carry the
+ * submission row's id + status + submitted_at + match_day_id + week
+ * anchor — enough to render status pills + link to the detail view.
+ */
+export type PlayerSubmissionSummary = {
+  submissionId: string;
+  matchDayId: string | null;
+  weekStartDate: string;
+  submittedAt: string;
+  validationStatus: "pending" | "approved" | "rejected";
+  rejectionReason: string | null;
+};
+
+export async function listSubmissionsForPlayerInSeason(
+  sb: SupabaseClient,
+  playerId: string,
+  seasonId: string,
+): Promise<Map<string, PlayerSubmissionSummary>> {
+  const { data, error } = await sb
+    .from("squad_submissions")
+    .select(
+      `id, match_day_id, week_start_date, submitted_at,
+       validation_status, rejection_reason`,
+    )
+    .eq("player_id", playerId)
+    .eq("season_id", seasonId)
+    .is("deleted_at", null)
+    .order("submitted_at", { ascending: false });
+  if (error) {
+    throw new Error(`listSubmissionsForPlayerInSeason: ${error.message}`);
+  }
+  type Row = {
+    id: string;
+    match_day_id: string | null;
+    week_start_date: string;
+    submitted_at: string;
+    validation_status: "pending" | "approved" | "rejected";
+    rejection_reason: string | null;
+  };
+  const out = new Map<string, PlayerSubmissionSummary>();
+  for (const r of (data ?? []) as Row[]) {
+    const summary: PlayerSubmissionSummary = {
+      submissionId: r.id,
+      matchDayId: r.match_day_id,
+      weekStartDate: r.week_start_date,
+      submittedAt: r.submitted_at,
+      validationStatus: r.validation_status,
+      rejectionReason: r.rejection_reason,
+    };
+    // Primary key: match_day_id when set, else synthetic week anchor. The
+    // page-level resolver then maps each match day to either its direct
+    // match_day_id key OR (if the row is legacy weekly) the week-anchor key
+    // derived from the match day's date.
+    const key = r.match_day_id ?? `week:${r.week_start_date}`;
+    // First write wins (rows are ordered submitted_at DESC, so the newest
+    // submission for the key takes precedence when multiple soft-deletes
+    // shake out in unexpected ways).
+    if (!out.has(key)) out.set(key, summary);
+  }
+  return out;
+}
+
+/**
+ * Plan 56 — load a single submission for `(player, match_day)` with items.
+ * Used by the per-MD detail view on `/player/squad?matchDay=<id>`.
+ *
+ * Falls back to the legacy week-anchor lookup when no row is stamped with
+ * the given `matchDayId` — older submissions filed via the weekly path
+ * have `match_day_id = NULL`. Caller passes the match day's
+ * `match_date` so we can derive the Thursday anchor.
+ */
+export async function getSubmissionForPlayerAndMatchDay(
+  sb: SupabaseClient,
+  playerId: string,
+  matchDayId: string,
+  weekStart: string,
+): Promise<{ submission: SubmissionRow; items: SquadItemRow[] } | null> {
+  // 1. Direct match on match_day_id (preferred).
+  const direct = await sb
+    .from("squad_submissions")
+    .select(
+      `id, season_id, player_id, week_start_date, match_day_id,
+       futbin_screenshot_path,
+       submitted_at, validation_status, validated_by, validated_at,
+       rejection_reason, notes`,
+    )
+    .eq("player_id", playerId)
+    .eq("match_day_id", matchDayId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (direct.error) {
+    throw new Error(`getSubmissionForPlayerAndMatchDay: ${direct.error.message}`);
+  }
+  let sub = direct.data;
+
+  // 2. Legacy fallback — older weekly submissions have no match_day_id.
+  //    Match by week anchor. Only used when the direct lookup whiffs.
+  if (!sub) {
+    const fallback = await sb
+      .from("squad_submissions")
+      .select(
+        `id, season_id, player_id, week_start_date, match_day_id,
+         futbin_screenshot_path,
+         submitted_at, validation_status, validated_by, validated_at,
+         rejection_reason, notes`,
+      )
+      .eq("player_id", playerId)
+      .eq("week_start_date", weekStart)
+      .is("match_day_id", null)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (fallback.error) {
+      throw new Error(
+        `getSubmissionForPlayerAndMatchDay (legacy): ${fallback.error.message}`,
+      );
+    }
+    sub = fallback.data;
+  }
+  if (!sub) return null;
+
+  const { data: items, error: iErr } = await sb
+    .from("squad_player_items")
+    .select(
+      `id, submission_id, name, rating, position, value, item_type,
+       nationality_flag, slot_index, resolved_fc_player_id,
+       fc_player:resolved_fc_player_id (
+         id, name, rating, position, item_type, nation_iso, nation, attributes
+       )`,
+    )
+    .eq("submission_id", sub.id)
+    .is("deleted_at", null)
+    .order("slot_index", { ascending: true });
+  if (iErr) {
+    throw new Error(
+      `getSubmissionForPlayerAndMatchDay items: ${iErr.message}`,
+    );
+  }
+  return {
+    submission: sub as unknown as SubmissionRow,
+    items: normalizeItems(items),
+  };
+}
+
 export async function getCurrentWeekSubmissionForPlayer(
   sb: SupabaseClient,
   playerId: string,
@@ -230,7 +395,8 @@ export async function getCurrentWeekSubmissionForPlayer(
   const { data: sub, error } = await sb
     .from("squad_submissions")
     .select(
-      `id, season_id, player_id, week_start_date, futbin_screenshot_path,
+      `id, season_id, player_id, week_start_date, match_day_id,
+       futbin_screenshot_path,
        submitted_at, validation_status, validated_by, validated_at,
        rejection_reason, notes`,
     )

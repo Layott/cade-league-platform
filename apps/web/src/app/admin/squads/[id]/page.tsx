@@ -101,6 +101,26 @@ export default async function AdminSquadDetailPage({
     screenshotUrl = null;
   }
 
+  // Plan 56 — when the submission is stamped with a match_day_id, fetch
+  // the match day's date+venue so the header can label it. Player↔admin
+  // parity rule: the player's `/player/squad?matchDay=<id>` page surfaces
+  // this match-day context — admin must too.
+  let matchDayLabel: { matchDate: string; venueName: string } | null = null;
+  if (submission.match_day_id) {
+    const { data: md } = await sb
+      .from("match_days")
+      .select("match_date, venue_name")
+      .eq("id", submission.match_day_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (md) {
+      matchDayLabel = {
+        matchDate: md.match_date,
+        venueName: md.venue_name,
+      };
+    }
+  }
+
   // Plan 10 extension — load the live Friday change request (if any) so
   // admins can see the player's proposed formation/slot/swap delta.
   const { data: changeRow } = await sb
@@ -124,9 +144,13 @@ export default async function AdminSquadDetailPage({
   return (
     <div className="space-y-8">
       <SectionHeader
-        eyebrow={`Week of ${submission.week_start_date}`}
+        eyebrow={
+          matchDayLabel
+            ? `Match day · ${matchDayLabel.matchDate} · ${matchDayLabel.venueName}`
+            : `Week of ${submission.week_start_date}`
+        }
         title={`${submission.player?.display_name ?? "Player"}'s squad`}
-        description={`Submitted ${formatWat(submission.submitted_at, "yyyy-MM-dd HH:mm")} WAT`}
+        description={`Submitted ${formatWat(submission.submitted_at, "yyyy-MM-dd HH:mm")} WAT${matchDayLabel ? ` · stamped match day ${matchDayLabel.matchDate}` : ""}`}
         action={
           <div className="flex items-center gap-3">
             <FcdbSummaryChip summary={fcdb.summary} />

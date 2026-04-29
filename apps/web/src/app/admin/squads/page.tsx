@@ -151,6 +151,27 @@ export default async function AdminSquadsListPage({
     );
   }
 
+  // Plan 56 — when any submission in the list is stamped with a
+  // match_day_id, fetch the match days in one round-trip + build a
+  // {match_day_id → match_date} map so the table can show "Match day:
+  // YYYY-MM-DD" inline. Cheap because match-days/season is bounded (~13).
+  const matchDayIds = Array.from(
+    new Set(rows.map((r) => r.match_day_id).filter((v): v is string => !!v)),
+  );
+  let matchDayDates = new Map<string, string>();
+  if (matchDayIds.length > 0) {
+    const { data: mdRows } = await svc
+      .from("match_days")
+      .select("id, match_date")
+      .in("id", matchDayIds)
+      .is("deleted_at", null);
+    matchDayDates = new Map(
+      (
+        (mdRows ?? []) as Array<{ id: string; match_date: string }>
+      ).map((r) => [r.id, r.match_date]),
+    );
+  }
+
   const columns: DataTableColumn<SubmissionRow>[] = [
     {
       key: "player",
@@ -172,6 +193,23 @@ export default async function AdminSquadsListPage({
           {formatWat(r.submitted_at, "yyyy-MM-dd HH:mm")}
         </span>
       ),
+    },
+    {
+      key: "match_day",
+      label: "Match day",
+      render: (r) =>
+        r.match_day_id ? (
+          <span
+            className="font-mono text-[11px] tabular text-[var(--primary)]"
+            data-testid={`squad-row-md-${r.id}`}
+          >
+            {matchDayDates.get(r.match_day_id) ?? r.match_day_id.slice(0, 8)}
+          </span>
+        ) : (
+          <span className="font-mono text-[11px] text-[var(--chalk-3)]">
+            —
+          </span>
+        ),
     },
     {
       key: "status",

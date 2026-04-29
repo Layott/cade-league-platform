@@ -1,21 +1,27 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import {
-  getCurrentWeekSubmissionForPlayer,
   getRuleForSeason,
   weekStartThursday,
   thursdayDeadline,
   resolveSquadWindowForMatchDay,
+  listSubmissionsForPlayerInSeason,
+  getSubmissionForPlayerAndMatchDay,
+  type PlayerSubmissionSummary,
 } from "@/server/squads";
 import { listMatchDays } from "@/server/matches/match-days";
-import { getCurrentSquadStatus } from "@/server/profile/squadStatus";
 import { formatWat } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SquadPickerBuilder } from "@/components/squads/SquadPickerBuilder";
 import { SquadPitchView } from "@/components/squads/SquadPitchView";
 import { PlayerSquadLiveRefresh } from "@/components/player/PlayerSquadLiveRefresh";
+import {
+  SquadMatchDayPicker,
+  type SquadMatchDayPickerItem,
+} from "@/components/player/SquadMatchDayPicker";
 import {
   requestUploadUrlAction,
   submitPickerAction,
@@ -24,14 +30,33 @@ import {
 export const dynamic = "force-dynamic";
 
 /**
- * Plan 30 — player squad page, Futbin-style picker.
+ * Plan 56 — `/player/squad` shows EVERY match day in the active season as a
+ * row in a picker. Players can:
+ *   - Click a past/current match day they've submitted for → read-only
+ *     <SquadPitchView />.
+ *   - Click an open (window force-opened OR pre-deadline) match day they
+ *     have NOT submitted for → <SquadPickerBuilder /> targeting that match
+ *     day.
+ *   - Click a closed match day they did not submit for → "Window closed"
+ *     info card.
+ *   - Click an upcoming match day not yet open → "Not open yet" info card.
  *
- * The page is a server component. If the player already has a live
- * submission for the current week we render a read-only summary — no
- * in-place editing, the Friday change window still uses its own route.
- * Otherwise we mount <SquadPickerBuilder /> with the active rule payload
- * so the totals bar can render budget + Nigerian thresholds.
+ * The `?matchDay=<id>` query param scopes to a single match day. Without it
+ * the page renders the bucketed picker (Past / This week / Upcoming).
+ *
+ * The Thursday deadline + Friday change window logic is unchanged. The
+ * weekly resolver only fires when a match day is ambient (not force-opened
+ * by an admin); admins reopen specific match days via /admin/squads.
  */
+
+type ResolvedRow = {
+  matchDayId: string;
+  matchDate: string;
+  venueName: string;
+  reason: string;
+  isOpen: boolean;
+  submission: PlayerSubmissionSummary | null;
+};
 
 export default async function PlayerSquadPage({
   searchParams,
@@ -63,7 +88,7 @@ export default async function PlayerSquadPage({
       <div className="space-y-4">
         <SectionHeader
           eyebrow="Squad"
-          title="This week's squad"
+          title="My squads"
           description="You do not have a player profile linked to your account yet. Contact an admin."
         />
       </div>
@@ -77,214 +102,241 @@ export default async function PlayerSquadPage({
     .eq("status", "active")
     .maybeSingle();
 
-  const weekStart = weekStartThursday(new Date());
-  const deadline = thursdayDeadline(weekStart);
-  const existing = await getCurrentWeekSubmissionForPlayer(sb, player.id, weekStart);
-
-  // Per-match-day window mode (admin override). Surface every match day
-  // whose window resolves to OPEN as a CTA the player can target. The
-  // weekly picker below stays as the fallback flow when no match-day
-  // override is in effect.
-  const svcEarly = getServiceRoleSupabase();
-  type OpenMatchDay = {
-    id: string;
-    matchDate: string;
-    venueName: string;
-    reason: string;
-    isMatchDayForcedOpen: boolean;
-  };
-  let openMatchDays: OpenMatchDay[] = [];
-  let selectedMatchDay: OpenMatchDay | null = null;
-  if (season?.id) {
-    const days = await listMatchDays(svcEarly, season.id);
-    const now = new Date();
-    const resolutions = await Promise.all(
-      days.map(async (d) => {
-        const r = await resolveSquadWindowForMatchDay(svcEarly, d.id, { now });
-        return { day: d, resolution: r };
-      }),
+  if (!season?.id) {
+    return (
+      <div className="space-y-4">
+        <SectionHeader
+          eyebrow="Squad"
+          title="My squads"
+          description="No active season — once an admin marks a season active you'll see your match days here."
+        />
+      </div>
     );
-    openMatchDays = resolutions
-      // Only surface match days the admin has explicitly forced OPEN —
-      // surfacing every "default open" match day would clutter the UI
-      // with the entire upcoming season.
-      .filter(({ resolution }) => resolution.reason === "match_day_force_open")
-      .map(({ day, resolution }) => ({
-        id: day.id,
-        matchDate: day.match_date,
-        venueName: day.venue_name,
-        reason: resolution.reason,
-        isMatchDayForcedOpen: true,
-      }));
-
-    if (sp.matchDay) {
-      const candidate = openMatchDays.find((m) => m.id === sp.matchDay);
-      if (candidate) selectedMatchDay = candidate;
-    }
   }
 
-  // Load the live rule for the totals bar. Safe against missing season or
-  // missing rule row (picker renders with rule=null).
-  let rule = null;
-  if (season?.id) {
-    try {
-      const raw = await getRuleForSeason(sb, season.id);
-      if (raw) {
-        rule = {
-          maxBudgetCoins: raw.max_budget_coins,
-          minNigerianItems: raw.min_nigerian_items,
-          bannedItemTypes: raw.banned_item_types,
-        };
-      }
-    } catch {
-      rule = null;
-    }
-  }
-
-  // Plan 10 + Plan 41 — squad window gating. If the deadline has
-  // passed AND no admin-reopen / change-window is in effect, hide the
-  // picker so players can't submit a late squad.
+  const now = new Date();
+  const todayWeekStart = weekStartThursday(now);
   const svc = getServiceRoleSupabase();
-  const submissionStatus = await getCurrentSquadStatus(svc, player.id, new Date());
-  const windowOpen =
-    submissionStatus.kind === "pre_deadline" ||
-    submissionStatus.kind === "reopened_by_admin" ||
-    submissionStatus.kind === "friday_change_window";
 
-  // If the player landed via a `?matchDay=<id>` link AND the admin has
-  // forced that match day's window open, mount the picker even if the
-  // weekly window is otherwise closed. The match-day mode is its own
-  // gate; the weekly resolver is bypassed when matchDayId is plumbed in.
-  const matchDayPickerOpen = selectedMatchDay !== null;
+  // Load every match day for the active season + the player's submissions
+  // in parallel. Match days come back sorted DESC; we'll re-sort ASC for
+  // the player view (chronological reads more naturally for a player
+  // browsing the season).
+  const [days, submissionMap] = await Promise.all([
+    listMatchDays(svc, season.id),
+    listSubmissionsForPlayerInSeason(svc, player.id, season.id),
+  ]);
+  const sortedDays = [...days].sort((a, b) =>
+    a.match_date < b.match_date ? -1 : a.match_date > b.match_date ? 1 : 0,
+  );
 
-  // Per-match-day picker: weekStartDate must equal the Thursday anchor of
-  // the match day's date (NOT necessarily this week's anchor — admins can
-  // open a future or past match day). The submit pipeline accepts the
-  // mismatched anchor when matchDayId is supplied.
-  const matchDayWeekStart = selectedMatchDay
-    ? weekStartThursday(selectedMatchDay.matchDate)
-    : weekStart;
+  // Resolve window state for each match day. Each call hits Supabase but
+  // they're independent — Promise.all keeps the page render wall-clock low.
+  const resolved: ResolvedRow[] = await Promise.all(
+    sortedDays.map(async (d) => {
+      const r = await resolveSquadWindowForMatchDay(svc, d.id, { now });
+      const direct = submissionMap.get(d.id);
+      const legacy = submissionMap.get(`week:${weekStartThursday(d.match_date)}`);
+      return {
+        matchDayId: d.id,
+        matchDate: d.match_date,
+        venueName: d.venue_name,
+        reason: r.reason,
+        isOpen: r.open,
+        submission: direct ?? legacy ?? null,
+      };
+    }),
+  );
+
+  // Per-match-day rule for the picker totals bar.
+  let rule = null;
+  try {
+    const raw = await getRuleForSeason(sb, season.id);
+    if (raw) {
+      rule = {
+        maxBudgetCoins: raw.max_budget_coins,
+        minNigerianItems: raw.min_nigerian_items,
+        bannedItemTypes: raw.banned_item_types,
+      };
+    }
+  } catch {
+    rule = null;
+  }
+
+  // Selected match day mode — render the detail view (submission OR picker
+  // OR closed-info).
+  const selected = sp.matchDay
+    ? resolved.find((r) => r.matchDayId === sp.matchDay) ?? null
+    : null;
+
+  if (selected) {
+    // Fetch the live submission's items only when one exists. This avoids
+    // pulling 13 weeks worth of items on the picker view.
+    const subWithItems = selected.submission
+      ? await getSubmissionForPlayerAndMatchDay(
+          svc,
+          player.id,
+          selected.matchDayId,
+          weekStartThursday(selected.matchDate),
+        )
+      : null;
+
+    const matchDayWeekStart = weekStartThursday(selected.matchDate);
+
+    return (
+      <div className="space-y-6">
+        <PlayerSquadLiveRefresh
+          playerId={player.id}
+          weekStartDate={todayWeekStart}
+        />
+        <SectionHeader
+          eyebrow={`Match day · ${selected.matchDate}`}
+          title={`Squad for ${selected.matchDate}`}
+          description={`Venue: ${selected.venueName}. Deadline: Thursday ${formatWat(thursdayDeadline(matchDayWeekStart), "HH:mm")} WAT (${matchDayWeekStart}).`}
+        />
+        <div>
+          <Link
+            href="/player/squad"
+            className="inline-flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            data-testid="squad-md-back-link"
+          >
+            ← Back to all match days
+          </Link>
+        </div>
+
+        {subWithItems ? (
+          <section
+            className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4"
+            data-testid="squad-existing-summary"
+          >
+            <div className="flex items-center gap-3">
+              <StatusPill status={subWithItems.submission.validation_status} />
+              <span className="text-xs text-[var(--chalk-2)]">
+                Submitted{" "}
+                {formatWat(
+                  subWithItems.submission.submitted_at,
+                  "yyyy-MM-dd HH:mm",
+                )}{" "}
+                WAT
+              </span>
+            </div>
+            {subWithItems.submission.rejection_reason ? (
+              <p className="mt-3 text-sm text-[var(--flare)]">
+                Rejection reason: {subWithItems.submission.rejection_reason}
+              </p>
+            ) : null}
+            <div className="mt-4">
+              <SquadPitchView items={subWithItems.items} />
+            </div>
+          </section>
+        ) : selected.isOpen ? (
+          <section data-testid="squad-match-day-picker">
+            <div className="mb-3 rounded-sm border border-[rgba(107,205,6,0.45)] bg-[rgba(107,205,6,0.08)] p-3 text-xs text-[var(--chalk-1)]">
+              Building squad for match day{" "}
+              <span className="font-mono font-semibold text-[var(--chalk-0)]">
+                {selected.matchDate}
+              </span>{" "}
+              · {selected.venueName}.
+            </div>
+            <SquadPickerBuilder
+              weekStartDate={matchDayWeekStart}
+              rule={rule}
+              submitAction={(payload) =>
+                submitPickerAction({
+                  ...payload,
+                  matchDayId: selected.matchDayId,
+                })
+              }
+              requestUploadUrlAction={requestUploadUrlAction}
+            />
+          </section>
+        ) : selected.matchDate > todayWeekStart ? (
+          <section
+            className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
+            data-testid="squad-window-not-open-yet"
+          >
+            <div className="mb-2 font-display text-lg font-bold text-[var(--chalk-0)]">
+              Not open yet
+            </div>
+            <p className="text-sm text-[var(--chalk-2)]">
+              Submissions for this match day open by Thursday{" "}
+              {formatWat(thursdayDeadline(matchDayWeekStart), "HH:mm")} WAT on{" "}
+              <span className="font-mono">{matchDayWeekStart}</span>. Check back
+              once an admin opens the window or once the regular weekly cycle
+              reaches this match day.
+            </p>
+          </section>
+        ) : (
+          <section
+            className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
+            data-testid="squad-window-closed"
+          >
+            <div className="mb-2 font-display text-lg font-bold text-[var(--chalk-0)]">
+              Squad window closed
+            </div>
+            <p className="text-sm text-[var(--chalk-2)]">
+              The submission deadline for this match day has passed. If you
+              missed it, contact an admin to reopen submissions for you.
+            </p>
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  // List view — bucket every match day into past / this_week / upcoming so
+  // the player's "next squad to file" sits in the most prominent group.
+  const items: SquadMatchDayPickerItem[] = resolved.map((r) => {
+    const weekAnchor = weekStartThursday(r.matchDate);
+    const bucket: SquadMatchDayPickerItem["bucket"] =
+      weekAnchor === todayWeekStart
+        ? "this_week"
+        : r.matchDate < todayWeekStart
+          ? "past"
+          : "upcoming";
+
+    let status: SquadMatchDayPickerItem["status"];
+    if (r.submission) {
+      status = "submitted";
+    } else if (r.isOpen) {
+      status = "open";
+    } else if (bucket === "upcoming") {
+      // Future match day with no live submission and no open window — the
+      // weekly cycle will roll round to it eventually.
+      status = "upcoming";
+    } else {
+      status = "closed";
+    }
+
+    return {
+      matchDayId: r.matchDayId,
+      matchDate: r.matchDate,
+      venueName: r.venueName,
+      status,
+      submittedAt: r.submission?.submittedAt ?? null,
+      validationStatus: r.submission?.validationStatus ?? null,
+      bucket,
+    };
+  });
+
+  // Find the "this week" match day id for the live-refresh ping.
+  const thisWeekItem = items.find((i) => i.bucket === "this_week");
 
   return (
     <div className="space-y-6">
       <PlayerSquadLiveRefresh
         playerId={player.id}
-        weekStartDate={weekStart}
+        weekStartDate={todayWeekStart}
       />
       <SectionHeader
-        eyebrow={`Week of ${weekStart}`}
-        title="This week's squad"
-        description={`Deadline: Thursday ${formatWat(deadline, "HH:mm")} WAT (${formatWat(deadline, "yyyy-MM-dd")}).`}
+        eyebrow="Squad"
+        title="My squads"
+        description={`Pick a match day to view your submission or file a new squad. Deadline each match day: Thursday ${formatWat(thursdayDeadline(todayWeekStart), "HH:mm")} WAT.`}
       />
-
-      {openMatchDays.length > 0 && !selectedMatchDay ? (
-        <section
-          className="rounded-sm border border-[rgba(107,205,6,0.45)] bg-[rgba(107,205,6,0.06)] p-4"
-          data-testid="squad-match-day-ctas"
-        >
-          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--signal)]">
-            Submission open by match day
-          </div>
-          <p className="mt-1 text-xs text-[var(--chalk-2)]">
-            An admin has opened squad submissions for the match day(s) below.
-            Select one to file a squad targeted at that match day.
-          </p>
-          <ul className="mt-3 flex flex-col gap-2">
-            {openMatchDays.map((md) => (
-              <li
-                key={md.id}
-                data-testid={`squad-match-day-cta-${md.id}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3"
-              >
-                <div>
-                  <div className="font-display text-sm font-semibold text-[var(--chalk-0)]">
-                    {md.matchDate}
-                  </div>
-                  <div className="text-[11px] text-[var(--chalk-2)]">
-                    {md.venueName}
-                  </div>
-                </div>
-                <a
-                  href={`/player/squad?matchDay=${encodeURIComponent(md.id)}`}
-                  className="inline-flex items-center justify-center rounded-sm border border-[var(--primary)] bg-[var(--primary)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary-ink)] transition-colors hover:bg-[#82e21a]"
-                >
-                  Submit squad for this match day
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {existing ? (
-        <section
-          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4"
-          data-testid="squad-existing-summary"
-        >
-          <div className="flex items-center gap-3">
-            <StatusPill status={existing.submission.validation_status} />
-            <span className="text-xs text-[var(--chalk-2)]">
-              Submitted {formatWat(existing.submission.submitted_at, "yyyy-MM-dd HH:mm")} WAT
-            </span>
-          </div>
-          {existing.submission.rejection_reason ? (
-            <p className="mt-3 text-sm text-[var(--flare)]">
-              Rejection reason: {existing.submission.rejection_reason}
-            </p>
-          ) : null}
-          <div className="mt-4">
-            <SquadPitchView items={existing.items} />
-          </div>
-        </section>
-      ) : selectedMatchDay ? (
-        <section data-testid="squad-match-day-picker">
-          <div className="mb-3 rounded-sm border border-[rgba(107,205,6,0.45)] bg-[rgba(107,205,6,0.08)] p-3 text-xs text-[var(--chalk-1)]">
-            Building squad for match day{" "}
-            <span className="font-mono font-semibold text-[var(--chalk-0)]">
-              {selectedMatchDay.matchDate}
-            </span>{" "}
-            · {selectedMatchDay.venueName}.{" "}
-            <a
-              href="/player/squad"
-              className="underline-offset-2 hover:underline"
-            >
-              Cancel
-            </a>
-          </div>
-          <SquadPickerBuilder
-            weekStartDate={matchDayWeekStart}
-            rule={rule}
-            submitAction={(payload) =>
-              submitPickerAction({
-                ...payload,
-                matchDayId: selectedMatchDay!.id,
-              })
-            }
-            requestUploadUrlAction={requestUploadUrlAction}
-          />
-        </section>
-      ) : !windowOpen && !matchDayPickerOpen ? (
-        <section
-          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
-          data-testid="squad-window-closed"
-        >
-          <div className="mb-2 font-display text-lg font-bold text-[var(--chalk-0)]">
-            Squad window closed
-          </div>
-          <p className="text-sm text-[var(--chalk-2)]">
-            {submissionStatus.kind === "window_closed"
-              ? "This week's deadline has passed. Contact an admin to reopen submission for you."
-              : "Submission is not accepting new squads right now."}
-          </p>
-        </section>
-      ) : (
-        <SquadPickerBuilder
-          weekStartDate={weekStart}
-          rule={rule}
-          submitAction={submitPickerAction}
-          requestUploadUrlAction={requestUploadUrlAction}
-        />
-      )}
+      <SquadMatchDayPicker
+        items={items}
+        currentMatchDayId={thisWeekItem?.matchDayId ?? null}
+      />
     </div>
   );
 }

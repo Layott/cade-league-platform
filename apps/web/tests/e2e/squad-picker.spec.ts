@@ -86,10 +86,18 @@ test("picker page mounts with pitch layout + formation switcher", async ({
   }
 
   await page.goto("/player/squad");
-  // We either land on the picker or on the read-only existing-submission view.
+  // Plan 56 — `/player/squad` now defaults to the match-day picker. The
+  // legacy paths (pitch-layout for an open weekly window OR
+  // squad-existing-summary for a read-only existing submission) still
+  // surface when the player navigates into a specific match day. Accept
+  // any of the three to stay tolerant against seed state.
+  const matchDayPicker = page.getByTestId("squad-match-day-picker");
+  const matchDayPickerEmpty = page.getByTestId("squad-match-day-picker-empty");
   const picker = page.getByTestId("pitch-layout");
   const existing = page.getByTestId("squad-existing-summary");
-  await expect(picker.or(existing)).toBeVisible({ timeout: 15_000 });
+  await expect(
+    matchDayPicker.or(matchDayPickerEmpty).or(picker).or(existing),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("picker API is reachable + gracefully empty on empty catalogue", async ({
