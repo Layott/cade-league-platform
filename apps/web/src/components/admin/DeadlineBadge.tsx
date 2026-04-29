@@ -30,9 +30,15 @@ export function DeadlineBadge({
   "data-testid"?: string;
 }) {
   const deadlineMs = new Date(deadlineIso).getTime();
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  // Initialize to deadlineMs so SSR + first CSR render produce the
+  // SAME computeDeadlineTone output (deterministic). Real Date.now() is
+  // hydrated in the effect below, after which the 30s tick keeps pace.
+  // Initializing with `Date.now()` here would cause React #418 because
+  // server clock != client clock (hydration mismatch).
+  const [nowMs, setNowMs] = useState<number>(deadlineMs);
 
   useEffect(() => {
+    setNowMs(Date.now());
     const id = setInterval(() => setNowMs(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);

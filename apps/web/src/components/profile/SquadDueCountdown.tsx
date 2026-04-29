@@ -14,13 +14,16 @@ export function SquadDueCountdown({
   deadlineIso: string;
   className?: string;
 }) {
-  const [now, setNow] = useState<number>(() => Date.now());
+  // SSR/CSR clock skew → React #418 hydration mismatch. Initialize to
+  // target time so initial render is deterministic (diff=0); useEffect
+  // hydrates real time after mount.
+  const target = new Date(deadlineIso).getTime();
+  const [now, setNow] = useState<number>(target);
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-
-  const target = new Date(deadlineIso).getTime();
   const diff = Math.max(0, target - now);
   const h = Math.floor(diff / 3_600_000);
   const m = Math.floor((diff % 3_600_000) / 60_000);

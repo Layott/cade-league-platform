@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
+import { getPlayerAvatarUrl } from "@/lib/player-photos";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,25 +51,35 @@ export async function GET(
     return NextResponse.json({ error: "match_day not found" }, { status: 404 });
   }
 
+  // Bug #27 fix (mirror of #24 orgs route): `display_name` + `avatar_url`
+  // do NOT live on `players`. `display_name` is on `users` via
+  // `players_user_id_fkey`. `avatar_url` is derived from the static
+  // player manifest via gamer_tag (`getPlayerAvatarUrl`). Bare try/catch
+  // was hiding the 42703 errors → empty rows on every prod call.
   type PlayerRow = {
     id: string;
-    display_name: string | null;
     gamer_tag: string | null;
-    avatar_url: string | null;
     coach_id: string | null;
+    users: { display_name: string | null } | { display_name: string | null }[] | null;
   };
 
   let players: PlayerRow[] = [];
-  try {
-    const { data } = await sb
-      .from("players")
-      .select("id, display_name, gamer_tag, avatar_url, coach_id")
-      .is("deleted_at", null)
-      .order("display_name", { ascending: true });
-    players = (data ?? []) as PlayerRow[];
-  } catch {
-    players = [];
+  const { data: playersData, error: playersErr } = await sb
+    .from("players")
+    .select(
+      `
+      id,
+      gamer_tag,
+      coach_id,
+      users:users!players_user_id_fkey ( display_name )
+      `,
+    )
+    .is("deleted_at", null)
+    .order("gamer_tag", { ascending: true });
+  if (playersErr) {
+    console.error("coaches route: players select", playersErr);
   }
+  players = (playersData ?? []) as unknown as PlayerRow[];
 
   // Coach lookup (best-effort — placeholder when coach_id is null).
   const coachIds = Array.from(
@@ -99,10 +110,11 @@ export async function GET(
 
   const rows = players.map((p) => {
     const coach = p.coach_id ? coachesById.get(p.coach_id) ?? null : null;
+    const userRow = Array.isArray(p.users) ? p.users[0] ?? null : p.users;
     return {
       playerId: p.id,
-      name: p.display_name ?? p.gamer_tag ?? "Player",
-      avatarUrl: p.avatar_url ?? null,
+      name: userRow?.display_name ?? p.gamer_tag ?? "Player",
+      avatarUrl: getPlayerAvatarUrl(p.gamer_tag),
       coachId: coach?.id ?? null,
       coachName: coach?.name ?? null,
     };
