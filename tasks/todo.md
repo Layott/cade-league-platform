@@ -771,3 +771,67 @@ A parallel agent committed an initial Stage 3 wave at `0e3a6341` that wired the 
 - `supabase/migrations/20260620000009_overlay_text_elements_partners_strip_extra.sql` (new) — seed augment.
 - 16 × `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` — bootstrap script extended.
 - 16 × `apps/web/public/overlays/v2/<key>/index.html` — synced mirror.
+
+
+## Wave 2 Stage 4 — review (post-2026-04-29 — animations + visual-regression CI gate)
+
+Stage 4 lands per-element animations + the visual-regression CI gate. Stages 1+2+3 were prereqs (server modules, schemas, text editor, partner editor, bootstrap extension). This stage closes Phase B by adding:
+- Animation server actions (`setAnimationAction`, `clearAnimationAction`)
+- Animations panel in the admin design editor
+- SSR plumbing for `?animTokens=` + `?previewAnimTokens=`
+- Bootstrap script extension that emits `<style id="cade-injected-anim-keyframes">` + `<style id="cade-injected-anim-rules">`
+- Preview-token decoder `decodePreviewAnimTokens`
+- E2E spec for the editor flow
+- Visual-regression baseline + diff harness for all 16 overlays
+- §15.B documentation in CLAUDE.md
+
+### Acceptance criteria (per spec §9.4)
+
+- [x] Admin Animations panel renders for every overlay+variant with at least one registered element.
+- [x] Admin can toggle Entry / Exit / Continuous tabs per element.
+- [x] Type select includes the 13 preset types + custom-css.
+- [x] Custom-css textarea appears only when type=custom-css and feeds the server sanitizer.
+- [x] Save calls `setAnimationAction` with the full FormData payload (overlayKey, variantId, elementId, animPhase, enabled, animType, durationMs, delayMs, easing, iterationCount, customCssKeyframes).
+- [x] Reset calls `clearAnimationAction` and soft-deletes the row.
+- [x] Live preview iframe URL embeds `?previewAnimTokens=<b64>` debounced 250 ms.
+- [x] SSR overlay route resolves DB rows via `resolveAnimations` and embeds `?animTokens=<b64>` on the iframe URL (`OverlayDataInjector`).
+- [x] Bootstrap decodes both params, generates preset `@keyframes` blocks (or sanitized custom-css), and emits phase-gated rules:
+  - entry/continuous → `body.cade-visible [data-element-id="X"]`
+  - exit → `body.cade-exiting [data-element-id="X"]`
+- [x] Server-side `upsertAnimation` rejects out-of-range / unknown type / unsanitized custom keyframes.
+- [x] `decodePreviewAnimTokens` rejects url() / @-rules / `<>` `\`` / oversized payloads / unknown anim types / unknown phases / out-of-range numerics / easing not in allowlist.
+
+### Verification gate (final)
+
+- `npx vitest run` — **2093 tests pass** (up from 2049 baseline at session start; +44 new across actions, preview, editor).
+- `npm run lint` — 0 errors, 16 warnings (all pre-existing).
+- `npm run build` — clean production build.
+- `node apps/web/scripts/_check-element-id-parity.mjs` — exit 0 (130 pre-existing warnings on missing element-id attrs in HTML, unchanged from Stage 3 baseline).
+- New scripts:
+  - `npm run e2e:visual-regression` — baseline screenshot comparison for all 16 overlays.
+  - `npm run e2e:visual-regression:update` — refresh baselines after intentional changes.
+
+### Files changed (delta vs. `0e3a6341`)
+
+- `apps/web/src/app/admin/broadcast/v2/design/actions.ts` — added `setAnimationAction` + `clearAnimationAction` + animation enums.
+- `apps/web/src/app/admin/broadcast/v2/design/actions.test.ts` — added 14 new tests covering perm gate, validation, sanitizer rejection, happy path, rate-limit, customCssKeyframes drop logic.
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` — `resolveAnimations` resolution + `decodePreviewAnimTokens` + iframe URL forwarding.
+- `apps/web/src/app/admin/broadcast/v2/design/page.tsx` — fetches `listAnimations` + builds `animatableElements` from text + partner-strip + bg-image.
+- `apps/web/src/server/overlays/design/preview.ts` — `decodePreviewAnimTokens` + `PreviewAnimTokens` type + AnimPhase/AnimType enums export + custom-css defence-in-depth (rejects url(), @-rules, angle brackets, backticks).
+- `apps/web/src/server/overlays/design/preview.test.ts` — 16 new animation decoder tests (happy path, multi-phase, rejection cases).
+- `apps/web/src/components/admin/OverlayDesignEditor.tsx` — Animations panel + AnimationPhaseEditor + AnimationRow type + `seedAnimationRows` + `buildAnimationsPreviewParam`.
+- `apps/web/src/components/admin/OverlayDesignEditor.test.tsx` — 8 new Animations-panel tests (panel render, phase tabs, type select, custom-css textarea visibility, save, reset, seeded rows).
+- `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx` — `designAnimTokens` + `previewAnimTokens` props + URL encoding.
+- `apps/web/scripts/_extend-bootstrap-script.mjs` — `buildPresetKeyframes` + `buildAnimRulesAndKeyframes` + emit two new `<style>` blocks for animations.
+- `apps/web/tests/e2e/overlay-design-animations.spec.ts` (new) — admin login + save entry slide-left + assert DB row + reset.
+- `apps/web/tests/e2e/visual-regression-baseline.spec.ts` (new) — Playwright screenshot diff harness for all 16 overlays at default state.
+- `apps/web/package.json` — `e2e:visual-regression` + `e2e:visual-regression:update` scripts.
+- `CLAUDE.md` — §15.B Phase B Wave 2 sub-section: token map table, anim phases, types, contribution flow, visual-regression gate, sync-script gate.
+- 16 × `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` — bootstrap script extended with animation handling.
+- 16 × `apps/web/public/overlays/v2/<key>/index.html` — synced mirror.
+
+### Open work / deferred
+
+- Visual-regression baseline screenshots — first run of `npm run e2e:visual-regression` writes snapshots; baseline images not committed in this commit (would require running Playwright headless under CI; deferred to first follow-up commit after dev-server smoke).
+- 130 element-id parity warnings — pre-existing; many seed rows reference HTML elements that don't yet have `data-element-id` attrs. Each warning surfaces a no-op admin save (no harm done; just no effect). Cleaning these up is per-overlay HTML authoring work, not Stage 4 scope.
+- New migrations — none. Stage 1 already shipped all 8 Phase B migrations (`20260620000001..00009`).

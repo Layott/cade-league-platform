@@ -274,3 +274,69 @@ The static HTML keeps `:root { --overlay-X: <hard-coded fallback> }` so OBS brow
 - E2E: `apps/web/tests/e2e/overlay-design-tokens.spec.ts` — login → save accent token → assert SSR style block on overlay route → revert → assert restored.
 - Smoke (one-shot, deleted after run): pattern lives at `apps/web/scripts/_overlay-design-smoke.mjs` — fetches `/overlay/v2/<key>?demo=1` for all 16 keys against the live Vercel URL and asserts the SSR token block contains `--overlay-bg-color`.
 
+### §15.B — Phase B (Wave 2): text / partners / animations layered on top (post-2026-04-29)
+
+Wave 2 extends the design system with three orthogonal channels — every channel rides the SAME b64-JSON URL-param wire, decoded by the unified bootstrap script in each overlay HTML.
+
+**Four parallel token maps** flow from SSR → iframe via `?<param>=<base64-json>`:
+
+| URL param | Source | Server module | Bootstrap output |
+|---|---|---|---|
+| `tokens` (Phase A) | `overlay_design_tokens` | `resolveTokens` | `<style id="cade-injected-tokens">` :root vars |
+| `previewTokens` (Phase A) | admin live-preview | (decoded inline) | same as above (cascades after design) |
+| `textTokens` (Stage 2) | `overlay_text_elements` | `resolveTextElements` | `<style id="cade-injected-text">` per-element rules + DOM textContent edits |
+| `previewTextTokens` (Stage 2) | admin live-preview | `decodePreviewTextTokens` | same as above (cascades after design) |
+| `partnerTokens` (Stage 3) | `overlay_partner_strip_layout` + `overlay_partner_logos` + `overlay_partner_logo_overrides` | `resolveStripLayout` + `resolvePartnerLogos` | `<style id="cade-injected-partners-layout">` + DOM rebuild of `[data-element-id="partners-strip"]` children |
+| `previewPartnerTokens` (Stage 3) | admin live-preview | `decodePreviewPartnerTokens` | same |
+| `animTokens` (Stage 4) | `overlay_element_animations` | `resolveAnimations` | `<style id="cade-injected-anim-keyframes">` `@keyframes` blocks + `<style id="cade-injected-anim-rules">` phase-gated `animation:` rules |
+| `previewAnimTokens` (Stage 4) | admin live-preview | `decodePreviewAnimTokens` | same |
+
+**Animation phases:**
+- `entry` -> fires when `body.cade-visible` class lands (overlay shown).
+- `exit` -> fires on `body.cade-exiting` (transitioning out).
+- `continuous` -> loops while `body.cade-visible`. `iterationCount: "infinite"` is allowed.
+
+**Animation types** (preset keyframes baked into bootstrap):
+- `slide-left/right/up/down` — translate from off-axis 32px to 0 + opacity 0->1.
+- `fade` — opacity 0->1.
+- `scale` — scale(0.8) + opacity 0 -> scale(1) + opacity 1.
+- `rotate` — rotate(-12deg) + opacity 0 -> rotate(0) + opacity 1.
+- `bounce` — translateY(20px)->-6px->0 with overshoot at 60%.
+- `pulse` — scale(1)->(1.04)->(1). Loops well at infinite iteration.
+- `glow` — drop-shadow(0)->drop-shadow(24px green)->drop-shadow(0).
+- `shake` — translateX +/-4px oscillation.
+- `flip` — perspective(800px) rotateY(-90deg)->0.
+- `custom-css` — admin-supplied `@keyframes` body, sanitized server-side (no `url()`, no `@-rules`, no `<>`, props limited to `ALLOWED_KEYFRAMES_PROPS` per `_shared/css-validator.ts`).
+
+**Adding a new animation type:**
+1. Append the type to `AnimType` union in `apps/web/src/server/overlays/animations/elements.ts`.
+2. Add a `case` to `buildKeyframesBody` server-side AND `buildPresetKeyframes` in `apps/web/scripts/_extend-bootstrap-script.mjs`.
+3. Re-run `node apps/web/scripts/_extend-bootstrap-script.mjs` + `node apps/web/scripts/sync-v2-overlays.mjs`.
+4. Add the option to `ANIM_TYPES` in `apps/web/src/components/admin/OverlayDesignEditor.tsx` (the editor select).
+5. **No migration needed** — the type catalog is code, the DB only stores divergent values.
+
+**Adding a new animatable element to an overlay:**
+1. Add `data-element-id="<kebab-id>"` attr to the HTML element.
+2. INSERT a row into `overlay_text_elements` via the `20260620000007_overlay_text_elements_seed.sql` pattern (or via the admin Text panel).
+3. Re-run `node apps/web/scripts/sync-v2-overlays.mjs` (or rely on `prebuild`).
+4. Admin sees the new ID in both Text + Animations panels next page load.
+
+**Section §14 frozen contract still applies.** The bootstrap script is REQUIRED in every v2 overlay HTML — it satisfies §14 by gating `cade-visible`/`cade-exiting` selectors and never throwing. Replacing it = the overlay loses cross-iframe token + animation propagation.
+
+**Visual-regression CI gate** (added Stage 4):
+- `apps/web/tests/e2e/visual-regression-baseline.spec.ts` — Playwright spec captures 1920x1080 screenshots of all 16 overlays at the static `?demo=1` route (pre-token state) and asserts <=0.1% pixel diff against committed baselines.
+- Run: `npm run e2e:visual-regression`.
+- Update baseline (after intentional design changes): `npm run e2e:visual-regression:update`.
+- Baselines live at `apps/web/tests/e2e/visual-regression-baseline.spec.ts-snapshots/<key>-default-chromium-<platform>.png` (Playwright auto-creates per platform).
+
+**E2E** (added Stage 4):
+- `apps/web/tests/e2e/overlay-design-animations.spec.ts` — login admin -> set entry slide-left on title -> save -> assert DB row -> reset -> assert soft-deleted.
+
+**Sync gate after editing the bootstrap source script:** the canonical bootstrap lives in `apps/web/scripts/_extend-bootstrap-script.mjs::BOOTSTRAP`. Editing the inline JS template (e.g. for a new token channel or animation type) requires:
+1. `node apps/web/scripts/_extend-bootstrap-script.mjs` — rewrites all 16 source `index.html` files at `KNOWLEDGE/brand-assets/elements/v2/<key>/`.
+2. `node apps/web/scripts/sync-v2-overlays.mjs` — mirrors source HTMLs to `apps/web/public/overlays/v2/<key>/`.
+3. `npm run e2e:visual-regression` — gate against pixel drift.
+4. Re-run unit tests covering the bootstrap shape (preview decoders).
+
+If you skip step 1 the source HTMLs drift from the public mirror; if you skip step 2 the iframe loads stale JS; if you skip step 3 you risk shipping a regression invisible to unit tests.
+

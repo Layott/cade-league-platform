@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:visual-regression": "playwright test visual-regression-baseline.spec.ts",
+    "e2e:visual-regression:update": "playwright test visual-regression-baseline.spec.ts --update-snapshots",
     "format": "prettier --write .",
     "sync:overlays": "node scripts/sync-v2-overlays.mjs",
     "sync:overlays:watch": "node scripts/sync-v2-overlays.mjs --watch",

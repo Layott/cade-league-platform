@@ -844,3 +844,29 @@ The duplicate match `63968865-7c26-4c23-a2ed-6bc6c20a314f` had `deleted_at = 202
 1. **HTML scanners that strip multiple block types must process them in source order, not in two separate passes.** Any naive two-pass `html.replace(<style>) + html.replace(<script>)` misses the case where one type embeds the literal name of the other (in a comment OR a string literal).
 2. **Add literal-string protection to ALL parity-linter inputs.** The regex `data-element-id\s*=\s*["']([a-z][a-z0-9-]*)["']` does not distinguish between an HTML attribute and a JS / CSS string literal. The minimal-correct strategy is: strip blocks that may contain literal strings (`<script>`, `<style>`, `<!-- -->`) BEFORE running the attr-extraction regex.
 3. **When a parity-linter result changes by more than 5% between commits, look for a regex bug, not an actual coverage delta.** A jump from "130 warnings" to "134" or "168" usually means the strip regex is mis-pairing tags, not that designers added/removed real attrs at scale.
+
+
+**Date:** 2026-04-29
+**Context:** Stage 4 — extending `_extend-bootstrap-script.mjs` with custom-css keyframe defence-in-depth. The bootstrap is a JS template literal (`` `...` ``) injected as inline `<script>` into 16 overlay HTMLs. I added a regex check inside the template like `if (/[<>\`]/.test(customBody)) return '';` — Node 25 `compileSourceTextModule` threw `SyntaxError: Unexpected identifier 'even'` because the unescaped backtick inside the template terminated the outer string at column 50 of a comment line.
+**Mistake:** Wrote a JS comment `// strip ...< > ` even if server` inside a template literal — the bare backtick character ended the outer template and the rest of the line parsed as JS code. Same issue applied to the regex `[<>\`]` — the `\`` IS a valid escape, but the COMMENT had a literal backtick that broke parsing first.
+**Correction:** (1) Removed the literal backtick from the comment, replacing it with the word "backtick". (2) Used `[<>\\`]` in the regex (escape both the `<` `>` for clarity and the backtick once via `\`).
+**Rule for future:**
+1. **Inside a JS template literal containing JS source, comments must NEVER contain bare backticks.** Replace with the word "backtick" or use a different quoting style. Even comments are part of the lexed template string.
+2. **When generating HTML or JS that embeds user-influenced strings, the embed regex MUST escape every backtick + every dollar-curly (`${`) in the inner code OR commit to template-string composition vs string concatenation up front.** Mixing them inside a JS-emitting JS template is fragile.
+3. **Run the bootstrap-extend script with `--dry` immediately after editing the BOOTSTRAP template** — Node will throw on the parse error before the file mutation runs. Skipping the dry-run risks silently writing 16 broken HTMLs across the source tree.
+
+**Date:** 2026-04-29
+**Context:** Stage 4 — adding a new `setAnimationAction` to the design action layer. I imported `upsertAnimation` + `deleteAnimation` from the server module. The actions test file was already extensively mocked, but the new tests needed `upsertAnimationMock` + `deleteAnimationMock` registered before `import { setAnimationAction } from "./actions"` ran.
+**Mistake:** Initially attempted to extend the partners/logos `vi.mock(...)` block to also export the animation mocks. That broke the partners mock structure (it mocks a different module). Wrong: trying to share a `vi.mock` factory across modules.
+**Correction:** Added a NEW `vi.mock("@/server/overlays/animations/elements", () => ({ upsertAnimation: ..., deleteAnimation: ... }))` block before the action-layer `import` statement.
+**Rule for future:**
+1. **Each `vi.mock(<path>)` factory only mocks one module.** Adding a new server module dependency to an action requires its OWN `vi.mock` block + its own `vi.hoisted(() => vi.fn())` mock pair. Trying to consolidate breaks discoverability + test isolation.
+2. **`vi.hoisted` mocks must appear in lexical order BEFORE the `import { actionUnderTest }` statement that references them.** Adding a mock at the bottom of the mock block won't work if the import was earlier.
+
+**Date:** 2026-04-29
+**Context:** Stage 4 — wiring the `OverlayDataInjector` to forward `designAnimTokens` + `previewAnimTokens` props through to the iframe URL. The two preceding stages (text + partner) had already wired similar params. The encoder helper `encodeTextTokensParam` was generic enough — the trick was to also handle the empty-payload case so URL stays clean.
+**Mistake:** Initially wrote the URL-set as an unconditional `params.set("animTokens", encodeTextTokensParam(...))`. Even when `designAnimTokens` was an empty `{}` map, the encoded base64 still ran (producing a non-trivial 4-char string `e30`). The bootstrap then decoded that into an empty object and skipped emit, but the URL stayed dirty + the visual-regression baseline drifted.
+**Correction:** Guard with `if (designAnimTokens && Object.keys(designAnimTokens).length > 0)` — exactly the pattern Stages 2+3 used. Only emit when there's actually something to forward.
+**Rule for future:**
+1. **Every URL-param channel needs a "skip if empty" guard at the encoder boundary** — empty maps shouldn't write empty-but-non-trivial params. Otherwise the iframe URL drifts on every overlay+variant combination + breaks any pixel-diff visual-regression baseline.
+2. **The bootstrap script is the LAST defence; the encoder is the FIRST.** If the encoder fires on empty payloads, the bootstrap will receive + decode + skip — but the URL is still drift-y. Fix at the encoder.
