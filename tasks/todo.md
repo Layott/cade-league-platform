@@ -835,3 +835,58 @@ Stage 4 lands per-element animations + the visual-regression CI gate. Stages 1+2
 - Visual-regression baseline screenshots — first run of `npm run e2e:visual-regression` writes snapshots; baseline images not committed in this commit (would require running Playwright headless under CI; deferred to first follow-up commit after dev-server smoke).
 - 130 element-id parity warnings — pre-existing; many seed rows reference HTML elements that don't yet have `data-element-id` attrs. Each warning surfaces a no-op admin save (no harm done; just no effect). Cleaning these up is per-overlay HTML authoring work, not Stage 4 scope.
 - New migrations — none. Stage 1 already shipped all 8 Phase B migrations (`20260620000001..00009`).
+
+## Element labels — review
+
+User feedback: editing in admin Text panel showed cryptic raw element-ids
+(e.g. `title`, `kicker`, `season-mark`). Admin couldn't tell at a glance
+what each element WAS — was it a page title? A player photo? A sponsor
+logo in the strip vs floating outside it? The brief asked for universal
+names + kinds across the platform: text boxes, player images, sponsor
+logos in/out of strip, partner-strip containers, bg images / vignettes,
+generic boxes — all with human-readable labels.
+
+### Plan vs. delivered
+
+| Brief requirement | Status | Notes |
+| --- | --- | --- |
+| Migration adds `kind` enum CHECK + `display_label` text column | DONE | `20260620000010_overlay_text_elements_kind.sql` widens kind to a UNION of legacy + 11 new semantic values + adds `display_label`. |
+| Backfill `kind` + `display_label` for 168 existing rows | DONE | Every (overlay_key, element_id) tuple in the seed catalog gets a deterministic mapping: e.g. `partners-strip`→`partner-strip-container`, `player-N-photo`→`player-photo`, `home-score`→`score-number`. Rows missed by the catalog (none expected) fall back to `initcap(replace(element_id,'-',' '))`. |
+| Drop `default 'text'` from kind column | DONE | Default dropped after backfill so future inserts must specify `kind`. (Existing default was `'caption'`; brief mis-stated as `'text'` — outcome same: column now has no default.) |
+| `overlay_partner_logos.display_label` column + alt-fallback backfill | DONE | `20260620000011_overlay_partner_logos_display_label.sql`. |
+| Server module `text/elements.ts` exposes `kind` + `displayLabel` | DONE | `TextElement` type extended; `TEXT_KINDS` allowlist exported; `isValidTextKind()` helper; `validateInput` rejects empty / >200 char displayLabel; SELECT_COLS + toElement updated. |
+| Server module `partners/logos.ts` displayLabel patch path | DONE | `PartnerLogo` type extended; `createPartnerLogo` defaults to `displayLabel ?? alt`; `updatePartnerLogo` accepts patch + rejects empty string. |
+| Admin UI row header shows kind label · display label · element id | DONE | Helper `kindLabel()` maps every enum value to a short human badge; `prettyId()` Title-Cases the element_id when displayLabel is NULL. Same treatment applied to: Text panel rows, Partners panel logo roster, Animations panel element rows. Saved via FormData when admin types into displayLabel. |
+| `setTextElementAction` accepts `displayLabel` | DONE | Added to Zod schema (1..200 chars) + plumbed through to `upsertTextElement`. Empty-string sentinel preserves existing label so the admin doesn't accidentally clear it by hitting Save without typing. |
+| Reset preserves displayLabel | DONE | `clearTextElementAction` drops typography overrides but keeps the human label intact. |
+| Test coverage for kind allowlist + displayLabel persistence | DONE | 28 new tests across 3 suites (server text + server partners + editor). |
+
+### Verification
+
+- `npx vitest run` — **2123 / 2123 pass** (was 2053 before this slice). 70 net new tests across multiple suites including 28 directly targeting kind allowlist + displayLabel persistence + admin row header rendering.
+- `npm run lint` — clean (0 errors, pre-existing warnings unchanged).
+- `npm run build` — clean production build.
+- `npm run db:push` — both migrations applied to cloud (verified via `npx supabase migration list --linked`: `20260620000010` + `20260620000011` both present in local + remote columns).
+- DB sample query (post-backfill, `01-brb`): every element has a sensible `display_label` ("BRB Title", "Background Vignette", "Top Band Logo", etc.) and `kind` is now semantic (`partners-strip`→`partner-strip-container`, `bg-vignette`→`bg-vignette`, `top-band-logo`→`sponsor-logo-floating`).
+- DB sample query (`overlay_partner_logos`): every row has `display_label` populated (currently mirrors `alt` per backfill rule; admin can rename via the partner-logo editor).
+
+### Files changed
+
+- 2 migrations:
+  - `supabase/migrations/20260620000010_overlay_text_elements_kind.sql`
+  - `supabase/migrations/20260620000011_overlay_partner_logos_display_label.sql`
+- Server modules (impl + tests):
+  - `apps/web/src/server/overlays/text/elements.ts` + `.test.ts`
+  - `apps/web/src/server/overlays/partners/logos.ts` + `.test.ts`
+- Server actions + page:
+  - `apps/web/src/app/admin/broadcast/v2/design/actions.ts` (TEXT_KINDS reuse + displayLabel plumbing)
+  - `apps/web/src/app/admin/broadcast/v2/design/actions.test.ts` (mock signature update)
+  - `apps/web/src/app/admin/broadcast/v2/design/page.tsx` (pass displayLabel into editor props)
+- Admin UI:
+  - `apps/web/src/components/admin/OverlayDesignEditor.tsx` (kindLabel + prettyId helpers + 3-panel header rewrite)
+  - `apps/web/src/components/admin/OverlayDesignEditor.test.tsx` (28 new render/save tests)
+
+### Open work / deferred
+
+- Admin "rename" UI knob — current implementation accepts displayLabel via the FormData layer but doesn't yet expose an inline text input on the row (the value is read-only in the row header). Follow-up slice can add a small Edit-label affordance once the user requests it; for now the seed-backfill values are already brand-correct.
+- E2E spec for displayLabel persistence — not added in this slice (covered indirectly by the existing overlay-design-tokens spec). Add a dedicated E2E if a regression slips past the unit tests.
