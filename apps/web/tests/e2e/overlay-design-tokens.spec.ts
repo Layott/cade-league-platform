@@ -219,3 +219,131 @@ test("overlay design tokens — admin save reflects on /overlay route", async ({
   const freshHtml = await fresh.text();
   expect(freshHtml).toContain("--overlay-accent-color: #fe036d");
 });
+
+/**
+ * Phase A — bg-image upload + iframe propagation.
+ *
+ * Drives the cross-document fix end-to-end:
+ *   1. POST a fake bg-image URL via setDesignToken (bypassing the storage
+ *      upload step — that's covered by the action layer's own validation).
+ *      We use a 1×1 transparent PNG hosted on a known stable URL so the
+ *      assertion target is deterministic.
+ *   2. Navigate to /overlay/v2/07-leaderboard?demo=1.
+ *   3. Wait for the iframe to load.
+ *   4. Read the iframe's documentElement getComputedStyle and assert that
+ *      `--overlay-bg-image` matches the URL we set. This proves the
+ *      cross-document propagation: the outer page's SSR `<style>` block
+ *      can NOT have crossed into the iframe; the only way the iframe sees
+ *      the URL is through the URL-param bootstrap script + injected
+ *      `<style id="cade-injected-tokens">` block.
+ *   5. Soft-delete the token via Supabase service-role client (mirrors
+ *      the existing afterEach pattern).
+ *   6. Re-load the overlay route and assert the iframe's
+ *      `--overlay-bg-image` falls back to the empty / default state.
+ *
+ * Spec: tasks/todo.md "Phase A — review"
+ */
+test("overlay design tokens — bg-image propagates through iframe", async ({
+  page,
+  context,
+}) => {
+  const TEST_URL =
+    "https://placehold.co/1920x1080/050505/6bcd06.png?text=PHASE+A+TEST";
+
+  await cleanupOverlayTokens("07-leaderboard", "default");
+
+  // 1. Login as admin and persist the token via the same form path the
+  //    UI uses (saveTokensAction). The upload-action path requires real
+  //    file plumbing which is not easy to drive from an E2E in CI;
+  //    asserting the propagation is independent of upload — the URL
+  //    lands as a token_value either way.
+  await login(page);
+  await page.goto("/admin/broadcast/v2/design");
+  await page.getByTestId("overlay-picker").selectOption("07-leaderboard");
+  await page.getByTestId("variant-picker").selectOption("default");
+  await page.getByRole("button", { name: /Select/i }).click();
+  await page.waitForLoadState("networkidle");
+
+  // Persist the token directly via the service-role client — this is
+  // the only deterministic way to set a `bg-image` row without going
+  // through the upload action's storage roundtrip.
+  const sb = getServiceRoleClient();
+  if (!sb) {
+    test.skip();
+    return;
+  }
+  const { data: adminUser } = await sb
+    .from("users")
+    .select("id")
+    .eq("email", ADMIN_EMAIL)
+    .maybeSingle();
+  expect(adminUser?.id).toBeTruthy();
+  await sb.from("overlay_design_tokens").upsert(
+    {
+      overlay_key: "07-leaderboard",
+      variant_id: "default",
+      token_key: "bg-image",
+      token_value: TEST_URL,
+      token_type: "image",
+      set_by: adminUser!.id,
+      set_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      deleted_at: null,
+    },
+    { onConflict: "overlay_key,variant_id,token_key" },
+  );
+
+  // 2. Navigate to the overlay route. `?demo=1&preview=1&active=0` keeps
+  //    the iframe in the demo loop so it doesn't auto-trigger a fetch
+  //    against a missing session id.
+  const overlayPage = await context.newPage();
+  await overlayPage.goto("/overlay/v2/07-leaderboard?demo=1&preview=1&active=0");
+  await overlayPage.waitForLoadState("domcontentloaded");
+
+  // 3. Locate the iframe. The injector renders a single iframe pointing
+  //    at the public mirror.
+  const iframeHandle = await overlayPage.waitForSelector("iframe");
+  expect(iframeHandle).toBeTruthy();
+  // 4. Wait for the bootstrap script to inject the style block, then
+  //    read the computed `--overlay-bg-image` from the iframe document.
+  await overlayPage.waitForFunction(
+    () => {
+      const iframe = document.querySelector("iframe") as HTMLIFrameElement | null;
+      if (!iframe || !iframe.contentDocument) return false;
+      const inj = iframe.contentDocument.getElementById("cade-injected-tokens");
+      return !!inj;
+    },
+    null,
+    { timeout: 10_000 },
+  );
+  const innerBg = await overlayPage.evaluate(() => {
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement | null;
+    if (!iframe || !iframe.contentDocument) return null;
+    return getComputedStyle(iframe.contentDocument.documentElement)
+      .getPropertyValue("--overlay-bg-image")
+      .trim();
+  });
+  expect(innerBg).toContain("placehold.co");
+
+  // 5 + 6. Clear the token and re-verify the iframe falls back.
+  await cleanupOverlayTokens("07-leaderboard", "default");
+  await overlayPage.goto(
+    `/overlay/v2/07-leaderboard?demo=1&preview=1&active=0&_=${Date.now()}`,
+  );
+  await overlayPage.waitForLoadState("domcontentloaded");
+  // After cleanup, the bg-image token row is soft-deleted, so the
+  // SSR resolver returns the catalog default (empty string), and the
+  // bootstrap script SKIPS empty image values — so the injected style
+  // block should NOT contain `--overlay-bg-image`. Assert by computing
+  // the variable: it should be empty or revert to the HTML fallback.
+  const fallbackBg = await overlayPage.evaluate(() => {
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement | null;
+    if (!iframe || !iframe.contentDocument) return null;
+    return getComputedStyle(iframe.contentDocument.documentElement)
+      .getPropertyValue("--overlay-bg-image")
+      .trim();
+  });
+  // Either empty (no override) or the literal HTML fallback URL. Both
+  // are correct — what matters is that it's NOT the placehold.co URL.
+  expect(fallbackBg).not.toContain("placehold.co");
+});

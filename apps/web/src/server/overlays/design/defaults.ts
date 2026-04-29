@@ -91,6 +91,13 @@ export const TOKEN_CATALOG: readonly TokenCatalogEntry[] = [
   },
   { tokenKey: "pattern", tokenType: "enum", label: "Background pattern" },
   { tokenKey: "partner-strip-show", tokenType: "boolean", label: "Partner strip" },
+  {
+    tokenKey: "bg-image",
+    tokenType: "image",
+    label: "Background image",
+    description:
+      "Custom backdrop image (recommended 1920×1080 PNG/JPG/WebP, ≤2MB). Only available on full-canvas overlays.",
+  },
 ] as const;
 
 /**
@@ -166,16 +173,24 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
   "01-brb": {
     "partner-strip-show": "true",
     pattern: "halftone",
+    "bg-image": "",
   },
   "02-timer": {
     "partner-strip-show": "false",
   },
-  "04-h2h-2": {},
-  "05-h2h-3": {},
-  "06-h2h-5": {},
+  "04-h2h-2": {
+    "bg-image": "",
+  },
+  "05-h2h-3": {
+    "bg-image": "",
+  },
+  "06-h2h-5": {
+    "bg-image": "",
+  },
   "07-leaderboard": {
     "row-highlight-count": "3",
     pattern: "halftone",
+    "bg-image": "",
   },
   "08-lower-third": {
     "pos-x": "60",
@@ -194,12 +209,15 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
   },
   "11-match-scores-day": {
     "partner-strip-show": "false",
+    "bg-image": "",
   },
   "12-starting-soon": {
     "partner-strip-show": "true",
+    "bg-image": "",
   },
   "13-stream-ended": {
     "partner-strip-show": "true",
+    "bg-image": "",
   },
   "14-top-scorers": {
     "row-highlight-count": "3",
@@ -210,6 +228,37 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
     "partner-strip-show": "false",
   },
 };
+
+/**
+ * The eight overlay keys that are full-canvas (1920×1080 backdrop visible
+ * to the viewer). Only these support a custom `bg-image` token — floating
+ * UI cards (timer, lower-third, score-bug, up-next, top-scorers, orgs,
+ * coaches, penalties) sit on a transparent canvas where a backdrop makes
+ * no sense.
+ *
+ * The admin design editor reads this list to gate the bg-image widget.
+ * The seed migration `20260612000001_overlay_design_tokens_bg_image.sql`
+ * inserts default rows for exactly these keys.
+ */
+export const BG_IMAGE_SUPPORTED_KEYS: readonly OverlayKey[] = [
+  "01-brb",
+  "04-h2h-2",
+  "05-h2h-3",
+  "06-h2h-5",
+  "07-leaderboard",
+  "11-match-scores-day",
+  "12-starting-soon",
+  "13-stream-ended",
+] as const;
+
+/**
+ * Whether the given overlay key supports a custom background image.
+ * Used by the design editor to filter the catalog + the upload action
+ * to validate the request.
+ */
+export function supportsBgImage(overlayKey: string): boolean {
+  return (BG_IMAGE_SUPPORTED_KEYS as readonly string[]).includes(overlayKey);
+}
 
 /**
  * Resolve the hard-coded defaults for a given overlay key. DB rows in

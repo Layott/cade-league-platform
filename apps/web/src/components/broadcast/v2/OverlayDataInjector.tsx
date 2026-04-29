@@ -150,7 +150,61 @@ export type OverlayDataInjectorProps = {
    * callers that pass an explicit `sessionId`.
    */
   ambient?: boolean;
+  /**
+   * Phase A — overlay design tokens.
+   *
+   * Persisted DB tokens for this overlay+variant, resolved server-side
+   * via `resolveTokens` and injected into the iframe URL as
+   * `?tokens=<base64-json>`. The static HTML's inline bootstrap script
+   * decodes the param into a `<style id="cade-injected-tokens">` block
+   * appended to `<head>` — landing AFTER the HTML's hard-coded
+   * `:root{...}` defaults so its values win the CSS source-order cascade.
+   *
+   * This is the cross-document propagation fix (the SSR `<style>` blocks
+   * the page injects sit on the OUTER document; CSS variables don't
+   * cross the iframe boundary so the persisted tokens never reached the
+   * actual rendered overlay HTML before this).
+   */
+  designTokens?: Record<string, string>;
+  /**
+   * Phase A — admin live-preview overrides. Same wire as `designTokens`
+   * but encoded into `?previewTokens=<base64-json>`. Both blocks are
+   * appended to `<head>` in order: design first, preview second, so
+   * preview overrides design via source-order. Pass undefined when the
+   * caller is not the admin design editor (live OBS, mini-previews) so
+   * the iframe URL stays clean.
+   */
+  previewTokens?: Record<string, string>;
 };
+
+/**
+ * Unicode-safe base64 encoder for the design-token query param.
+ *
+ * `btoa` only handles latin1; brand strings can contain UTF-8
+ * (e.g. an apostrophe in a future overlay label, or an em-dash in a
+ * description). The `unescape(encodeURIComponent(...))` dance widens
+ * to UTF-8 before `btoa` reads it. We intentionally do NOT URL-safe
+ * encode (`+/=` swap) — the iframe-side decoder uses the standard
+ * alphabet via `atob` to keep the inline `<script>` minimal.
+ */
+function encodeTokensParam(tokens: Record<string, string>): string {
+  if (!tokens || Object.keys(tokens).length === 0) return "";
+  try {
+    const json = JSON.stringify(tokens);
+    if (typeof btoa === "function") {
+      // `unescape` is deprecated in favour of `decodeURIComponent`, but
+      // it's still the standard pattern for the latin1-widening trick
+      // that lets `btoa` handle UTF-8 strings without throwing
+      // `InvalidCharacterError` on multibyte characters.
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+    // SSR / Node fallback (component is "use client" but this branch
+    // exists for unit-test friendliness).
+    return Buffer.from(json, "utf-8").toString("base64");
+  } catch {
+    return "";
+  }
+}
 
 export default function OverlayDataInjector({
   overlayKey,
@@ -160,6 +214,8 @@ export default function OverlayDataInjector({
   active = true,
   slot = null,
   ambient = false,
+  designTokens,
+  previewTokens,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -603,6 +659,21 @@ export default function OverlayDataInjector({
   // slot, the static HTML reads `?slot=N` to hide the other anchors +
   // filter postMessages. Live (OBS) URLs leave it unset.
   if (slot != null) params.set("slot", String(slot));
+  // Phase A — overlay design tokens are forwarded via b64-JSON query
+  // params. The static HTML's inline bootstrap script decodes them and
+  // appends a `<style id="cade-injected-tokens">` block to its own
+  // `<head>` so the persisted tokens + admin live-preview overrides
+  // actually reach the rendered iframe (CSS variables don't cross
+  // document boundaries — the SSR `<style>` blocks on the outer page
+  // were never visible inside the iframe).
+  if (designTokens && Object.keys(designTokens).length > 0) {
+    const enc = encodeTokensParam(designTokens);
+    if (enc) params.set("tokens", enc);
+  }
+  if (previewTokens && Object.keys(previewTokens).length > 0) {
+    const enc = encodeTokensParam(previewTokens);
+    if (enc) params.set("previewTokens", enc);
+  }
   const qs = params.toString();
   const src = `/overlays/v2/${overlayKey}/index.html${qs ? `?${qs}` : ""}`;
 

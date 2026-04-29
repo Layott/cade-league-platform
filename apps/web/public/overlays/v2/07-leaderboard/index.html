@@ -30,6 +30,81 @@
   <meta name="viewport" content="width=1920, initial-scale=1" />
   <title>CADE — Elite League Leaderboard</title>
 
+
+<script id="cade-token-bootstrap">
+(function() {
+  // Phase A — cross-document design-token propagation.
+  //
+  // Read base64-encoded JSON token maps from the iframe URL query
+  // string and emit a <style id="cade-injected-tokens"> block whose
+  // :root rules WIN over the HTML's hard-coded defaults below (CSS
+  // source-order cascade — the injected block is appended LATER in
+  // <head>). Image tokens are wrapped in url("..."); other tokens
+  // pass through after stripping the same metacharacters the server-
+  // side schema rejects (;{}<>"').
+  function decodeTokens(param) {
+    if (!param) return null;
+    try {
+      var json = decodeURIComponent(escape(atob(param)));
+      var obj = JSON.parse(json);
+      if (typeof obj !== 'object' || !obj) return null;
+      return obj;
+    } catch (e) { return null; }
+  }
+  function buildCssVars(tokens) {
+    if (!tokens) return '';
+    var parts = [];
+    var imageKeys = { 'bg-image': 1 };
+    for (var k in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, k)) continue;
+      var v = tokens[k];
+      if (typeof v !== 'string') continue;
+      // Strip CSS metacharacters that could break out of the var rule.
+      var safe = v.replace(/[;{}<>"']/g, '');
+      if (imageKeys[k]) {
+        // Empty image value = "no override, use HTML fallback".
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': url("' + safe + '")');
+      } else {
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': ' + safe);
+      }
+    }
+    return parts.length ? ':root{' + parts.join(';') + ';}' : '';
+  }
+  try {
+    var qs = new URLSearchParams(location.search);
+    var design = decodeTokens(qs.get('tokens'));
+    var preview = decodeTokens(qs.get('previewTokens'));
+    // Source order: design first, preview second so preview wins.
+    var rule = buildCssVars(design) + buildCssVars(preview);
+    if (!rule) return;
+    var emit = function() {
+      // Re-check head — defensive against the rare case where a
+      // browser inserts <head> only after DOMContentLoaded.
+      if (!document.head) return;
+      var style = document.createElement('style');
+      style.id = 'cade-injected-tokens';
+      style.textContent = rule;
+      document.head.appendChild(style);
+    };
+    // ALWAYS defer to DOMContentLoaded — running synchronously
+    // during <head> parse appends BEFORE the author <style> blocks
+    // get parsed, so author :root{} defaults win the cascade and our
+    // override is invisible. Deferring lands the injected block AFTER
+    // all author <style> blocks → our overrides win source-order.
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', emit);
+    } else {
+      emit();
+    }
+  } catch (e) {
+    // Bootstrap MUST never throw — it would white-flash the overlay
+    // and break OBS chroma-key. Swallow + fall back to defaults.
+  }
+})();
+</script>
+
 <style>
   /* REAL BRAND FONTS */
   @font-face {
@@ -167,25 +242,26 @@
   }
 
   /* ============================================================
-     BACKGROUND — bright lime-green wall + halftone-dot texture.
+     BACKGROUND — ELITE S2 BG (matches the rest of the v2 family).
+     Phase A — admins can override `--overlay-bg-image` per variant.
+     The fallback was the green linear-gradient + halftone-dot pair;
+     the ELITE S2 BG already carries its own texture so the .bg-halftone
+     element is hidden by default (kept in the DOM for back-compat with
+     existing templates that target it via realtime postMessages).
   ============================================================ */
   .bg-fill {
     position: absolute; inset: 0;
-    background: linear-gradient(180deg, var(--green-bright) 0%, var(--green) 32%, var(--green-deep) 100%);
+    background-image: var(--overlay-bg-image, url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png'));
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     z-index: 0;
   }
   .bg-halftone {
-    position: absolute; inset: -2%;
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.42) 1.4px, transparent 1.7px);
-    background-size: 14px 14px;
-    background-position: 0 0;
-    opacity: 0.65;
-    mix-blend-mode: multiply;
-    z-index: 1;
-    pointer-events: none;
-    /* slow drift so the dot field doesn't read as a static wallpaper */
-    animation: halftone-drift 28s ease-in-out infinite alternate;
+    /* Disabled by default — ELITE S2 BG carries the texture. Producers
+       can re-enable via a future `--overlay-pattern: halftone` token if
+       a custom (un-textured) bg-image is uploaded. */
+    display: none;
   }
   @keyframes halftone-drift {
     0%   { transform: translate(0, 0) scale(1); }
@@ -193,9 +269,12 @@
   }
   .bg-vignette {
     position: absolute; inset: 0;
+    /* Stronger vignette than the green-wall variant — dark ELITE S2 bg
+       needs less inner contrast push but readability at the bottom row
+       benefits from a deeper falloff. */
     background:
-      radial-gradient(ellipse at 50% 38%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.05) 55%, rgba(0,0,0,0.28) 100%),
-      linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 65%, rgba(0,0,0,0.20) 100%);
+      radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.55) 100%),
+      linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.10) 60%, rgba(0,0,0,0.45) 100%);
     z-index: 2;
     pointer-events: none;
   }

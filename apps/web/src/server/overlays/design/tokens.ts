@@ -26,7 +26,29 @@ export type TokenType =
   | "number"
   | "boolean"
   | "enum"
-  | "string";
+  | "string"
+  | "image";
+
+/**
+ * Wrap an image URL into a CSS `url("...")` value, stripping the same
+ * metacharacters the `decodePreviewTokens` schema rejects (`;{}<>"'`)
+ * so a malformed token value can never break out of the variable
+ * context. Returns the empty string when the input is empty so callers
+ * can detect "no override, fall back to HTML default".
+ *
+ * Used by the iframe-side inline script (mirrored in JS) and by any
+ * server-side code that needs to embed a stored image URL into a CSS
+ * `:root` block. SSR doesn't actually wrap image tokens itself — the
+ * raw URL passes through `escapeCssValue` and lands as the bare value
+ * of `--overlay-bg-image`. The CONSUMER stylesheet inside each overlay
+ * HTML is responsible for the `url(...)` framing via
+ * `background-image: var(--overlay-bg-image, url(<fallback>))`.
+ */
+export function escapeUrl(value: string): string {
+  if (!value) return "";
+  const safe = value.replace(/[;{}<>"']/g, "");
+  return `url("${safe}")`;
+}
 
 export type DesignToken = {
   overlayKey: string;

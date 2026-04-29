@@ -303,6 +303,8 @@ export default async function OverlayV2Page({
         active={isActive}
         slot={slotParsed}
         ambient={ambient}
+        designTokens={designTokens}
+        previewTokens={previewTokens ?? undefined}
       />
     </>
   );
