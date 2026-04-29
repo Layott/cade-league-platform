@@ -387,6 +387,57 @@ describe("OverlayDataInjector", () => {
     fetchSpy.mockRestore();
   });
 
+  // 2026-04-28 — Bug #25 fix.
+  // The SSR wrapper at `/overlay/v2/<key>` used to silently drop
+  // `?demo=1`, breaking the demo cycle on direct navigation + the admin
+  // design editor preview (which relies on `?demo=1&preview=1&active=1`
+  // to fire the entry animation in its embedded iframe).
+  describe("demo prop", () => {
+    it("appends demo=1 to iframe src when demo=true", () => {
+      const { container } = render(
+        <OverlayDataInjector overlayKey="01-brb" demo />,
+      );
+      const iframe = getIframe(container);
+      const src = iframe.getAttribute("src")!;
+      expect(src.startsWith("/overlays/v2/01-brb/index.html?")).toBe(true);
+      expect(src).toContain("demo=1");
+    });
+
+    it("does NOT append demo when prop is omitted (default)", () => {
+      const { container } = render(<OverlayDataInjector overlayKey="01-brb" />);
+      const iframe = getIframe(container);
+      const src = iframe.getAttribute("src")!;
+      // Live OBS / vMix URLs must NOT carry `demo` so the demo loop
+      // never fires on stream.
+      expect(src).not.toContain("demo=1");
+    });
+
+    it("does NOT append demo when prop is false", () => {
+      const { container } = render(
+        <OverlayDataInjector overlayKey="01-brb" demo={false} />,
+      );
+      const iframe = getIframe(container);
+      const src = iframe.getAttribute("src")!;
+      expect(src).not.toContain("demo=1");
+    });
+
+    it("emits demo=1 alongside session + token params", () => {
+      const { container } = render(
+        <OverlayDataInjector
+          overlayKey="07-leaderboard"
+          sessionId="sess-d"
+          token="tok-d"
+          demo
+        />,
+      );
+      const iframe = getIframe(container);
+      const src = iframe.getAttribute("src")!;
+      expect(src).toContain("session=sess-d");
+      expect(src).toContain("token=tok-d");
+      expect(src).toContain("demo=1");
+    });
+  });
+
   // Ambient-session mode (2026-04-26).
   describe("ambient mode", () => {
     it("polls /api/broadcast/active-session on mount when ambient=true", async () => {

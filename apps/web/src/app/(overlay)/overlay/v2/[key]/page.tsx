@@ -143,6 +143,27 @@ type SearchParams = {
   previewTextTokens?: string;
   previewPartnerTokens?: string;
   previewAnimTokens?: string;
+  /**
+   * 2026-04-28 — Bug #25 fix.
+   *
+   * Forward the `?demo=1` query param down into the iframe URL so the
+   * static HTML's demo-loop script (gated on `?demo=1` per CLAUDE.md
+   * §14) actually runs when the user navigates the SSR wrapper route
+   * `/overlay/v2/<key>?demo=1`. Before this, the SSR page resolved
+   * tokens + built the iframe `src` with `?session=` / `?token=` /
+   * `?tokens=` / `?previewTokens=` etc. but silently dropped `demo`,
+   * which broke:
+   *   - Direct navigation to `/overlay/v2/<key>?demo=1` for QA + demo
+   *     preview (verification report 2026-04-28).
+   *   - The admin design editor preview iframe (passes
+   *     `?demo=1&preview=1&active=1` — only the latter two were
+   *     reaching the static HTML, so the demo cycle never fired).
+   *
+   * Static HTML at `/overlays/v2/<key>/index.html?demo=1` was already
+   * working — only the SSR wrapper was lossy. Any truthy value (`1`,
+   * `true`, `yes`) flips it on for forgiveness with hand-typed URLs.
+   */
+  demo?: string;
 };
 
 /**
@@ -180,7 +201,14 @@ export default async function OverlayV2Page({
     previewTextTokens: previewTextTokensRaw,
     previewPartnerTokens: previewPartnerTokensRaw,
     previewAnimTokens: previewAnimTokensRaw,
+    demo,
   } = await searchParams;
+  // 2026-04-28 — Bug #25. Normalize the `?demo` flag so the same set of
+  // truthy values (`1` / `true` / `yes`) all enable the demo cycle. The
+  // flag is later forwarded to OverlayDataInjector → iframe URL so the
+  // static HTML's `data-tag="cade-demo-mode"` script (gated on
+  // `?demo=1`) fires on the SSR wrapper route.
+  const isDemo = demo === "1" || demo === "true" || demo === "yes";
   if (!ALLOWED_KEYS.has(key)) {
     const alias = KEY_ALIASES[key];
     if (alias) redirect(`/overlay/v2/${alias}`);
@@ -427,6 +455,7 @@ export default async function OverlayV2Page({
         active={isActive}
         slot={slotParsed}
         ambient={ambient}
+        demo={isDemo}
         designTokens={designTokens}
         previewTokens={previewTokens ?? undefined}
         designTextTokens={designTextTokens}

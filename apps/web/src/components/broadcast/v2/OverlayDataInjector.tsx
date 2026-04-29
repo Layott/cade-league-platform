@@ -170,6 +170,22 @@ export type OverlayDataInjectorProps = {
    */
   ambient?: boolean;
   /**
+   * 2026-04-28 — Bug #25 fix.
+   *
+   * When the SSR wrapper route at `/overlay/v2/<key>` is invoked with
+   * `?demo=1` (or `?demo=true` / `?demo=yes`), the page-level resolver
+   * passes `demo=true` here and the injector appends `demo=1` onto the
+   * iframe `src`. The static HTML's `data-tag="cade-demo-mode"` block
+   * is gated on `?demo=1` per CLAUDE.md §14, so without this hop the
+   * demo cycle never fires when navigating the SSR wrapper directly
+   * (the OBS-source flow + admin design editor preview both depend on
+   * this).
+   *
+   * Live (non-demo) OBS / vMix URLs leave this false so the demo loop
+   * never fires on stream.
+   */
+  demo?: boolean;
+  /**
    * Phase A — overlay design tokens.
    *
    * Persisted DB tokens for this overlay+variant, resolved server-side
@@ -411,6 +427,7 @@ export default function OverlayDataInjector({
   active = true,
   slot = null,
   ambient = false,
+  demo = false,
   designTokens,
   previewTokens,
   designTextTokens,
@@ -862,6 +879,14 @@ export default function OverlayDataInjector({
   // slot, the static HTML reads `?slot=N` to hide the other anchors +
   // filter postMessages. Live (OBS) URLs leave it unset.
   if (slot != null) params.set("slot", String(slot));
+  // 2026-04-28 Bug #25 — forward `?demo=1` from the SSR wrapper into the
+  // iframe URL so the static HTML's `data-tag="cade-demo-mode"` script
+  // (gated on `?demo=1` per CLAUDE.md §14) actually fires. Without this
+  // the demo cycle was lost between `/overlay/v2/<key>?demo=1` and the
+  // inner `/overlays/v2/<key>/index.html` source. Always emit a literal
+  // `1` so the static HTML's strict equality check passes regardless of
+  // which truthy form the caller used (`1` / `true` / `yes`).
+  if (demo) params.set("demo", "1");
   // Phase A — overlay design tokens are forwarded via b64-JSON query
   // params. The static HTML's inline bootstrap script decodes them and
   // appends a `<style id="cade-injected-tokens">` block to its own

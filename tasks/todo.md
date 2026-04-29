@@ -890,3 +890,51 @@ generic boxes — all with human-readable labels.
 
 - Admin "rename" UI knob — current implementation accepts displayLabel via the FormData layer but doesn't yet expose an inline text input on the row (the value is read-only in the row header). Follow-up slice can add a small Edit-label affordance once the user requests it; for now the seed-backfill values are already brand-correct.
 - E2E spec for displayLabel persistence — not added in this slice (covered indirectly by the existing overlay-design-tokens spec). Add a dedicated E2E if a regression slips past the unit tests.
+
+## Bugs #25 + #26 — review (2026-04-28)
+
+Two small bug fixes from the verification pass. Both surgical, single commit, no architectural change.
+
+### Bug #25 — SSR `/overlay/v2/[key]` dropped `?demo=1`
+
+**Symptom (verification report 2026-04-28):**
+- `https://cade-league.vercel.app/overlay/v2/01-brb?demo=1` rendered the static HTML with NO demo cycle running. `/overlays/v2/01-brb/index.html?demo=1` (direct static) worked.
+- The admin design editor preview iframe (which sets `?demo=1&preview=1&active=1` per `OverlayDesignEditor.tsx:1196-1213`) was hitting the SSR wrapper but losing `demo`, so the preview never auto-fired the entry animation.
+
+**Root cause:**
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` destructured `searchParams` for `session`, `token`, `season`, `preview`, `active`, `slot`, `variant`, `previewTokens`, `previewTextTokens`, `previewPartnerTokens`, `previewAnimTokens` — but NOT `demo`.
+- The page resolved tokens server-side, set up two `<style>` blocks, and handed the rest off to `OverlayDataInjector`. The injector built the iframe `src` from its own props — none of which carried demo state.
+- Result: every URL query param except `demo` made it to the iframe.
+
+**Fix:**
+1. Added `demo?: string` to `SearchParams` in `page.tsx`.
+2. Destructured `demo` and computed `const isDemo = demo === "1" || demo === "true" || demo === "yes"` (forgiving on hand-typed URLs; the static HTML's `data-tag="cade-demo-mode"` script does a strict `=== '1'` check, so the injector always emits `demo=1` regardless of which truthy form the caller used).
+3. Added `demo={isDemo}` prop pass to `OverlayDataInjector`.
+4. Added `demo?: boolean` to `OverlayDataInjectorProps` (default `false` — preserves all existing test-suite calls + ensures live OBS / vMix URLs never auto-fire the demo).
+5. In the iframe URL builder: `if (demo) params.set("demo", "1")`.
+6. Added 4 new unit tests in `OverlayDataInjector.test.tsx` covering: demo=true appends, default omits, explicit false omits, demo coexists with session+token params.
+
+**Files changed:**
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` — searchParams type + isDemo + prop pass.
+- `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx` — prop type + default + URL builder.
+- `apps/web/src/components/broadcast/v2/OverlayDataInjector.test.tsx` — 4 new tests in `describe("demo prop")`.
+
+### Bug #26 — `/player/profile` returns 404
+
+**Symptom:** Verification flagged that nav drawer + admin referer links use `/player/profile` (per JSDoc comments in `PlayerSubnav.tsx:17-19` and `NavDrawer.tsx:36-39` saying "still exists as a redirect stub for stale bookmarks") — but the stub was never created. The `(auth)/profile/` directory exists; `player/profile/` does not.
+
+**Fix (option 1 — least invasive):** Created `apps/web/src/app/player/profile/page.tsx` that 307-redirects to `/profile`. Same one-line redirect-only pattern as `/player/disputes/page.tsx` and `/player/appeals/page.tsx` (UI Audit Slice 2 stubs from 2026-04-28). `redirect()` from `next/navigation` issues a 307 by default from a server component, preserving request method on POST callers + signaling crawlers that `/profile` is canonical.
+
+**Files changed:**
+- `apps/web/src/app/player/profile/page.tsx` — new 21-line redirect stub.
+
+### Verification
+
+- **Unit tests:** `npm run test` — 198 files, 2138 tests, all green (was 2134; +4 new tests for the demo prop).
+- **Lint:** `npm run lint` — 0 errors, 16 warnings (all pre-existing — none introduced by my changes).
+- **Build:** `npm run build` — clean. `/player/profile` route registered (323 B, same size as the disputes redirect stub). `/overlay/v2/[key]` size unchanged at 2.54 kB / 194 kB First Load JS.
+- **Prod verification:** see commit + push step below.
+
+### Out-of-scope changes left in working tree
+
+The repo had pre-existing modifications from another agent on H2H components + API routes (`H2HComparisonCard.tsx`, `api/broadcast/sessions/[id]/h2h/route.ts`, etc.). Those are NOT in my commit — only the 4 bug-fix files staged.
