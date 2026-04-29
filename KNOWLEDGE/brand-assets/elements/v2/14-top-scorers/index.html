@@ -1456,15 +1456,32 @@
         const p3 = document.querySelector('.pod-card--p3 .pod-goals');
         if (!p1 || !p2 || !p3) return;
 
-        [p1, p2, p3].forEach(el => { el.textContent = '0'; });
+        // B6 fix (2026-04-28): drop hardcoded `|| 22 / 19 / 17` fallback
+        // demo numbers that persisted in OBS when the live payload was
+        // empty. NaN now renders an em-dash so producers get a clear
+        // "no data" signal instead of phantom goal counts. Pods that
+        // already carry a target attribute roll normally.
+        const t1 = parseInt(p1.dataset.target || p1.textContent, 10);
+        const t2 = parseInt(p2.dataset.target || p2.textContent, 10);
+        const t3 = parseInt(p3.dataset.target || p3.textContent, 10);
 
-        const t1 = parseInt(p1.dataset.target || p1.textContent, 10) || 22;
-        const t2 = parseInt(p2.dataset.target || p2.textContent, 10) || 19;
-        const t3 = parseInt(p3.dataset.target || p3.textContent, 10) || 17;
+        function maybeRoll(el, t, delay) {
+          if (Number.isNaN(t)) {
+            el.textContent = '—';
+            return;
+          }
+          setTimeout(() => rollOne(el, t, 900), delay);
+        }
 
-        setTimeout(() => rollOne(p3, t3, 900), offsets.p3);
-        setTimeout(() => rollOne(p2, t2, 900), offsets.p2);
-        setTimeout(() => rollOne(p1, t1, 900), offsets.p1);
+        // Reset visible counters before tweening only when we have a real
+        // target — otherwise leave the em-dash in place.
+        if (!Number.isNaN(t1)) p1.textContent = '0';
+        if (!Number.isNaN(t2)) p2.textContent = '0';
+        if (!Number.isNaN(t3)) p3.textContent = '0';
+
+        maybeRoll(p3, t3, offsets.p3);
+        maybeRoll(p2, t2, offsets.p2);
+        maybeRoll(p1, t1, offsets.p1);
       };
       // No initial run; no setInterval. Live handler triggers it on show.
     })();
@@ -1483,24 +1500,31 @@
       function rebuildTail(scorers) {
         if (!tailStrip) return;
         var html = '';
-        // Render up to 7 cells for ranks 4..10 from index 3..9.
-        for (var i = 3; i < Math.min(10, scorers.length); i++) {
-          var s = scorers[i] || {};
-          var photo = s.photoUrl
+        // B6 fix (2026-04-28): always render 7 cells (ranks 4..10) so the
+        // user sees the full structure in OBS even when only top-3 (or
+        // zero) scorers are live. Slots without a scorer carry em-dash
+        // placeholders for both name and goals — matching the empty-state
+        // convention used by the podium pods.
+        for (var i = 3; i < 10; i++) {
+          var s = scorers && scorers[i] ? scorers[i] : null;
+          var rankNumber = (s && s.rank) ? s.rank : (i + 1);
+          var nameText = s && s.name ? s.name : '(empty)';
+          var goalsText = s && typeof s.goals === 'number' ? s.goals : '—';
+          var photoHtml = s && s.photoUrl
             ? '<img src="' + s.photoUrl + '" alt="' + (s.name || '') + '" />'
             : '';
           html += '<article class="tail-cell">' +
             '<div class="tail-header">' +
-              '<span class="tail-rank">' + (s.rank || (i + 1)) + '</span>' +
+              '<span class="tail-rank">' + rankNumber + '</span>' +
               '<span class="tail-tag">Pos</span>' +
             '</div>' +
             '<div class="tail-photo-wrap">' +
-              '<div class="tail-photo">' + photo + '</div>' +
+              '<div class="tail-photo">' + photoHtml + '</div>' +
               '<div class="tail-photo-ring" aria-hidden="true"></div>' +
             '</div>' +
-            '<div class="tail-name">' + (s.name || '—') + '</div>' +
+            '<div class="tail-name">' + nameText + '</div>' +
             '<div class="tail-goals-row">' +
-              '<div class="tail-goals">' + (typeof s.goals === 'number' ? s.goals : '0') + '</div>' +
+              '<div class="tail-goals">' + goalsText + '</div>' +
               '<div class="tail-goals-label">G</div>' +
             '</div>' +
           '</article>';
@@ -1534,9 +1558,7 @@
         var scorers = readScorers(data);
         if (!scorers) return;
         if (scorers.length === 0) {
-          console.info('[overlay/14-top-scorers] empty scorers[]; clearing mock');
-          // Fall through to the loop below — `entry` will be null for all 3
-          // pods and they'll be cleared.
+          console.info('[overlay/14-top-scorers] empty scorers[]; rendering empty-state placeholders');
         }
         // Normalize server shape (rank/displayName/goals/photoUrl) into the
         // overlay's expected shape (rank/name/slug/goals/photoUrl).
@@ -1550,7 +1572,10 @@
           };
         });
         console.info('[overlay/14-top-scorers] scorers[]', normalized.length);
-        // Clear pods 2/3 and tail when fewer scorers come in than slots.
+        // B6 fix (2026-04-28): when a pod slot lacks a scorer, show a
+        // `(no scorers)` placeholder + em-dash goals + clear the photo.
+        // dataset.target is REMOVED so the digit-roll renders em-dash
+        // (Number.isNaN branch) instead of cycling demo defaults.
         var pods = ['p1', 'p2', 'p3'];
         for (var i = 0; i < pods.length; i++) {
           var entry = i < normalized.length ? normalized[i] : null;
@@ -1565,13 +1590,18 @@
             if (nameEl && entry.name) nameEl.textContent = entry.name;
             if (img && entry.photoUrl) img.src = entry.photoUrl;
           } else {
-            // Fewer than 3 scorers — clear unused pod slots.
-            if (goalsEl) { goalsEl.dataset.target = '0'; goalsEl.textContent = '—'; }
-            if (nameEl) nameEl.textContent = '—';
+            if (goalsEl) {
+              // Drop dataset.target entirely so digit-roll skips this pod.
+              if (goalsEl.dataset && 'target' in goalsEl.dataset) {
+                delete goalsEl.dataset.target;
+              }
+              goalsEl.textContent = '—';
+            }
+            if (nameEl) nameEl.textContent = '(no scorers)';
             if (img) img.removeAttribute('src');
           }
         }
-        // Always rebuild tail (will clear when length <= 3).
+        // Always rebuild tail (renders 7 placeholder slots when no data).
         rebuildTail(normalized);
       }
       function show() {
@@ -1650,6 +1680,43 @@
   }
   apply();
   new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+})();
+</script>
+<script data-tag="cade-clear-static-seeds">
+/* B6 fix (2026-04-28): when this overlay is loaded by OBS (NOT in demo
+   mode), drop the static hardcoded podium goal seeds (22 / 19 / 17) and
+   tail-strip seeds so the bug "random goal numbers in OBS" disappears
+   even when no postMessage update has fired yet. Demo mode keeps the
+   seeds so the local preview cycle still has something to render
+   before the demo loop fires its synthetic `show`. */
+(function(){
+  if (new URLSearchParams(location.search).get('demo') === '1') return;
+  function clear(el) {
+    if (!el) return;
+    if (el.dataset && 'target' in el.dataset) delete el.dataset.target;
+    el.textContent = '—';
+  }
+  function clearName(el, msg) { if (el) el.textContent = msg; }
+  // Pods
+  clear(document.querySelector('.pod-card--p1 .pod-goals'));
+  clear(document.querySelector('.pod-card--p2 .pod-goals'));
+  clear(document.querySelector('.pod-card--p3 .pod-goals'));
+  clearName(document.querySelector('.pod-card--p1 .pod-name'), '(no scorers)');
+  clearName(document.querySelector('.pod-card--p2 .pod-name'), '(no scorers)');
+  clearName(document.querySelector('.pod-card--p3 .pod-name'), '(no scorers)');
+  // Pod photos — clear src so static demo headshots don't bleed through.
+  document.querySelectorAll('.pod-photo img').forEach(function(img){
+    img.removeAttribute('src');
+  });
+  // Tail cells — replace each rendered cell's name + goals with placeholders.
+  document.querySelectorAll('.tail-cell').forEach(function(cell){
+    var n = cell.querySelector('.tail-name');
+    var g = cell.querySelector('.tail-goals');
+    var img = cell.querySelector('.tail-photo img');
+    if (n) n.textContent = '(empty)';
+    if (g) g.textContent = '—';
+    if (img) img.removeAttribute('src');
+  });
 })();
 </script>
 <script data-tag="cade-demo-mode">

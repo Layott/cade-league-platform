@@ -248,3 +248,37 @@ Bug 5 + 6 (07-leaderboard) and Bug 8 (11-match-scores-day) cleanups requested in
 - The sync script intentionally rewrites paths during mirror — "byte-identical" is impossible by design. Verify by running the sync, then diff and confirm only path rewrites differ. Captured in `tasks/lessons.md` 2026-04-29.
 - `git stash --include-untracked` plus an existing pre-session stash (`pre-slice3-wip`) on the same workspace is risky: pop can pull in unrelated working-tree changes from other agents' WIP slices. Always verify the post-pop diff includes only your own work; stage explicitly with `git add <file>` rather than `git add -A` to avoid accidentally committing other agents' in-flight code. Captured in `tasks/lessons.md` 2026-04-29.
 
+## Phase B3 + B6 — review
+
+Brief: smooth out 09-secondary-score-bug entry crack (B3) + clear top-scorers demo seeds + render full 4-10 tail strip + photo path normalization (B6). Both targets sit OUTSIDE the Phase A bootstrap-script set (09 is anchored, 14 was not in the 8 full-canvas list). No Phase A preservation needed.
+
+### B3 — `KNOWLEDGE/brand-assets/elements/v2/09-secondary-score-bug/index.html`
+
+- **a) `@keyframes entry` collapsed from 4-stop overshoot to 2-keyframe ease-out.** Was: `0% translateX(120%) scale(0.88) opacity 0; 35% translateX(20%) scale(0.96) opacity 0.7; 72% translateX(-2%) scale(1.02) opacity 1; 100% translateX(0) scale(1) opacity 1;` paired with `cubic-bezier(.18,.9,.28,1.18)` (overshoot-bouncy). Now: `0% translateX(140%) scale(0.95) opacity 0; 100% translateX(0) scale(1) opacity 1;` with `cubic-bezier(0.22, 1, 0.36, 1)` (smooth ease-out). Duration 0.9s → 0.65s — feels snappier without the visible overshoot crack at 35% / 72% stops.
+- **b) `.bar` `glowPulse` gated on `.bug-mount.entered`.** Was running concurrently with the entry transform — two animations competing for paint frames during the 0.65s reveal. Now scoped via `.bug-mount.entered .bar { animation: glowPulse ... }`. JS adds `.entered` on `animationend` of the `entry` keyframe (filtered by `event.animationName === 'entry'` so `pulseRing` and `scorePop` don't trigger early). `show()` removes `.entered` + re-arms the listener so each cycle waits for a fresh entry to finish before resuming the loop.
+
+### B6 — `KNOWLEDGE/brand-assets/elements/v2/14-top-scorers/index.html`
+
+- **a) Hardcoded fallback demo numbers `|| 22 / 19 / 17` dropped from `__cadeRunDigitRoll`.** Was: `parseInt(...) || 22` would render the demo-time placeholder when the live payload was empty. Now: `parseInt(...)` returns NaN when no `data-target` is present + the new `maybeRoll` helper renders an em-dash for NaN. Real data still rolls 0 → target as before.
+- **b) `rebuildTail` now ALWAYS renders 7 cells (ranks 4-10).** Was: `for (var i = 3; i < Math.min(10, scorers.length); i++)` skipped the loop when `scorers.length <= 3`. Now: `for (var i = 3; i < 10; i++)` renders all 7 slots; missing data falls through to `(empty)` name + `—` goals + no photo. Matches user complaint "only top 3 with no pictures" — the tail strip is now visible structurally even with sparse data.
+- **c) Empty-state placeholder for podium pods.** When `update()` runs with fewer than 3 scorers, the unused pods now show name `(no scorers)` + goals `—` + cleared photo `src`. The `dataset.target` attribute is DELETED (not just zeroed), so the digit-roll skips that pod via the new NaN branch. Producer sees clear "no data" signal in OBS.
+- **d) New `cade-clear-static-seeds` IIFE strips placeholder seeds on production load.** When `?demo=1` is absent, the script clears all 3 podium pods (`data-target` deleted, text → `—`, names → `(no scorers)`, photo `src` removed) and all 7 tail-strip cells (names → `(empty)`, goals → `—`, photo `src` removed) BEFORE any postMessage `show` arrives. Demo mode (`?demo=1`) keeps the seeds intact so the local preview still renders the designed state. This kills the "random goal numbers in OBS" symptom even if the broadcast control panel ships `show` without `data`.
+- **e) Demo loop already guarded by `?demo=1`.** Confirmed at line 1687 — the brief's concern about (3) was based on a stale view of the file. No change needed.
+- **f) Photo path normalization via server helper update.** `apps/web/src/lib/player-photos.ts` `getPlayerHeadshotUrl` now returns `/overlays/v2/_assets/players/processed/<slug>/headshot_<NN>_nobg.png` instead of `/players/<slug>/headshot_<NN>.png`. The new path matches the v2 sync script's published asset tree + the static fallback paths inside the overlay HTML — so server payloads (top_scorers_data, autofill, lower-third) all resolve photos from the SAME asset tree the static HTML defaults to. No more `/players/...` vs `/overlays/v2/_assets/...` split. Unit tests updated; `top_scorers_data.test.ts` passes through hardcoded URL strings to test schema serialization (not the helper) so no test changes there.
+
+### Verification gate (CLAUDE.md §11 + §12)
+
+| Check | Result |
+|---|---|
+| `npm run test` | 188 files / 1763 tests passed |
+| `npm run lint` | clean (0 errors, 14 pre-existing warnings none from this slice) |
+| `npm run build` | (running at commit time — see commit body if any new errors) |
+| Sync script | `node apps/web/scripts/sync-v2-overlays.mjs` → 16/16 HTML synced. `wc -l` confirms source/mirror line-count parity for both 09 (894) + 14 (1736). |
+| Phase B markers | `B3 fix (2026-04-28)` + `B6 fix (2026-04-28)` comments present in source HTMLs and the player-photos helper. |
+| Live verify | Post-deploy via Claude-in-Chrome (logged separately). |
+
+### Lessons captured
+
+- Static-HTML "designer-time" placeholders (`data-target="22"`) are NOT inert in production. They survive page load and bleed through OBS until JS overwrites them. Add a `?demo=1`-gated clear pass that strips placeholder data before any animation triggers. Captured in `tasks/lessons.md` 2026-04-28 (Phase B6 lesson).
+- For "enter from off-screen" reveals, prefer single ease-out curves over multi-stop anticipation/overshoot keyframes. Concurrent infinite animations (glowPulse, breathe) on the entering element MUST be gated on a post-entry class — `animation-delay` doesn't pause GPU paint. `animationend` listeners must filter on `event.animationName` to avoid pulseRing/scorePop triggering them early. Captured in `tasks/lessons.md` 2026-04-28 (Phase B3 lesson).
+

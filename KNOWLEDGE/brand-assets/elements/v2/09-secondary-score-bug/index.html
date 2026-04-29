@@ -134,8 +134,11 @@
   }
 
   .bug-mount.visible {
-    /* Slowed ~1.6x: 0.55s → 0.9s for a more confident, less frantic entry */
-    animation: entry 0.9s cubic-bezier(.18,.9,.28,1.18) both;
+    /* B3 fix (2026-04-28): replaced 4-stop overshoot keyframes with a smooth
+       2-keyframe ease-out so the entry doesn't visibly "crack" at the 35% +
+       72% overshoot stops. cubic-bezier(0.22, 1, 0.36, 1) is a single
+       ease-out curve — no scale overshoot, no bouncy bezier. */
+    animation: entry 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .bug-mount.hidden {
@@ -143,10 +146,8 @@
   }
 
   @keyframes entry {
-    0%   { transform: translateX(120%) scale(0.88); opacity: 0; }
-    35%  { transform: translateX(20%)  scale(0.96); opacity: 0.7; }
-    72%  { transform: translateX(-2%)  scale(1.02); opacity: 1; }
-    100% { transform: translateX(0)    scale(1);    opacity: 1; }
+    0%   { transform: translateX(140%) scale(0.95); opacity: 0; }
+    100% { transform: translateX(0)    scale(1.0);  opacity: 1; }
   }
 
   @keyframes exitOut {
@@ -223,8 +224,14 @@
     box-shadow:
       0 12px 32px rgba(0, 0, 0, 0.6),
       0 0 0 1px rgba(255, 255, 255, 0.025) inset;
-    animation: glowPulse 3.2s ease-in-out infinite;
     transition: transform 0.35s ease, box-shadow 0.35s ease;
+  }
+
+  /* B3 fix (2026-04-28): gate glowPulse infinite loop until the entry
+     animation completes. JS adds `.entered` on `animationend` of the entry
+     transform — see the bug-mount entry handler near the bottom of <script>. */
+  .bug-mount.entered .bar {
+    animation: glowPulse 3.2s ease-in-out infinite;
   }
 
   @keyframes glowPulse {
@@ -729,18 +736,35 @@
 
   // ============================================================
   // SHOW / HIDE
+  //
+  // B3 fix (2026-04-28): defer the .bar glowPulse infinite loop until the
+  // bug-mount entry animation completes. Adding `.entered` on
+  // `animationend` lets the entry transform finish smoothly without the
+  // glowPulse box-shadow re-paints competing for paint frames mid-entry.
   // ============================================================
+  function onEntryEnd(ev) {
+    // Only react to the `entry` keyframe — not pulseRing or scorePop.
+    if (ev && ev.animationName !== 'entry') return;
+    mount.classList.add('entered');
+    mount.removeEventListener('animationend', onEntryEnd);
+  }
+
   function show() {
     mount.classList.remove('hidden');
+    mount.classList.remove('entered');
     mount.classList.remove('visible');
     void mount.offsetWidth;
     mount.classList.add('visible');
     mount.style.opacity = '';
     mount.style.transform = '';
+    // Re-arm the entered-on-end listener for THIS show cycle.
+    mount.removeEventListener('animationend', onEntryEnd);
+    mount.addEventListener('animationend', onEntryEnd);
   }
 
   function hide() {
     mount.classList.remove('visible');
+    mount.classList.remove('entered');
     mount.classList.add('hidden');
   }
 

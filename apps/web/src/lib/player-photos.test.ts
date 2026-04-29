@@ -27,33 +27,32 @@ describe("gamerTagToSlug", () => {
 });
 
 describe("getPlayerHeadshotUrl", () => {
-  it("returns the pose-1 normal headshot for a known gamer tag", () => {
+  it("returns the pose-1 v2 _nobg headshot for a known gamer tag", () => {
+    // B6 update (2026-04-28): canonical photo path is the v2 _assets
+    // tree so every overlay resolves photos from the same place.
     expect(getPlayerHeadshotUrl("Adefola")).toBe(
-      "/players/adefola/headshot_01.png",
+      "/overlays/v2/_assets/players/processed/adefola/headshot_01_nobg.png",
     );
   });
 
-  it("returns a real PNG for the transparent variant (currently same as normal)", () => {
-    // Plan 22's `_nobg` pipeline isn't shipped yet — both variants resolve
-    // to the existing `headshot_<NN>.png` which is already transparent.
-    // Lock the contract: the URL must point at a real file under /public.
+  it("returns the v2 _nobg path for the transparent variant", () => {
     expect(getPlayerHeadshotUrl("Adefola", "transparent")).toBe(
-      "/players/adefola/headshot_01.png",
+      "/overlays/v2/_assets/players/processed/adefola/headshot_01_nobg.png",
     );
   });
 
-  it("returns the requested pose index when present", () => {
+  it("returns the requested pose index padded to 2 digits", () => {
     expect(getPlayerHeadshotUrl("Anife", "normal", 3)).toBe(
-      "/players/anife/headshot_03.png",
+      "/overlays/v2/_assets/players/processed/anife/headshot_03_nobg.png",
     );
   });
 
   it("normalises tags with spaces and casing", () => {
     expect(getPlayerHeadshotUrl("KILLER FREAK")).toBe(
-      "/players/killer_freak/headshot_01.png",
+      "/overlays/v2/_assets/players/processed/killer_freak/headshot_01_nobg.png",
     );
     expect(getPlayerHeadshotUrl("mr oga")).toBe(
-      "/players/mr_oga/headshot_01.png",
+      "/overlays/v2/_assets/players/processed/mr_oga/headshot_01_nobg.png",
     );
   });
 
@@ -74,9 +73,9 @@ describe("getPlayerHeadshotUrl", () => {
 });
 
 describe("getPlayerAvatarUrl", () => {
-  it("delegates to pose-1 normal headshot", () => {
+  it("delegates to pose-1 v2 _nobg headshot", () => {
     expect(getPlayerAvatarUrl("Tactical")).toBe(
-      "/players/tactical/headshot_01.png",
+      "/overlays/v2/_assets/players/processed/tactical/headshot_01_nobg.png",
     );
   });
 

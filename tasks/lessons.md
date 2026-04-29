@@ -693,4 +693,26 @@ The duplicate match `63968865-7c26-4c23-a2ed-6bc6c20a314f` had `deleted_at = 202
 - Before `git stash`, check `git stash list` — an existing stash `pre-<something>` from another agent means popping or applying stashes is risky. Prefer NOT to stash; instead use `git status` snapshot + verify changes manually.
 - After ANY stash operation that touched untracked files, re-run `git status` to see if files appeared that weren't there before. Cross-reference against your own edit log.
 
+**Date:** 2026-04-28
+**Context:** Phase B6 — `/overlay/v2/14-top-scorers`. User reported "random goal numbers in OBS, only top 3 with no pictures". The `__cadeRunDigitRoll` JS had `parseInt(p1.dataset.target || p1.textContent, 10) || 22` (and similar `|| 19`, `|| 17`). The static HTML's `data-target="22"` was a designer-time placeholder so the file looks correct when opened directly. But in production, when the live broadcast control panel pushed `show` without `data` (or before the first `update` arrived), the digit-roll re-read those static seeds and rolled to 22 / 19 / 17 — phantom goal counts.
+**Mistake:** Treated the demo seeds as harmless. Static HTML "designer-time" placeholders are NOT inert in OBS — they live until JS overwrites them. If a user can hit the deployed URL directly (without `?demo=1`), they see whatever lives in the static markup.
+**Correction (commit TBD this session):**
+- `__cadeRunDigitRoll` no longer fallbacks to hardcoded goal counts. `parseInt` returning NaN now branches to render `—`.
+- New `cade-clear-static-seeds` IIFE runs on load when `?demo=1` is absent. It strips `data-target` + replaces text + clears photo `src` for all 3 podium pods + 7 tail-strip cells.
+- `update()` for the empty-payload branch now also strips `dataset.target` so the digit-roll skips that pod.
+**Rule for future:**
+1. Any "designer-time placeholder" string / number / image src that lives in static HTML and is later overwritten by JS MUST be cleared on load when the overlay is opened in production mode (no `?demo=1`). The clear runs BEFORE any animation triggers, so the producer never sees the seed flash through.
+2. Demo guards must be CONSISTENT: if you guard the visibility loop on `?demo=1`, also guard the data seeds. Otherwise an OBS load (no `?demo=1`) shows the seed data even though the demo loop never fires.
+3. When a `__cadeRunDigitRoll` (or similar) reads from `dataset.X`, it MUST handle NaN as a deliberate output, not a fallback to a hardcoded value. Hardcoded fallbacks become permanent placeholders the moment live data is empty.
+
+**Date:** 2026-04-28
+**Context:** Phase B3 — `/overlay/v2/09-secondary-score-bug`. User said the entry animation "cracks". The `@keyframes entry` had 4 stops with overshoot at 35% (`opacity 0.7`) + 72% (`scale 1.02`) + a bouncy cubic-bezier (`y2 = 1.18`). Combined with a concurrent `glowPulse 3.2s infinite` running on the inner `.bar` (which paints box-shadow continuously), the GPU was juggling two animation timelines with overlapping repaints during the transform-heavy entry.
+**Mistake:** Multi-stop "anticipation + overshoot" keyframe sequences look great in design tools but stutter on Chromium when (a) any non-trivial concurrent animation also paints, OR (b) the overshoot triggers >3 layout passes in 0.3s. The crack the user perceived was the GPU dropping a frame at the 35%/72% intermediate stops.
+**Correction (commit TBD this session):**
+- Replaced 4-stop `@keyframes entry` with smooth 2-keyframe ease-out (`cubic-bezier(0.22, 1, 0.36, 1)`, 0.65s, no scale overshoot, no opacity hold).
+- Deferred `.bar` `glowPulse` until entry completes via `.bug-mount.entered .bar { animation: glowPulse ... }`. JS adds `.entered` on `animationend` of the `entry` keyframe (named-event filter so other animations don't trigger it).
+**Rule for future:**
+1. For "enter from off-screen" reveals on small UI elements, a single ease-out curve (0.5-0.7s) almost always beats multi-stop overshoot. Save anticipation/overshoot for HERO transitions, not chrome bug-bars.
+2. If a target element has an INFINITE animation (glowPulse, breathe, etc.) AND an entry animation, gate the infinite one on a post-entry class. Don't rely on `animation-delay` — it doesn't pause the GPU's anticipated paint cycle, just delays the visible start.
+3. `animationend` listeners MUST filter on `event.animationName` — otherwise `pulseRing`, `scorePop`, and other transient animations on the same element will all fire the listener and cause class-add/remove churn.
 

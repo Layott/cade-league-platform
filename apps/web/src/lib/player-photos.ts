@@ -55,14 +55,14 @@ export function gamerTagToSlug(gamerTag: string): string {
 /**
  * Resolve a public URL for a player's headshot.
  *
- * Plan 22 deposited transparent-background headshots at
- * `public/players/<slug>/headshot_<NN>.png`. The accompanying manifest
- * also references a `*_nobg.png` sibling that was processed separately
- * and is NOT shipped in /public — so the `transparent` variant resolves
- * to the same file as `normal` (the existing headshot is already
- * transparent). Once the bg-stripped pipeline is shipped, this helper
- * will start preferring the `_nobg` filename when present in the
- * manifest pose entry.
+ * B6 update (2026-04-28): the v2 overlay sync script ships fully bg-
+ * stripped headshots at `/overlays/v2/_assets/players/processed/<slug>/
+ * headshot_<NN>_nobg.png`. The Plan 22 path at `/players/<slug>/
+ * headshot_<NN>.png` still works (assets are also transparent there)
+ * but the v2 path is the canonical one consumed by every v2 overlay,
+ * so server payloads now hand out the v2 URL. This guarantees that
+ * top-scorers, lower-third, h2h, etc. all resolve photos from the
+ * same asset tree and the static-HTML fallbacks line up.
  *
  * Returns null when the slug isn't in the manifest or the requested pose
  * doesn't exist. Caller falls back to initials.
@@ -79,16 +79,14 @@ export function getPlayerHeadshotUrl(
   if (!entry) return null;
   const pose = entry.poses.find((p) => p.pose_index === poseIndex);
   if (!pose) return null;
-  // Plan 22 ships only the `headshot_<NN>.png` family in /public — these
-  // PNGs are already transparent, suitable for both backgrounded and
-  // composed contexts (CadePlayerCard photo well). The manifest mentions a
-  // `_nobg` sibling but the bg-stripped pipeline output isn't deployed
-  // yet. Resolve both `normal` and `transparent` to the same filename so
-  // referenced URLs always resolve to a real file in /public.
-  void variant; // reserved for future _nobg preference
-  const rel = pose.variants.headshot;
-  if (!rel) return null;
-  return `/players/${rel}`;
+  // The v2 sync script publishes both `headshot_<NN>.png` and
+  // `headshot_<NN>_nobg.png` under `/overlays/v2/_assets/players/
+  // processed/<slug>/`. The `_nobg` PNGs are the cleanly bg-stripped
+  // variant the v2 overlays expect; non-overlay consumers (the
+  // CadePlayerCard photo well, /players/[id]) read the same files.
+  void variant; // reserved for `headshot` (no-suffix) variant in future
+  const padded = String(poseIndex).padStart(2, "0");
+  return `/overlays/v2/_assets/players/processed/${slug}/headshot_${padded}_nobg.png`;
 }
 
 /**
