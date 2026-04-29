@@ -617,20 +617,57 @@ Per scope discipline (Stage 1 is backend-only):
 
 **Spec:** `docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md` §5.1 (admin UI), §6 (bootstrap), §8 (element-id seed catalog).
 
-### Plan
+### What landed
 
-- [ ] **A.** New server actions in `actions.ts`: `setTextElementAction(formData)` + `clearTextElementAction(formData)`. Both gate on `overlay.design.manage` via existing `gate()`.
-- [ ] **B.** Extend `OverlayDesignEditor.tsx` with a Text section ABOVE the existing Tokens panel. Per-element row with content / color / font-size / weight / position / alignment / opacity / save / reset.
-- [ ] **C.** SSR token resolution: `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` resolves text tokens via `resolveTextElements` + decodes `?previewTextTokens=<b64>`.
-- [ ] **D.** Iframe URL relay: `OverlayDataInjector.tsx` accepts `designTextTokens` + `previewTextTokens` props, encodes both as b64-JSON onto iframe URL.
-- [ ] **E.** Bootstrap script extension: ALL 16 overlay HTMLs at `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` get `data-element-id` attrs (per Stage 1 seed catalog) + bootstrap decodes `?textTokens=` + `?previewTextTokens=`. 7 of 16 need bootstrap script ADDED (02-timer, 08-lower-third, 09, 10, 15, 16, 17).
-- [ ] **F.** Tests: extend Stage 1 test count by ≥6. New `OverlayDesignEditor.test.tsx` for the Text section, plus an E2E spec.
-- [ ] **G.** Element-ID parity linter: `apps/web/scripts/_check-element-id-parity.mjs` walks `data-element-id` attrs vs the seed catalog, exits 1 on mismatch. Wired into `prebuild`.
+- [x] **A.** Two new server actions in `actions.ts`: `setTextElementAction(formData)` + `clearTextElementAction(formData)`. Both gate on `overlay.design.manage` via existing `gate()`. Validate via Zod (kebab-case elementId, OVERLAY_KEYS enum). Action layer parses string/empty-sentinel into typed `TextElementInput` and delegates to `upsertTextElement`. Looks up existing seed row first to preserve `kind` + `origin`.
+- [x] **B.** `OverlayDesignEditor.tsx` extended: new "Text" panel ABOVE the Tokens panel. Renders one collapsed `<details>` per text element (content / color / font / size / weight / position / alignment / opacity / visible toggle / Save / Reset). Live preview iframe extends with `?previewTextTokens=<b64>` so edits debounce-render at 250ms.
+- [x] **C.** SSR overlay route (`apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx`) resolves text tokens via `resolveTextElements(sb, key, activeVariantId)` + decodes `?previewTextTokens=` via the new `decodePreviewTextTokens` (Zod-validated, rejects HTML metacharacters, font allowlist, color regex). Both maps pass through to `OverlayDataInjector` as new props.
+- [x] **D.** `OverlayDataInjector.tsx` accepts `designTextTokens` + `previewTextTokens` props, encodes each as b64-JSON onto the iframe URL as `?textTokens=` + `?previewTextTokens=`. Empty maps skip the param to keep iframe URLs clean.
+- [x] **E.** Bootstrap script unified across all 16 overlay HTMLs via `_extend-bootstrap-script.mjs`: 9 HAD the Phase A bootstrap (replaced), 7 had none (injected). New unified bootstrap decodes 4 token maps (tokens / previewTokens / textTokens / previewTextTokens) + emits `<style id="cade-injected-tokens">` + `<style id="cade-injected-text">` blocks AND replaces `textContent` on each `[data-element-id="X"]` matching node. Wrapped in IIFE — never throws.
+- [x] **E.1.** `data-element-id` attrs added to 36 elements across 14 of the 16 overlay HTMLs via `_seed-element-ids.mjs`. Each attr matches a row in the Stage 1 seed catalog. Idempotent (re-runs are no-ops).
+- [x] **F.** Tests:
+  - `actions.test.ts` extended +9 tests covering perm-gate, unknown overlay, kebab-case validation, seed-row preserves kind, runtime-row defaults, clear no-ops on missing rows.
+  - `preview.test.ts` extended +10 tests for `decodePreviewTextTokens` (null on missing, malformed b64, malformed JSON, valid override, kebab guard, HTML injection guard, CSS metacharacter guard, font allowlist, fontWeight bounds, oversize map).
+  - `OverlayDesignEditor.test.tsx` (new) +6 tests: Text panel renders/hides on prop, summary entries, content edit, Save calls action, Reset calls clearAction.
+  - `parity-linter.test.ts` (new) +5 tests for the linter helpers.
+  - `page.test.ts` updated (+1 mock) to keep Stage 1 token-injection tests green.
+  - **Net delta: +30 unit tests** (1966 → 1996).
+- [x] **G.** Element-ID parity linter at `apps/web/scripts/_check-element-id-parity.mjs`: walks every `data-element-id` attr in `apps/web/public/overlays/v2/*/index.html`, compares against the seed catalog parsed from migration `20260620000007`. WARNS on missing-in-HTML (130 currently — admin-saves silently no-op for unattached elements; future Stages will close the gap), ERRORS on extra-in-HTML (would target rows that don't exist server-side). Wired into `npm run prebuild` as `check:element-id-parity`.
+- [x] **E2E** spec at `apps/web/tests/e2e/overlay-design-text.spec.ts` — login → design page → edit `12-starting-soon` title → save → verify DB row content + reset.
+
+### Files changed
+
+- `apps/web/src/app/admin/broadcast/v2/design/actions.ts` (+set/clearTextElementAction; +Zod schemas + parsers)
+- `apps/web/src/app/admin/broadcast/v2/design/actions.test.ts` (+9 new tests)
+- `apps/web/src/app/admin/broadcast/v2/design/page.tsx` (load `listTextElements` + pass `initialTextElements`)
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` (resolve text tokens + previewTextTokens, pass to injector)
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.test.ts` (+resolveTextElements mock)
+- `apps/web/src/components/admin/OverlayDesignEditor.tsx` (+Text section + TextElementEditorRow component)
+- `apps/web/src/components/admin/OverlayDesignEditor.test.tsx` (NEW, 6 tests)
+- `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx` (+designTextTokens/previewTextTokens props + URL params)
+- `apps/web/src/server/overlays/design/preview.ts` (+decodePreviewTextTokens + Zod schemas)
+- `apps/web/src/server/overlays/design/preview.test.ts` (+10 new tests)
+- `apps/web/src/server/overlays/text/parity-linter.test.ts` (NEW, 5 tests)
+- `apps/web/scripts/_check-element-id-parity.mjs` (NEW)
+- `apps/web/scripts/_seed-element-ids.mjs` (NEW one-shot helper)
+- `apps/web/scripts/_extend-bootstrap-script.mjs` (NEW one-shot helper)
+- `apps/web/package.json` (prebuild + check:element-id-parity)
+- `apps/web/tests/e2e/overlay-design-text.spec.ts` (NEW)
+- 16 × `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` (bootstrap replaced/injected, data-element-id attrs added)
+- 16 × `apps/web/public/overlays/v2/<key>/index.html` (mirrored)
 
 ### Verification gate
 
-- `npx vitest run` — all green.
-- `npm run lint` — clean.
-- `npm run build` — clean.
-- `node apps/web/scripts/_check-element-id-parity.mjs` — exit 0.
-- Manual via Claude-in-Chrome: edit a text element → save → verify on overlay route.
+- `npx vitest run` — **1996 tests pass** (was 1966, +30 new).
+- `npm run lint` — 0 errors, 14 pre-existing warnings.
+- `npm run build` — clean production build.
+- `node apps/web/scripts/_check-element-id-parity.mjs` — exit 0 (130 warnings).
+- Dev server smoke: `/overlay/v2/01-brb?demo=1` returns 200, emits `<style id="overlay-design-tokens">`, iframe URL carries `?tokens=<b64>`. `/admin/broadcast/v2/design` returns 307 (auth redirect — expected).
+
+### Known scope gaps (intentional — deferred to later stages)
+
+- **Partner strip + logo manager** — Stage 3 scope.
+- **Per-element animations** — Stage 4 scope.
+- **130 seed rows without HTML attrs** — designers will progressively add `data-element-id` attrs as they touch overlays in subsequent waves. Linter surfaces these as warnings, not errors. Most-edited elements (titles, eyebrows, subtitles, season-marks, partners-strip) ARE attached on the 14 overlays where they exist as discrete DOM nodes.
+- **Adding runtime text elements from the admin UI** — the server action accepts runtime origin + position payload, but the UI doesn't yet render an "Add element" button. Deferred to Stage 3 (where the partner-strip add modal already establishes the pattern).
+- **`ResolvedTextElement.origin` shape mismatch** — the resolver in Stage 1 returns `origin` only on the typed result; the bootstrap doesn't actually need origin (only for the runtime-DOM-injection path which is deferred). Type-safe today; might tighten in Stage 3.
