@@ -74,8 +74,10 @@ export type SubmitPickerActionPayload = {
   weekStartDate: string;
   // Optional admin-controlled per-match-day window. When supplied, the
   // submission is stamped with this match_day_id and the window check
-  // uses the per-match-day resolver.
-  matchDayId?: string;
+  // uses the per-match-day resolver. Accepts null so the picker can pass
+  // through the explicit "no match day" signal without callers having to
+  // strip the key.
+  matchDayId?: string | null;
   futbinScreenshotPath: string;
   slots: Array<{
     slotIndex: number;
