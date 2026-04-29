@@ -435,3 +435,44 @@ All bugs ✓ shipped + verified. All tasks marked complete. Plan = done.
 
 **Constraints honored:** No edits to `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx`, `apps/web/src/server/overlays/design/defaults.ts`, or `apps/web/public/overlays/v2/14-top-scorers/index.html` (other agents own those for Bug 3 + Bug 4).
 
+## Bug 4 — review
+
+**Date:** 2026-04-29
+
+**Bug:** Match-scores-day overlay rendered "MATCH DAY 8" + the wrong fixtures on the live OBS browser source while the admin live-preview iframe rendered the correct match-day. User reproduced for Sunday Apr 26 (MD 1) and Saturday May 2 (MD 2) — both correct in admin preview, both showed MD 8 (May 30) in OBS.
+
+**Root cause (one-liner):** The ambient-session resolver picked the most-recently-started session by `started_at DESC`, and a leftover "active" session pinned to a future match-day (MD 8) outranked the operator's actual driving session.
+
+**Investigation:**
+- Live DB state via service-role client: TWO `stream_sessions` rows had `ended_at IS NULL` simultaneously — `73c21280...` (started 2026-04-29 13:44, pinned to MD 8 = 2026-05-30) and `8018f9e3...` (started 2026-04-26, the operator's actual driving session). Trigger events (`overlay_events.stream_session_id`) were all writing to `8018f9e3...`, but the ambient resolver picked `73c21280...` because of its fresher `started_at`.
+- Admin route always passes `?session=<sessionId>&preview=1` to the iframe → `resolvedSession` = the explicit one → correct render.
+- OBS bare URL has no `?session=` → falls into ambient resolution → wrong session → wrong match-day.
+
+**Option chosen: Option A (modified) — operator-activity-driven ambient resolver.**
+
+I picked Option A as my baseline (the cleanest match for the existing architecture: `stream_sessions.match_day_id` already exists and the broadcast control panel already updates it via `setSessionMatchDayAction`). The catch: Option A's "filter active=true ORDER BY started_at DESC LIMIT 1" rule is exactly what already shipped — and it's what FAILED here. The producer's session was driving overlays correctly; an UNRELATED leftover session happened to be more recently started.
+
+So I extended Option A: the ambient resolver picks the live session with the most recent overlay-trigger activity (`overlay_events.triggered_at` ∪ `overlay_active_instances.triggered_at`). This naturally tracks "the session the operator is currently driving" because every click in the broadcast control panel writes a row tagged with the session id. Falls back to `started_at DESC` when no triggers exist (fresh session, never driven yet — the legitimate one-active-session case).
+
+**Why not Option B or C:**
+- Option B (explicit `?match_day_id` query param) would require admin UI changes + payload schema changes + iframe URL builder rework. The existing `stream_sessions.match_day_id` column already represents the producer's intent — adding a parallel query-param channel would just mean two sources of truth.
+- Option C (hybrid) is what we already had: `stream_sessions.match_day_id` IS the source of truth, but the ambient resolver was picking the WRONG session. The fix doesn't need Option C — it needs the resolver to pick the right session.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `apps/web/src/server/broadcast/active_session.ts` | New `pickByMostRecentActivity` helper queries `overlay_events` + `overlay_active_instances` ordered DESC, filters to live-session set, picks the freshest. `getActiveSessionId` + `getActiveSession` use it as primary; fall back to `started_at DESC` when no triggers exist. Module-level docstring updated to flag Bug 4 + reference the new selection rule. |
+| `apps/web/src/server/broadcast/active_session.test.ts` | Rewrote mock factory to route by `from(table)` so each table can be configured independently. 11 tests (was 8): 4 new for `getActiveSessionId` (only-one-live, no-live, multi-with-events, fallback-to-started_at, events ∪ instances merge), 5 retained + reshaped for `getActiveSession`, 1 new explicit Bug-4 reproduction case ("operator-driven session over leftover fresher session"). |
+| `tasks/lessons.md` | New session entry. 5 rules: (1) Admin-preview ↔ OBS divergence is a class of bug. (2) Multiple-active-sessions is the norm. (3) Trigger activity is the cleanest live-operator signal. (4) Pre-flight trace BOTH paths for any new live-broadcast feature. (5) TS strict-mode narrowing trap: use accumulator object pattern when comparing inside `||`. |
+| `tasks/todo.md` | This review section. |
+
+**Verification gate:**
+- `npx vitest run` — 1778/1778 tests pass (active_session test count went 8 → 11; total maintained).
+- `npm run lint` — 0 errors, 14 pre-existing warnings unchanged.
+- `npm run build` — clean production build (after fixing TS strict-mode `bestAt` narrowing trap with accumulator-object pattern).
+
+**Prod verification (post-push):** Will be exercised against `https://cade-league.vercel.app/overlay/v2/11-match-scores-day` (bare URL, no params — simulates OBS) after Vercel deploys. Acceptance: with the operator-driven session pinned to MD 1 (Apr 26), the iframe DOM should show "MATCH DAY 1 RESULTS" not "MATCH DAY 8 RESULTS". Switching the operator to MD 2 (May 2) and refreshing the OBS tab should flip the rendered label to "MATCH DAY 2 RESULTS".
+
+**Constraints honored:** No edits to `/api/broadcast/sessions/[id]/h2h/route.ts`, `top_scorers_data.ts`, `OverlayDataInjector.tsx`, `defaults.ts`, or `14-top-scorers/index.html`. Only touched: `active_session.ts` + its test. The match-scores-day endpoint at `/api/broadcast/sessions/[id]/match-scores-day/route.ts` is unchanged — the bug was upstream of it (wrong session id flowing in).
+
