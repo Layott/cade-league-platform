@@ -27,7 +27,10 @@ function queueChain(queue: ChainResult[]) {
     callCount += 1;
     return Promise.resolve(result);
   };
-  for (const m of ["select", "eq", "is"]) {
+  // Bug-2 fallback (2026-04-29) added `.in()` + `.not()` to the
+  // match_results chain — include them in the shared stub so any chain
+  // that calls them resolves correctly.
+  for (const m of ["select", "eq", "is", "in", "not"]) {
     api[m] = vi.fn(() => api);
   }
   api.maybeSingle = vi.fn(makeThenable);
@@ -64,6 +67,7 @@ describe("fetchTopScorersData", () => {
         { data: [], error: null },
         { data: [], error: null },
       ]),
+      match_results: queueChain([{ data: [], error: null }]),
     });
     const out = await fetchTopScorersData(sb as never, SEASON);
     expect(out.rows).toEqual([]);
@@ -109,6 +113,7 @@ describe("fetchTopScorersData", () => {
         { data: [], error: null },
         { data: [], error: null },
       ]),
+      match_results: queueChain([{ data: [], error: null }]),
     });
     const out = await fetchTopScorersData(sb as never, SEASON);
     expect(out.rows.length).toBe(2);
@@ -160,6 +165,7 @@ describe("fetchTopScorersData", () => {
         { data: [], error: null },
         { data: [], error: null },
       ]),
+      match_results: queueChain([{ data: [], error: null }]),
     });
     const out = await fetchTopScorersData(sb as never, SEASON);
     expect(out.rows.length).toBe(1);
@@ -238,6 +244,7 @@ describe("fetchTopScorersData", () => {
         { data: gePayload, error: null },
         { data: gePayload, error: null },
       ]),
+      match_results: queueChain([{ data: [], error: null }]),
     });
     const out = await fetchTopScorersData(sb as never, SEASON);
     // Adefola 4, Faruk 2 (ge MATCH_A) + 1 (pms MATCH_B) = 3
@@ -272,6 +279,190 @@ describe("fetchTopScorersData", () => {
         { data: [], error: null },
         { data: [], error: null },
       ]),
+      match_results: queueChain([{ data: [], error: null }]),
+    });
+    const out = await fetchTopScorersData(sb as never, SEASON);
+    expect(out.rows).toEqual([]);
+  });
+
+  it("Bug-2 regression — falls back to match_results.home_score/away_score when both per-player sources are empty", async () => {
+    // Today's score-entry flow writes only home_score/away_score into
+    // match_results — no goal_events, no player_match_stats. Without the
+    // fallback the overlay was empty even after 10+ confirmed matches.
+    // Two confirmed matches:
+    //   - MATCH_A: p1 (home) 5-2 p2 (away)  → p1=5, p2=2
+    //   - MATCH_B: p1 (away) 1-3 p2 (home)  → p2=3, p1=1
+    // Final aggregate: p1=6, p2=5
+    const mr = [
+      {
+        match_id: MATCH_A,
+        home_score: 5,
+        away_score: 2,
+        result_type: "normal",
+        walkover_pending: null,
+        confirmed_at: "2026-05-01T18:00:00Z",
+        match: {
+          season_id: SEASON,
+          deleted_at: null,
+          home_player_id: "p1",
+          away_player_id: "p2",
+          home_player: {
+            gamer_tag: "FARUK",
+            users: { display_name: "Faruk" },
+          },
+          away_player: {
+            gamer_tag: "ADEFOLA",
+            users: { display_name: "Adefola" },
+          },
+        },
+      },
+      {
+        match_id: MATCH_B,
+        home_score: 3,
+        away_score: 1,
+        result_type: "normal",
+        walkover_pending: null,
+        confirmed_at: "2026-05-02T18:00:00Z",
+        match: {
+          season_id: SEASON,
+          deleted_at: null,
+          home_player_id: "p2",
+          away_player_id: "p1",
+          home_player: {
+            gamer_tag: "ADEFOLA",
+            users: { display_name: "Adefola" },
+          },
+          away_player: {
+            gamer_tag: "FARUK",
+            users: { display_name: "Faruk" },
+          },
+        },
+      },
+    ];
+    const sb = mkSb({
+      player_match_stats: queueChain([
+        { data: [], error: null },
+        { data: [], error: null },
+      ]),
+      goal_events: queueChain([
+        { data: [], error: null },
+        { data: [], error: null },
+      ]),
+      match_results: queueChain([{ data: mr, error: null }]),
+    });
+    const out = await fetchTopScorersData(sb as never, SEASON);
+    expect(out.rows.length).toBe(2);
+    // Ranked by goals desc, then name asc
+    expect(out.rows[0].player_name).toBe("Faruk");
+    expect(out.rows[0].goals).toBe(6);
+    expect(out.rows[0].rank).toBe(1);
+    expect(out.rows[1].player_name).toBe("Adefola");
+    expect(out.rows[1].goals).toBe(5);
+    expect(out.rows[1].rank).toBe(2);
+  });
+
+  it("Bug-2 regression — explicit player_match_stats data wins over match_results fallback for same (player, match)", async () => {
+    // p1 has explicit pms data for MATCH_A (3 goals attributed). The
+    // match_results row for the same match says home_score=5 — the
+    // fallback must NOT add 5 on top of the 3 (otherwise we'd double-
+    // count). p2 has no explicit data — gets the 2 away goals via
+    // fallback.
+    const pms = [
+      {
+        player_id: "p1",
+        match_id: MATCH_A,
+        goals: 3,
+        match: {
+          season_id: SEASON,
+          deleted_at: null,
+          match_results: [
+            { confirmed_at: "2026-05-01T18:00:00Z", result_type: "normal" },
+          ],
+        },
+        player: { gamer_tag: "FARUK", users: { display_name: "Faruk" } },
+      },
+    ];
+    const mr = [
+      {
+        match_id: MATCH_A,
+        home_score: 5,
+        away_score: 2,
+        result_type: "normal",
+        walkover_pending: null,
+        confirmed_at: "2026-05-01T18:00:00Z",
+        match: {
+          season_id: SEASON,
+          deleted_at: null,
+          home_player_id: "p1",
+          away_player_id: "p2",
+          home_player: {
+            gamer_tag: "FARUK",
+            users: { display_name: "Faruk" },
+          },
+          away_player: {
+            gamer_tag: "ADEFOLA",
+            users: { display_name: "Adefola" },
+          },
+        },
+      },
+    ];
+    const sb = mkSb({
+      player_match_stats: queueChain([
+        { data: pms, error: null },
+        { data: pms, error: null },
+      ]),
+      goal_events: queueChain([
+        { data: [], error: null },
+        { data: [], error: null },
+      ]),
+      match_results: queueChain([{ data: mr, error: null }]),
+    });
+    const out = await fetchTopScorersData(sb as never, SEASON);
+    expect(out.rows.length).toBe(2);
+    expect(out.rows[0].player_name).toBe("Faruk");
+    expect(out.rows[0].goals).toBe(3); // pms wins, fallback skipped
+    expect(out.rows[1].player_name).toBe("Adefola");
+    expect(out.rows[1].goals).toBe(2); // fallback only
+  });
+
+  it("Bug-2 regression — fallback skips walkover_pending=true rows", async () => {
+    // Walkover requests carry scores but aren't counter-confirmed yet —
+    // they must NOT contribute. recompute_standings excludes them; the
+    // fallback must too.
+    const mr = [
+      {
+        match_id: MATCH_A,
+        home_score: 3,
+        away_score: 0,
+        result_type: "forfeit",
+        walkover_pending: true,
+        confirmed_at: "2026-05-01T18:00:00Z",
+        match: {
+          season_id: SEASON,
+          deleted_at: null,
+          home_player_id: "p1",
+          away_player_id: "p2",
+          home_player: {
+            gamer_tag: "FARUK",
+            users: { display_name: "Faruk" },
+          },
+          away_player: {
+            gamer_tag: "ADEFOLA",
+            users: { display_name: "Adefola" },
+          },
+        },
+      },
+    ];
+    const sb = mkSb({
+      player_match_stats: queueChain([
+        { data: [], error: null },
+        { data: [], error: null },
+      ]),
+      goal_events: queueChain([
+        { data: [], error: null },
+        { data: [], error: null },
+      ]),
+      match_results: queueChain([{ data: mr, error: null }]),
     });
     const out = await fetchTopScorersData(sb as never, SEASON);
     expect(out.rows).toEqual([]);
@@ -305,6 +496,7 @@ describe("fetchTopScorersData", () => {
         { data: null, error: missingTableError },
         { data: null, error: missingTableError },
       ]),
+      match_results: queueChain([{ data: [], error: null }]),
     });
     const out = await fetchTopScorersData(sb as never, SEASON);
     expect(out.rows.length).toBe(1);

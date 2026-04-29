@@ -22,12 +22,12 @@ import { NextRequest, NextResponse } from "next/server";
  *   7. Missing `ids` + valid `key` + no overlay_events row → 200 + empty
  *      cards (overlay HTML keeps placeholder shape).
  *   8. Missing `ids` + valid `key` + active overlay_events row →
- *      resolves displayName → users.gamer_tag → players.id chain → 200
- *      + cards.
+ *      resolves displayName → players.gamer_tag → players.id chain →
+ *      200 + cards.
  *   9. buildH2HCards throws → 500.
- *
- * The mock client is hand-rolled per branch (Supabase chains diverge by
- * query). Each test composes only the chains the route actually walks.
+ *  10. Bug-1 regression — payload displayName "BAJI JNR" (with space)
+ *      resolves against players.gamer_tag "BAJI_JNR" (with underscore)
+ *      via the normalizeTag step.
  */
 
 const { enforcePublicReadMock, getServiceRoleSupabaseMock, checkViewTokenMock, buildH2HCardsMock } =
@@ -58,8 +58,6 @@ const MATCH_DAY_ID = "22222222-2222-2222-2222-222222222222";
 const SEASON_ID = "33333333-3333-3333-3333-333333333333";
 const PLAYER_A = "44444444-4444-4444-4444-44444444444a";
 const PLAYER_B = "44444444-4444-4444-4444-44444444444b";
-const USER_A = "55555555-5555-5555-5555-55555555555a";
-const USER_B = "55555555-5555-5555-5555-55555555555b";
 const VIEW_TOKEN = "view-token-abc";
 
 beforeEach(() => {
@@ -75,8 +73,8 @@ beforeEach(() => {
  *   stream_sessions → select(...).eq().is().maybeSingle()  (session lookup)
  *   match_days      → select(...).eq().is().maybeSingle()  (mday → season)
  *   overlay_events  → select(...).eq().is().is().order().limit()  (pinned)
- *   users           → select(...).in().is()  (gamer_tag → user resolve)
- *   players         → select(...).in().is()  (user → player resolve)
+ *   players         → select(...).is()  (full active roster — gamer_tag
+ *                                        → id direct resolve)
  *
  * Each per-table fixture is optional — branches skip downstream lookups.
  */
@@ -88,8 +86,7 @@ function mkSb(opts: {
     payload: Record<string, unknown> | null;
     overlay_templates: { template_key: string } | null;
   }>;
-  users?: Array<{ id: string; gamer_tag: string }>;
-  players?: Array<{ id: string; user_id: string }>;
+  players?: Array<{ id: string; gamer_tag: string }>;
 }) {
   const sessionMaybe = vi.fn().mockResolvedValue({
     data: opts.session === undefined ? null : opts.session,
@@ -102,9 +99,6 @@ function mkSb(opts: {
   const overlayEventsLimit = vi
     .fn()
     .mockResolvedValue({ data: opts.overlayEvents ?? [], error: null });
-  const usersIs = vi
-    .fn()
-    .mockResolvedValue({ data: opts.users ?? [], error: null });
   const playersIs = vi
     .fn()
     .mockResolvedValue({ data: opts.players ?? [], error: null });
@@ -142,17 +136,10 @@ function mkSb(opts: {
           })),
         };
       }
-      if (table === "users") {
-        return {
-          select: vi.fn(() => ({
-            in: vi.fn(() => ({ is: usersIs })),
-          })),
-        };
-      }
       if (table === "players") {
         return {
           select: vi.fn(() => ({
-            in: vi.fn(() => ({ is: playersIs })),
+            is: playersIs,
           })),
         };
       }
@@ -336,13 +323,9 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
             overlay_templates: { template_key: "h2h_2" },
           },
         ],
-        users: [
-          { id: USER_A, gamer_tag: "FARUK" },
-          { id: USER_B, gamer_tag: "ANIFE" },
-        ],
         players: [
-          { id: PLAYER_A, user_id: USER_A },
-          { id: PLAYER_B, user_id: USER_B },
+          { id: PLAYER_A, gamer_tag: "FARUK" },
+          { id: PLAYER_B, gamer_tag: "ANIFE" },
         ],
       }),
     );
@@ -385,6 +368,53 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.cards).toHaveLength(2);
+    expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
+      PLAYER_A,
+      PLAYER_B,
+    ]);
+  });
+
+  it("Bug-1 regression — normalizes spaced displayName ('BAJI JNR') to underscored gamer_tag ('BAJI_JNR')", async () => {
+    checkViewTokenMock.mockResolvedValue({ ok: true, response: null });
+    getServiceRoleSupabaseMock.mockReturnValue(
+      mkSb({
+        session: { id: SESSION_ID, match_day_id: MATCH_DAY_ID },
+        matchDay: { id: MATCH_DAY_ID, season_id: SEASON_ID },
+        overlayEvents: [
+          {
+            id: "evt-1",
+            payload: {
+              // Control panel writes display names with spaces — must
+              // resolve to DB rows that store the same identity with
+              // underscores. Includes "KING NONEX" → "KINGNONEX" (no
+              // underscore at all in DB) which exercises the strip-
+              // underscores normalization path.
+              players: [
+                { displayName: "BAJI JNR" },
+                { displayName: "KING NONEX" },
+              ],
+            },
+            overlay_templates: { template_key: "h2h_2" },
+          },
+        ],
+        players: [
+          { id: PLAYER_A, gamer_tag: "BAJI_JNR" },
+          { id: PLAYER_B, gamer_tag: "KINGNONEX" },
+          // Other roster rows present so the lookup is not trivially
+          // 1:1 — confirms the normalization correctly disambiguates.
+          {
+            id: "44444444-4444-4444-4444-44444444444c",
+            gamer_tag: "FARUK",
+          },
+        ],
+      }),
+    );
+    buildH2HCardsMock.mockResolvedValue([]);
+
+    const res = await GET(mkReq({ key: "04-h2h-2" }), {
+      params: Promise.resolve({ id: SESSION_ID }),
+    });
+    expect(res.status).toBe(200);
     expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
       PLAYER_A,
       PLAYER_B,

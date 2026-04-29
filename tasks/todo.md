@@ -399,3 +399,39 @@ All bugs ✓ shipped + verified. All tasks marked complete. Plan = done.
 
 **Auto-pipeline:** `db:push` runs in GitHub Actions on push to main when `supabase/migrations/**` changes (per `.github/workflows/db-push.yml`); no manual push needed.
 
+## Bug 1 + Bug 2 — review
+
+**Date:** 2026-04-29
+
+**User report:**
+- Bug 1 — H2H stats show `—` on prod even when the overlay is triggered. The stats are supposed to be cumulative season-wide.
+- Bug 2 — Top scorers stays frozen empty even though the season has 10+ confirmed matches. Should be cumulative across all match days.
+
+**Root causes (all 3 silent in unit tests):**
+
+1. **Wrong table.** `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.ts` resolved displayName via `users.gamer_tag` but the `users` table has NO `gamer_tag` column — `gamer_tag` lives on `players`. The Supabase JS client returned the 42703 error in the `error` field which the destructure ignored, so `data` was always null and the chain returned an empty cards array on every live h2h trigger. Confirmed via `information_schema.columns`: users has only `id, supabase_auth_id, email, phone, display_name, last_login_at, failed_login_count, created_at, updated_at, deleted_at`.
+
+2. **Space vs underscore mismatch.** `V2_PLAYER_NAMES` writes display names with spaces (`"BAJI JNR"`, `"KING NONEX"`, `"MR OGA"`, `"KILLER FREAK"`), but `players.gamer_tag` stores the same identities with underscores or no separator (`"BAJI_JNR"`, `"KINGNONEX"`, `"MR_OGA"`, `"KILLER_FREAK"`). Even after fixing the wrong-table bug, a direct uppercase `.in()` would still miss those 4 of 13 players. Fix: `normalizeTag(s) = s.toUpperCase().replace(/[\s_]+/g, "")` applied to both sides.
+
+3. **Empty data sources.** `top_scorers_data.ts` aggregated only from `goal_events` + `player_match_stats`. Both are 0 rows in the cloud DB (queried directly: `SELECT count(*) FROM goal_events WHERE deleted_at IS NULL` → 0; same for `player_match_stats`). The score-entry flow writes ONLY team-level `home_score`/`away_score` into `match_results` — so the overlay was always empty even though `standings` had `goals_for=11` for `BAJI_JNR`, `15` for `KAYKAY`, etc. Fix: added a third tier to the data-source ladder that attributes `match_results.home_score` to `home_player_id` and `away_score` to `away_player_id` for confirmed `result_type IN ('normal','forfeit')` non-`walkover_pending` matches that have NO row in either explicit source. The explicit-data set is tracked via a `matchIdsWithExplicit` Map<player_id, Set<match_id>> so the fallback never double-counts a (player, match) tuple that already has explicit per-player attribution.
+
+**Files changed:**
+
+| File | Change |
+|------|--------|
+| `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.ts` | Dropped the broken `users.gamer_tag` 2-step chain. Resolves `displayName` directly via `players.gamer_tag` with the new `normalizeTag` helper (strip spaces+underscores, uppercase). Updated docstring with Bug-1 attribution. |
+| `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.test.ts` | Mock `mkSb` no longer accepts `users` rows — `players` rows are now `{id, gamer_tag}`. Removed unused `USER_A`/`USER_B` constants. Added Bug-1 regression test: payload `[{displayName: "BAJI JNR"}, {displayName: "KING NONEX"}]` resolves to player rows with `gamer_tag: "BAJI_JNR"` / `"KINGNONEX"` via normalizeTag, with a third unrelated row in the roster to confirm the lookup actually disambiguates. |
+| `apps/web/src/server/overlays/top_scorers_data.ts` | Added match_results.home_score/away_score fallback. Tracks per-player explicit-data set via `matchIdsWithExplicit: Map<player_id, Set<match_id>>` so the fallback skips (player, match) tuples that already have authoritative per-player rows. Mirrors the standings.recompute filter exactly: `season_id` match, `result_type IN ('normal','forfeit')`, `walkover_pending IS NULL OR FALSE`, `confirmed_at IS NOT NULL`, `deleted_at IS NULL` on both `match_results` AND `matches`. |
+| `apps/web/src/server/overlays/top_scorers_data.test.ts` | Added `.in()` and `.not()` to the `queueChain` shared stub. Added `match_results: queueChain([...])` mock to all 5 existing tests (each returns empty so the existing assertions still hold). Added 3 new regression tests: pure-fallback (no explicit data, 2 confirmed matches, asserts cumulative attribution), explicit-wins (pms says 3, mr says 5 → 3 wins, fallback only applies to other player), walkover_pending=true skipped (fallback respects the same filter as recompute_standings). |
+| `tasks/lessons.md` | New session entry. 5 rules: (1) Trust the schema, not the destructure — check `error` on every Supabase chain. (2) Reconcile cross-system identity formats up front. (3) When live-data overlay is empty, query the underlying table directly. (4) Tier data sources for aggregating overlays. (5) Schema-mismatch + identity-format + empty-fallback bugs all silent in mocked tests. |
+| `tasks/todo.md` | This review section. |
+
+**Verification gate:**
+- `npx vitest run` — 1781/1781 tests pass (was 1776 → +5 new regression tests on these two files).
+- `npm run lint` — 0 errors, 14 pre-existing warnings unchanged.
+- `npm run build` — clean production build, no new route warnings.
+
+**Prod verification (post-push):** Will exercise the real cloud DB through `https://cade-league.vercel.app` after Vercel deploys the commit. Curl both endpoints with the active session UUID `73c21280-2115-4720-bc50-7c1abc552c54` + view_token `bvieBUPxadkI5H6C0tULOc6auI0wRqDN6Z9kcw-Q8Mw` and assert non-empty `cards` / `payload.rows`.
+
+**Constraints honored:** No edits to `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx`, `apps/web/src/server/overlays/design/defaults.ts`, or `apps/web/public/overlays/v2/14-top-scorers/index.html` (other agents own those for Bug 3 + Bug 4).
+

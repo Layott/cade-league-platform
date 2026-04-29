@@ -10,21 +10,24 @@ import { getPlayerHeadshotUrl } from "@/lib/player-photos";
  * Data source strategy
  * --------------------
  * This overlay needs per-player goal totals — something `public.standings`
- * does NOT store (it only tracks team-level goals_for). Two sources are
- * available:
+ * does NOT store (it only tracks team-level goals_for). Three sources
+ * stack in priority order:
  *
  *   1. `public.goal_events` (new in migration `20260517000100`) — per-goal
  *      attribution with `own_goal` flag. Authoritative once score-entry
  *      lands per-goal attribution (see header of that migration).
  *   2. `public.player_match_stats.goals` — per-player per-match aggregate
- *      that the Plan 14 OCR pipeline writes into. Already populated for
+ *      that the Plan 14 OCR pipeline writes into. Populated for
  *      screenshot-ingested matches.
- *
- * We prefer `goal_events` when any row exists for a match in the target
- * season, and fall back to `player_match_stats.goals` for matches without
- * per-goal rows. This lets top-scorers go live NOW with the OCR-seeded
- * data while future score-entry improvements incrementally shift traffic
- * to `goal_events`.
+ *   3. **Bug-2 fix (2026-04-29)** — fallback to `match_results.home_score`
+ *      / `away_score` attributed to whoever played that side of the
+ *      match. The score-entry flow writes only `home_score` /
+ *      `away_score` (no per-player goal rows yet), so without this
+ *      fallback the overlay was always empty even though the season had
+ *      10 confirmed matches with 50+ goals scored. The fallback is
+ *      ONLY applied to (player, match) tuples that have NO row in
+ *      `goal_events` AND NO row in `player_match_stats` so explicit
+ *      per-goal attribution always wins when present.
  *
  * Realtime strategy
  * -----------------
@@ -279,6 +282,13 @@ export async function fetchTopScorersData(
   };
   const rowsPms = (pmsData2 ?? []) as unknown as PmsRow2[];
   void pmsRows;
+  // Track (player, match) pairs that already have an explicit per-player
+  // attribution (goal_events OR player_match_stats) so the match_results
+  // fallback below doesn't double-count them.
+  const matchIdsWithExplicit = new Map<string, Set<string>>();
+  for (const [pid, a] of acc) {
+    matchIdsWithExplicit.set(pid, new Set(a.match_ids_with_ge));
+  }
   for (const p of rowsPms) {
     // Skip matches without a confirmed non-void result row — matches
     // standings.recompute's filter (`result_type IN (normal, forfeit)`
@@ -307,6 +317,127 @@ export async function fetchTopScorersData(
         match_ids_with_ge: new Set(),
       });
     }
+    // Mark this (player, match) as having explicit per-player data so
+    // the match_results fallback skips it.
+    let s = matchIdsWithExplicit.get(p.player_id);
+    if (!s) {
+      s = new Set();
+      matchIdsWithExplicit.set(p.player_id, s);
+    }
+    s.add(p.match_id);
+  }
+
+  // Bug-2 fix (2026-04-29) — match_results.home_score/away_score fallback.
+  //
+  // Today's score-entry flow writes only team-level scores into
+  // `match_results` (no `goal_events` rows, no `player_match_stats` rows
+  // for those matches). Without a fallback, top-scorers stays frozen at
+  // empty even after 10+ confirmed matches because both per-player
+  // sources are 0 rows. Attribute home_score to home_player and away_score
+  // to away_player ONLY for (player, match) tuples that don't already
+  // have explicit per-player data above.
+  //
+  // Filter mirrors `recompute_standings()`:
+  //   - season_id matches via the matches FK
+  //   - result_type IN ('normal', 'forfeit')
+  //   - walkover_pending IS NULL OR walkover_pending = false
+  //   - confirmed_at IS NOT NULL
+  //   - deleted_at IS NULL on both match_results AND matches
+  const { data: mrData, error: mrErr } = await sb
+    .from("match_results")
+    .select(
+      `
+      match_id,
+      home_score,
+      away_score,
+      result_type,
+      walkover_pending,
+      confirmed_at,
+      match:match_id!inner (
+        season_id,
+        deleted_at,
+        home_player_id,
+        away_player_id,
+        home_player:home_player_id (
+          gamer_tag,
+          users:users!players_user_id_fkey ( display_name )
+        ),
+        away_player:away_player_id (
+          gamer_tag,
+          users:users!players_user_id_fkey ( display_name )
+        )
+      )
+      `,
+    )
+    .eq("match.season_id", seasonId)
+    .is("match.deleted_at", null)
+    .is("deleted_at", null)
+    .in("result_type", ["normal", "forfeit"])
+    .not("confirmed_at", "is", null);
+
+  if (mrErr) {
+    throw new Error(`fetchTopScorersData mr fallback failed: ${mrErr.message}`);
+  }
+
+  type MrRow = {
+    match_id: string;
+    home_score: number;
+    away_score: number;
+    walkover_pending: boolean | null;
+    match: {
+      home_player_id: string;
+      away_player_id: string;
+      home_player: {
+        gamer_tag: string | null;
+        users: { display_name: string | null } | null;
+      } | null;
+      away_player: {
+        gamer_tag: string | null;
+        users: { display_name: string | null } | null;
+      } | null;
+    } | null;
+  };
+  const rowsMr = (mrData ?? []) as unknown as MrRow[];
+  for (const r of rowsMr) {
+    if (!r.match) continue;
+    if (r.walkover_pending === true) continue;
+    const homeId = r.match.home_player_id;
+    const awayId = r.match.away_player_id;
+    const homePlayerGt = r.match.home_player?.gamer_tag ?? null;
+    const awayPlayerGt = r.match.away_player?.gamer_tag ?? null;
+    const homePlayerName =
+      r.match.home_player?.users?.display_name ?? homePlayerGt ?? "(unknown)";
+    const awayPlayerName =
+      r.match.away_player?.users?.display_name ?? awayPlayerGt ?? "(unknown)";
+
+    function attribute(
+      pid: string,
+      gt: string | null,
+      name: string,
+      goals: number,
+    ): void {
+      if (!pid || goals <= 0) return;
+      const existingExplicit = matchIdsWithExplicit.get(pid);
+      // Skip if explicit per-player data already exists for this
+      // (player, match) — it's authoritative.
+      if (existingExplicit?.has(r.match_id)) return;
+      const existing = acc.get(pid);
+      if (existing) {
+        existing.pms_goals += goals;
+      } else {
+        acc.set(pid, {
+          player_id: pid,
+          player_name: name,
+          gamer_tag: gt,
+          pms_goals: goals,
+          ge_goals: 0,
+          match_ids_with_ge: new Set(),
+        });
+      }
+    }
+
+    attribute(homeId, homePlayerGt, homePlayerName, r.home_score);
+    attribute(awayId, awayPlayerGt, awayPlayerName, r.away_score);
   }
 
   // Collapse to row + rank, filter 0-goal rows, sort, take top N.

@@ -175,10 +175,23 @@ const OVERLAY_KEY_TO_TEMPLATE_KEY: Record<string, string> = {
 };
 
 /**
+ * Normalize a player tag for cross-shape matching.
+ *
+ * 2026-04-29 fix (Bug 1): the control-panel writes display names with
+ * spaces ("BAJI JNR", "KING NONEX", "MR OGA", "KILLER FREAK") into the
+ * overlay_events payload but `players.gamer_tag` stores the same
+ * identities with underscores ("BAJI_JNR", "KINGNONEX", "MR_OGA",
+ * "KILLER_FREAK"). Strip whitespace + underscores, uppercase, so both
+ * representations match the same canonical key.
+ */
+function normalizeTag(s: string): string {
+  return s.toUpperCase().replace(/[\s_]+/g, "");
+}
+
+/**
  * Read the latest non-cleared overlay_events row for the given session +
  * template_key, decode `payload.players[]` (each `{displayName}`), and
- * resolve those names to player UUIDs via the gamer_tag → user → player
- * chain.
+ * resolve those names directly to player UUIDs via `players.gamer_tag`.
  *
  * Returns:
  *   - `string[]` of player ids (in payload order) on success,
@@ -186,10 +199,15 @@ const OVERLAY_KEY_TO_TEMPLATE_KEY: Record<string, string> = {
  *   - `null` when the payload has no resolvable players (so the endpoint
  *     can short-circuit to an empty `cards` response without blowing up).
  *
- * Resolution rule: each `displayName` is matched against `users.gamer_tag`
- * (case-insensitive uppercase). The displayName values written by the
- * broadcast control panel come from `V2_PLAYER_NAMES` which mirrors the
- * `users.gamer_tag` set verbatim, so this is a direct lookup.
+ * 2026-04-29 fix (Bug 1): the previous implementation queried
+ * `users.gamer_tag` but that column does NOT exist on the `users` table —
+ * `gamer_tag` lives on `players`. The Supabase JS client surfaces the
+ * underlying 42703 error in `error` (which we weren't checking), so the
+ * destructured `data` was always null + the chain returned an empty
+ * cards array on every live h2h trigger. Now we resolve directly against
+ * `players.gamer_tag` with a normalized key (strip whitespace + under-
+ * scores) so V2_PLAYER_NAMES values like "BAJI JNR" match DB rows like
+ * "BAJI_JNR".
  */
 async function resolvePinnedPlayerIds(
   sb: ReturnType<typeof getServiceRoleSupabase>,
@@ -248,54 +266,33 @@ async function resolvePinnedPlayerIds(
     if (!p || typeof p !== "object") continue;
     const dn = (p as { displayName?: unknown }).displayName;
     if (typeof dn === "string" && dn.trim().length > 0) {
-      displayNames.push(dn.trim().toUpperCase());
+      displayNames.push(dn.trim());
     }
   }
   if (displayNames.length === 0) return null;
 
-  // Resolve displayName → users.gamer_tag → users.id → players.id.
-  const { data: userRows } = await sb
-    .from("users")
-    .select("id, gamer_tag")
-    .in("gamer_tag", displayNames)
-    .is("deleted_at", null);
-
-  if (!userRows || userRows.length === 0) return null;
-
-  type UserRow = { id: string; gamer_tag: string };
-  const userByTag = new Map<string, string>();
-  for (const u of userRows as UserRow[]) {
-    if (u.gamer_tag) userByTag.set(u.gamer_tag.toUpperCase(), u.id);
-  }
-
-  const userIds: string[] = [];
-  for (const dn of displayNames) {
-    const uid = userByTag.get(dn);
-    if (uid) userIds.push(uid);
-  }
-  if (userIds.length === 0) return null;
-
+  // Resolve displayName → players.gamer_tag → players.id directly.
+  // Pull the active 13-row roster + match on a normalized key (strip
+  // whitespace + underscores, uppercase). Roster size is fixed and small
+  // — no need for a `.in()` filter against a derived list of variants.
   const { data: playerRows } = await sb
     .from("players")
-    .select("id, user_id")
-    .in("user_id", userIds)
+    .select("id, gamer_tag")
     .is("deleted_at", null);
 
   if (!playerRows || playerRows.length === 0) return null;
 
-  type PlayerRow = { id: string; user_id: string };
-  const playerByUser = new Map<string, string>();
+  type PlayerRow = { id: string; gamer_tag: string };
+  const playerByNorm = new Map<string, string>();
   for (const p of playerRows as PlayerRow[]) {
-    playerByUser.set(p.user_id, p.id);
+    if (p.gamer_tag) playerByNorm.set(normalizeTag(p.gamer_tag), p.id);
   }
 
   // Re-order to match payload order so the overlay slots align with the
   // operator's selection.
   const out: string[] = [];
   for (const dn of displayNames) {
-    const uid = userByTag.get(dn);
-    if (!uid) continue;
-    const pid = playerByUser.get(uid);
+    const pid = playerByNorm.get(normalizeTag(dn));
     if (pid) out.push(pid);
   }
   return out.length > 0 ? out : null;
