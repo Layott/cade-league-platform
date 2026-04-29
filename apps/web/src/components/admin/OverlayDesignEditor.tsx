@@ -63,6 +63,12 @@ export type TextElementRow = {
   elementId: string;
   origin: "seed" | "runtime";
   kind: string;
+  /**
+   * Human-readable name shown in the row header (e.g. "BRB Title",
+   * "Player A Photo"). NULL falls back to a prettified `elementId` so
+   * even unbackfilled rows render a usable label.
+   */
+  displayLabel?: string | null;
   visible: boolean;
   content: string;
   fontFamily: string | null;
@@ -109,6 +115,13 @@ export type PartnerLogoRow = {
   partnerKey: string;
   label: string;
   alt: string;
+  /**
+   * Human-readable name shown in the partners-roster row header. Distinct
+   * from `alt` (accessibility text rendered into the static HTML) so
+   * admins can rename without altering on-air alt-text. Falls back to
+   * `label` then `alt` when NULL.
+   */
+  displayLabel?: string | null;
   fileUrl: string;
   sortOrder: number;
   dimensionWPx: number;
@@ -254,10 +267,16 @@ export type EditorProps = {
    *   - the partner-strip element id ("partners-strip")
    *   - any other animatable IDs declared in the static HTML for this
    *     overlay (bg-image, score-bug numbers, etc.)
-   * Empty list collapses the panel to a "no animatable elements"
-   * placeholder.
+   * Each entry can carry an optional `displayLabel` (universal element
+   * label introduced 2026-04-28) so the row header in the Animations
+   * panel reads the same human label as the Text panel. Empty list
+   * collapses the panel to a "no animatable elements" placeholder.
    */
-  animatableElements?: ReadonlyArray<{ elementId: string; kind?: string }>;
+  animatableElements?: ReadonlyArray<{
+    elementId: string;
+    kind?: string;
+    displayLabel?: string | null;
+  }>;
   /**
    * Wave 2 Stage 4 — initial animation rows (DB-resolved). One row per
    * (element_id, anim_phase). Empty list when no admin overrides exist
@@ -666,6 +685,7 @@ export default function OverlayDesignEditor({
           fd.set("variantId", variantId);
           fd.set("elementId", row.elementId);
           fd.set("kind", row.kind);
+          if (row.displayLabel) fd.set("displayLabel", row.displayLabel);
           fd.set("visible", row.visible ? "true" : "false");
           fd.set("content", row.content ?? "");
           if (row.fontFamily) fd.set("fontFamily", row.fontFamily);
@@ -1066,6 +1086,7 @@ export default function OverlayDesignEditor({
 
         <AnimationsPanel
           rows={animationRows}
+          registry={animatableElements ?? []}
           pending={pending}
           onUpdate={updateAnimationRow}
           onSave={saveAnimationRow}
@@ -1343,6 +1364,83 @@ function normalizeHex(v: string): string {
 }
 
 /**
+ * Convert a kebab-case `element_id` into a Title-Case fallback label
+ * for the row header (e.g. `home-score` → "Home Score"). Only used when
+ * the DB row carries a NULL `display_label` (legacy rows that pre-date
+ * the universal-element-labels migration `20260620000010`).
+ */
+export function prettyId(id: string): string {
+  if (!id) return "";
+  return id
+    .split("-")
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
+}
+
+/**
+ * Map a `kind` enum value (DB-stored) to a short human-readable badge
+ * label for the row header. Covers both legacy typographic kinds and
+ * semantic kinds. Falls back to the raw kind for unknown values.
+ *
+ * Pairs with the kind allowlist in
+ * `apps/web/src/server/overlays/text/elements.ts::TEXT_KINDS` and the
+ * DB CHECK constraint introduced in migration `20260620000010_*`.
+ */
+export function kindLabel(kind: string | null | undefined): string {
+  switch (kind) {
+    // Legacy typographic
+    case "heading":
+      return "Heading";
+    case "subheading":
+      return "Subheading";
+    case "eyebrow":
+      return "Eyebrow";
+    case "title":
+      return "Title";
+    case "subtitle":
+      return "Subtitle";
+    case "caption":
+      return "Caption";
+    case "number":
+      return "Number";
+    case "label":
+      return "Label";
+    case "body":
+      return "Body";
+    case "image":
+      return "Image";
+    case "layout":
+      return "Layout";
+    // Semantic (post-2026-04-28)
+    case "text":
+      return "Text";
+    case "score-number":
+      return "Score";
+    case "player-name":
+      return "Player Name";
+    case "player-photo":
+      return "Photo";
+    case "player-box":
+      return "Player Box";
+    case "sponsor-logo-strip":
+      return "Sponsor (Strip)";
+    case "sponsor-logo-floating":
+      return "Sponsor Logo";
+    case "partner-strip-container":
+      return "Partner Strip";
+    case "bg-image":
+      return "Background";
+    case "bg-vignette":
+      return "Vignette";
+    case "box":
+      return "Box";
+    default:
+      return typeof kind === "string" && kind.length > 0 ? kind : "Element";
+  }
+}
+
+/**
  * Image-token widget — file picker + 80×45 (16:9) thumb + Upload + Clear.
  *
  * On Upload:
@@ -1536,8 +1634,22 @@ function TextElementEditorRow({
     "block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]";
   const inputStyle =
     "w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 font-mono text-xs text-[var(--chalk-0)] focus:border-[var(--signal)] focus:outline-none";
-  const isImage = row.kind === "image";
-  const isLayout = row.kind === "layout";
+  // Image-like kinds skip the content field entirely — these are picture
+  // / sponsor-logo / background slots driven by data, not text. Layout
+  // kinds (box / partner-strip / player-box) are pure containers.
+  const isImage =
+    row.kind === "image" ||
+    row.kind === "player-photo" ||
+    row.kind === "bg-image" ||
+    row.kind === "bg-vignette" ||
+    row.kind === "sponsor-logo-strip" ||
+    row.kind === "sponsor-logo-floating";
+  const isLayout =
+    row.kind === "layout" ||
+    row.kind === "box" ||
+    row.kind === "player-box" ||
+    row.kind === "partner-strip-container";
+  const headerLabel = row.displayLabel || prettyId(row.elementId);
 
   return (
     <details
@@ -1547,12 +1659,21 @@ function TextElementEditorRow({
       <summary className="cursor-pointer list-none px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex flex-1 flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-[var(--chalk-0)]">
-                {row.elementId}
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]"
+                data-testid={`text-row-${row.elementId}-kind-label`}
+              >
+                {kindLabel(row.kind)}
               </span>
-              <span className="rounded-sm border border-[var(--ink-4)] px-1.5 py-px text-[9px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                {row.kind}
+              <span
+                className="font-display text-sm font-bold text-[var(--chalk-0)]"
+                data-testid={`text-row-${row.elementId}-display-label`}
+              >
+                {headerLabel}
+              </span>
+              <span className="font-mono text-[10px] text-[var(--chalk-3)]">
+                {row.elementId}
               </span>
               {row.origin === "runtime" ? (
                 <span className="rounded-sm border border-[var(--primary)] px-1.5 py-px text-[9px] uppercase tracking-[0.18em] text-[var(--signal)]">
@@ -2089,11 +2210,25 @@ function PartnersPanel({
                     />
                   </div>
                   <div className="flex flex-1 flex-col">
-                    <span className="text-xs font-mono text-[var(--chalk-0)]">
-                      {logo.partnerKey}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]"
+                        data-testid={`partner-logo-${logo.partnerKey}-kind-label`}
+                      >
+                        Sponsor (Strip)
+                      </span>
+                      <span
+                        className="font-display text-sm font-bold text-[var(--chalk-0)]"
+                        data-testid={`partner-logo-${logo.partnerKey}-display-label`}
+                      >
+                        {logo.displayLabel || logo.label || logo.alt}
+                      </span>
+                      <span className="font-mono text-[10px] text-[var(--chalk-3)]">
+                        {logo.partnerKey}
+                      </span>
+                    </div>
                     <span className="text-[10px] text-[var(--chalk-3)]">
-                      {logo.label} · {logo.dimensionWPx}×{logo.dimensionHPx}
+                      {logo.dimensionWPx}×{logo.dimensionHPx}
                     </span>
                   </div>
                   <label className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
@@ -2349,12 +2484,18 @@ function PartnerLogoUploader({
  */
 function AnimationsPanel({
   rows,
+  registry,
   pending,
   onUpdate,
   onSave,
   onReset,
 }: {
   rows: ReadonlyArray<AnimationRow>;
+  registry: ReadonlyArray<{
+    elementId: string;
+    kind?: string;
+    displayLabel?: string | null;
+  }>;
   pending: boolean;
   onUpdate: (
     elementId: string,
@@ -2367,6 +2508,20 @@ function AnimationsPanel({
   const [activePhase, setActivePhase] = useState<
     Record<string, AnimPhase>
   >({});
+
+  // Lookup table for the universal element label + kind. Pairs with
+  // the same shape rendered in the Text panel so admins see one
+  // consistent label across every panel for the same element_id.
+  const registryByKey = useMemo(() => {
+    const m = new Map<
+      string,
+      { kind?: string; displayLabel?: string | null }
+    >();
+    for (const r of registry) {
+      m.set(r.elementId, { kind: r.kind, displayLabel: r.displayLabel });
+    }
+    return m;
+  }, [registry]);
 
   // Group rows by element_id.
   const byElement = useMemo(() => {
@@ -2429,10 +2584,31 @@ function AnimationsPanel({
             >
               <summary className="cursor-pointer list-none px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex flex-1 items-center gap-2">
-                    <span className="font-mono text-xs text-[var(--chalk-0)]">
-                      {elementId}
-                    </span>
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    {(() => {
+                      const meta = registryByKey.get(elementId);
+                      const labelText =
+                        meta?.displayLabel || prettyId(elementId);
+                      return (
+                        <>
+                          <span
+                            className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]"
+                            data-testid={`anim-element-${elementId}-kind-label`}
+                          >
+                            {kindLabel(meta?.kind)}
+                          </span>
+                          <span
+                            className="font-display text-sm font-bold text-[var(--chalk-0)]"
+                            data-testid={`anim-element-${elementId}-display-label`}
+                          >
+                            {labelText}
+                          </span>
+                          <span className="font-mono text-[10px] text-[var(--chalk-3)]">
+                            {elementId}
+                          </span>
+                        </>
+                      );
+                    })()}
                     {enabledPhases.length > 0 ? (
                       <span className="rounded-sm border border-[var(--primary)] px-1.5 py-px text-[9px] uppercase tracking-[0.18em] text-[var(--signal)]">
                         {enabledPhases.length} phase

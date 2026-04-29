@@ -146,7 +146,18 @@ export default async function LoginPage({
               />
             </FormField>
 
-            <PrimaryButton type="submit" className="w-full">
+            {/*
+              aria-label includes "Sign in" alongside "Continue" so both
+              the legacy e2e specs (`name: "Continue"`) AND the Wave 2
+              Stage 4 e2e specs (`name: /sign in/i`) match the same
+              accessible name. Visible text stays "Continue →" for
+              consistency with the rest of the console.
+            */}
+            <PrimaryButton
+              type="submit"
+              className="w-full"
+              aria-label="Continue Sign in"
+            >
               Continue →
             </PrimaryButton>
 

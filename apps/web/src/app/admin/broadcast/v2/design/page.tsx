@@ -132,6 +132,7 @@ export default async function OverlayDesignPage({
     elementId: r.elementId,
     origin: r.origin,
     kind: r.kind,
+    displayLabel: r.displayLabel ?? null,
     visible: r.visible,
     content: r.content,
     fontFamily: r.fontFamily,
@@ -174,6 +175,7 @@ export default async function OverlayDesignPage({
     partnerKey: l.partnerKey,
     label: l.label,
     alt: l.alt,
+    displayLabel: l.displayLabel ?? null,
     fileUrl: l.fileUrl,
     sortOrder: l.sortOrder,
     dimensionWPx: l.dimensionWPx,
@@ -200,8 +202,16 @@ export default async function OverlayDesignPage({
   // disabled rows for every (element_id, phase) so the toggle UI is
   // always reachable.
   const animatableElements = [
-    ...textElements.map((t) => ({ elementId: t.elementId, kind: t.kind })),
-    { elementId: "partners-strip", kind: "layout" },
+    ...textElements.map((t) => ({
+      elementId: t.elementId,
+      kind: t.kind,
+      displayLabel: t.displayLabel ?? null,
+    })),
+    {
+      elementId: "partners-strip",
+      kind: "partner-strip-container",
+      displayLabel: "Partners Strip",
+    },
   ];
   const animationRows: AnimationRow[] = (
     await listAnimations(sb, selectedOverlay, selectedVariantId).catch(() => [])

@@ -23,6 +23,7 @@ import {
 import {
   upsertTextElement,
   getTextElement,
+  TEXT_KINDS as ELEMENT_TEXT_KINDS,
   type TextAlignment,
   type TextKind,
 } from "@/server/overlays/text/elements";
@@ -36,11 +37,15 @@ import {
   deletePartnerLogo,
 } from "@/server/overlays/partners/logos";
 import {
-  upsertAnimation,
   deleteAnimation,
   type AnimPhase,
   type AnimType,
 } from "@/server/overlays/animations/elements";
+import { sanitizeKeyframes } from "@/server/overlays/animations/sanitize_keyframes";
+import {
+  isValidElementId,
+  isValidEasing,
+} from "@/server/overlays/_shared/css-validator";
 
 /**
  * Phase 3 — overlay design admin server actions.
@@ -420,19 +425,10 @@ export async function uploadOverlayBgAction(
  *
  * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.3, §3.1
  */
-const TEXT_KINDS = [
-  "heading",
-  "subheading",
-  "eyebrow",
-  "title",
-  "subtitle",
-  "caption",
-  "number",
-  "label",
-  "body",
-  "image",
-  "layout",
-] as const satisfies readonly TextKind[];
+// Mirror of the server module's allowlist — keeps the action layer's Zod
+// validation in lockstep with the server-side `validateInput` allowlist
+// + the DB CHECK constraint introduced by migration 20260620000010.
+const TEXT_KINDS = ELEMENT_TEXT_KINDS;
 
 const TEXT_ALIGNMENTS = [
   "left",
@@ -461,6 +457,11 @@ const SetTextElementSchema = z.object({
   // Optional fields — empty string sentinel means "inherit HTML default".
   visible: z.enum(["true", "false"]).optional(),
   content: z.string().max(1024).optional(),
+  // Universal element labels (post-2026-04-28) — admin can rename a
+  // text-element label without altering the on-air content. Empty
+  // string means "no override; preserve existing or fall back to
+  // prettyId(elementId)".
+  displayLabel: z.string().max(200).optional(),
   fontFamily: z.string().max(40).optional(),
   fontWeight: z.string().max(4).optional(),
   fontSizePx: z.string().max(4).optional(),
@@ -515,6 +516,8 @@ export async function setTextElementAction(formData: FormData) {
     elementId: String(formData.get("elementId") ?? ""),
     visible: (formData.get("visible") as string | null) ?? undefined,
     content: (formData.get("content") as string | null) ?? undefined,
+    displayLabel:
+      (formData.get("displayLabel") as string | null) ?? undefined,
     fontFamily: (formData.get("fontFamily") as string | null) ?? undefined,
     fontWeight: (formData.get("fontWeight") as string | null) ?? undefined,
     fontSizePx: (formData.get("fontSizePx") as string | null) ?? undefined,
@@ -569,12 +572,21 @@ export async function setTextElementAction(formData: FormData) {
         ? true
         : (existing?.visible ?? true);
 
+  // displayLabel: empty-string sentinel means "no change" — preserve
+  // the existing label so the seed-backfill values stay intact unless
+  // the admin explicitly typed a new one.
+  const displayLabelInput =
+    parsed.data.displayLabel != null && parsed.data.displayLabel !== ""
+      ? parsed.data.displayLabel
+      : (existing?.displayLabel ?? null);
+
   await upsertTextElement(sb, actor, {
     overlayKey: parsed.data.overlayKey,
     variantId: parsed.data.variantId,
     elementId: parsed.data.elementId,
     origin,
     kind,
+    displayLabel: displayLabelInput,
     visible: visibleParsed,
     content: parsed.data.content ?? "",
     fontFamily: parseOptStr(parsed.data.fontFamily, TEXT_FONT_FAMILIES),
@@ -654,6 +666,10 @@ export async function clearTextElementAction(formData: FormData) {
     elementId: parsed.data.elementId,
     origin: existing.origin,
     kind: existing.kind,
+    // Reset clears typography + content but PRESERVES displayLabel —
+    // the human-readable name shouldn't reset just because the admin
+    // wanted to remove a color override.
+    displayLabel: existing.displayLabel,
     visible: true,
     content: "",
     fontFamily: null,
@@ -893,6 +909,7 @@ export async function uploadPartnerLogoAction(
   const partnerKey = String(formData.get("partnerKey") ?? "").trim();
   const label = String(formData.get("label") ?? "").trim();
   const alt = String(formData.get("alt") ?? "").trim();
+  const displayLabelRaw = String(formData.get("displayLabel") ?? "").trim();
   const sortOrderRaw = String(formData.get("sortOrder") ?? "0");
   const file = formData.get("file");
 
@@ -909,6 +926,9 @@ export async function uploadPartnerLogoAction(
   }
   if (!alt || alt.length > 200) {
     return { ok: false, error: "alt required (1..200 chars)" };
+  }
+  if (displayLabelRaw && displayLabelRaw.length > 200) {
+    return { ok: false, error: "displayLabel must be ≤200 chars" };
   }
   const sortOrder = Number(sortOrderRaw);
   if (!Number.isFinite(sortOrder) || sortOrder < 0 || sortOrder > 999) {
@@ -1028,6 +1048,13 @@ export async function uploadPartnerLogoAction(
         partnerKey,
         label,
         alt,
+        // displayLabel falls back to the human label, then to the
+        // accessibility alt text — admin can rename later via the
+        // partner-logo editor.
+        displayLabel:
+          displayLabelRaw && displayLabelRaw !== ""
+            ? displayLabelRaw
+            : label || alt,
         fileUrl: publicUrl,
         fileSizeBytes: file.size,
         dimensionWPx,
@@ -1227,15 +1254,29 @@ const SetAnimationSchema = z.object({
 /**
  * Persist an element-animation override. The action upserts a row in
  * `overlay_element_animations` keyed on (overlay_key, variant_id,
- * element_id, anim_phase). Stage 1's `upsertAnimation` does the
- * `validateInput()` pass + the `sanitizeKeyframes` call when
- * `animType === 'custom-css'`. The action layer's responsibility is
- * the perm gate, FormData → typed input coercion, and the revalidate
- * cycle.
+ * element_id, anim_phase).
  *
- * `customCssKeyframes` is dropped entirely when `animType !== 'custom-
- * css'` — the server module rejects non-null payloads on non-custom
- * types as a defence-in-depth pass.
+ * NOTE on upsert path: `overlay_element_animations` has a PARTIAL
+ * unique index (`WHERE deleted_at IS NULL`). Postgres' `INSERT ... ON
+ * CONFLICT (cols) DO UPDATE` requires a non-partial constraint OR an
+ * explicit WHERE on the conflict target — Supabase JS client only
+ * supports the column-list form, which fails inference against partial
+ * indexes ("there is no unique or exclusion constraint matching the
+ * ON CONFLICT specification"). We therefore SELECT first and pick
+ * INSERT-or-UPDATE manually, mirroring `setStripLayoutAction` /
+ * `setLogoOverrideAction` (see commit `b7b3deff`).
+ *
+ * Validation mirrors `validateInput` in the server module
+ * (`server/overlays/animations/elements.ts::upsertAnimation`):
+ *   - element_id matches `isValidElementId` (kebab-case, len 1..64);
+ *   - easing matches `isValidEasing` (allow-listed presets +
+ *     `cubic-bezier(...)`);
+ *   - durationMs/delayMs in 50..5000 / 0..5000 (already enforced by
+ *     the Zod schema);
+ *   - iterationCount in {`infinite`} ∪ ints 1..100;
+ *   - `customCssKeyframes` runs through the server-side `sanitizeKeyframes`
+ *     reject-on-violation pass when type is `custom-css`; ignored on
+ *     other types.
  *
  * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.5, §3.4
  */
@@ -1263,29 +1304,102 @@ export async function setAnimationAction(formData: FormData) {
     );
   }
 
-  const { sb, publicUserId, roles } = await gate();
-  const customKeyframes =
-    parsed.data.animType === "custom-css"
-      ? parsed.data.customCssKeyframes ?? null
-      : null;
+  // Defence-in-depth runtime validation (mirrors server module's
+  // `validateInput`).
+  if (!isValidElementId(parsed.data.elementId)) {
+    throw new Error(
+      `invalid element_id ${parsed.data.elementId}: kebab-case (a-z, 0-9, -), 1..64 chars`,
+    );
+  }
+  if (!isValidEasing(parsed.data.easing)) {
+    throw new Error(
+      `invalid easing ${parsed.data.easing}: must be a preset keyword or cubic-bezier(...)`,
+    );
+  }
+  if (
+    parsed.data.iterationCount !== "infinite" &&
+    !/^\d{1,3}$/.test(parsed.data.iterationCount)
+  ) {
+    throw new Error(
+      `iteration_count must be 'infinite' or a 1-3 digit integer`,
+    );
+  }
+  if (parsed.data.iterationCount !== "infinite") {
+    const n = parseInt(parsed.data.iterationCount, 10);
+    if (n < 1 || n > 100) {
+      throw new Error(`iteration_count integer must be 1..100`);
+    }
+  }
 
-  await upsertAnimation(
-    sb,
-    { userId: publicUserId, roles },
-    {
-      overlayKey: parsed.data.overlayKey,
-      variantId: parsed.data.variantId,
-      elementId: parsed.data.elementId,
-      animPhase: parsed.data.animPhase as AnimPhase,
-      enabled: parsed.data.enabled === "true",
-      animType: parsed.data.animType as AnimType,
-      durationMs: parsed.data.durationMs,
-      delayMs: parsed.data.delayMs,
-      easing: parsed.data.easing,
-      iterationCount: parsed.data.iterationCount,
-      customCssKeyframes: customKeyframes,
-    },
-  );
+  // `customCssKeyframes` is dropped entirely when `animType !==
+  // 'custom-css'`. For `custom-css` we run the server-side sanitizer
+  // (reject-on-first-violation, no silent strip) so URL-borne admin
+  // pastes can't sneak in `url()` / `@-rules` / forbidden CSS
+  // metacharacters.
+  let sanitizedKeyframes: string | null = null;
+  if (parsed.data.animType === "custom-css") {
+    if (
+      !parsed.data.customCssKeyframes ||
+      parsed.data.customCssKeyframes.trim() === ""
+    ) {
+      throw new Error(
+        `custom-css anim type requires customCssKeyframes payload`,
+      );
+    }
+    const r = sanitizeKeyframes(parsed.data.customCssKeyframes);
+    if (!r.ok) {
+      throw new Error(`keyframes sanitize failed: ${r.error}`);
+    }
+    sanitizedKeyframes = r.normalized;
+  }
+
+  const { sb, publicUserId } = await gate();
+
+  const nowIso = new Date().toISOString();
+  const row = {
+    overlay_key: parsed.data.overlayKey,
+    variant_id: parsed.data.variantId,
+    element_id: parsed.data.elementId,
+    anim_phase: parsed.data.animPhase as AnimPhase,
+    enabled: parsed.data.enabled === "true",
+    anim_type: parsed.data.animType as AnimType,
+    duration_ms: parsed.data.durationMs,
+    delay_ms: parsed.data.delayMs,
+    easing: parsed.data.easing,
+    iteration_count: parsed.data.iterationCount,
+    custom_css_keyframes: sanitizedKeyframes,
+    set_by: publicUserId,
+    updated_at: nowIso,
+    deleted_at: null,
+  };
+
+  // SELECT-then-INSERT-or-UPDATE keyed on the partial unique tuple.
+  const { data: existing } = await sb
+    .from("overlay_element_animations")
+    .select("id")
+    .eq("overlay_key", parsed.data.overlayKey)
+    .eq("variant_id", parsed.data.variantId)
+    .eq("element_id", parsed.data.elementId)
+    .eq("anim_phase", parsed.data.animPhase)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await sb
+      .from("overlay_element_animations")
+      .update(row)
+      .eq("id", (existing as { id: string }).id);
+    if (error) {
+      throw new Error(`setAnimationAction (update): ${error.message}`);
+    }
+  } else {
+    const { error } = await sb
+      .from("overlay_element_animations")
+      .insert(row);
+    if (error) {
+      throw new Error(`setAnimationAction (insert): ${error.message}`);
+    }
+  }
 
   revalidatePath("/admin/broadcast/v2/design");
   revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");

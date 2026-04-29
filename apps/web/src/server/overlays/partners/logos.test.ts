@@ -37,6 +37,7 @@ type LogoRow = {
   partner_key: string;
   label: string;
   alt: string;
+  display_label: string | null;
   file_url: string;
   file_size_bytes: number;
   dimension_w_px: number;
@@ -61,6 +62,7 @@ function mkLogo(overrides: Partial<LogoRow> = {}): LogoRow {
     partner_key: "gameevo",
     label: "GameEvo",
     alt: "GameEvo",
+    display_label: null,
     file_url: "/x/gameevo.png",
     file_size_bytes: 150000,
     dimension_w_px: 600,
@@ -134,7 +136,7 @@ function logosTable(rows: LogoRow[]) {
       const isPatch =
         payload != null &&
         Object.keys(payload).some((k) =>
-          ["label", "alt", "file_url", "file_size_bytes",
+          ["label", "alt", "display_label", "file_url", "file_size_bytes",
            "dimension_w_px", "dimension_h_px"].includes(k),
         );
       if (isPatch) return update();
@@ -485,5 +487,84 @@ describe("resolvePartnerLogos — merge logic", () => {
     );
     const out = await resolvePartnerLogos(sb as never, KEY, VARIANT);
     expect(out.map((l) => l.partnerKey)).toEqual(["b", "a"]);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Universal element labels (post-2026-04-28)                         *
+ * Migration: 20260620000011_overlay_partner_logos_display_label.sql  *
+ * ------------------------------------------------------------------ */
+
+describe("PartnerLogo displayLabel field", () => {
+  beforeEach(() => requirePermAsyncMock.mockReset().mockResolvedValue(undefined));
+
+  it("listPartnerLogos maps display_label to displayLabel", async () => {
+    const sb = mkSb([
+      mkLogo({ partner_key: "gameevo", display_label: "GameEvo Sponsor Logo" }),
+    ]);
+    const out = await listPartnerLogos(sb as never);
+    expect(out[0].displayLabel).toBe("GameEvo Sponsor Logo");
+  });
+
+  it("listPartnerLogos coerces missing display_label to null", async () => {
+    const sb = mkSb([mkLogo({ display_label: null })]);
+    const out = await listPartnerLogos(sb as never);
+    expect(out[0].displayLabel).toBeNull();
+  });
+
+  it("createPartnerLogo persists displayLabel", async () => {
+    const sb = mkSb([mkLogo({ partner_key: "newpartner" })]);
+    await createPartnerLogo(sb as never, ACTOR, {
+      ...VALID_LOGO,
+      displayLabel: "New Sponsor",
+    });
+    expect(sb._logos.insert).toHaveBeenCalled();
+  });
+
+  it("createPartnerLogo defaults displayLabel to alt when omitted", async () => {
+    const sb = mkSb([mkLogo({ partner_key: "newpartner" })]);
+    // Server default: when no displayLabel passed, the row carries `alt`.
+    // Validation passes — confirms the default-fallback path doesn't trip.
+    await expect(
+      createPartnerLogo(sb as never, ACTOR, VALID_LOGO),
+    ).resolves.toBeDefined();
+  });
+
+  it("createPartnerLogo rejects empty-string displayLabel", async () => {
+    const sb = mkSb([]);
+    await expect(
+      createPartnerLogo(sb as never, ACTOR, {
+        ...VALID_LOGO,
+        displayLabel: "",
+      }),
+    ).rejects.toThrow(/displayLabel must be 1\.\.200/);
+  });
+
+  it("createPartnerLogo rejects displayLabel longer than 200 chars", async () => {
+    const sb = mkSb([]);
+    await expect(
+      createPartnerLogo(sb as never, ACTOR, {
+        ...VALID_LOGO,
+        displayLabel: "X".repeat(201),
+      }),
+    ).rejects.toThrow(/displayLabel must be 1\.\.200/);
+  });
+
+  it("updatePartnerLogo accepts a displayLabel patch", async () => {
+    const sb = mkSb([mkLogo({ display_label: "Old Label" })]);
+    await expect(
+      updatePartnerLogo(sb as never, ACTOR, "gameevo", {
+        displayLabel: "New Label",
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it("updatePartnerLogo rejects empty-string displayLabel patch", async () => {
+    const sb = mkSb([mkLogo()]);
+    await expect(
+      updatePartnerLogo(sb as never, ACTOR, "gameevo", {
+        displayLabel: "",
+      }),
+    ).rejects.toThrow(/displayLabel must be 1\.\.200/);
   });
 });

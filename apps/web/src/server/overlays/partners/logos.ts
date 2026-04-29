@@ -27,6 +27,13 @@ export type PartnerLogo = {
   partnerKey: string;
   label: string;
   alt: string;
+  /**
+   * Human-readable name shown in the admin UI (e.g. "GameEvo Sponsor
+   * Logo"). Distinct from `alt` (accessibility text rendered into the
+   * static HTML) so admins can rename without altering on-air alt-text.
+   * Falls back to `alt` when NULL.
+   */
+  displayLabel: string | null;
   fileUrl: string;
   fileSizeBytes: number;
   dimensionWPx: number;
@@ -41,6 +48,7 @@ export type PartnerLogoInput = {
   partnerKey: string;
   label: string;
   alt: string;
+  displayLabel?: string | null;
   fileUrl: string;
   fileSizeBytes: number;
   dimensionWPx: number;
@@ -51,6 +59,7 @@ export type PartnerLogoInput = {
 export type PartnerLogoPatch = Partial<{
   label: string;
   alt: string;
+  displayLabel: string | null;
   fileUrl: string;
   fileSizeBytes: number;
   dimensionWPx: number;
@@ -80,6 +89,7 @@ type LogoRow = {
   partner_key: string;
   label: string;
   alt: string;
+  display_label: string | null;
   file_url: string;
   file_size_bytes: number;
   dimension_w_px: number;
@@ -100,7 +110,7 @@ type OverrideRow = {
 };
 
 const LOGO_SELECT_COLS =
-  "id, partner_key, label, alt, file_url, file_size_bytes, dimension_w_px, dimension_h_px, sort_order, set_by, created_at, updated_at";
+  "id, partner_key, label, alt, display_label, file_url, file_size_bytes, dimension_w_px, dimension_h_px, sort_order, set_by, created_at, updated_at";
 
 const OVERRIDE_SELECT_COLS =
   "id, overlay_key, variant_id, partner_key, visible, sort_override";
@@ -111,6 +121,7 @@ function toLogo(r: LogoRow): PartnerLogo {
     partnerKey: r.partner_key,
     label: r.label,
     alt: r.alt,
+    displayLabel: r.display_label ?? null,
     fileUrl: r.file_url,
     fileSizeBytes: r.file_size_bytes,
     dimensionWPx: r.dimension_w_px,
@@ -170,6 +181,12 @@ function validateLogoInput(input: PartnerLogoInput): void {
   }
   if (input.alt == null || input.alt.length > 200) {
     throw new Error(`alt required, max 200 chars`);
+  }
+  if (
+    input.displayLabel != null &&
+    (input.displayLabel.length === 0 || input.displayLabel.length > 200)
+  ) {
+    throw new Error(`displayLabel must be 1..200 chars`);
   }
   if (!input.fileUrl || input.fileUrl.length > 1000) {
     throw new Error(`fileUrl required, max 1000 chars`);
@@ -243,6 +260,7 @@ export async function createPartnerLogo(
       partner_key: input.partnerKey,
       label: input.label,
       alt: input.alt,
+      display_label: input.displayLabel ?? input.alt,
       file_url: input.fileUrl,
       file_size_bytes: input.fileSizeBytes,
       dimension_w_px: input.dimensionWPx,
@@ -287,10 +305,18 @@ export async function updatePartnerLogo(
     if (!r.ok) throw new Error(`updatePartnerLogo: ${r.error}`);
   }
 
+  if (
+    patch.displayLabel != null &&
+    (patch.displayLabel.length === 0 || patch.displayLabel.length > 200)
+  ) {
+    throw new Error(`updatePartnerLogo: displayLabel must be 1..200 chars`);
+  }
+
   const nowIso = new Date().toISOString();
   const updates: Record<string, unknown> = { updated_at: nowIso };
   if (patch.label != null) updates.label = patch.label;
   if (patch.alt != null) updates.alt = patch.alt;
+  if (patch.displayLabel !== undefined) updates.display_label = patch.displayLabel;
   if (patch.fileUrl != null) updates.file_url = patch.fileUrl;
   if (patch.fileSizeBytes != null) updates.file_size_bytes = patch.fileSizeBytes;
   if (patch.dimensionWPx != null) updates.dimension_w_px = patch.dimensionWPx;

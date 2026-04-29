@@ -20,6 +20,8 @@ import {
   deleteTextElement,
   restoreTextElement,
   resolveTextElements,
+  isValidTextKind,
+  TEXT_KINDS,
   type TextElementInput,
 } from "./elements";
 
@@ -34,6 +36,7 @@ type Row = {
   element_id: string;
   origin: "seed" | "runtime";
   kind: string;
+  display_label: string | null;
   visible: boolean;
   content: string;
   font_family: string | null;
@@ -61,6 +64,7 @@ function mkSeedRow(overrides: Partial<Row> = {}): Row {
     element_id: "title",
     origin: "seed",
     kind: "title",
+    display_label: null,
     visible: true,
     content: "",
     font_family: null,
@@ -630,5 +634,241 @@ describe("restoreTextElement", () => {
     await expect(
       restoreTextElement(sb as never, ACTOR, KEY, VARIANT, "title"),
     ).rejects.toThrow(/overlay\.design\.manage/);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Universal element labels + kinds (post-2026-04-28)                 *
+ * Migration: 20260620000010_overlay_text_elements_kind.sql           *
+ * ------------------------------------------------------------------ */
+
+describe("TEXT_KINDS allowlist", () => {
+  it("accepts every legacy typographic kind", () => {
+    for (const k of [
+      "heading",
+      "subheading",
+      "eyebrow",
+      "title",
+      "subtitle",
+      "caption",
+      "number",
+      "label",
+      "body",
+      "image",
+      "layout",
+    ]) {
+      expect(isValidTextKind(k)).toBe(true);
+    }
+  });
+
+  it("accepts every new semantic kind", () => {
+    for (const k of [
+      "text",
+      "score-number",
+      "player-name",
+      "player-photo",
+      "player-box",
+      "sponsor-logo-strip",
+      "sponsor-logo-floating",
+      "partner-strip-container",
+      "bg-image",
+      "bg-vignette",
+      "box",
+    ]) {
+      expect(isValidTextKind(k)).toBe(true);
+    }
+  });
+
+  it("rejects unknown values", () => {
+    expect(isValidTextKind("not-a-kind")).toBe(false);
+    expect(isValidTextKind("")).toBe(false);
+    expect(isValidTextKind(null)).toBe(false);
+    expect(isValidTextKind(undefined)).toBe(false);
+    expect(isValidTextKind(42)).toBe(false);
+  });
+
+  it("TEXT_KINDS array contains all 22 entries", () => {
+    expect(TEXT_KINDS.length).toBe(22);
+  });
+});
+
+describe("upsertTextElement — kind validation", () => {
+  beforeEach(() => requirePermAsyncMock.mockReset().mockResolvedValue(undefined));
+
+  function mkInput(overrides: Partial<TextElementInput> = {}): TextElementInput {
+    return {
+      overlayKey: KEY,
+      variantId: VARIANT,
+      elementId: "title",
+      origin: "seed",
+      kind: "title",
+      displayLabel: null,
+      visible: true,
+      content: "",
+      fontFamily: null,
+      fontWeight: null,
+      fontSizePx: null,
+      letterSpacing: null,
+      lineHeight: null,
+      color: null,
+      alignment: null,
+      opacityPct: null,
+      positionXPx: null,
+      positionYPx: null,
+      zIndex: null,
+      sortOrder: 0,
+      ...overrides,
+    };
+  }
+
+  it("rejects unknown kind", async () => {
+    const sb = mkSb([]);
+    await expect(
+      upsertTextElement(
+        sb as never,
+        ACTOR,
+        mkInput({ kind: "not-a-kind" as never }),
+      ),
+    ).rejects.toThrow(/invalid kind/);
+  });
+
+  it("accepts new semantic kind player-photo", async () => {
+    const r = mkSeedRow({ element_id: "title", kind: "player-photo" });
+    const sb = mkSb([r]);
+    const out = await upsertTextElement(
+      sb as never,
+      ACTOR,
+      mkInput({ kind: "player-photo" }),
+    );
+    expect(out.kind).toBe("player-photo");
+  });
+
+  it("accepts new semantic kind partner-strip-container", async () => {
+    const r = mkSeedRow({
+      element_id: "partners-strip",
+      kind: "partner-strip-container",
+    });
+    const sb = mkSb([r]);
+    const out = await upsertTextElement(
+      sb as never,
+      ACTOR,
+      mkInput({
+        elementId: "partners-strip",
+        kind: "partner-strip-container",
+      }),
+    );
+    expect(out.kind).toBe("partner-strip-container");
+  });
+});
+
+describe("upsertTextElement — displayLabel persistence", () => {
+  beforeEach(() => requirePermAsyncMock.mockReset().mockResolvedValue(undefined));
+
+  it("persists displayLabel on upsert", async () => {
+    const r = mkSeedRow({
+      element_id: "title",
+      kind: "heading",
+      display_label: "BRB Title",
+    });
+    const sb = mkSb([r]);
+    const out = await upsertTextElement(sb as never, ACTOR, {
+      overlayKey: KEY,
+      variantId: VARIANT,
+      elementId: "title",
+      origin: "seed",
+      kind: "heading",
+      displayLabel: "BRB Title",
+      visible: true,
+      content: "",
+      fontFamily: null,
+      fontWeight: null,
+      fontSizePx: null,
+      letterSpacing: null,
+      lineHeight: null,
+      color: null,
+      alignment: null,
+      opacityPct: null,
+      positionXPx: null,
+      positionYPx: null,
+      zIndex: null,
+      sortOrder: 0,
+    });
+    expect(out.displayLabel).toBe("BRB Title");
+  });
+
+  it("rejects empty-string displayLabel", async () => {
+    const sb = mkSb([]);
+    await expect(
+      upsertTextElement(sb as never, ACTOR, {
+        overlayKey: KEY,
+        variantId: VARIANT,
+        elementId: "title",
+        origin: "seed",
+        kind: "title",
+        displayLabel: "",
+        visible: true,
+        content: "",
+        fontFamily: null,
+        fontWeight: null,
+        fontSizePx: null,
+        letterSpacing: null,
+        lineHeight: null,
+        color: null,
+        alignment: null,
+        opacityPct: null,
+        positionXPx: null,
+        positionYPx: null,
+        zIndex: null,
+        sortOrder: 0,
+      }),
+    ).rejects.toThrow(/displayLabel must be 1\.\.200/);
+  });
+
+  it("rejects displayLabel longer than 200 chars", async () => {
+    const sb = mkSb([]);
+    const tooLong = "A".repeat(201);
+    await expect(
+      upsertTextElement(sb as never, ACTOR, {
+        overlayKey: KEY,
+        variantId: VARIANT,
+        elementId: "title",
+        origin: "seed",
+        kind: "title",
+        displayLabel: tooLong,
+        visible: true,
+        content: "",
+        fontFamily: null,
+        fontWeight: null,
+        fontSizePx: null,
+        letterSpacing: null,
+        lineHeight: null,
+        color: null,
+        alignment: null,
+        opacityPct: null,
+        positionXPx: null,
+        positionYPx: null,
+        zIndex: null,
+        sortOrder: 0,
+      }),
+    ).rejects.toThrow(/displayLabel must be 1\.\.200/);
+  });
+
+  it("listTextElements maps display_label to displayLabel", async () => {
+    const r = mkSeedRow({
+      element_id: "partners-strip",
+      kind: "partner-strip-container",
+      display_label: "Partners Strip",
+    });
+    const sb = mkSb([r]);
+    const out = await listTextElements(sb as never, KEY, VARIANT);
+    expect(out[0].displayLabel).toBe("Partners Strip");
+    expect(out[0].kind).toBe("partner-strip-container");
+  });
+
+  it("getTextElement returns NULL displayLabel for unbackfilled rows", async () => {
+    const r = mkSeedRow({ display_label: null });
+    const sb = mkSb([r]);
+    const out = await getTextElement(sb as never, KEY, VARIANT, "title");
+    expect(out?.displayLabel).toBeNull();
   });
 });

@@ -169,6 +169,61 @@ const getTextElementMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("@/server/overlays/text/elements", () => ({
   upsertTextElement: upsertTextElementMock,
   getTextElement: getTextElementMock,
+  // Mirror the runtime allowlist + helper exports so the action
+  // module's `import { TEXT_KINDS } from ...` resolves under vitest's
+  // module mock. Kept in sync with `TEXT_KINDS` in
+  // apps/web/src/server/overlays/text/elements.ts (any drift here will
+  // surface as a fresh test failure rather than a silent regression).
+  TEXT_KINDS: [
+    "heading",
+    "subheading",
+    "eyebrow",
+    "title",
+    "subtitle",
+    "caption",
+    "number",
+    "label",
+    "body",
+    "image",
+    "layout",
+    "text",
+    "score-number",
+    "player-name",
+    "player-photo",
+    "player-box",
+    "sponsor-logo-strip",
+    "sponsor-logo-floating",
+    "partner-strip-container",
+    "bg-image",
+    "bg-vignette",
+    "box",
+  ],
+  isValidTextKind: (v: unknown) =>
+    typeof v === "string" &&
+    [
+      "heading",
+      "subheading",
+      "eyebrow",
+      "title",
+      "subtitle",
+      "caption",
+      "number",
+      "label",
+      "body",
+      "image",
+      "layout",
+      "text",
+      "score-number",
+      "player-name",
+      "player-photo",
+      "player-box",
+      "sponsor-logo-strip",
+      "sponsor-logo-floating",
+      "partner-strip-container",
+      "bg-image",
+      "bg-vignette",
+      "box",
+    ].includes(v),
 }));
 
 // Wave 2 Stage 3 — partner-logo CRUD mocks. (Strip-layout + logo
@@ -187,17 +242,16 @@ vi.mock("@/server/overlays/partners/logos", () => ({
   deletePartnerLogo: deletePartnerLogoMock,
 }));
 
-// Wave 2 Stage 4 — animation server-module mocks. The action layer
-// gates on `overlay.design.manage` + zod-validates inputs; the
-// server-module functions are mocked so unit tests don't need a DB.
-const upsertAnimationMock = vi.hoisted(() =>
-  vi.fn().mockResolvedValue({ id: "anim-1" }),
-);
+// Wave 2 Stage 4 — animation mocks. `setAnimationAction` writes
+// directly via the shared service-role `fromMock` (SELECT-then-
+// INSERT-or-UPDATE pattern from b7b3deff — Supabase JS .upsert()
+// throws PG 42P10 against the partial unique index). Only
+// `deleteAnimation` is still routed through the server module
+// (clearAnimationAction).
 const deleteAnimationMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined),
 );
 vi.mock("@/server/overlays/animations/elements", () => ({
-  upsertAnimation: upsertAnimationMock,
   deleteAnimation: deleteAnimationMock,
 }));
 
@@ -257,7 +311,6 @@ beforeEach(() => {
   });
   fromInsertMock.mockReset().mockResolvedValue({ data: null, error: null });
   fromUpdateMock.mockReset().mockResolvedValue({ data: null, error: null });
-  upsertAnimationMock.mockReset().mockResolvedValue({ id: "anim-1" });
   deleteAnimationMock.mockReset().mockResolvedValue(undefined);
 });
 
@@ -1029,104 +1082,117 @@ describe("setAnimationAction (Wave 2 Stage 4)", () => {
     await expect(setAnimationAction(fdAnim())).rejects.toThrow(
       /Forbidden|overlay\.design\.manage/,
     );
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects unknown overlayKey", async () => {
     await expect(
       setAnimationAction(fdAnim({ overlayKey: "not-a-real-key" })),
     ).rejects.toThrow();
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects invalid elementId (not kebab-case)", async () => {
     await expect(
       setAnimationAction(fdAnim({ elementId: "Bad_Id" })),
     ).rejects.toThrow();
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects invalid anim_phase enum", async () => {
     await expect(
       setAnimationAction(fdAnim({ animPhase: "spinning" })),
     ).rejects.toThrow();
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects unknown anim_type", async () => {
     await expect(
       setAnimationAction(fdAnim({ animType: "explode" })),
     ).rejects.toThrow();
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects durationMs out of range", async () => {
     await expect(
       setAnimationAction(fdAnim({ durationMs: "10000" })),
     ).rejects.toThrow();
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects delayMs out of range", async () => {
     await expect(
       setAnimationAction(fdAnim({ delayMs: "-1" })),
     ).rejects.toThrow();
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
-  it("calls upsertAnimation on the happy path", async () => {
+  it("inserts a new row on the happy path when none exists", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     await setAnimationAction(fdAnim());
-    expect(upsertAnimationMock).toHaveBeenCalledTimes(1);
-    const call = upsertAnimationMock.mock.calls[0];
-    expect(call[2]).toMatchObject({
-      overlayKey: "07-leaderboard",
-      variantId: "default",
-      elementId: "title",
-      animPhase: "entry",
-      enabled: true,
-      animType: "slide-left",
-      durationMs: 420,
-      delayMs: 60,
-      easing: "cubic-bezier(0.16,1,0.3,1)",
-      iterationCount: "1",
-      customCssKeyframes: null,
-    });
+    expect(fromInsertMock).toHaveBeenCalledTimes(1);
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
-  it("forwards customCssKeyframes ONLY when animType=custom-css", async () => {
+  it("updates an existing row when one is found", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({
+      data: { id: "anim-existing" },
+      error: null,
+    });
+    await setAnimationAction(fdAnim());
+    expect(fromUpdateMock).toHaveBeenCalledTimes(1);
+    expect(fromInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("inserts on happy path with sanitized customCssKeyframes for custom-css", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     await setAnimationAction(
       fdAnim({
         animType: "custom-css",
         customCssKeyframes: "0% { opacity: 0 } 100% { opacity: 1 }",
       }),
     );
-    expect(upsertAnimationMock).toHaveBeenCalledTimes(1);
-    expect(upsertAnimationMock.mock.calls[0][2]).toMatchObject({
-      animType: "custom-css",
-      customCssKeyframes: "0% { opacity: 0 } 100% { opacity: 1 }",
-    });
+    expect(fromInsertMock).toHaveBeenCalledTimes(1);
   });
 
-  it("drops customCssKeyframes for non-custom anim types", async () => {
+  it("rejects custom-css with empty / missing customCssKeyframes payload", async () => {
+    await expect(
+      setAnimationAction(
+        fdAnim({
+          animType: "custom-css",
+          // No customCssKeyframes field at all → fdAnim drops to undefined.
+        }),
+      ),
+    ).rejects.toThrow(/custom-css.*requires customCssKeyframes/i);
+    expect(fromInsertMock).not.toHaveBeenCalled();
+  });
+
+  it("drops customCssKeyframes payload for non-custom anim types (still inserts)", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     await setAnimationAction(
       fdAnim({
         animType: "fade",
         customCssKeyframes: "0% { opacity: 0 }",
       }),
     );
-    expect(upsertAnimationMock.mock.calls[0][2].customCssKeyframes).toBeNull();
+    expect(fromInsertMock).toHaveBeenCalledTimes(1);
   });
 
   it("rate-limited request throws rate_limited", async () => {
     enforceAuthedWriteMock.mockResolvedValueOnce(true);
     await expect(setAnimationAction(fdAnim())).rejects.toThrow(/rate_limited/);
-    expect(upsertAnimationMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
-  it("propagates server-module sanitizer rejection", async () => {
-    upsertAnimationMock.mockRejectedValueOnce(
-      new Error("upsertAnimation: keyframes sanitize failed: forbidden CSS construct: url("),
-    );
+  it("rejects custom-css with forbidden url() construct via sanitizer", async () => {
     await expect(
       setAnimationAction(
         fdAnim({
@@ -1135,6 +1201,8 @@ describe("setAnimationAction (Wave 2 Stage 4)", () => {
         }),
       ),
     ).rejects.toThrow(/sanitize failed/);
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 });
 

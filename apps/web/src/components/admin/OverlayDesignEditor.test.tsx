@@ -87,6 +87,7 @@ function mkRow(overrides: Partial<TextElementRow> = {}): TextElementRow {
     elementId: "title",
     origin: "seed",
     kind: "title",
+    displayLabel: null,
     visible: true,
     content: "",
     fontFamily: null,
@@ -247,6 +248,249 @@ describe("OverlayDesignEditor — Text section (Wave 2 Stage 2)", () => {
     expect(clearTextElementMock).toHaveBeenCalledTimes(1);
     const fd = clearTextElementMock.mock.calls[0][0] as FormData;
     expect(fd.get("elementId")).toBe("title");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Universal element labels (post-2026-04-28)                         *
+ * Migration: 20260620000010_overlay_text_elements_kind.sql           *
+ * ------------------------------------------------------------------ */
+
+describe("OverlayDesignEditor — universal element labels", () => {
+  it("renders kind label + display label + element id in row header", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({
+            elementId: "title",
+            kind: "heading",
+            displayLabel: "BRB Title",
+          }),
+        ]}
+      />,
+    );
+    const kindBadge = screen.getByTestId("text-row-title-kind-label");
+    expect(kindBadge.textContent).toBe("Heading");
+    const displayLabel = screen.getByTestId("text-row-title-display-label");
+    expect(displayLabel.textContent).toBe("BRB Title");
+    // Original element-id still present (mono small) so admins can copy
+    // it when authoring custom CSS / animation hooks.
+    const row = screen.getByTestId("text-row-title");
+    expect(row.textContent).toMatch(/title/);
+  });
+
+  it("falls back to prettyId(elementId) when displayLabel is null", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({
+            elementId: "season-mark",
+            kind: "caption",
+            displayLabel: null,
+          }),
+        ]}
+      />,
+    );
+    const displayLabel = screen.getByTestId(
+      "text-row-season-mark-display-label",
+    );
+    expect(displayLabel.textContent).toBe("Season Mark");
+  });
+
+  it("renders semantic kind labels for new enum values", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="04-h2h-2"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({
+            elementId: "player-1-photo",
+            kind: "player-photo",
+            displayLabel: "Player A Photo",
+          }),
+          mkRow({
+            elementId: "partners-strip",
+            kind: "partner-strip-container",
+            displayLabel: "Partners Strip",
+          }),
+          mkRow({
+            elementId: "home-score",
+            kind: "score-number",
+            displayLabel: "Home Score",
+          }),
+        ]}
+      />,
+    );
+    expect(
+      screen.getByTestId("text-row-player-1-photo-kind-label").textContent,
+    ).toBe("Photo");
+    expect(
+      screen.getByTestId("text-row-partners-strip-kind-label").textContent,
+    ).toBe("Partner Strip");
+    expect(
+      screen.getByTestId("text-row-home-score-kind-label").textContent,
+    ).toBe("Score");
+  });
+
+  it("hides the Content input for image-like kinds", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="04-h2h-2"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({
+            elementId: "player-1-photo",
+            kind: "player-photo",
+            displayLabel: "Player A Photo",
+          }),
+        ]}
+      />,
+    );
+    expect(
+      screen.queryByTestId("text-row-player-1-photo-content"),
+    ).toBeNull();
+  });
+
+  it("Save passes displayLabel through FormData when present", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({
+            elementId: "title",
+            kind: "heading",
+            displayLabel: "BRB Title",
+            content: "BACK SOON",
+          }),
+        ]}
+      />,
+    );
+    const row = screen.getByTestId("text-row-title");
+    const saveBtn = Array.from(row.querySelectorAll("button")).find(
+      (b) => b.textContent === "Save",
+    ) as HTMLButtonElement;
+    fireEvent.click(saveBtn);
+    expect(setTextElementMock).toHaveBeenCalledTimes(1);
+    const fd = setTextElementMock.mock.calls[0][0] as FormData;
+    expect(fd.get("displayLabel")).toBe("BRB Title");
+    expect(fd.get("kind")).toBe("heading");
+  });
+});
+
+describe("OverlayDesignEditor — Partners panel display labels", () => {
+  it("renders sponsor kind badge + display label in partner-roster row", () => {
+    const logo: PartnerLogoRow = {
+      partnerKey: "gameevo",
+      label: "GameEvo",
+      alt: "GameEvo Esports",
+      displayLabel: "GameEvo Sponsor Logo",
+      fileUrl: "/x/gameevo.png",
+      sortOrder: 0,
+      dimensionWPx: 600,
+      dimensionHPx: 300,
+    };
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[logo]}
+        initialLogoOverrides={[]}
+      />,
+    );
+    expect(
+      screen.getByTestId("partner-logo-gameevo-kind-label").textContent,
+    ).toBe("Sponsor (Strip)");
+    expect(
+      screen.getByTestId("partner-logo-gameevo-display-label").textContent,
+    ).toBe("GameEvo Sponsor Logo");
+  });
+
+  it("falls back to label then alt when displayLabel is null", () => {
+    const logo: PartnerLogoRow = {
+      partnerKey: "fallback",
+      label: "Fallback Label",
+      alt: "Alt only",
+      displayLabel: null,
+      fileUrl: "/x/fallback.png",
+      sortOrder: 0,
+      dimensionWPx: 600,
+      dimensionHPx: 300,
+    };
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[logo]}
+        initialLogoOverrides={[]}
+      />,
+    );
+    expect(
+      screen.getByTestId("partner-logo-fallback-display-label").textContent,
+    ).toBe("Fallback Label");
+  });
+});
+
+describe("OverlayDesignEditor — Animations panel display labels", () => {
+  it("renders kind + display label + id in animation-element row header", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="04-h2h-2"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={[
+          {
+            elementId: "player-1-photo",
+            kind: "player-photo",
+            displayLabel: "Player A Photo",
+          },
+        ]}
+        initialAnimations={[]}
+      />,
+    );
+    expect(
+      screen.getByTestId("anim-element-player-1-photo-kind-label").textContent,
+    ).toBe("Photo");
+    expect(
+      screen.getByTestId("anim-element-player-1-photo-display-label").textContent,
+    ).toBe("Player A Photo");
   });
 });
 

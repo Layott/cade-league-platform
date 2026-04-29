@@ -27,7 +27,25 @@ import { OVERLAY_KEYS } from "../design/defaults";
 
 export type TextOrigin = "seed" | "runtime";
 
+/**
+ * Kind catalog — drives the admin Text-panel row label + groups elements
+ * for editor affordances (e.g. score-number gets a numeric input, image
+ * kinds skip the content field, etc.).
+ *
+ * Two cohorts coexist for back-compat:
+ *  - Legacy typographic enum (heading/subheading/eyebrow/title/...) —
+ *    the original Stage 1 seed used these.
+ *  - Semantic enum (text/score-number/player-name/player-photo/...) —
+ *    introduced 2026-04-28 by migration `20260620000010_*` so admins
+ *    see a meaningful "what is this element" label rather than a typo
+ *    classification.
+ *
+ * Both groups are accepted by the DB CHECK constraint. Backfill in the
+ * same migration moves seed rows over to the semantic enum where the
+ * legacy value was less specific.
+ */
 export type TextKind =
+  // Legacy typographic enum (kept for back-compat).
   | "heading"
   | "subheading"
   | "eyebrow"
@@ -38,7 +56,55 @@ export type TextKind =
   | "label"
   | "body"
   | "image"
-  | "layout";
+  | "layout"
+  // Semantic enum (post-2026-04-28 — universal element labels).
+  | "text"
+  | "score-number"
+  | "player-name"
+  | "player-photo"
+  | "player-box"
+  | "sponsor-logo-strip"
+  | "sponsor-logo-floating"
+  | "partner-strip-container"
+  | "bg-image"
+  | "bg-vignette"
+  | "box";
+
+/**
+ * Allowlist mirror of `TextKind` for runtime validation. Matches the DB
+ * CHECK constraint introduced in migration `20260620000010_*`.
+ */
+export const TEXT_KINDS: ReadonlyArray<TextKind> = [
+  "heading",
+  "subheading",
+  "eyebrow",
+  "title",
+  "subtitle",
+  "caption",
+  "number",
+  "label",
+  "body",
+  "image",
+  "layout",
+  "text",
+  "score-number",
+  "player-name",
+  "player-photo",
+  "player-box",
+  "sponsor-logo-strip",
+  "sponsor-logo-floating",
+  "partner-strip-container",
+  "bg-image",
+  "bg-vignette",
+  "box",
+];
+
+export function isValidTextKind(value: unknown): value is TextKind {
+  return (
+    typeof value === "string" &&
+    (TEXT_KINDS as readonly string[]).includes(value)
+  );
+}
 
 export type TextAlignment = "left" | "center" | "right" | "justify";
 
@@ -49,6 +115,12 @@ export type TextElement = {
   elementId: string;
   origin: TextOrigin;
   kind: TextKind;
+  /**
+   * Human-readable name shown in the admin UI (e.g. "BRB Title",
+   * "Player A Photo"). NULL falls back to `prettyId(elementId)` in the
+   * editor so a missing label never produces a blank row header.
+   */
+  displayLabel: string | null;
   visible: boolean;
   content: string;
   fontFamily: string | null;
@@ -99,6 +171,7 @@ type Row = {
   element_id: string;
   origin: TextOrigin;
   kind: TextKind;
+  display_label: string | null;
   visible: boolean;
   content: string;
   font_family: string | null;
@@ -119,7 +192,7 @@ type Row = {
 };
 
 const SELECT_COLS =
-  "id, overlay_key, variant_id, element_id, origin, kind, visible, content, font_family, font_weight, font_size_px, letter_spacing, line_height, color, alignment, opacity_pct, position_x_px, position_y_px, z_index, sort_order, set_by, created_at, updated_at";
+  "id, overlay_key, variant_id, element_id, origin, kind, display_label, visible, content, font_family, font_weight, font_size_px, letter_spacing, line_height, color, alignment, opacity_pct, position_x_px, position_y_px, z_index, sort_order, set_by, created_at, updated_at";
 
 function toElement(r: Row): TextElement {
   const ls = r.letter_spacing == null ? null : Number(r.letter_spacing);
@@ -131,6 +204,7 @@ function toElement(r: Row): TextElement {
     elementId: r.element_id,
     origin: r.origin,
     kind: r.kind,
+    displayLabel: r.display_label ?? null,
     visible: r.visible,
     content: r.content,
     fontFamily: r.font_family,
@@ -157,6 +231,19 @@ function validateInput(input: TextElementInput): void {
   }
   if (!isValidElementId(input.elementId)) {
     throw new Error(`upsertTextElement: invalid element_id ${input.elementId}`);
+  }
+  if (!isValidTextKind(input.kind)) {
+    throw new Error(
+      `upsertTextElement: invalid kind ${String(input.kind)} (allowlist: ${TEXT_KINDS.join(", ")})`,
+    );
+  }
+  if (
+    input.displayLabel != null &&
+    (input.displayLabel.length === 0 || input.displayLabel.length > 200)
+  ) {
+    throw new Error(
+      `upsertTextElement: displayLabel must be 1..200 chars (got ${input.displayLabel.length})`,
+    );
   }
   if (input.origin === "runtime") {
     if (!input.content || input.content.length === 0) {
@@ -242,6 +329,7 @@ export async function upsertTextElement(
         element_id: input.elementId,
         origin: input.origin,
         kind: input.kind,
+        display_label: input.displayLabel,
         visible: input.visible,
         content: input.content,
         font_family: input.fontFamily,
