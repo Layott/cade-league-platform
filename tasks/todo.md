@@ -372,3 +372,30 @@ All 9 user-reported bugs shipped + verified on prod across 4 commits:
 
 All bugs ✓ shipped + verified. All tasks marked complete. Plan = done.
 
+## Bug 3 — review (2026-04-28)
+
+**Reported:** "there is no way to add background to the top 10 goal scorers overlay on the design page, the upload bg modal does not show for the top 10 goal scorers."
+
+**Root cause:** Phase A (commit `53374dc7`) shipped `BG_IMAGE_SUPPORTED_KEYS` with eight full-canvas overlays only — `01-brb`, `04-h2h-2`, `05-h2h-3`, `06-h2h-5`, `07-leaderboard`, `11-match-scores-day`, `12-starting-soon`, `13-stream-ended`. The Golden Pad (`14-top-scorers`) was misclassified as floating-UI at that time, so the editor's `supportsBgImage()` gate hid the image-row widget for it. In reality, the top-scorers podium fills the full 1920×1080 canvas (paints the ELITE S2 stadium BG behind the podium / tail strip) — qualifies as full-canvas.
+
+**Fix slice (single commit):**
+
+| File | Change |
+|---|---|
+| `apps/web/src/server/overlays/design/defaults.ts` | Added `"14-top-scorers"` to `BG_IMAGE_SUPPORTED_KEYS` (now 9 keys). Added `"bg-image": ""` to its `OVERLAY_OVERRIDES` entry. Updated comment to reflect the change + reference Bug 3 + the new follow-up migration. |
+| `apps/web/src/server/overlays/design/defaults.test.ts` | Moved `14-top-scorers` from `FLOATING_UI` test list into `FULL_CANVAS` list. Updated test description label to "nine full-canvas overlay keys". |
+| `KNOWLEDGE/brand-assets/elements/v2/14-top-scorers/index.html` | Added the cade-token-bootstrap `<script>` block at the top of `<head>` (verbatim copy from `04-h2h-2`). Wired `.bg-image { background-image: var(--overlay-bg-image, url('...ELITE S2 BG.png')); }` so the iframe picks up the admin-uploaded URL when present, falls back to the canonical stadium image otherwise. |
+| `apps/web/public/overlays/v2/14-top-scorers/index.html` | Mirror auto-synced via `node apps/web/scripts/sync-v2-overlays.mjs`. Sync rewrites the relative `../../../designsample/...` path to absolute `/overlays/v2/_assets/designsample/...` for the public folder. |
+| `supabase/migrations/20260615000001_top_scorers_bg_image.sql` | Idempotent INSERT of one `bg-image=''` row for `(14-top-scorers, default)`, mirroring Phase A's seed pattern. Uses the same admin-fallback-or-skip ladder for `set_by`. |
+| `tasks/todo.md` | This review section. |
+
+`OverlayDesignEditor.tsx` was inspected — the gate is data-driven via `supportsBgImage(overlayKey)` (line 156). No hard-coded list to fix in the component. Once the key landed in `BG_IMAGE_SUPPORTED_KEYS` the editor's `filteredCatalog` automatically includes the image row.
+
+**Verification gate:**
+- `npm run test --run` — 1773/1773 pass (defaults.test.ts: 17/17, including the new `14-top-scorers` assertions in both FULL_CANVAS branches).
+- `npm run lint` — 0 errors (only pre-existing warnings unrelated to this change).
+- `npm run build` — clean production build.
+- Sync script — 16/16 HTML files synced, asset buckets unchanged.
+
+**Auto-pipeline:** `db:push` runs in GitHub Actions on push to main when `supabase/migrations/**` changes (per `.github/workflows/db-push.yml`); no manual push needed.
+

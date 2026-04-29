@@ -221,6 +221,7 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
   },
   "14-top-scorers": {
     "row-highlight-count": "3",
+    "bg-image": "",
   },
   "15-orgs": {},
   "16-coaches": {},
@@ -230,15 +231,20 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
 };
 
 /**
- * The eight overlay keys that are full-canvas (1920×1080 backdrop visible
+ * The nine overlay keys that are full-canvas (1920×1080 backdrop visible
  * to the viewer). Only these support a custom `bg-image` token — floating
- * UI cards (timer, lower-third, score-bug, up-next, top-scorers, orgs,
- * coaches, penalties) sit on a transparent canvas where a backdrop makes
- * no sense.
+ * UI cards (timer, lower-third, score-bug, up-next, orgs, coaches,
+ * penalties) sit on a transparent canvas where a backdrop makes no sense.
+ *
+ * `14-top-scorers` is full-canvas (the Golden Pad podium fills the frame
+ * and already paints the ELITE S2 stadium BG), so it joins the supported
+ * list per Bug 3 (2026-04-28). Seeded by migration
+ * `20260615000001_top_scorers_bg_image.sql`.
  *
  * The admin design editor reads this list to gate the bg-image widget.
  * The seed migration `20260612000001_overlay_design_tokens_bg_image.sql`
- * inserts default rows for exactly these keys.
+ * inserts default rows for the original eight keys; the top-scorers
+ * follow-up migration above seeds the ninth row.
  */
 export const BG_IMAGE_SUPPORTED_KEYS: readonly OverlayKey[] = [
   "01-brb",
@@ -249,6 +255,7 @@ export const BG_IMAGE_SUPPORTED_KEYS: readonly OverlayKey[] = [
   "11-match-scores-day",
   "12-starting-soon",
   "13-stream-ended",
+  "14-top-scorers",
 ] as const;
 
 /**

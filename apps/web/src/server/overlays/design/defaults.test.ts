@@ -123,19 +123,19 @@ describe("supportsBgImage", () => {
     "11-match-scores-day",
     "12-starting-soon",
     "13-stream-ended",
+    "14-top-scorers",
   ] as const;
   const FLOATING_UI = [
     "02-timer",
     "08-lower-third",
     "09-secondary-score-bug",
     "10-up-next-bug",
-    "14-top-scorers",
     "15-orgs",
     "16-coaches",
     "17-penalties",
   ] as const;
 
-  it("returns true for the eight full-canvas overlay keys", () => {
+  it("returns true for the nine full-canvas overlay keys", () => {
     for (const k of FULL_CANVAS) {
       expect(supportsBgImage(k), `expected ${k} to support bg-image`).toBe(true);
     }

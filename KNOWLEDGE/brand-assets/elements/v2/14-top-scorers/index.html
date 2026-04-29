@@ -19,6 +19,81 @@
   <meta name="viewport" content="width=1920, initial-scale=1" />
   <title>CADE — Top Scorers · Golden Pad</title>
 
+
+<script id="cade-token-bootstrap">
+(function() {
+  // Phase A — cross-document design-token propagation.
+  //
+  // Read base64-encoded JSON token maps from the iframe URL query
+  // string and emit a <style id="cade-injected-tokens"> block whose
+  // :root rules WIN over the HTML's hard-coded defaults below (CSS
+  // source-order cascade — the injected block is appended LATER in
+  // <head>). Image tokens are wrapped in url("..."); other tokens
+  // pass through after stripping the same metacharacters the server-
+  // side schema rejects (;{}<>"').
+  function decodeTokens(param) {
+    if (!param) return null;
+    try {
+      var json = decodeURIComponent(escape(atob(param)));
+      var obj = JSON.parse(json);
+      if (typeof obj !== 'object' || !obj) return null;
+      return obj;
+    } catch (e) { return null; }
+  }
+  function buildCssVars(tokens) {
+    if (!tokens) return '';
+    var parts = [];
+    var imageKeys = { 'bg-image': 1 };
+    for (var k in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, k)) continue;
+      var v = tokens[k];
+      if (typeof v !== 'string') continue;
+      // Strip CSS metacharacters that could break out of the var rule.
+      var safe = v.replace(/[;{}<>"']/g, '');
+      if (imageKeys[k]) {
+        // Empty image value = "no override, use HTML fallback".
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': url("' + safe + '")');
+      } else {
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': ' + safe);
+      }
+    }
+    return parts.length ? ':root{' + parts.join(';') + ';}' : '';
+  }
+  try {
+    var qs = new URLSearchParams(location.search);
+    var design = decodeTokens(qs.get('tokens'));
+    var preview = decodeTokens(qs.get('previewTokens'));
+    // Source order: design first, preview second so preview wins.
+    var rule = buildCssVars(design) + buildCssVars(preview);
+    if (!rule) return;
+    var emit = function() {
+      // Re-check head — defensive against the rare case where a
+      // browser inserts <head> only after DOMContentLoaded.
+      if (!document.head) return;
+      var style = document.createElement('style');
+      style.id = 'cade-injected-tokens';
+      style.textContent = rule;
+      document.head.appendChild(style);
+    };
+    // ALWAYS defer to DOMContentLoaded — running synchronously
+    // during <head> parse appends BEFORE the author <style> blocks
+    // get parsed, so author :root{} defaults win the cascade and our
+    // override is invisible. Deferring lands the injected block AFTER
+    // all author <style> blocks → our overrides win source-order.
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', emit);
+    } else {
+      emit();
+    }
+  } catch (e) {
+    // Bootstrap MUST never throw — it would white-flash the overlay
+    // and break OBS chroma-key. Swallow + fall back to defaults.
+  }
+})();
+</script>
+
 <style>
   /* ── REAL BRAND FONTS ───────────────────────────────────────── */
   @font-face {
@@ -213,10 +288,14 @@
   }
 
   /* ── BG: halftone-green stadium texture ─────────────────────── */
+  /* Reads --overlay-bg-image set by the cade-token-bootstrap script
+     when ?tokens= or ?previewTokens= carry a bg-image override. Falls
+     back to the hard-coded ELITE S2 BG so OBS browser sources pointing
+     at this static HTML (no SSR layer) still render the brand backdrop. */
   .bg-image {
     position: absolute;
     inset: -3% -3%;
-    background-image: url('../../../designsample/ELITE%20S2%20BG.png');
+    background-image: var(--overlay-bg-image, url('../../../designsample/ELITE%20S2%20BG.png'));
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
