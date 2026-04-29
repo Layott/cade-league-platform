@@ -2506,7 +2506,7 @@ function PartnersPanel({
             <label className={labelStyle}>Scale (%)</label>
             <input
               type="number"
-              min={50}
+              min={20}
               max={200}
               step={1}
               value={stripLayout.scalePct}
