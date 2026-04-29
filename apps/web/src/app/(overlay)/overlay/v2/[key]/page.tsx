@@ -9,8 +9,11 @@ import { resolveTokens } from "@/server/overlays/design/tokens";
 import { getActiveTemplateVariant } from "@/server/overlays/design/templates";
 import {
   decodePreviewTokens,
+  decodePreviewTextTokens,
   escapeCssValue,
+  type PreviewTextTokens,
 } from "@/server/overlays/design/preview";
+import { resolveTextElements, type ResolvedTextElement } from "@/server/overlays/text/elements";
 
 /**
  * Resolve the active season for a given broadcast session via
@@ -120,6 +123,7 @@ type SearchParams = {
   slot?: string;
   variant?: string;
   previewTokens?: string;
+  previewTextTokens?: string;
 };
 
 /**
@@ -154,6 +158,7 @@ export default async function OverlayV2Page({
     slot,
     variant,
     previewTokens: previewTokensRaw,
+    previewTextTokens: previewTextTokensRaw,
   } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) {
     const alias = KEY_ALIASES[key];
@@ -170,6 +175,7 @@ export default async function OverlayV2Page({
   // null-safe (malformed input returns null silently).
   let designTokens: Record<string, string> = {};
   let activeVariantId: string | null = null;
+  let designTextTokens: Record<string, ResolvedTextElement> = {};
   try {
     const sbDesign = getServiceRoleSupabase();
     const variantRow = variant
@@ -177,12 +183,21 @@ export default async function OverlayV2Page({
       : await getActiveTemplateVariant(sbDesign, key);
     activeVariantId = variantRow?.variantId ?? "default";
     designTokens = await resolveTokens(sbDesign, key, activeVariantId);
+    // Wave 2 Stage 2 — text-element overrides for the iframe bootstrap.
+    // resolveTextElements skips no-op rows so the map is empty when no
+    // admin has touched a text element yet — keeps backward-compat
+    // invariant #1 (default render is byte-identical pre-Wave-2).
+    designTextTokens = await resolveTextElements(sbDesign, key, activeVariantId);
   } catch {
     // Token resolution failure must not break the overlay route. Fall
     // back to the canonical HTML defaults.
     designTokens = {};
+    designTextTokens = {};
   }
   const previewTokens = await decodePreviewTokens(previewTokensRaw);
+  const previewTextTokens: PreviewTextTokens | null = await decodePreviewTextTokens(
+    previewTextTokensRaw,
+  );
   const cssVarRule = buildCssVarRule(designTokens);
   const previewVarRule = previewTokens ? buildCssVarRule(previewTokens) : null;
 
@@ -305,6 +320,8 @@ export default async function OverlayV2Page({
         ambient={ambient}
         designTokens={designTokens}
         previewTokens={previewTokens ?? undefined}
+        designTextTokens={designTextTokens}
+        previewTextTokens={previewTextTokens ?? undefined}
       />
     </>
   );

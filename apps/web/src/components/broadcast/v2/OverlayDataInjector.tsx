@@ -194,6 +194,43 @@ export type OverlayDataInjectorProps = {
    * the iframe URL stays clean.
    */
   previewTokens?: Record<string, string>;
+  /**
+   * Wave 2 Stage 2 — text-element overrides resolved server-side from
+   * `overlay_text_elements`. Each entry is a per-element shape:
+   *   {
+   *     origin: 'seed'|'runtime',
+   *     visible: boolean,
+   *     content: string|null,    // null = use HTML default
+   *     styles: { color?, fontFamily?, fontSize?, fontWeight?, ... }
+   *   }
+   * Encoded as base64-JSON onto the iframe URL as `?textTokens=<b64>`.
+   * The bootstrap script in each overlay HTML decodes the param +
+   * applies inline `style` attributes / textContent edits to elements
+   * with matching `data-element-id`.
+   */
+  designTextTokens?: Record<
+    string,
+    {
+      origin: "seed" | "runtime";
+      visible: boolean;
+      content: string | null;
+      styles: Record<string, string | number>;
+    }
+  >;
+  /**
+   * Wave 2 Stage 2 — admin live-preview text-element overrides. Same
+   * wire as `designTextTokens` but encoded as `?previewTextTokens=`.
+   * Bootstrap applies preview AFTER design so preview wins source-order.
+   */
+  previewTextTokens?: Record<
+    string,
+    {
+      origin?: "seed" | "runtime";
+      visible?: boolean;
+      content?: string | null;
+      styles?: Record<string, string | number>;
+    }
+  >;
 };
 
 /**
@@ -225,6 +262,26 @@ function encodeTokensParam(tokens: Record<string, string>): string {
   }
 }
 
+/**
+ * Wave 2 Stage 2 — encode the text-tokens map into a b64-JSON URL
+ * param. Identical wire to `encodeTokensParam` but typed for the
+ * deeper per-element shape.
+ */
+function encodeTextTokensParam(
+  tokens: Record<string, unknown> | undefined,
+): string {
+  if (!tokens || Object.keys(tokens).length === 0) return "";
+  try {
+    const json = JSON.stringify(tokens);
+    if (typeof btoa === "function") {
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+    return Buffer.from(json, "utf-8").toString("base64");
+  } catch {
+    return "";
+  }
+}
+
 export default function OverlayDataInjector({
   overlayKey,
   sessionId,
@@ -235,6 +292,8 @@ export default function OverlayDataInjector({
   ambient = false,
   designTokens,
   previewTokens,
+  designTextTokens,
+  previewTextTokens,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -692,6 +751,22 @@ export default function OverlayDataInjector({
   if (previewTokens && Object.keys(previewTokens).length > 0) {
     const enc = encodeTokensParam(previewTokens);
     if (enc) params.set("previewTokens", enc);
+  }
+  // Wave 2 Stage 2 — text-element overrides flow through their own b64
+  // params. Bootstrap script in each overlay HTML decodes them and
+  // applies content / inline-style edits to elements with matching
+  // `data-element-id`. Empty maps skip the param to keep the URL clean.
+  if (designTextTokens && Object.keys(designTextTokens).length > 0) {
+    const enc = encodeTextTokensParam(
+      designTextTokens as unknown as Record<string, unknown>,
+    );
+    if (enc) params.set("textTokens", enc);
+  }
+  if (previewTextTokens && Object.keys(previewTextTokens).length > 0) {
+    const enc = encodeTextTokensParam(
+      previewTextTokens as unknown as Record<string, unknown>,
+    );
+    if (enc) params.set("previewTextTokens", enc);
   }
   const qs = params.toString();
   const src = `/overlays/v2/${overlayKey}/index.html${qs ? `?${qs}` : ""}`;

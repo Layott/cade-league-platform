@@ -4,6 +4,133 @@
 <meta charset="UTF-8" />
   <meta name="color-scheme" content="dark" />
 <title>CADE Up Next Bug</title>
+
+<script id="cade-token-bootstrap">
+(function() {
+  // Wave 2 Stage 2 — cross-document design + text-element propagation.
+  //
+  // Read base64-encoded JSON token maps from the iframe URL query
+  // string and emit two <style> blocks that win the CSS source-order
+  // cascade (appended LATER in <head> than the author defaults).
+  //
+  // Token shapes:
+  //   tokens / previewTokens     — { 'bg-color': '#000', ... }
+  //   textTokens / previewTextTokens — { '<elementId>': { visible?,
+  //     content?, styles?: { color, fontFamily, fontSize, ... } } }
+  //
+  // Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §6.2
+  function decodeTokens(param) {
+    if (!param) return null;
+    try {
+      var json = decodeURIComponent(escape(atob(param)));
+      var obj = JSON.parse(json);
+      if (typeof obj !== 'object' || !obj) return null;
+      return obj;
+    } catch (e) { return null; }
+  }
+  function buildCssVars(tokens) {
+    if (!tokens) return '';
+    var parts = [];
+    var imageKeys = { 'bg-image': 1 };
+    for (var k in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, k)) continue;
+      var v = tokens[k];
+      if (typeof v !== 'string') continue;
+      var safe = v.replace(/[;{}<>"']/g, '');
+      if (imageKeys[k]) {
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': url("' + safe + '")');
+      } else {
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': ' + safe);
+      }
+    }
+    return parts.length ? ':root{' + parts.join(';') + ';}' : '';
+  }
+  function sanitizeCss(v) {
+    return String(v == null ? '' : v).replace(/[;{}<>"\\`]/g, '');
+  }
+  function buildTextRules(tokens) {
+    if (!tokens || typeof tokens !== 'object') return '';
+    var rules = [];
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var t = tokens[elId];
+      if (!t || typeof t !== 'object') continue;
+      var s = t.styles || {};
+      var declarations = [];
+      if (s.color)         declarations.push('color:' + sanitizeCss(s.color));
+      if (s.fontFamily)    declarations.push("font-family:'" + sanitizeCss(s.fontFamily) + "'");
+      if (s.fontWeight)    declarations.push('font-weight:' + (+s.fontWeight || 400));
+      if (s.fontSize)      declarations.push('font-size:' + sanitizeCss(s.fontSize));
+      if (s.letterSpacing) declarations.push('letter-spacing:' + sanitizeCss(s.letterSpacing));
+      if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
+      if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
+      if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
+      if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
+      if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
+      if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
+      if (s.left || s.top) declarations.push('position:absolute');
+      if (t.visible === false) declarations.push('display:none');
+      if (declarations.length) {
+        rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');
+      }
+    }
+    return rules.join('\n');
+  }
+  function applyTextContent(tokens) {
+    if (!tokens || typeof tokens !== 'object') return;
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var t = tokens[elId];
+      if (!t || typeof t !== 'object') continue;
+      if (typeof t.content !== 'string') continue;
+      if (t.content === '' || t.content == null) continue;
+      var node = document.querySelector('[data-element-id="' + elId + '"]');
+      if (!node) continue;
+      try { node.textContent = t.content; } catch (e) { /* read-only */ }
+    }
+  }
+  try {
+    var qs = new URLSearchParams(location.search);
+    var design = decodeTokens(qs.get('tokens'));
+    var preview = decodeTokens(qs.get('previewTokens'));
+    var textTokens = decodeTokens(qs.get('textTokens'));
+    var previewTextTokens = decodeTokens(qs.get('previewTextTokens'));
+    // Source order: design first, preview second so preview wins.
+    var cssVarRule = buildCssVars(design) + buildCssVars(preview);
+    var textRule = buildTextRules(textTokens) + (buildTextRules(textTokens).length && buildTextRules(previewTextTokens).length ? '\n' : '') + buildTextRules(previewTextTokens);
+    var emit = function() {
+      if (!document.head) return;
+      if (cssVarRule) {
+        var s1 = document.createElement('style');
+        s1.id = 'cade-injected-tokens';
+        s1.textContent = cssVarRule;
+        document.head.appendChild(s1);
+      }
+      if (textRule) {
+        var s2 = document.createElement('style');
+        s2.id = 'cade-injected-text';
+        s2.textContent = textRule;
+        document.head.appendChild(s2);
+      }
+      // Apply textContent edits AFTER DOM is parsed.
+      applyTextContent(textTokens);
+      applyTextContent(previewTextTokens);
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', emit);
+    } else {
+      emit();
+    }
+  } catch (e) {
+    // Bootstrap MUST never throw — fall back to HTML defaults.
+  }
+})();
+</script>
+
 <!-- DATA WIRES: player1 = {name, slug}, player2 = {name, slug} -->
 <!-- postMessage API:
        { type: 'update', data: { player1: { name, slug }, player2: { name, slug } } }
@@ -451,7 +578,7 @@
 
 <div class="stage">
 
-  <div class="bug" id="bug">
+  <div data-element-id="up-next-card" class="bug" id="bug">
 
     <!-- ============== UP NEXT label strip ============== -->
     <div class="label-strip">

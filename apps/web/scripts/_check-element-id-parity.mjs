@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+/**
+ * Wave 2 Stage 2 — element-id parity linter.
+ *
+ * Walks every overlay HTML at:
+ *   apps/web/public/overlays/v2/<key>/index.html
+ * and gathers the `data-element-id="..."` attrs. Compares against the
+ * canonical seed catalog at:
+ *   supabase/migrations/20260620000007_overlay_text_elements_seed.sql
+ *
+ * Mismatch → exit 1 with a per-overlay diff report so the offending
+ * file or migration is obvious.
+ *
+ * Reports two classes of mismatch:
+ *   - DB has element_id, HTML missing → admin's "Save" call would
+ *     attach style overrides to a `data-element-id` selector that
+ *     doesn't exist in the DOM, silently no-op.
+ *   - HTML has element_id, DB missing → admin can't see / edit it
+ *     from the design page (the catalog drives the UI).
+ *
+ * Wired into `npm run prebuild` so a deploy is blocked on drift.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §10.4
+ */
+
+import { readFile, readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const APP_WEB_ROOT = resolve(__dirname, "..");
+const REPO_ROOT = resolve(APP_WEB_ROOT, "..", "..");
+
+const HTML_ROOT = resolve(APP_WEB_ROOT, "public", "overlays", "v2");
+const SEED_PATH = resolve(
+  REPO_ROOT,
+  "supabase",
+  "migrations",
+  "20260620000007_overlay_text_elements_seed.sql",
+);
+
+/** Extract every (overlay_key, element_id) tuple from the seed migration. */
+async function loadSeedCatalog() {
+  if (!existsSync(SEED_PATH)) {
+    throw new Error(`seed migration not found: ${SEED_PATH}`);
+  }
+  const sql = await readFile(SEED_PATH, "utf8");
+  // INSERT VALUES rows look like:
+  //   ('01-brb', 'default', 'kicker', 'seed', 'eyebrow', '', v_set_by),
+  // Tolerate whitespace / column count drift via a relaxed regex.
+  const ROW_RE =
+    /\(\s*'([0-9]{2}-[a-z0-9-]+)'\s*,\s*'[^']*'\s*,\s*'([a-z][a-z0-9-]*)'/g;
+  const out = new Map();
+  for (const m of sql.matchAll(ROW_RE)) {
+    const overlay = m[1];
+    const elementId = m[2];
+    if (!out.has(overlay)) out.set(overlay, new Set());
+    out.get(overlay).add(elementId);
+  }
+  return out;
+}
+
+/** Extract every `data-element-id="..."` from a single HTML file. */
+async function readHtmlElementIds(htmlPath) {
+  if (!existsSync(htmlPath)) return new Set();
+  const html = await readFile(htmlPath, "utf8");
+  const out = new Set();
+  const RE = /data-element-id\s*=\s*["']([a-z][a-z0-9-]*)["']/g;
+  for (const m of html.matchAll(RE)) {
+    out.add(m[1]);
+  }
+  return out;
+}
+
+async function main() {
+  const seed = await loadSeedCatalog();
+  if (seed.size === 0) {
+    console.error(
+      "[check-element-id-parity] seed migration parsed to empty catalog — aborting",
+    );
+    process.exit(1);
+  }
+
+  let overlayDirs;
+  try {
+    overlayDirs = await readdir(HTML_ROOT, { withFileTypes: true });
+  } catch (e) {
+    console.error(
+      `[check-element-id-parity] cannot read ${HTML_ROOT}: ${e?.message}`,
+    );
+    process.exit(1);
+  }
+
+  let totalErrors = 0;
+  let totalWarnings = 0;
+  const errors = [];
+  const warnings = [];
+
+  for (const [overlayKey, expectedIds] of seed.entries()) {
+    const dirEntry = overlayDirs.find(
+      (d) => d.isDirectory() && d.name === overlayKey,
+    );
+    if (!dirEntry) {
+      warnings.push(
+        `[${overlayKey}] no overlay HTML directory found at ${HTML_ROOT}/${overlayKey}`,
+      );
+      totalWarnings += 1;
+      continue;
+    }
+    const htmlPath = join(HTML_ROOT, overlayKey, "index.html");
+    const actualIds = await readHtmlElementIds(htmlPath);
+
+    const missingInHtml = [];
+    for (const id of expectedIds) {
+      if (!actualIds.has(id)) missingInHtml.push(id);
+    }
+    const extraInHtml = [];
+    for (const id of actualIds) {
+      if (!expectedIds.has(id)) extraInHtml.push(id);
+    }
+
+    // ERRORS — `data-element-id` attrs in HTML that have NO seed row.
+    // This is the dangerous direction: an admin trying to edit such an
+    // element would target a server row that doesn't exist (or an
+    // unknown elementId regex would reject the action). Fix: either
+    // seed it or remove the HTML attr.
+    if (extraInHtml.length) {
+      errors.push(
+        `[${overlayKey}] HTML has ${extraInHtml.length} data-element-id attr${extraInHtml.length === 1 ? "" : "s"} not in seed: ${extraInHtml.slice(0, 8).join(", ")}${extraInHtml.length > 8 ? `, +${extraInHtml.length - 8} more` : ""}`,
+      );
+      totalErrors += extraInHtml.length;
+    }
+
+    // WARNINGS — seed rows without HTML attrs. The Stage 2 admin UI
+    // still works (rows show up in the editor), but saving against an
+    // unattached element_id silently no-ops in the iframe. Future
+    // stages will close the gap as designers add attrs to richer
+    // overlays.
+    if (missingInHtml.length) {
+      warnings.push(
+        `[${overlayKey}] ${missingInHtml.length} seed row${missingInHtml.length === 1 ? "" : "s"} missing data-element-id in HTML: ${missingInHtml.slice(0, 8).join(", ")}${missingInHtml.length > 8 ? `, +${missingInHtml.length - 8} more` : ""}`,
+      );
+      totalWarnings += missingInHtml.length;
+    }
+  }
+
+  // Surface warnings unconditionally so designers see what's still un-
+  // seeded in HTML. They don't block exit — see the rationale block
+  // above. Errors block exit.
+  if (warnings.length) {
+    for (const w of warnings) console.warn(w);
+    console.warn(
+      `[check-element-id-parity] ${totalWarnings} warning${totalWarnings === 1 ? "" : "s"} (seed rows without HTML attrs — admin save no-ops on these)`,
+    );
+  }
+
+  if (errors.length === 0) {
+    const overlayCount = seed.size;
+    let totalSeeded = 0;
+    for (const ids of seed.values()) totalSeeded += ids.size;
+    console.log(
+      `[check-element-id-parity] OK — ${overlayCount} overlays · ${totalSeeded} elements seeded · ${totalWarnings === 0 ? "all" : "no extra"} data-element-id attrs match`,
+    );
+    process.exit(0);
+  }
+
+  console.error(
+    `[check-element-id-parity] FAIL — ${totalErrors} error${totalErrors === 1 ? "" : "s"} (HTML attrs without seed rows)`,
+  );
+  for (const r of errors) console.error(r);
+  console.error(
+    "Fix: remove the offending data-element-id attr OR add a row to migration 20260620000007 + db push.",
+  );
+  process.exit(1);
+}
+
+const isMain =
+  typeof process !== "undefined" &&
+  process.argv[1] &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (isMain) {
+  main().catch((e) => {
+    console.error(`[check-element-id-parity] threw: ${e?.stack ?? e}`);
+    process.exit(1);
+  });
+}
+
+export { loadSeedCatalog, readHtmlElementIds };

@@ -609,3 +609,28 @@ Per scope discipline (Stage 1 is backend-only):
 - Overlay HTML `data-element-id` attribute pass + bootstrap script extension (Stage 2 scope per parent plan).
 - E2E tests for the editor flows (Stage 2/3/4 scope).
 - Visual-regression baseline for backward-compat invariant #1 (Stage 2 scope).
+
+
+## 2026-04-29 — Wave 2 Stage 2 — review
+
+**Goal:** Text editing UI + SSR token plumbing + bootstrap script extension. Builds on Stage 1's `overlay_text_elements` table + `resolveTextElements` resolver.
+
+**Spec:** `docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md` §5.1 (admin UI), §6 (bootstrap), §8 (element-id seed catalog).
+
+### Plan
+
+- [ ] **A.** New server actions in `actions.ts`: `setTextElementAction(formData)` + `clearTextElementAction(formData)`. Both gate on `overlay.design.manage` via existing `gate()`.
+- [ ] **B.** Extend `OverlayDesignEditor.tsx` with a Text section ABOVE the existing Tokens panel. Per-element row with content / color / font-size / weight / position / alignment / opacity / save / reset.
+- [ ] **C.** SSR token resolution: `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` resolves text tokens via `resolveTextElements` + decodes `?previewTextTokens=<b64>`.
+- [ ] **D.** Iframe URL relay: `OverlayDataInjector.tsx` accepts `designTextTokens` + `previewTextTokens` props, encodes both as b64-JSON onto iframe URL.
+- [ ] **E.** Bootstrap script extension: ALL 16 overlay HTMLs at `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` get `data-element-id` attrs (per Stage 1 seed catalog) + bootstrap decodes `?textTokens=` + `?previewTextTokens=`. 7 of 16 need bootstrap script ADDED (02-timer, 08-lower-third, 09, 10, 15, 16, 17).
+- [ ] **F.** Tests: extend Stage 1 test count by ≥6. New `OverlayDesignEditor.test.tsx` for the Text section, plus an E2E spec.
+- [ ] **G.** Element-ID parity linter: `apps/web/scripts/_check-element-id-parity.mjs` walks `data-element-id` attrs vs the seed catalog, exits 1 on mismatch. Wired into `prebuild`.
+
+### Verification gate
+
+- `npx vitest run` — all green.
+- `npm run lint` — clean.
+- `npm run build` — clean.
+- `node apps/web/scripts/_check-element-id-parity.mjs` — exit 0.
+- Manual via Claude-in-Chrome: edit a text element → save → verify on overlay route.

@@ -67,12 +67,23 @@ vi.mock("@/server/overlays/design/templates", () => ({
   getActiveTemplateVariant: getActiveTemplateVariantMock,
 }));
 
+// Wave 2 Stage 2 — overlay route now resolves text-element overrides
+// alongside the design tokens. Mock to empty so the existing token
+// snapshot tests don't crash when the resolver hits the (mocked) sb.
+const resolveTextElementsMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({}),
+);
+vi.mock("@/server/overlays/text/elements", () => ({
+  resolveTextElements: resolveTextElementsMock,
+}));
+
 import OverlayV2Page from "./page";
 
 beforeEach(() => {
   redirectMock.mockClear();
   resolveTokensMock.mockClear();
   getActiveTemplateVariantMock.mockClear();
+  resolveTextElementsMock.mockClear();
 });
 
 /** Render the React tree to a flat string of element tags + props text. */

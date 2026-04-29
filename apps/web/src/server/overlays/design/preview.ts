@@ -110,3 +110,132 @@ export function encodePreviewTokens(tokens: Record<string, string>): string {
 export function escapeCssValue(v: string): string {
   return v.replace(/[;{}<>"']/g, "");
 }
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 2 — text-element preview decoder                      *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Element-id schema — kebab-case, 1..64 chars, starts with lowercase
+ * letter. Mirrors `_shared/css-validator.ts::ELEMENT_ID_RE`.
+ */
+const ELEMENT_ID_RE = /^[a-z][a-z0-9-]{0,63}$/;
+const COLOR_RE = /^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,\s%-]+\))$/;
+const ALIGNMENT_VALUES = ["left", "center", "right", "justify"] as const;
+const FONT_FAMILY_ALLOWLIST = [
+  "Agharti",
+  "Quedora",
+  "Inter",
+  "JetBrains Mono",
+] as const;
+
+/**
+ * Per-element style override schema. All fields optional — every absent
+ * key leaves that property at the HTML / DB default. Mirrors the
+ * iframe-side bootstrap's expected shape (see spec §6.2).
+ *
+ * `fontSize`, `letterSpacing`, `left`, `top` are CSS-shape strings (e.g.
+ * `'120px'`, `'0.04em'`). We re-validate them through the metacharacter
+ * regex so a malicious previewTextTokens param can't break out of the
+ * declaration block.
+ */
+const TextStyleSchema = z
+  .object({
+    fontFamily: z
+      .enum(FONT_FAMILY_ALLOWLIST as readonly string[] as [string, ...string[]])
+      .optional(),
+    fontWeight: z.number().int().min(100).max(900).optional(),
+    fontSize: z
+      .string()
+      .max(20)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .optional(),
+    letterSpacing: z
+      .string()
+      .max(20)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .optional(),
+    lineHeight: z.number().min(0.6).max(3.0).optional(),
+    color: z
+      .string()
+      .max(40)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .refine((v) => COLOR_RE.test(v))
+      .optional(),
+    textAlign: z
+      .enum(ALIGNMENT_VALUES as readonly string[] as [string, ...string[]])
+      .optional(),
+    opacity: z.number().min(0).max(1).optional(),
+    left: z
+      .string()
+      .max(20)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .optional(),
+    top: z
+      .string()
+      .max(20)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .optional(),
+    zIndex: z.number().int().min(0).max(40).optional(),
+  })
+  .strict();
+
+const TextElementOverrideSchema = z
+  .object({
+    origin: z.enum(["seed", "runtime"]).optional(),
+    visible: z.boolean().optional(),
+    content: z
+      .string()
+      .max(1024)
+      .refine((v) => !/[<>]/.test(v), {
+        message: "content cannot contain < or > (HTML injection guard)",
+      })
+      .nullable()
+      .optional(),
+    styles: TextStyleSchema.optional(),
+  })
+  .strict();
+
+const PreviewTextTokensSchema = z
+  .record(
+    z.string().regex(ELEMENT_ID_RE, "element_id must be kebab-case"),
+    TextElementOverrideSchema,
+  )
+  .refine((obj) => Object.keys(obj).length <= 64, {
+    message: "too many preview text tokens (>64)",
+  });
+
+export type PreviewTextTokens = z.infer<typeof PreviewTextTokensSchema>;
+
+/**
+ * Decode `?previewTextTokens=<base64>` into a typed map. Returns null on
+ * any failure (missing param, malformed b64, malformed JSON, schema
+ * mismatch) so a typo in the URL never 500s the overlay route.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §6.1
+ */
+export async function decodePreviewTextTokens(
+  raw: string | undefined | null,
+): Promise<PreviewTextTokens | null> {
+  if (!raw) return null;
+  let json: string;
+  try {
+    const padded = raw.replaceAll("-", "+").replaceAll("_", "/");
+    const padLen = padded.length % 4 === 0 ? 0 : 4 - (padded.length % 4);
+    const fullPadded = padded + "=".repeat(padLen);
+    json = Buffer.from(fullPadded, "base64").toString("utf-8");
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  const result = PreviewTextTokensSchema.safeParse(parsed);
+  if (!result.success) return null;
+  return result.data;
+}

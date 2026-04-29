@@ -20,6 +20,12 @@ import {
   TOKEN_CATALOG_BY_KEY,
   supportsBgImage,
 } from "@/server/overlays/design/defaults";
+import {
+  upsertTextElement,
+  getTextElement,
+  type TextAlignment,
+  type TextKind,
+} from "@/server/overlays/text/elements";
 
 /**
  * Phase 3 — overlay design admin server actions.
@@ -377,4 +383,278 @@ export async function uploadOverlayBgAction(
   revalidatePath("/admin/broadcast/v2/design");
   revalidatePath(`/overlay/v2/${overlayKeyParsed.data}`, "page");
   return { ok: true, url: publicUrl };
+}
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 2 — text-element editing                              *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Form payload schema for text-element edits.
+ *
+ * The admin UI POSTs one element at a time (vs. the batched `tokens`
+ * field used by saveTokensAction). Each field is optional — empty
+ * strings clear the override and inherit the HTML default. The Zod
+ * schema accepts strings (FormData round-trips everything as text), then
+ * coerces to the typed shape `upsertTextElement` expects.
+ *
+ * `content` cap: 1024 chars (also enforced server-side in
+ * `validateInput`). `color` regex matches the css-validator allowlist.
+ * Position fields accept negative values so admins can pull elements
+ * partly off-stage if a design calls for it.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.3, §3.1
+ */
+const TEXT_KINDS = [
+  "heading",
+  "subheading",
+  "eyebrow",
+  "title",
+  "subtitle",
+  "caption",
+  "number",
+  "label",
+  "body",
+  "image",
+  "layout",
+] as const satisfies readonly TextKind[];
+
+const TEXT_ALIGNMENTS = [
+  "left",
+  "center",
+  "right",
+  "justify",
+] as const satisfies readonly TextAlignment[];
+
+const TEXT_FONT_FAMILIES = [
+  "Agharti",
+  "Quedora",
+  "Inter",
+  "JetBrains Mono",
+] as const;
+
+const SetTextElementSchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  elementId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9-]{0,63}$/, {
+      message: "elementId must be kebab-case (a-z, 0-9, -)",
+    }),
+  // Optional fields — empty string sentinel means "inherit HTML default".
+  visible: z.enum(["true", "false"]).optional(),
+  content: z.string().max(1024).optional(),
+  fontFamily: z.string().max(40).optional(),
+  fontWeight: z.string().max(4).optional(),
+  fontSizePx: z.string().max(4).optional(),
+  letterSpacing: z.string().max(8).optional(),
+  lineHeight: z.string().max(8).optional(),
+  color: z.string().max(40).optional(),
+  alignment: z.string().max(10).optional(),
+  opacityPct: z.string().max(4).optional(),
+  positionXPx: z.string().max(6).optional(),
+  positionYPx: z.string().max(6).optional(),
+  zIndex: z.string().max(3).optional(),
+});
+
+function parseOptInt(s: string | undefined): number | null {
+  if (s == null || s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function parseOptFloat(s: string | undefined): number | null {
+  if (s == null || s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseOptStr<T extends string>(
+  s: string | undefined,
+  allowed: readonly T[],
+): T | null {
+  if (s == null || s === "") return null;
+  return (allowed as readonly string[]).includes(s) ? (s as T) : null;
+}
+
+/**
+ * Persist a text-element override. The action upserts a row in
+ * `overlay_text_elements`. Empty-string field values map to NULL so the
+ * row stays a "partial override" — only the populated fields flow into
+ * the resolver's effective styles map.
+ *
+ * Seed-catalog rows are pre-inserted with `origin='seed'` and all-NULL
+ * typography fields (see migration `20260620000007`). We re-fetch the
+ * row first to preserve `kind` + `origin`; if the row doesn't exist yet
+ * (admin-created runtime element), we accept a `kind` from the form and
+ * default origin to 'runtime'.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.3
+ */
+export async function setTextElementAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    elementId: String(formData.get("elementId") ?? ""),
+    visible: (formData.get("visible") as string | null) ?? undefined,
+    content: (formData.get("content") as string | null) ?? undefined,
+    fontFamily: (formData.get("fontFamily") as string | null) ?? undefined,
+    fontWeight: (formData.get("fontWeight") as string | null) ?? undefined,
+    fontSizePx: (formData.get("fontSizePx") as string | null) ?? undefined,
+    letterSpacing:
+      (formData.get("letterSpacing") as string | null) ?? undefined,
+    lineHeight: (formData.get("lineHeight") as string | null) ?? undefined,
+    color: (formData.get("color") as string | null) ?? undefined,
+    alignment: (formData.get("alignment") as string | null) ?? undefined,
+    opacityPct: (formData.get("opacityPct") as string | null) ?? undefined,
+    positionXPx: (formData.get("positionXPx") as string | null) ?? undefined,
+    positionYPx: (formData.get("positionYPx") as string | null) ?? undefined,
+    zIndex: (formData.get("zIndex") as string | null) ?? undefined,
+  };
+
+  const parsed = SetTextElementSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid text element payload: ${parsed.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ")}`,
+    );
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  const actor = { userId: publicUserId, roles };
+
+  // Look up the existing row so we keep `kind` + `origin` stable. If no
+  // row exists (admin is creating a runtime element from scratch), we
+  // require `kind` from FormData and default origin='runtime'. Seed rows
+  // are pre-populated by migration `20260620000007` — admins editing seed
+  // overlays will always hit this branch.
+  const existing = await getTextElement(
+    sb,
+    parsed.data.overlayKey,
+    parsed.data.variantId,
+    parsed.data.elementId,
+  );
+
+  const kindFromForm = String(formData.get("kind") ?? "");
+  const kind = existing
+    ? existing.kind
+    : ((TEXT_KINDS as readonly string[]).includes(kindFromForm)
+        ? (kindFromForm as TextKind)
+        : ("body" as TextKind));
+  const origin = existing ? existing.origin : "runtime";
+  const sortOrder = existing ? existing.sortOrder : 0;
+
+  const visibleParsed =
+    parsed.data.visible === "false"
+      ? false
+      : parsed.data.visible === "true"
+        ? true
+        : (existing?.visible ?? true);
+
+  await upsertTextElement(sb, actor, {
+    overlayKey: parsed.data.overlayKey,
+    variantId: parsed.data.variantId,
+    elementId: parsed.data.elementId,
+    origin,
+    kind,
+    visible: visibleParsed,
+    content: parsed.data.content ?? "",
+    fontFamily: parseOptStr(parsed.data.fontFamily, TEXT_FONT_FAMILIES),
+    fontWeight: parseOptInt(parsed.data.fontWeight),
+    fontSizePx: parseOptInt(parsed.data.fontSizePx),
+    letterSpacing: parseOptFloat(parsed.data.letterSpacing),
+    lineHeight: parseOptFloat(parsed.data.lineHeight),
+    color: parsed.data.color && parsed.data.color !== "" ? parsed.data.color : null,
+    alignment: parseOptStr(parsed.data.alignment, TEXT_ALIGNMENTS),
+    opacityPct: parseOptInt(parsed.data.opacityPct),
+    positionXPx: parseOptInt(parsed.data.positionXPx),
+    positionYPx: parseOptInt(parsed.data.positionYPx),
+    zIndex: parseOptInt(parsed.data.zIndex),
+    sortOrder,
+  });
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+}
+
+const ClearTextElementSchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  elementId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9-]{0,63}$/),
+});
+
+/**
+ * Reset a text-element row to "no override" — every typography field
+ * goes NULL, content goes empty string. For seed rows this returns the
+ * overlay to its HTML default render (the resolver skips no-op rows).
+ *
+ * For runtime rows the row stays soft-alive (visible toggleable) but
+ * with no styling overrides. To fully remove a runtime row, the admin
+ * uses a separate delete action (not in scope for Stage 2 — runtime
+ * element addition is Stage 3).
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.3
+ */
+export async function clearTextElementAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    elementId: String(formData.get("elementId") ?? ""),
+  };
+  const parsed = ClearTextElementSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid clear payload: ${parsed.error.issues
+        .map((i) => i.message)
+        .join("; ")}`,
+    );
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  const actor = { userId: publicUserId, roles };
+
+  const existing = await getTextElement(
+    sb,
+    parsed.data.overlayKey,
+    parsed.data.variantId,
+    parsed.data.elementId,
+  );
+  if (!existing) {
+    // Nothing to clear — no-op (still revalidate so the UI re-fetches).
+    revalidatePath("/admin/broadcast/v2/design");
+    revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+    return;
+  }
+
+  await upsertTextElement(sb, actor, {
+    overlayKey: parsed.data.overlayKey,
+    variantId: parsed.data.variantId,
+    elementId: parsed.data.elementId,
+    origin: existing.origin,
+    kind: existing.kind,
+    visible: true,
+    content: "",
+    fontFamily: null,
+    fontWeight: null,
+    fontSizePx: null,
+    letterSpacing: null,
+    lineHeight: null,
+    color: null,
+    alignment: null,
+    opacityPct: null,
+    positionXPx: null,
+    positionYPx: null,
+    zIndex: null,
+    sortOrder: existing.sortOrder,
+  });
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
 }

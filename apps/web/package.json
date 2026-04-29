@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "sync:overlays": "node scripts/sync-v2-overlays.mjs",
     "sync:overlays:watch": "node scripts/sync-v2-overlays.mjs --watch",
-    "prebuild": "npm run sync:overlays"
+    "check:element-id-parity": "node scripts/_check-element-id-parity.mjs",
+    "prebuild": "npm run sync:overlays && npm run check:element-id-parity"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

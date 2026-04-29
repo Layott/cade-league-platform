@@ -7,10 +7,12 @@ import { SectionHeader } from "@/components/admin/SectionHeader";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import OverlayDesignEditor, {
   type CatalogEntry,
+  type TextElementRow,
 } from "@/components/admin/OverlayDesignEditor";
 import { resolveTokens } from "@/server/overlays/design/tokens";
 import { listTemplates } from "@/server/overlays/design/templates";
 import { listHistory } from "@/server/overlays/design/history";
+import { listTextElements } from "@/server/overlays/text/elements";
 import {
   OVERLAY_KEYS,
   TOKEN_CATALOG,
@@ -110,6 +112,30 @@ export default async function OverlayDesignPage({
 
   const tokens = await resolveTokens(sb, selectedOverlay, selectedVariantId);
   const history = await listHistory(sb, selectedOverlay, selectedVariantId, 50);
+  // Wave 2 Stage 2 — text-element catalog for the new Text panel.
+  const textRowsRaw = await listTextElements(
+    sb,
+    selectedOverlay,
+    selectedVariantId,
+  ).catch(() => []);
+  const textElements: TextElementRow[] = textRowsRaw.map((r) => ({
+    elementId: r.elementId,
+    origin: r.origin,
+    kind: r.kind,
+    visible: r.visible,
+    content: r.content,
+    fontFamily: r.fontFamily,
+    fontWeight: r.fontWeight,
+    fontSizePx: r.fontSizePx,
+    letterSpacing: r.letterSpacing,
+    lineHeight: r.lineHeight,
+    color: r.color,
+    alignment: r.alignment,
+    opacityPct: r.opacityPct,
+    positionXPx: r.positionXPx,
+    positionYPx: r.positionYPx,
+    zIndex: r.zIndex,
+  }));
 
   const catalog: CatalogEntry[] = TOKEN_CATALOG.map((c) => ({
     tokenKey: c.tokenKey,
@@ -188,6 +214,7 @@ export default async function OverlayDesignPage({
         catalog={catalog}
         fontOptions={FONT_VALUES}
         patternOptions={PATTERN_VALUES}
+        initialTextElements={textElements}
       />
 
       <section className="space-y-3">

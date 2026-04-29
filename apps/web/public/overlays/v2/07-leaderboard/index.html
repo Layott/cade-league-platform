@@ -33,15 +33,18 @@
 
 <script id="cade-token-bootstrap">
 (function() {
-  // Phase A — cross-document design-token propagation.
+  // Wave 2 Stage 2 — cross-document design + text-element propagation.
   //
   // Read base64-encoded JSON token maps from the iframe URL query
-  // string and emit a <style id="cade-injected-tokens"> block whose
-  // :root rules WIN over the HTML's hard-coded defaults below (CSS
-  // source-order cascade — the injected block is appended LATER in
-  // <head>). Image tokens are wrapped in url("..."); other tokens
-  // pass through after stripping the same metacharacters the server-
-  // side schema rejects (;{}<>"').
+  // string and emit two <style> blocks that win the CSS source-order
+  // cascade (appended LATER in <head> than the author defaults).
+  //
+  // Token shapes:
+  //   tokens / previewTokens     — { 'bg-color': '#000', ... }
+  //   textTokens / previewTextTokens — { '<elementId>': { visible?,
+  //     content?, styles?: { color, fontFamily, fontSize, ... } } }
+  //
+  // Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §6.2
   function decodeTokens(param) {
     if (!param) return null;
     try {
@@ -59,10 +62,8 @@
       if (!Object.prototype.hasOwnProperty.call(tokens, k)) continue;
       var v = tokens[k];
       if (typeof v !== 'string') continue;
-      // Strip CSS metacharacters that could break out of the var rule.
       var safe = v.replace(/[;{}<>"']/g, '');
       if (imageKeys[k]) {
-        // Empty image value = "no override, use HTML fallback".
         if (!safe) continue;
         parts.push('--overlay-' + k + ': url("' + safe + '")');
       } else {
@@ -72,35 +73,86 @@
     }
     return parts.length ? ':root{' + parts.join(';') + ';}' : '';
   }
+  function sanitizeCss(v) {
+    return String(v == null ? '' : v).replace(/[;{}<>"\\`]/g, '');
+  }
+  function buildTextRules(tokens) {
+    if (!tokens || typeof tokens !== 'object') return '';
+    var rules = [];
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var t = tokens[elId];
+      if (!t || typeof t !== 'object') continue;
+      var s = t.styles || {};
+      var declarations = [];
+      if (s.color)         declarations.push('color:' + sanitizeCss(s.color));
+      if (s.fontFamily)    declarations.push("font-family:'" + sanitizeCss(s.fontFamily) + "'");
+      if (s.fontWeight)    declarations.push('font-weight:' + (+s.fontWeight || 400));
+      if (s.fontSize)      declarations.push('font-size:' + sanitizeCss(s.fontSize));
+      if (s.letterSpacing) declarations.push('letter-spacing:' + sanitizeCss(s.letterSpacing));
+      if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
+      if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
+      if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
+      if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
+      if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
+      if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
+      if (s.left || s.top) declarations.push('position:absolute');
+      if (t.visible === false) declarations.push('display:none');
+      if (declarations.length) {
+        rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');
+      }
+    }
+    return rules.join('\n');
+  }
+  function applyTextContent(tokens) {
+    if (!tokens || typeof tokens !== 'object') return;
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var t = tokens[elId];
+      if (!t || typeof t !== 'object') continue;
+      if (typeof t.content !== 'string') continue;
+      if (t.content === '' || t.content == null) continue;
+      var node = document.querySelector('[data-element-id="' + elId + '"]');
+      if (!node) continue;
+      try { node.textContent = t.content; } catch (e) { /* read-only */ }
+    }
+  }
   try {
     var qs = new URLSearchParams(location.search);
     var design = decodeTokens(qs.get('tokens'));
     var preview = decodeTokens(qs.get('previewTokens'));
+    var textTokens = decodeTokens(qs.get('textTokens'));
+    var previewTextTokens = decodeTokens(qs.get('previewTextTokens'));
     // Source order: design first, preview second so preview wins.
-    var rule = buildCssVars(design) + buildCssVars(preview);
-    if (!rule) return;
+    var cssVarRule = buildCssVars(design) + buildCssVars(preview);
+    var textRule = buildTextRules(textTokens) + (buildTextRules(textTokens).length && buildTextRules(previewTextTokens).length ? '\n' : '') + buildTextRules(previewTextTokens);
     var emit = function() {
-      // Re-check head — defensive against the rare case where a
-      // browser inserts <head> only after DOMContentLoaded.
       if (!document.head) return;
-      var style = document.createElement('style');
-      style.id = 'cade-injected-tokens';
-      style.textContent = rule;
-      document.head.appendChild(style);
+      if (cssVarRule) {
+        var s1 = document.createElement('style');
+        s1.id = 'cade-injected-tokens';
+        s1.textContent = cssVarRule;
+        document.head.appendChild(s1);
+      }
+      if (textRule) {
+        var s2 = document.createElement('style');
+        s2.id = 'cade-injected-text';
+        s2.textContent = textRule;
+        document.head.appendChild(s2);
+      }
+      // Apply textContent edits AFTER DOM is parsed.
+      applyTextContent(textTokens);
+      applyTextContent(previewTextTokens);
     };
-    // ALWAYS defer to DOMContentLoaded — running synchronously
-    // during <head> parse appends BEFORE the author <style> blocks
-    // get parsed, so author :root{} defaults win the cascade and our
-    // override is invisible. Deferring lands the injected block AFTER
-    // all author <style> blocks → our overrides win source-order.
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', emit);
     } else {
       emit();
     }
   } catch (e) {
-    // Bootstrap MUST never throw — it would white-flash the overlay
-    // and break OBS chroma-key. Swallow + fall back to defaults.
+    // Bootstrap MUST never throw — fall back to HTML defaults.
   }
 })();
 </script>
@@ -564,12 +616,12 @@
     <div class="bg-vignette" aria-hidden="true"></div>
 
     <!-- Corner marks -->
-    <div class="matchday-mark">Live Update</div>
-    <div class="season-mark">Elite League &middot; Season 2</div>
+    <div data-element-id="matchday-mark" class="matchday-mark">Live Update</div>
+    <div data-element-id="season-mark" class="season-mark">Elite League &middot; Season 2</div>
 
     <!-- Top header: CADE Esports left, League badge right -->
     <header class="top-band">
-      <img class="logo-cade"
+      <img data-element-id="top-band-logo" class="logo-cade"
            src="/overlays/v2/_assets/logos/1cade%20esport.png"
            alt="CADE Esports" />
     </header>
@@ -580,8 +632,8 @@
 
     <!-- Headline -->
     <section class="headline">
-      <div class="eyebrow">Elite League</div>
-      <h1 class="title">Leaderboard</h1>
+      <div data-element-id="eyebrow" class="eyebrow">Elite League</div>
+      <h1 data-element-id="title" class="title">Leaderboard</h1>
     </section>
 
     <!-- TABLE — TWO COLUMNS -->
@@ -615,7 +667,7 @@
     </section>
 
     <!-- Partner strip — GameEvo, Gamepride, ESN, TRACE + OAS esport -->
-    <footer class="partners" aria-label="Official Partners">
+    <footer data-element-id="partners-strip" class="partners" aria-label="Official Partners">
       <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20Black_strip.png" alt="GameEvo Esports" />
       <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
       <img class="partner partner--esn"     src="/overlays/v2/_assets/logos/processed/eSports%20Federation%20of%20Nigeria-1_strip.png" alt="eSports Federation of Nigeria" />
