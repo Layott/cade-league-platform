@@ -204,6 +204,100 @@
     });
     return true;
   }
+  // ────────── Stage 4 — element animations ──────────
+  //
+  // Build @keyframes BODY for a given preset anim type. Mirrors
+  // server/overlays/animations/elements.ts::buildKeyframesBody — same
+  // values across server-side resolver + client-side bootstrap so
+  // SSR-emitted styles + URL-borne overrides yield identical motion.
+  function buildPresetKeyframes(animType, name, customBody) {
+    switch (animType) {
+      case 'slide-left':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateX(-32px)}to{opacity:1;transform:translateX(0)}}';
+      case 'slide-right':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateX(32px)}to{opacity:1;transform:translateX(0)}}';
+      case 'slide-up':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}';
+      case 'slide-down':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateY(-32px)}to{opacity:1;transform:translateY(0)}}';
+      case 'fade':
+        return '@keyframes ' + name + '{from{opacity:0}to{opacity:1}}';
+      case 'scale':
+        return '@keyframes ' + name + '{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}';
+      case 'rotate':
+        return '@keyframes ' + name + '{from{opacity:0;transform:rotate(-12deg)}to{opacity:1;transform:rotate(0)}}';
+      case 'bounce':
+        return '@keyframes ' + name + '{0%{opacity:0;transform:translateY(20px)}60%{transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}';
+      case 'pulse':
+        return '@keyframes ' + name + '{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}';
+      case 'glow':
+        return '@keyframes ' + name + '{0%{filter:drop-shadow(0 0 0 rgba(107,205,6,0))}50%{filter:drop-shadow(0 0 24px rgba(107,205,6,0.55))}100%{filter:drop-shadow(0 0 0 rgba(107,205,6,0))}}';
+      case 'shake':
+        return '@keyframes ' + name + '{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}';
+      case 'flip':
+        return '@keyframes ' + name + '{from{opacity:0;transform:perspective(800px) rotateY(-90deg)}to{opacity:1;transform:perspective(800px) rotateY(0)}}';
+      case 'custom-css':
+        // Defence-in-depth: strip url(), at-rules, and angle/backtick
+        // characters even if server sanitizer was bypassed (URL-borne).
+        if (typeof customBody !== 'string') return '';
+        if (/\burl\s*\(/i.test(customBody)) return '';
+        if (/@(import|font-face|charset|media|supports|keyframes)\b/i.test(customBody)) return '';
+        if (/[<>\`]/.test(customBody)) return '';
+        return '@keyframes ' + name + '{' + customBody + '}';
+      case 'none':
+      default:
+        return '';
+    }
+  }
+  function buildAnimRulesAndKeyframes(tokens) {
+    if (!tokens || typeof tokens !== 'object') return { keyframes: '', rules: '' };
+    var keyframesParts = [];
+    var rulesParts = [];
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var phases = tokens[elId];
+      if (!phases || typeof phases !== 'object') continue;
+      for (var phase in phases) {
+        if (!Object.prototype.hasOwnProperty.call(phases, phase)) continue;
+        if (phase !== 'entry' && phase !== 'exit' && phase !== 'continuous') continue;
+        var p = phases[phase];
+        if (!p || typeof p !== 'object') continue;
+        if (p.enabled === false) continue;
+        if (!p.animType || p.animType === 'none') continue;
+        var animName = 'cade-' + elId + '-' + phase;
+        var kf = buildPresetKeyframes(
+          p.animType,
+          animName,
+          p.customCssKeyframes || ''
+        );
+        if (!kf) continue;
+        keyframesParts.push(kf);
+        var duration = (+p.durationMs) || 360;
+        var delay = (+p.delayMs) || 0;
+        var easing = sanitizeCss(p.easing || 'ease-out');
+        var iterations = sanitizeCss(p.iterationCount || '1');
+        // Phase-gated selector. Continuous animations only run while
+        // the overlay is visible (cade-visible class on body).
+        var sel =
+          phase === 'exit'
+            ? 'body.cade-exiting [data-element-id="' + elId + '"]'
+            : 'body.cade-visible [data-element-id="' + elId + '"]';
+        var rule =
+          'animation:' + animName +
+          ' ' + duration + 'ms' +
+          ' ' + easing +
+          ' ' + delay + 'ms' +
+          ' ' + iterations +
+          ' both;';
+        rulesParts.push(sel + '{' + rule + '}');
+      }
+    }
+    return {
+      keyframes: keyframesParts.join('\n'),
+      rules: rulesParts.join('\n'),
+    };
+  }
   try {
     var qs = new URLSearchParams(location.search);
     var design = decodeTokens(qs.get('tokens'));
@@ -212,6 +306,8 @@
     var previewTextTokens = decodeTokens(qs.get('previewTextTokens'));
     var partnerTokens = decodeTokens(qs.get('partnerTokens'));
     var previewPartnerTokens = decodeTokens(qs.get('previewPartnerTokens'));
+    var animTokens = decodeTokens(qs.get('animTokens'));
+    var previewAnimTokens = decodeTokens(qs.get('previewAnimTokens'));
     // Source order: design first, preview second so preview wins.
     var cssVarRule = buildCssVars(design) + buildCssVars(preview);
     var textRule = buildTextRules(textTokens) + (buildTextRules(textTokens).length && buildTextRules(previewTextTokens).length ? '\n' : '') + buildTextRules(previewTextTokens);
@@ -226,6 +322,18 @@
       var r2 = buildPartnerLayoutRule(previewPartnerTokens.layout);
       if (r2) partnerRules.push(r2);
     }
+    // Stage 4 — element animations. Build keyframes + rules from both
+    // design + preview maps. Source-order wins on identical names: the
+    // preview block emits second, so its keyframes & rules overwrite
+    // design's via CSS cascade (same selector + same animation-name).
+    var animDesign = buildAnimRulesAndKeyframes(animTokens);
+    var animPreview = buildAnimRulesAndKeyframes(previewAnimTokens);
+    var animKeyframesCss = animDesign.keyframes +
+      (animDesign.keyframes && animPreview.keyframes ? '\n' : '') +
+      animPreview.keyframes;
+    var animRulesCss = animDesign.rules +
+      (animDesign.rules && animPreview.rules ? '\n' : '') +
+      animPreview.rules;
     var emit = function() {
       if (!document.head) return;
       if (cssVarRule) {
@@ -245,6 +353,20 @@
         s3.id = 'cade-injected-partners-layout';
         s3.textContent = partnerRules.join('\n');
         document.head.appendChild(s3);
+      }
+      // Stage 4 — animation keyframes block FIRST (must precede rules
+      // so the named animations resolve).
+      if (animKeyframesCss) {
+        var s4 = document.createElement('style');
+        s4.id = 'cade-injected-anim-keyframes';
+        s4.textContent = animKeyframesCss;
+        document.head.appendChild(s4);
+      }
+      if (animRulesCss) {
+        var s5 = document.createElement('style');
+        s5.id = 'cade-injected-anim-rules';
+        s5.textContent = animRulesCss;
+        document.head.appendChild(s5);
       }
       // Apply textContent edits AFTER DOM is parsed.
       applyTextContent(textTokens);

@@ -3,6 +3,7 @@ import {
   decodePreviewTokens,
   decodePreviewTextTokens,
   decodePreviewPartnerTokens,
+  decodePreviewAnimTokens,
   encodePreviewTokens,
   escapeCssValue,
 } from "./preview";
@@ -367,5 +368,179 @@ describe("decodePreviewPartnerTokens", () => {
     const b64 = b64encode({ logos: [validLogo, httpsLogo] });
     const out = await decodePreviewPartnerTokens(b64);
     expect(out?.logos).toHaveLength(2);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 4 — animation preview decoder                         *
+ * ------------------------------------------------------------------ */
+
+describe("decodePreviewAnimTokens", () => {
+  const validEntryPhase = {
+    enabled: true,
+    animType: "slide-left",
+    durationMs: 420,
+    delayMs: 60,
+    easing: "cubic-bezier(0.16,1,0.3,1)",
+    iterationCount: "1",
+  };
+
+  it("returns null when raw is undefined / empty", async () => {
+    expect(await decodePreviewAnimTokens(undefined)).toBeNull();
+    expect(await decodePreviewAnimTokens(null)).toBeNull();
+    expect(await decodePreviewAnimTokens("")).toBeNull();
+  });
+
+  it("returns null on malformed base64", async () => {
+    expect(await decodePreviewAnimTokens("not!base64!")).toBeNull();
+  });
+
+  it("returns null on malformed JSON", async () => {
+    const fake = Buffer.from("{not json", "utf-8")
+      .toString("base64")
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replaceAll("=", "");
+    expect(await decodePreviewAnimTokens(fake)).toBeNull();
+  });
+
+  it("decodes a valid single-element entry phase", async () => {
+    const payload = {
+      title: { entry: validEntryPhase },
+    };
+    const b64 = b64encode(payload);
+    const out = await decodePreviewAnimTokens(b64);
+    expect(out).not.toBeNull();
+    expect(out?.title?.entry?.animType).toBe("slide-left");
+    expect(out?.title?.entry?.durationMs).toBe(420);
+  });
+
+  it("decodes multi-phase entries (entry + continuous + exit)", async () => {
+    const payload = {
+      title: {
+        entry: validEntryPhase,
+        exit: { ...validEntryPhase, animType: "fade", easing: "ease-in" },
+        continuous: {
+          ...validEntryPhase,
+          animType: "pulse",
+          iterationCount: "infinite",
+          easing: "ease-in-out",
+        },
+      },
+    };
+    const b64 = b64encode(payload);
+    const out = await decodePreviewAnimTokens(b64);
+    expect(out?.title?.entry).toBeDefined();
+    expect(out?.title?.exit?.animType).toBe("fade");
+    expect(out?.title?.continuous?.iterationCount).toBe("infinite");
+  });
+
+  it("rejects non-kebab-case element ID", async () => {
+    const payload = { Bad_Title: { entry: validEntryPhase } };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("rejects unknown anim_type", async () => {
+    const payload = {
+      title: { entry: { ...validEntryPhase, animType: "explode" } },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("rejects durationMs outside 50..5000", async () => {
+    const payload = {
+      title: { entry: { ...validEntryPhase, durationMs: 99999 } },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("rejects easing outside the allowlist", async () => {
+    const payload = {
+      title: { entry: { ...validEntryPhase, easing: "magic-curve" } },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("accepts cubic-bezier easings", async () => {
+    const payload = {
+      title: {
+        entry: { ...validEntryPhase, easing: "cubic-bezier(0,0,1,1)" },
+      },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).not.toBeNull();
+  });
+
+  it("rejects iterationCount outside 'infinite' or digits", async () => {
+    const payload = {
+      title: { entry: { ...validEntryPhase, iterationCount: "many" } },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("rejects custom-css with url()", async () => {
+    const payload = {
+      title: {
+        entry: {
+          ...validEntryPhase,
+          animType: "custom-css",
+          customCssKeyframes: "0% { background: url(http://x.com/a.png) }",
+        },
+      },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("rejects custom-css with @-rules", async () => {
+    const payload = {
+      title: {
+        entry: {
+          ...validEntryPhase,
+          animType: "custom-css",
+          customCssKeyframes: "0% { opacity: 0 } @import url(x);",
+        },
+      },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("rejects custom-css with angle brackets", async () => {
+    const payload = {
+      title: {
+        entry: {
+          ...validEntryPhase,
+          animType: "custom-css",
+          customCssKeyframes: "0% { color: <script>alert(1)</script> }",
+        },
+      },
+    };
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("accepts safe custom-css keyframes", async () => {
+    const payload = {
+      title: {
+        entry: {
+          ...validEntryPhase,
+          animType: "custom-css",
+          customCssKeyframes:
+            "0% { opacity: 0 } 50% { opacity: 0.5 } 100% { opacity: 1 }",
+        },
+      },
+    };
+    const out = await decodePreviewAnimTokens(b64encode(payload));
+    expect(out?.title?.entry?.customCssKeyframes).toContain("opacity");
+  });
+
+  it("rejects oversized maps (>64 elements)", async () => {
+    const payload: Record<string, { entry: typeof validEntryPhase }> = {};
+    for (let i = 0; i < 65; i++) {
+      payload[`element-${i}`] = { entry: validEntryPhase };
+    }
+    expect(await decodePreviewAnimTokens(b64encode(payload))).toBeNull();
+  });
+
+  it("accepts an empty object", async () => {
+    const b64 = b64encode({});
+    expect(await decodePreviewAnimTokens(b64)).toEqual({});
   });
 });

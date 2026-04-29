@@ -68,9 +68,57 @@ const storageFromMock = vi.hoisted(() =>
     getPublicUrl: storagePublicUrlMock,
   })),
 );
+
+/**
+ * Service-client `.from()` mock. Wave 2 Stage 3 actions use the SELECT-
+ * then-INSERT-or-UPDATE pattern directly against the client because the
+ * partner tables have partial unique indexes that don't work with
+ * Supabase JS upsert. We therefore have to fake the chained query
+ * builders for each of: maybeSingle (SELECT), insert, update.
+ */
+type FakeQuery = {
+  select: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  is: ReturnType<typeof vi.fn>;
+  maybeSingle: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+};
+const fromMaybeSingleMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: null, error: null }),
+);
+const fromInsertMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: null, error: null }),
+);
+const fromUpdateMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: null, error: null }),
+);
+const fromMock = vi.hoisted(() => {
+  return vi.fn(() => {
+    const q: FakeQuery = {
+      select: vi.fn().mockReturnThis() as unknown as FakeQuery["select"],
+      eq: vi.fn().mockReturnThis() as unknown as FakeQuery["eq"],
+      is: vi.fn().mockReturnThis() as unknown as FakeQuery["is"],
+      maybeSingle: fromMaybeSingleMock,
+      insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+    };
+    // Make insert + update reroute through the shared mocks so tests
+    // can introspect them.
+    q.insert = vi.fn((_row: unknown) => fromInsertMock());
+    q.update = vi.fn((_row: unknown) => ({
+      eq: vi.fn().mockReturnValue(fromUpdateMock()),
+    })) as unknown as FakeQuery["update"];
+    return q;
+  });
+});
+
 vi.mock("@/lib/supabase/service", () => ({
   getServiceRoleSupabase: () => ({
     storage: { from: storageFromMock },
+    from: fromMock,
   }),
 }));
 
@@ -123,27 +171,34 @@ vi.mock("@/server/overlays/text/elements", () => ({
   getTextElement: getTextElementMock,
 }));
 
-// Wave 2 Stage 3 — partner-strip + logo CRUD mocks.
-const upsertStripLayoutMock = vi.hoisted(() =>
-  vi.fn().mockResolvedValue({ id: "row-1" }),
-);
-vi.mock("@/server/overlays/partners/strip", () => ({
-  upsertStripLayout: upsertStripLayoutMock,
-}));
-
+// Wave 2 Stage 3 — partner-logo CRUD mocks. (Strip-layout + logo
+// override write paths now go through the action layer's own SELECT-
+// then-INSERT-or-UPDATE pattern instead of the server-module wrappers
+// because the partial unique index makes ON CONFLICT inference fail —
+// see the JSDoc on setStripLayoutAction.)
 const createPartnerLogoMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ id: "row-1", partnerKey: "p" }),
 );
 const deletePartnerLogoMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined),
 );
-const setLogoOverrideMock = vi.hoisted(() =>
-  vi.fn().mockResolvedValue({ id: "row-1" }),
-);
 vi.mock("@/server/overlays/partners/logos", () => ({
   createPartnerLogo: createPartnerLogoMock,
   deletePartnerLogo: deletePartnerLogoMock,
-  setLogoOverride: setLogoOverrideMock,
+}));
+
+// Wave 2 Stage 4 — animation server-module mocks. The action layer
+// gates on `overlay.design.manage` + zod-validates inputs; the
+// server-module functions are mocked so unit tests don't need a DB.
+const upsertAnimationMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ id: "anim-1" }),
+);
+const deleteAnimationMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+vi.mock("@/server/overlays/animations/elements", () => ({
+  upsertAnimation: upsertAnimationMock,
+  deleteAnimation: deleteAnimationMock,
 }));
 
 // `sharp` mock — yields configurable metadata so we can simulate good
@@ -168,6 +223,8 @@ import {
   uploadPartnerLogoAction,
   removePartnerLogoAction,
   setLogoOverrideAction,
+  setAnimationAction,
+  clearAnimationAction,
 } from "./actions";
 
 beforeEach(() => {
@@ -181,13 +238,11 @@ beforeEach(() => {
   revertToSnapshotMock.mockClear().mockResolvedValue(undefined);
   upsertTextElementMock.mockReset().mockResolvedValue({ id: "row-1" });
   getTextElementMock.mockReset().mockResolvedValue(null);
-  upsertStripLayoutMock.mockReset().mockResolvedValue({ id: "row-1" });
   createPartnerLogoMock.mockReset().mockResolvedValue({
     id: "row-1",
     partnerKey: "p",
   });
   deletePartnerLogoMock.mockReset().mockResolvedValue(undefined);
-  setLogoOverrideMock.mockReset().mockResolvedValue({ id: "row-1" });
   sharpMetadataMock.mockReset().mockResolvedValue({ width: 600, height: 300 });
   sharpDefaultMock.mockClear();
   storageUploadMock.mockReset().mockResolvedValue({ data: {}, error: null });
@@ -195,6 +250,15 @@ beforeEach(() => {
     data: { publicUrl: "https://supabase.local/partner-logos/test.png" },
   });
   storageFromMock.mockClear();
+  fromMock.mockClear();
+  fromMaybeSingleMock.mockReset().mockResolvedValue({
+    data: null,
+    error: null,
+  });
+  fromInsertMock.mockReset().mockResolvedValue({ data: null, error: null });
+  fromUpdateMock.mockReset().mockResolvedValue({ data: null, error: null });
+  upsertAnimationMock.mockReset().mockResolvedValue({ id: "anim-1" });
+  deleteAnimationMock.mockReset().mockResolvedValue(undefined);
 });
 
 function fdSave(overlayKey: string, variantId: string, tokens: object): FormData {
@@ -615,14 +679,15 @@ describe("setStripLayoutAction (Wave 2 Stage 3)", () => {
     await expect(setStripLayoutAction(fdLayout("01-brb"))).rejects.toThrow(
       /Forbidden|overlay\.design\.manage/,
     );
-    expect(upsertStripLayoutMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
+    expect(fromUpdateMock).not.toHaveBeenCalled();
   });
 
   it("rejects unknown overlayKey", async () => {
     await expect(
       setStripLayoutAction(fdLayout("not-a-real-key")),
     ).rejects.toThrow();
-    expect(upsertStripLayoutMock).not.toHaveBeenCalled();
+    expect(fromInsertMock).not.toHaveBeenCalled();
   });
 
   it("rejects unknown anchor", async () => {
@@ -644,7 +709,8 @@ describe("setStripLayoutAction (Wave 2 Stage 3)", () => {
     );
   });
 
-  it("delegates to upsertStripLayout on success + revalidates", async () => {
+  it("INSERTs when no row exists + revalidates", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     await setStripLayoutAction(
       fdLayout("01-brb", {
         anchor: "top-right",
@@ -653,21 +719,22 @@ describe("setStripLayoutAction (Wave 2 Stage 3)", () => {
         scalePct: "150",
       }),
     );
-    expect(upsertStripLayoutMock).toHaveBeenCalledTimes(1);
-    const call = upsertStripLayoutMock.mock.calls[0];
-    expect(call[2]).toMatchObject({
-      overlayKey: "01-brb",
-      variantId: "default",
-      anchor: "top-right",
-      positionXPx: 1820,
-      positionYPx: 100,
-      scalePct: 150,
-      visible: true,
-    });
+    expect(fromInsertMock).toHaveBeenCalledTimes(1);
+    expect(fromUpdateMock).not.toHaveBeenCalled();
     expect(revalidateMock).toHaveBeenCalledWith(
       "/admin/broadcast/v2/design",
     );
     expect(revalidateMock).toHaveBeenCalledWith("/overlay/v2/01-brb", "page");
+  });
+
+  it("UPDATEs when an existing row is found", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({
+      data: { id: "row-1" },
+      error: null,
+    });
+    await setStripLayoutAction(fdLayout("01-brb", { anchor: "top-left" }));
+    expect(fromUpdateMock).toHaveBeenCalledTimes(1);
+    expect(fromInsertMock).not.toHaveBeenCalled();
   });
 });
 
@@ -890,24 +957,28 @@ describe("setLogoOverrideAction (Wave 2 Stage 3)", () => {
     ).rejects.toThrow();
   });
 
-  it("upserts override (visible=false) on success", async () => {
+  it("INSERTs override (visible=false) when no row exists + revalidates", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     await setLogoOverrideAction(fdOverride({ visible: "false" }));
-    expect(setLogoOverrideMock).toHaveBeenCalledTimes(1);
-    const callInput = setLogoOverrideMock.mock.calls[0][2];
-    expect(callInput).toMatchObject({
-      overlayKey: "01-brb",
-      variantId: "default",
-      partnerKey: "gameevo",
-      visible: false,
-      sortOverride: null,
-    });
+    expect(fromInsertMock).toHaveBeenCalledTimes(1);
+    expect(fromUpdateMock).not.toHaveBeenCalled();
     expect(revalidateMock).toHaveBeenCalledWith("/overlay/v2/01-brb", "page");
   });
 
+  it("UPDATEs when override row exists", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({
+      data: { id: "row-1" },
+      error: null,
+    });
+    await setLogoOverrideAction(fdOverride({ visible: "false" }));
+    expect(fromUpdateMock).toHaveBeenCalledTimes(1);
+    expect(fromInsertMock).not.toHaveBeenCalled();
+  });
+
   it("accepts numeric sortOverride", async () => {
+    fromMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
     await setLogoOverrideAction(fdOverride({ sortOverride: "3" }));
-    const callInput = setLogoOverrideMock.mock.calls[0][2];
-    expect(callInput).toMatchObject({ sortOverride: 3 });
+    expect(fromInsertMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects when actor lacks perm", async () => {
@@ -917,5 +988,189 @@ describe("setLogoOverrideAction (Wave 2 Stage 3)", () => {
     await expect(setLogoOverrideAction(fdOverride())).rejects.toThrow(
       /Forbidden|overlay\.design\.manage/,
     );
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 4 — animation actions                                 *
+ * ------------------------------------------------------------------ */
+
+function fdAnim(overrides: Record<string, string> = {}): FormData {
+  const fd = new FormData();
+  fd.set("overlayKey", "07-leaderboard");
+  fd.set("variantId", "default");
+  fd.set("elementId", "title");
+  fd.set("animPhase", "entry");
+  fd.set("enabled", "true");
+  fd.set("animType", "slide-left");
+  fd.set("durationMs", "420");
+  fd.set("delayMs", "60");
+  fd.set("easing", "cubic-bezier(0.16,1,0.3,1)");
+  fd.set("iterationCount", "1");
+  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
+  return fd;
+}
+
+function fdClearAnim(overrides: Record<string, string> = {}): FormData {
+  const fd = new FormData();
+  fd.set("overlayKey", "07-leaderboard");
+  fd.set("variantId", "default");
+  fd.set("elementId", "title");
+  fd.set("animPhase", "entry");
+  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
+  return fd;
+}
+
+describe("setAnimationAction (Wave 2 Stage 4)", () => {
+  it("rejects when actor lacks overlay.design.manage", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new FakePermissionError("missing permission: overlay.design.manage"),
+    );
+    await expect(setAnimationAction(fdAnim())).rejects.toThrow(
+      /Forbidden|overlay\.design\.manage/,
+    );
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown overlayKey", async () => {
+    await expect(
+      setAnimationAction(fdAnim({ overlayKey: "not-a-real-key" })),
+    ).rejects.toThrow();
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid elementId (not kebab-case)", async () => {
+    await expect(
+      setAnimationAction(fdAnim({ elementId: "Bad_Id" })),
+    ).rejects.toThrow();
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid anim_phase enum", async () => {
+    await expect(
+      setAnimationAction(fdAnim({ animPhase: "spinning" })),
+    ).rejects.toThrow();
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown anim_type", async () => {
+    await expect(
+      setAnimationAction(fdAnim({ animType: "explode" })),
+    ).rejects.toThrow();
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects durationMs out of range", async () => {
+    await expect(
+      setAnimationAction(fdAnim({ durationMs: "10000" })),
+    ).rejects.toThrow();
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects delayMs out of range", async () => {
+    await expect(
+      setAnimationAction(fdAnim({ delayMs: "-1" })),
+    ).rejects.toThrow();
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("calls upsertAnimation on the happy path", async () => {
+    await setAnimationAction(fdAnim());
+    expect(upsertAnimationMock).toHaveBeenCalledTimes(1);
+    const call = upsertAnimationMock.mock.calls[0];
+    expect(call[2]).toMatchObject({
+      overlayKey: "07-leaderboard",
+      variantId: "default",
+      elementId: "title",
+      animPhase: "entry",
+      enabled: true,
+      animType: "slide-left",
+      durationMs: 420,
+      delayMs: 60,
+      easing: "cubic-bezier(0.16,1,0.3,1)",
+      iterationCount: "1",
+      customCssKeyframes: null,
+    });
+  });
+
+  it("forwards customCssKeyframes ONLY when animType=custom-css", async () => {
+    await setAnimationAction(
+      fdAnim({
+        animType: "custom-css",
+        customCssKeyframes: "0% { opacity: 0 } 100% { opacity: 1 }",
+      }),
+    );
+    expect(upsertAnimationMock).toHaveBeenCalledTimes(1);
+    expect(upsertAnimationMock.mock.calls[0][2]).toMatchObject({
+      animType: "custom-css",
+      customCssKeyframes: "0% { opacity: 0 } 100% { opacity: 1 }",
+    });
+  });
+
+  it("drops customCssKeyframes for non-custom anim types", async () => {
+    await setAnimationAction(
+      fdAnim({
+        animType: "fade",
+        customCssKeyframes: "0% { opacity: 0 }",
+      }),
+    );
+    expect(upsertAnimationMock.mock.calls[0][2].customCssKeyframes).toBeNull();
+  });
+
+  it("rate-limited request throws rate_limited", async () => {
+    enforceAuthedWriteMock.mockResolvedValueOnce(true);
+    await expect(setAnimationAction(fdAnim())).rejects.toThrow(/rate_limited/);
+    expect(upsertAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates server-module sanitizer rejection", async () => {
+    upsertAnimationMock.mockRejectedValueOnce(
+      new Error("upsertAnimation: keyframes sanitize failed: forbidden CSS construct: url("),
+    );
+    await expect(
+      setAnimationAction(
+        fdAnim({
+          animType: "custom-css",
+          customCssKeyframes: "0% { background: url(http://attacker/x.gif) }",
+        }),
+      ),
+    ).rejects.toThrow(/sanitize failed/);
+  });
+});
+
+describe("clearAnimationAction (Wave 2 Stage 4)", () => {
+  it("rejects when actor lacks overlay.design.manage", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new FakePermissionError("missing permission: overlay.design.manage"),
+    );
+    await expect(clearAnimationAction(fdClearAnim())).rejects.toThrow(
+      /Forbidden|overlay\.design\.manage/,
+    );
+    expect(deleteAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects bad elementId", async () => {
+    await expect(
+      clearAnimationAction(fdClearAnim({ elementId: "Bad" })),
+    ).rejects.toThrow();
+    expect(deleteAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects bad anim_phase", async () => {
+    await expect(
+      clearAnimationAction(fdClearAnim({ animPhase: "spinning" })),
+    ).rejects.toThrow();
+    expect(deleteAnimationMock).not.toHaveBeenCalled();
+  });
+
+  it("calls deleteAnimation on the happy path", async () => {
+    await clearAnimationAction(fdClearAnim());
+    expect(deleteAnimationMock).toHaveBeenCalledTimes(1);
+    const call = deleteAnimationMock.mock.calls[0];
+    // (sb, actor, overlayKey, variantId, elementId, phase)
+    expect(call[2]).toBe("07-leaderboard");
+    expect(call[3]).toBe("default");
+    expect(call[4]).toBe("title");
+    expect(call[5]).toBe("entry");
   });
 });

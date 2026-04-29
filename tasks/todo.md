@@ -715,3 +715,59 @@ Spec: `docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md` §5.2, §6, 
   - `node apps/web/scripts/_check-element-id-parity.mjs` — should reduce warnings.
   - Manual smoke via Claude-in-Chrome: admin upload PNG → enable on `01-brb` → reposition strip → confirm iframe re-renders.
 - [ ] I. Commit + push.
+
+## Wave 2 Stage 3 — review
+
+A parallel agent committed an initial Stage 3 wave at `0e3a6341` that wired the spec but used Supabase JS `.upsert(...)` against partial unique indexes — the upserts threw at runtime ("there is no unique or exclusion constraint matching the ON CONFLICT specification") on both `setStripLayoutAction` and `setLogoOverrideAction`. This follow-on commit makes the wave actually save.
+
+### What changed (this commit)
+
+**Bug fix — partial-unique-index workaround**
+- `setStripLayoutAction` and `setLogoOverrideAction` now SELECT first, then INSERT-or-UPDATE manually rather than calling the server module's `upsertStripLayout` / `setLogoOverride` wrappers. The Stage 1 server modules left untouched; the action layer side-steps the broken upsert path. JSDoc explains why on each action.
+
+**Bug fix — partial-index seed augment**
+- Migration `20260620000009_overlay_text_elements_partners_strip_extra.sql` adds two seed rows (06-h2h-5, 17-penalties partners-strip) that the original Stage 1 seed missed. Uses `ON CONFLICT (cols) WHERE deleted_at IS NULL DO NOTHING` to satisfy the partial unique index.
+
+**Parity-linter robustness**
+- `_check-element-id-parity.mjs` now strips HTML comments + `<style>` blocks + `<script>` blocks (in their actual source order) before scanning for `data-element-id` attrs. This handles the case where a `<script>` string-literal contains the word "<style>" OR a `/* ... */` CSS comment contains "<script>". Prior naive two-pass strip mis-paired those and created false positives. Linter also reads optional augment seed files (currently `20260620000009`) so adding rows without rewriting the original seed migration doesn't break parity.
+
+**Stage 3 e2e**
+- New `apps/web/tests/e2e/overlay-design-partners.spec.ts` — admin reposition partner strip → assert DB row + iframe URL embeds preview tokens; toggle a logo override → assert DB row.
+
+**Page test mocks**
+- Added `resolveAnimations` mock to `apps/web/src/app/(overlay)/overlay/v2/[key]/page.test.ts` so the Stage 4 animations resolver doesn't cascade-fail the SSR token-injection snapshot test.
+
+**Test mocks for new write path**
+- `actions.test.ts` extended with a `from()` query-builder mock so the new SELECT-then-INSERT-or-UPDATE pattern is exercised. Removed obsolete `upsertStripLayoutMock` + `setLogoOverrideMock` since the action layer no longer calls those server-module wrappers.
+
+### Verification gate (final)
+
+- `npx vitest run` — **2084 tests pass** (up from 1996 baseline, +88 across actions, preview, editor, page, animations).
+- `npm run lint` — 0 errors, 17 warnings (all pre-existing).
+- `npm run build` — clean production build.
+- `node apps/web/scripts/_check-element-id-parity.mjs` — exit 0, **130 warnings** (same as baseline; 168 elements seeded vs. 166 prior).
+- Manual via Claude-in-Chrome (localhost:3030):
+  - Logged in admin → `/admin/broadcast/v2/design?overlay=01-brb` → Partners panel renders strip layout panel + roster of 5 seeded logos + uploader widget.
+  - Changed anchor `bottom-center` → `top-right`, scale `100` → `110` → save → DB row INSERTed (`overlay_partner_strip_layout` carries `anchor='top-right'`, `scale_pct=110`).
+  - Reloaded `/overlay/v2/01-brb?demo=1` → iframe URL contains `?partnerTokens=<b64>` with the persisted layout.
+  - Iframe document has `<style id="cade-injected-partners-layout">` with `transform:translateX(-50%) scale(1.1)` and `right:` anchor offset.
+  - 5 `<img>` partner logos rendered as children of `[data-element-id="partners-strip"]`.
+
+### Files changed (delta vs. `0e3a6341`)
+
+- `apps/web/src/app/admin/broadcast/v2/design/actions.ts` — partial-index workaround in setStripLayoutAction + setLogoOverrideAction.
+- `apps/web/src/app/admin/broadcast/v2/design/actions.test.ts` — `from()` mock + new test cases.
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.test.ts` — animation mock.
+- `apps/web/scripts/_check-element-id-parity.mjs` — comment/style/script strip + seed augment loader.
+- `apps/web/scripts/_extend-bootstrap-script.mjs` — partner-token decode + DOM rebuild + layout CSS emit.
+- `apps/web/src/server/overlays/design/preview.ts` — `decodePreviewPartnerTokens` decoder + `PreviewPartnerTokens` type.
+- `apps/web/src/server/overlays/design/preview.test.ts` — 17 new partner decoder tests.
+- `apps/web/src/components/admin/OverlayDesignEditor.tsx` — Partners panel + uploader widget + `buildPartnerPreviewParam` encoder.
+- `apps/web/src/components/admin/OverlayDesignEditor.test.tsx` — 8 new Partners-panel tests.
+- `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx` — `designPartnerTokens` + `previewPartnerTokens` props + URL encode.
+- `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx` — resolves strip + logos, encodes onto iframe URL.
+- `apps/web/src/app/admin/broadcast/v2/design/page.tsx` — passes initial strip layout + logos + overrides to editor.
+- `apps/web/tests/e2e/overlay-design-partners.spec.ts` (new) — e2e for layout reposition + override toggle.
+- `supabase/migrations/20260620000009_overlay_text_elements_partners_strip_extra.sql` (new) — seed augment.
+- 16 × `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` — bootstrap script extended.
+- 16 × `apps/web/public/overlays/v2/<key>/index.html` — synced mirror.

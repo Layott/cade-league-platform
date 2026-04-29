@@ -89,6 +89,13 @@ vi.mock("@/server/overlays/partners/logos", () => ({
   resolvePartnerLogos: resolvePartnerLogosMock,
 }));
 
+// Wave 2 Stage 4 — overlay route also resolves per-element animations.
+// Mock to empty so legacy snapshot tests don't crash.
+const resolveAnimationsMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+vi.mock("@/server/overlays/animations/elements", () => ({
+  resolveAnimations: resolveAnimationsMock,
+}));
+
 import OverlayV2Page from "./page";
 
 beforeEach(() => {
@@ -98,6 +105,7 @@ beforeEach(() => {
   resolveTextElementsMock.mockClear();
   resolveStripLayoutMock.mockReset().mockResolvedValue(null);
   resolvePartnerLogosMock.mockReset().mockResolvedValue([]);
+  resolveAnimationsMock.mockReset().mockResolvedValue({});
 });
 
 /** Render the React tree to a flat string of element tags + props text. */

@@ -26,17 +26,21 @@ import {
   type TextAlignment,
   type TextKind,
 } from "@/server/overlays/text/elements";
-import {
-  upsertStripLayout,
-  type PartnerStripAnchor,
-  type PartnerStripJustification,
-  type PartnerStripOrientation,
+import type {
+  PartnerStripAnchor,
+  PartnerStripJustification,
+  PartnerStripOrientation,
 } from "@/server/overlays/partners/strip";
 import {
   createPartnerLogo,
   deletePartnerLogo,
-  setLogoOverride,
 } from "@/server/overlays/partners/logos";
+import {
+  upsertAnimation,
+  deleteAnimation,
+  type AnimPhase,
+  type AnimType,
+} from "@/server/overlays/animations/elements";
 
 /**
  * Phase 3 — overlay design admin server actions.
@@ -728,6 +732,16 @@ const SetStripLayoutSchema = z.object({
  * the row and applies anchor → top/bottom/left/right computation
  * client-side (see spec §6.2).
  *
+ * NOTE on upsert path: `overlay_partner_strip_layout` has a PARTIAL
+ * unique index (`WHERE deleted_at IS NULL`). Postgres' `INSERT ... ON
+ * CONFLICT (cols) DO UPDATE` requires a non-partial constraint OR an
+ * explicit WHERE on the conflict target — Supabase JS client only
+ * supports the column-list form, which fails inference against partial
+ * indexes ("there is no unique or exclusion constraint matching the
+ * ON CONFLICT specification"). We therefore SELECT first and pick
+ * INSERT-or-UPDATE manually instead of going through the server
+ * module's upsert wrapper.
+ *
  * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.4
  */
 export async function setStripLayoutAction(formData: FormData) {
@@ -753,24 +767,59 @@ export async function setStripLayoutAction(formData: FormData) {
     );
   }
 
-  const { sb, publicUserId, roles } = await gate();
-  await upsertStripLayout(
-    sb,
-    { userId: publicUserId, roles },
-    {
-      overlayKey: parsed.data.overlayKey,
-      variantId: parsed.data.variantId,
-      visible: parsed.data.visible === "true",
-      positionXPx: parsed.data.positionXPx,
-      positionYPx: parsed.data.positionYPx,
-      anchor: parsed.data.anchor as PartnerStripAnchor,
-      orientation: parsed.data.orientation as PartnerStripOrientation,
-      scalePct: parsed.data.scalePct,
-      itemSpacingPx: parsed.data.itemSpacingPx,
-      justification: parsed.data.justification as PartnerStripJustification,
-      zIndex: parsed.data.zIndex,
-    },
-  );
+  const { sb, publicUserId } = await gate();
+
+  // Range checks mirror the server-module validator so we still throw on
+  // bad input even though we're side-stepping the upsert wrapper.
+  if (parsed.data.scalePct < 50 || parsed.data.scalePct > 200) {
+    throw new Error("scalePct out of range (50..200)");
+  }
+  if (parsed.data.itemSpacingPx < 0 || parsed.data.itemSpacingPx > 256) {
+    throw new Error("itemSpacingPx out of range (0..256)");
+  }
+  if (parsed.data.zIndex < 0 || parsed.data.zIndex > 40) {
+    throw new Error("zIndex out of range (0..40)");
+  }
+
+  const nowIso = new Date().toISOString();
+  const row = {
+    overlay_key: parsed.data.overlayKey,
+    variant_id: parsed.data.variantId,
+    visible: parsed.data.visible === "true",
+    position_x_px: parsed.data.positionXPx,
+    position_y_px: parsed.data.positionYPx,
+    anchor: parsed.data.anchor,
+    orientation: parsed.data.orientation,
+    scale_pct: parsed.data.scalePct,
+    item_spacing_px: parsed.data.itemSpacingPx,
+    justification: parsed.data.justification,
+    z_index: parsed.data.zIndex,
+    set_by: publicUserId,
+    updated_at: nowIso,
+    deleted_at: null,
+  };
+
+  // SELECT-then-INSERT-or-UPDATE.
+  const { data: existing } = await sb
+    .from("overlay_partner_strip_layout")
+    .select("id")
+    .eq("overlay_key", parsed.data.overlayKey)
+    .eq("variant_id", parsed.data.variantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await sb
+      .from("overlay_partner_strip_layout")
+      .update(row)
+      .eq("id", (existing as { id: string }).id);
+    if (error) throw new Error(`setStripLayoutAction (update): ${error.message}`);
+  } else {
+    const { error } = await sb
+      .from("overlay_partner_strip_layout")
+      .insert(row);
+    if (error) throw new Error(`setStripLayoutAction (insert): ${error.message}`);
+  }
 
   revalidatePath("/admin/broadcast/v2/design");
   revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
@@ -1049,6 +1098,10 @@ const SetLogoOverrideSchema = z.object({
  * `overlay_partner_logo_overrides`. Toggle visibility + optionally
  * pin a sort position. Empty `sortOverride` field clears the override
  * (sets DB column to NULL via the server module).
+ *
+ * Same partial-unique-index workaround as `setStripLayoutAction`:
+ * SELECT first, then INSERT-or-UPDATE manually because Supabase JS
+ * `.upsert(...)` cannot infer against a partial unique index.
  */
 export async function setLogoOverrideAction(formData: FormData) {
   const raw = {
@@ -1076,17 +1129,212 @@ export async function setLogoOverrideAction(formData: FormData) {
     sortOverride = Math.trunc(n);
   }
 
+  const { sb, publicUserId } = await gate();
+  const nowIso = new Date().toISOString();
+  const row = {
+    overlay_key: parsed.data.overlayKey,
+    variant_id: parsed.data.variantId,
+    partner_key: parsed.data.partnerKey,
+    visible: parsed.data.visible === "true",
+    sort_override: sortOverride,
+    set_by: publicUserId,
+    updated_at: nowIso,
+    deleted_at: null,
+  };
+
+  const { data: existing } = await sb
+    .from("overlay_partner_logo_overrides")
+    .select("id")
+    .eq("overlay_key", parsed.data.overlayKey)
+    .eq("variant_id", parsed.data.variantId)
+    .eq("partner_key", parsed.data.partnerKey)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await sb
+      .from("overlay_partner_logo_overrides")
+      .update(row)
+      .eq("id", (existing as { id: string }).id);
+    if (error) {
+      throw new Error(`setLogoOverrideAction (update): ${error.message}`);
+    }
+  } else {
+    const { error } = await sb
+      .from("overlay_partner_logo_overrides")
+      .insert(row);
+    if (error) {
+      throw new Error(`setLogoOverrideAction (insert): ${error.message}`);
+    }
+  }
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+}
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 4 — element animations                                *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Animation enums mirror the DB CHECK constraints
+ * (`overlay_element_animations.anim_phase`,
+ *  `overlay_element_animations.anim_type`) and the server module's
+ * runtime validator (`animations/elements.ts::validateInput`).
+ */
+const ANIM_PHASE_ENUM = ["entry", "exit", "continuous"] as const satisfies readonly AnimPhase[];
+const ANIM_TYPE_ENUM = [
+  "slide-left",
+  "slide-right",
+  "slide-up",
+  "slide-down",
+  "fade",
+  "scale",
+  "rotate",
+  "bounce",
+  "pulse",
+  "glow",
+  "shake",
+  "flip",
+  "custom-css",
+  "none",
+] as const satisfies readonly AnimType[];
+
+const SetAnimationSchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  elementId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9-]{0,63}$/, {
+      message: "elementId must be kebab-case (a-z, 0-9, -)",
+    }),
+  animPhase: z.enum(
+    ANIM_PHASE_ENUM as readonly string[] as [string, ...string[]],
+  ),
+  enabled: z.enum(["true", "false"]),
+  animType: z.enum(
+    ANIM_TYPE_ENUM as readonly string[] as [string, ...string[]],
+  ),
+  durationMs: z.coerce.number().int().min(50).max(5000),
+  delayMs: z.coerce.number().int().min(0).max(5000),
+  easing: z.string().min(1).max(80),
+  iterationCount: z.string().min(1).max(10),
+  customCssKeyframes: z.string().max(4096).optional(),
+});
+
+/**
+ * Persist an element-animation override. The action upserts a row in
+ * `overlay_element_animations` keyed on (overlay_key, variant_id,
+ * element_id, anim_phase). Stage 1's `upsertAnimation` does the
+ * `validateInput()` pass + the `sanitizeKeyframes` call when
+ * `animType === 'custom-css'`. The action layer's responsibility is
+ * the perm gate, FormData → typed input coercion, and the revalidate
+ * cycle.
+ *
+ * `customCssKeyframes` is dropped entirely when `animType !== 'custom-
+ * css'` — the server module rejects non-null payloads on non-custom
+ * types as a defence-in-depth pass.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.5, §3.4
+ */
+export async function setAnimationAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    elementId: String(formData.get("elementId") ?? ""),
+    animPhase: String(formData.get("animPhase") ?? ""),
+    enabled: String(formData.get("enabled") ?? "true"),
+    animType: String(formData.get("animType") ?? "fade"),
+    durationMs: String(formData.get("durationMs") ?? "360"),
+    delayMs: String(formData.get("delayMs") ?? "0"),
+    easing: String(formData.get("easing") ?? "ease-out"),
+    iterationCount: String(formData.get("iterationCount") ?? "1"),
+    customCssKeyframes:
+      (formData.get("customCssKeyframes") as string | null) ?? undefined,
+  };
+  const parsed = SetAnimationSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid animation payload: ${parsed.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ")}`,
+    );
+  }
+
   const { sb, publicUserId, roles } = await gate();
-  await setLogoOverride(
+  const customKeyframes =
+    parsed.data.animType === "custom-css"
+      ? parsed.data.customCssKeyframes ?? null
+      : null;
+
+  await upsertAnimation(
     sb,
     { userId: publicUserId, roles },
     {
       overlayKey: parsed.data.overlayKey,
       variantId: parsed.data.variantId,
-      partnerKey: parsed.data.partnerKey,
-      visible: parsed.data.visible === "true",
-      sortOverride,
+      elementId: parsed.data.elementId,
+      animPhase: parsed.data.animPhase as AnimPhase,
+      enabled: parsed.data.enabled === "true",
+      animType: parsed.data.animType as AnimType,
+      durationMs: parsed.data.durationMs,
+      delayMs: parsed.data.delayMs,
+      easing: parsed.data.easing,
+      iterationCount: parsed.data.iterationCount,
+      customCssKeyframes: customKeyframes,
     },
+  );
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+}
+
+const ClearAnimationSchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  elementId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9-]{0,63}$/),
+  animPhase: z.enum(
+    ANIM_PHASE_ENUM as readonly string[] as [string, ...string[]],
+  ),
+});
+
+/**
+ * Soft-delete an element-animation row for (element_id, anim_phase).
+ * Sets `deleted_at` so the resolver skips it; subsequent
+ * `setAnimationAction` calls on the same row re-create / re-enable.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.5, §3.4
+ */
+export async function clearAnimationAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    elementId: String(formData.get("elementId") ?? ""),
+    animPhase: String(formData.get("animPhase") ?? ""),
+  };
+  const parsed = ClearAnimationSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid clear animation payload: ${parsed.error.issues
+        .map((i) => i.message)
+        .join("; ")}`,
+    );
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  await deleteAnimation(
+    sb,
+    { userId: publicUserId, roles },
+    parsed.data.overlayKey,
+    parsed.data.variantId,
+    parsed.data.elementId,
+    parsed.data.animPhase as AnimPhase,
   );
 
   revalidatePath("/admin/broadcast/v2/design");

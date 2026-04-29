@@ -374,3 +374,142 @@ export async function decodePreviewPartnerTokens(
   if (!result.success) return null;
   return result.data;
 }
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 4 — animation preview decoder                         *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Animation-phase enum mirrors `AnimPhase` from the server module
+ * (`apps/web/src/server/overlays/animations/elements.ts`).
+ */
+const ANIM_PHASE_VALUES = ["entry", "exit", "continuous"] as const;
+const ANIM_TYPE_VALUES = [
+  "slide-left",
+  "slide-right",
+  "slide-up",
+  "slide-down",
+  "fade",
+  "scale",
+  "rotate",
+  "bounce",
+  "pulse",
+  "glow",
+  "shake",
+  "flip",
+  "custom-css",
+  "none",
+] as const;
+
+/**
+ * Easing-allowlist mirrors `_shared/css-validator.ts::isValidEasing`.
+ * Includes the standard CSS keywords + cubic-bezier patterns used
+ * across brand presets.
+ */
+const EASING_RE =
+  /^(linear|ease|ease-in|ease-out|ease-in-out|step-start|step-end|cubic-bezier\(\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*\))$/;
+
+/**
+ * Per-phase override schema. Mirrors `ResolvedAnimation` shape from the
+ * server module but admits the optional `customCssKeyframes` field for
+ * the `custom-css` animType.
+ *
+ * `customCssKeyframes` here is the SAME body sanitizer used by the
+ * server-side `setAnimationAction`. The preview path is the
+ * defence-in-depth pass — even if an admin bypasses the server action
+ * (e.g. by hand-crafting a URL), the live-preview iframe still rejects
+ * unsafe payloads.
+ */
+const AnimPhaseSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    animType: z.enum(
+      ANIM_TYPE_VALUES as readonly string[] as [string, ...string[]],
+    ),
+    durationMs: z.number().int().min(50).max(5000),
+    delayMs: z.number().int().min(0).max(5000),
+    easing: z
+      .string()
+      .max(80)
+      .refine((v) => EASING_RE.test(v), { message: "easing not in allowlist" }),
+    iterationCount: z
+      .string()
+      .max(10)
+      .refine((v) => v === "infinite" || /^\d{1,3}$/.test(v), {
+        message: "iterationCount must be 'infinite' or 1..3 digit integer",
+      }),
+    customCssKeyframes: z
+      .string()
+      .max(4096)
+      .refine((v) => !/[<>`]/.test(v), {
+        message: "customCssKeyframes contains forbidden character",
+      })
+      .refine((v) => !/\burl\s*\(/i.test(v), {
+        message: "url() not allowed in custom keyframes",
+      })
+      .refine((v) => !/@(import|font-face|charset|media|supports|keyframes)\b/i.test(v), {
+        message: "@-rules not allowed in custom keyframes",
+      })
+      .nullable()
+      .optional(),
+  })
+  .strict();
+
+const PreviewAnimEntrySchema = z
+  .object({
+    entry: AnimPhaseSchema.optional(),
+    exit: AnimPhaseSchema.optional(),
+    continuous: AnimPhaseSchema.optional(),
+  })
+  .strict();
+
+const PreviewAnimTokensSchema = z
+  .record(
+    z.string().regex(ELEMENT_ID_RE, "element_id must be kebab-case"),
+    PreviewAnimEntrySchema,
+  )
+  .refine((obj) => Object.keys(obj).length <= 64, {
+    message: "too many preview anim tokens (>64)",
+  });
+
+export type PreviewAnimTokens = z.infer<typeof PreviewAnimTokensSchema>;
+
+/**
+ * Decode `?previewAnimTokens=<base64>` into a typed
+ * `Record<elementId, { entry?, exit?, continuous? }>` map. Returns null
+ * on any failure (missing param, malformed b64/JSON, schema mismatch,
+ * easing not in allowlist, custom-css contains url() or `<` etc).
+ *
+ * Live-preview path only — persisted animations land via
+ * `setAnimationAction` which uses the server-side `sanitizeKeyframes`.
+ * This decoder is the defence-in-depth pass for URL-borne previews.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.5, §10.3, §10.5
+ */
+export async function decodePreviewAnimTokens(
+  raw: string | undefined | null,
+): Promise<PreviewAnimTokens | null> {
+  if (!raw) return null;
+  let json: string;
+  try {
+    const padded = raw.replaceAll("-", "+").replaceAll("_", "/");
+    const padLen = padded.length % 4 === 0 ? 0 : 4 - (padded.length % 4);
+    const fullPadded = padded + "=".repeat(padLen);
+    json = Buffer.from(fullPadded, "base64").toString("utf-8");
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  const result = PreviewAnimTokensSchema.safeParse(parsed);
+  if (!result.success) return null;
+  return result.data;
+}
+
+export { ANIM_PHASE_VALUES, ANIM_TYPE_VALUES };

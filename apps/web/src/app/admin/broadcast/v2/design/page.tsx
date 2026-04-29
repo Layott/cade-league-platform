@@ -11,6 +11,7 @@ import OverlayDesignEditor, {
   type PartnerStripLayoutRow,
   type PartnerLogoRow,
   type PartnerLogoOverrideRow,
+  type AnimationRow,
 } from "@/components/admin/OverlayDesignEditor";
 import { resolveTokens } from "@/server/overlays/design/tokens";
 import { listTemplates } from "@/server/overlays/design/templates";
@@ -21,6 +22,7 @@ import {
   listPartnerLogos,
   getOverrides,
 } from "@/server/overlays/partners/logos";
+import { listAnimations } from "@/server/overlays/animations/elements";
 import {
   OVERLAY_KEYS,
   TOKEN_CATALOG,
@@ -187,6 +189,34 @@ export default async function OverlayDesignPage({
     sortOverride: o.sortOverride,
   }));
 
+  // Wave 2 Stage 4 — animatable elements + initial animation rows for
+  // the new Animations panel. The element list is the union of:
+  //   - text-element seed rows (every text element registered for this
+  //     overlay+variant — even ones with no overrides yet);
+  //   - partners-strip (the partner-strip container always animates as
+  //     a single unit);
+  //   - bg-image (when supported by the overlay).
+  // The Animations panel filters the list further if needed but seeds
+  // disabled rows for every (element_id, phase) so the toggle UI is
+  // always reachable.
+  const animatableElements = [
+    ...textElements.map((t) => ({ elementId: t.elementId, kind: t.kind })),
+    { elementId: "partners-strip", kind: "layout" },
+  ];
+  const animationRows: AnimationRow[] = (
+    await listAnimations(sb, selectedOverlay, selectedVariantId).catch(() => [])
+  ).map((a) => ({
+    elementId: a.elementId,
+    animPhase: a.animPhase,
+    enabled: a.enabled,
+    animType: a.animType,
+    durationMs: a.durationMs,
+    delayMs: a.delayMs,
+    easing: a.easing,
+    iterationCount: a.iterationCount,
+    customCssKeyframes: a.customCssKeyframes,
+  }));
+
   const catalog: CatalogEntry[] = TOKEN_CATALOG.map((c) => ({
     tokenKey: c.tokenKey,
     tokenType: c.tokenType,
@@ -268,6 +298,8 @@ export default async function OverlayDesignPage({
         initialStripLayout={stripLayout}
         initialPartnerLogos={partnerLogos}
         initialLogoOverrides={logoOverrides}
+        animatableElements={animatableElements}
+        initialAnimations={animationRows}
       />
 
       <section className="space-y-3">

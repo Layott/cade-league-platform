@@ -11,9 +11,11 @@ import {
   decodePreviewTokens,
   decodePreviewTextTokens,
   decodePreviewPartnerTokens,
+  decodePreviewAnimTokens,
   escapeCssValue,
   type PreviewTextTokens,
   type PreviewPartnerTokens,
+  type PreviewAnimTokens,
 } from "@/server/overlays/design/preview";
 import { resolveTextElements, type ResolvedTextElement } from "@/server/overlays/text/elements";
 import {
@@ -24,6 +26,11 @@ import {
   resolvePartnerLogos,
   type PartnerLogo,
 } from "@/server/overlays/partners/logos";
+import {
+  resolveAnimations,
+  type AnimPhase,
+  type ResolvedAnimation,
+} from "@/server/overlays/animations/elements";
 
 /**
  * Resolve the active season for a given broadcast session via
@@ -135,6 +142,7 @@ type SearchParams = {
   previewTokens?: string;
   previewTextTokens?: string;
   previewPartnerTokens?: string;
+  previewAnimTokens?: string;
 };
 
 /**
@@ -171,6 +179,7 @@ export default async function OverlayV2Page({
     previewTokens: previewTokensRaw,
     previewTextTokens: previewTextTokensRaw,
     previewPartnerTokens: previewPartnerTokensRaw,
+    previewAnimTokens: previewAnimTokensRaw,
   } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) {
     const alias = KEY_ALIASES[key];
@@ -194,6 +203,11 @@ export default async function OverlayV2Page({
   // (backward-compat invariant #1).
   let partnerStrip: PartnerStripLayout | null = null;
   let partnerLogos: PartnerLogo[] = [];
+  // Wave 2 Stage 4 — element animations.
+  // Resolver returns `Record<elementId, { entry?, exit?, continuous? }>`.
+  // Empty map preserves hard-coded HTML defaults (backward-compat
+  // invariant #1).
+  let designAnimTokens: Record<string, Partial<Record<AnimPhase, ResolvedAnimation>>> = {};
   try {
     const sbDesign = getServiceRoleSupabase();
     const variantRow = variant
@@ -208,6 +222,7 @@ export default async function OverlayV2Page({
     designTextTokens = await resolveTextElements(sbDesign, key, activeVariantId);
     partnerStrip = await resolveStripLayout(sbDesign, key, activeVariantId);
     partnerLogos = await resolvePartnerLogos(sbDesign, key, activeVariantId);
+    designAnimTokens = await resolveAnimations(sbDesign, key, activeVariantId);
   } catch {
     // Token resolution failure must not break the overlay route. Fall
     // back to the canonical HTML defaults.
@@ -215,6 +230,7 @@ export default async function OverlayV2Page({
     designTextTokens = {};
     partnerStrip = null;
     partnerLogos = [];
+    designAnimTokens = {};
   }
   const previewTokens = await decodePreviewTokens(previewTokensRaw);
   const previewTextTokens: PreviewTextTokens | null = await decodePreviewTextTokens(
@@ -222,6 +238,8 @@ export default async function OverlayV2Page({
   );
   const previewPartnerTokens: PreviewPartnerTokens | null =
     await decodePreviewPartnerTokens(previewPartnerTokensRaw);
+  const previewAnimTokens: PreviewAnimTokens | null =
+    await decodePreviewAnimTokens(previewAnimTokensRaw);
 
   // Build the merged partner token map for the iframe bootstrap. Only
   // surface the param when the admin has actually persisted layout /
@@ -253,6 +271,42 @@ export default async function OverlayV2Page({
           })),
         }
       : undefined;
+  // Wave 2 Stage 4 — animations wire-shape mirrors the
+  // `PreviewAnimTokens` shape consumed by `decodePreviewAnimTokens`.
+  // Each phase carries the resolved animation parameters; the bootstrap
+  // builds `<style>@keyframes anim-<id>-<phase> {...}</style>` + an
+  // animation rule scoped to `body.cade-visible` (entry/continuous) or
+  // `body.cade-exiting` (exit). Empty wire-shape skips the URL param.
+  const designAnimWire = Object.keys(designAnimTokens).length > 0
+    ? Object.fromEntries(
+        Object.entries(designAnimTokens).map(([elementId, phases]) => [
+          elementId,
+          Object.fromEntries(
+            Object.entries(phases).map(([phase, anim]) => [
+              phase,
+              {
+                enabled: true,
+                animType: anim.animType,
+                durationMs: anim.durationMs,
+                delayMs: anim.delayMs,
+                easing: anim.easing,
+                iterationCount: anim.iterationCount,
+                // `keyframesCss` is the full `@keyframes name{body}`
+                // wrapper from the resolver. The bootstrap re-builds
+                // its own keyframes from `animType` + only uses
+                // `customCssKeyframes` when type is `custom-css`. We
+                // pass the body for completeness even though preset
+                // types regenerate client-side.
+                customCssKeyframes:
+                  anim.animType === "custom-css"
+                    ? anim.keyframesCss.replace(/^@keyframes\s+\S+\s*\{/, "").replace(/\}\s*$/, "")
+                    : null,
+              },
+            ]),
+          ),
+        ]),
+      )
+    : undefined;
   const cssVarRule = buildCssVarRule(designTokens);
   const previewVarRule = previewTokens ? buildCssVarRule(previewTokens) : null;
 
@@ -379,6 +433,8 @@ export default async function OverlayV2Page({
         previewTextTokens={previewTextTokens ?? undefined}
         designPartnerTokens={designPartnerTokens}
         previewPartnerTokens={previewPartnerTokens ?? undefined}
+        designAnimTokens={designAnimWire}
+        previewAnimTokens={previewAnimTokens ?? undefined}
       />
     </>
   );

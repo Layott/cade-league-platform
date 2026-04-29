@@ -10,6 +10,7 @@ import OverlayDesignEditor, {
   type PartnerLogoRow,
   type PartnerStripLayoutRow,
   type TextElementRow,
+  type AnimationRow,
 } from "./OverlayDesignEditor";
 
 /**
@@ -55,6 +56,13 @@ const setLogoOverrideMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined),
 );
 
+const setAnimationMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const clearAnimationMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+
 vi.mock("@/app/admin/broadcast/v2/design/actions", () => ({
   saveTokensAction: saveTokensMock,
   uploadOverlayBgAction: uploadOverlayBgMock,
@@ -64,6 +72,8 @@ vi.mock("@/app/admin/broadcast/v2/design/actions", () => ({
   uploadPartnerLogoAction: uploadPartnerLogoMock,
   removePartnerLogoAction: removePartnerLogoMock,
   setLogoOverrideAction: setLogoOverrideMock,
+  setAnimationAction: setAnimationMock,
+  clearAnimationAction: clearAnimationMock,
 }));
 
 const CATALOG: CatalogEntry[] = [
@@ -102,6 +112,8 @@ beforeEach(() => {
   uploadPartnerLogoMock.mockClear();
   removePartnerLogoMock.mockClear();
   setLogoOverrideMock.mockClear();
+  setAnimationMock.mockClear();
+  clearAnimationMock.mockClear();
 });
 
 afterEach(() => cleanup());
@@ -451,5 +463,212 @@ describe("OverlayDesignEditor — Partners panel (Wave 2 Stage 3)", () => {
     expect(screen.getByTestId("partner-uploader-error").textContent).toMatch(
       /required/i,
     );
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 4 — Animations panel                                  *
+ * ------------------------------------------------------------------ */
+
+const ELEMENTS_FIXTURE = [
+  { elementId: "title", kind: "title" },
+  { elementId: "subtitle", kind: "subtitle" },
+];
+
+const SAMPLE_ANIMATION: AnimationRow = {
+  elementId: "title",
+  animPhase: "entry",
+  enabled: true,
+  animType: "slide-left",
+  durationMs: 420,
+  delayMs: 60,
+  easing: "ease-out",
+  iterationCount: "1",
+  customCssKeyframes: null,
+};
+
+describe("OverlayDesignEditor — Animations panel (Wave 2 Stage 4)", () => {
+  it("renders the Animations panel when animatableElements are supplied", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    expect(screen.getByTestId("overlay-design-animations-panel")).toBeTruthy();
+    expect(screen.getByTestId("anim-element-title")).toBeTruthy();
+    expect(screen.getByTestId("anim-element-subtitle")).toBeTruthy();
+  });
+
+  it("shows a placeholder when no animatable elements are registered", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={[]}
+        initialAnimations={[]}
+      />,
+    );
+    const panel = screen.getByTestId("overlay-design-animations-panel");
+    expect(panel.textContent).toMatch(/No animatable elements/i);
+  });
+
+  it("renders three phase tabs per element (entry, exit, continuous)", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    expect(screen.getByTestId("anim-phase-title-entry")).toBeTruthy();
+    expect(screen.getByTestId("anim-phase-title-exit")).toBeTruthy();
+    expect(screen.getByTestId("anim-phase-title-continuous")).toBeTruthy();
+  });
+
+  it("clicking phase tab switches the editor inputs", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    // Default phase = entry, find entry duration input.
+    expect(screen.getByTestId("anim-title-entry-duration")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("anim-phase-title-continuous"));
+    expect(screen.getByTestId("anim-title-continuous-duration")).toBeTruthy();
+  });
+
+  it("changing animType updates the selected phase row", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    const typeSelect = screen.getByTestId(
+      "anim-title-entry-type",
+    ) as HTMLSelectElement;
+    fireEvent.change(typeSelect, { target: { value: "slide-left" } });
+    expect(typeSelect.value).toBe("slide-left");
+  });
+
+  it("custom-css textarea appears only when animType=custom-css", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    expect(
+      screen.queryByTestId("anim-title-entry-keyframes"),
+    ).toBeNull();
+    const typeSelect = screen.getByTestId(
+      "anim-title-entry-type",
+    ) as HTMLSelectElement;
+    fireEvent.change(typeSelect, { target: { value: "custom-css" } });
+    expect(screen.getByTestId("anim-title-entry-keyframes")).toBeTruthy();
+  });
+
+  it("Save calls setAnimationAction with full FormData", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[SAMPLE_ANIMATION]}
+      />,
+    );
+    const row = screen.getByTestId("anim-element-title");
+    const saveBtn = Array.from(row.querySelectorAll("button")).find(
+      (b) => b.textContent === "Save",
+    ) as HTMLButtonElement;
+    fireEvent.click(saveBtn);
+    expect(setAnimationMock).toHaveBeenCalledTimes(1);
+    const fd = setAnimationMock.mock.calls[0][0] as FormData;
+    expect(fd.get("overlayKey")).toBe("01-brb");
+    expect(fd.get("elementId")).toBe("title");
+    expect(fd.get("animPhase")).toBe("entry");
+    expect(fd.get("animType")).toBe("slide-left");
+    expect(fd.get("enabled")).toBe("true");
+  });
+
+  it("Reset calls clearAnimationAction", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[SAMPLE_ANIMATION]}
+      />,
+    );
+    const row = screen.getByTestId("anim-element-title");
+    const resetBtn = Array.from(row.querySelectorAll("button")).find(
+      (b) => b.textContent === "Reset",
+    ) as HTMLButtonElement;
+    fireEvent.click(resetBtn);
+    expect(clearAnimationMock).toHaveBeenCalledTimes(1);
+    const fd = clearAnimationMock.mock.calls[0][0] as FormData;
+    expect(fd.get("elementId")).toBe("title");
+    expect(fd.get("animPhase")).toBe("entry");
+  });
+
+  it("seeds rows for elements with no DB animation yet", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    // Subtitle has no DB row, panel should still expose its tabs.
+    expect(screen.getByTestId("anim-phase-subtitle-entry")).toBeTruthy();
+    expect(screen.getByTestId("anim-subtitle-entry-type")).toBeTruthy();
   });
 });

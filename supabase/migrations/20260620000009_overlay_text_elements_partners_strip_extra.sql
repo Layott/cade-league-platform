@@ -47,5 +47,5 @@ begin
   values
     ('06-h2h-5',     'default', 'partners-strip', 'seed', 'layout', '', v_set_by),
     ('17-penalties', 'default', 'partners-strip', 'seed', 'layout', '', v_set_by)
-  on conflict (overlay_key, variant_id, element_id) do nothing;
+  on conflict (overlay_key, variant_id, element_id) where deleted_at is null do nothing;
 end$$;

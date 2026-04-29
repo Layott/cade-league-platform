@@ -17,6 +17,8 @@ import {
   uploadPartnerLogoAction,
   removePartnerLogoAction,
   setLogoOverrideAction,
+  setAnimationAction,
+  clearAnimationAction,
 } from "@/app/admin/broadcast/v2/design/actions";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import { supportsBgImage } from "@/server/overlays/design/defaults";
@@ -122,6 +124,104 @@ export type PartnerLogoOverrideRow = {
   sortOverride: number | null;
 };
 
+/**
+ * Wave 2 Stage 4 — animation phase + type enums. Mirror the values in
+ * `apps/web/src/server/overlays/animations/elements.ts` (AnimPhase,
+ * AnimType) so wire shapes stay in lockstep.
+ */
+export type AnimPhase = "entry" | "exit" | "continuous";
+export type AnimType =
+  | "slide-left"
+  | "slide-right"
+  | "slide-up"
+  | "slide-down"
+  | "fade"
+  | "scale"
+  | "rotate"
+  | "bounce"
+  | "pulse"
+  | "glow"
+  | "shake"
+  | "flip"
+  | "custom-css"
+  | "none";
+
+/**
+ * Per-element animation row delivered to the editor. One row per
+ * (element_id, anim_phase). Map-based parent state keys these by
+ * `${elementId}::${phase}` so no two rows ever collide.
+ */
+export type AnimationRow = {
+  elementId: string;
+  animPhase: AnimPhase;
+  enabled: boolean;
+  animType: AnimType;
+  durationMs: number;
+  delayMs: number;
+  easing: string;
+  iterationCount: string;
+  customCssKeyframes: string | null;
+};
+
+const ANIM_TYPES: ReadonlyArray<AnimType> = [
+  "slide-left",
+  "slide-right",
+  "slide-up",
+  "slide-down",
+  "fade",
+  "scale",
+  "rotate",
+  "bounce",
+  "pulse",
+  "glow",
+  "shake",
+  "flip",
+  "custom-css",
+  "none",
+];
+
+const EASING_PRESETS = [
+  "linear",
+  "ease",
+  "ease-in",
+  "ease-out",
+  "ease-in-out",
+  "cubic-bezier(0.16,1,0.3,1)",
+  "cubic-bezier(0.34,1.56,0.64,1)",
+];
+
+const ANIM_PHASES: ReadonlyArray<AnimPhase> = ["entry", "exit", "continuous"];
+
+const PHASE_DEFAULTS: Record<AnimPhase, Omit<AnimationRow, "elementId" | "animPhase">> = {
+  entry: {
+    enabled: false,
+    animType: "fade",
+    durationMs: 360,
+    delayMs: 0,
+    easing: "ease-out",
+    iterationCount: "1",
+    customCssKeyframes: null,
+  },
+  exit: {
+    enabled: false,
+    animType: "fade",
+    durationMs: 360,
+    delayMs: 0,
+    easing: "ease-in",
+    iterationCount: "1",
+    customCssKeyframes: null,
+  },
+  continuous: {
+    enabled: false,
+    animType: "pulse",
+    durationMs: 1200,
+    delayMs: 0,
+    easing: "ease-in-out",
+    iterationCount: "infinite",
+    customCssKeyframes: null,
+  },
+};
+
 export type EditorProps = {
   overlayKey: string;
   variantId: string;
@@ -146,6 +246,26 @@ export type EditorProps = {
   initialPartnerLogos?: ReadonlyArray<PartnerLogoRow>;
   /** Wave 2 Stage 3 — per-overlay logo overrides. */
   initialLogoOverrides?: ReadonlyArray<PartnerLogoOverrideRow>;
+  /**
+   * Wave 2 Stage 4 — registered animatable element IDs for this
+   * overlay+variant. Drives the Animations panel's element picker. The
+   * page server component derives this from the union of:
+   *   - text-element seed rows (from `initialTextElements`)
+   *   - the partner-strip element id ("partners-strip")
+   *   - any other animatable IDs declared in the static HTML for this
+   *     overlay (bg-image, score-bug numbers, etc.)
+   * Empty list collapses the panel to a "no animatable elements"
+   * placeholder.
+   */
+  animatableElements?: ReadonlyArray<{ elementId: string; kind?: string }>;
+  /**
+   * Wave 2 Stage 4 — initial animation rows (DB-resolved). One row per
+   * (element_id, anim_phase). Empty list when no admin overrides exist
+   * yet. Editor seeds blank disabled rows for the Animation panel's
+   * element picker so it can offer add-an-animation flows for elements
+   * with no rows yet.
+   */
+  initialAnimations?: ReadonlyArray<AnimationRow>;
 };
 
 const DEFAULT_STRIP_LAYOUT: PartnerStripLayoutRow = {
@@ -255,6 +375,51 @@ type PartnerPreviewTokens = {
   }>;
 };
 
+/**
+ * Wave 2 Stage 4 — encode the animations map for the iframe URL. Skips
+ * disabled rows and `animType === 'none'` — yields the same shape the
+ * SSR resolver emits so the bootstrap reads identical wire from either
+ * channel.
+ */
+function buildAnimationsPreviewParam(
+  rows: ReadonlyArray<AnimationRow>,
+): string {
+  type WireEntry = {
+    enabled: boolean;
+    animType: AnimType;
+    durationMs: number;
+    delayMs: number;
+    easing: string;
+    iterationCount: string;
+    customCssKeyframes?: string | null;
+  };
+  const map: Record<string, Partial<Record<AnimPhase, WireEntry>>> = {};
+  for (const r of rows) {
+    if (!r.enabled || r.animType === "none") continue;
+    if (!map[r.elementId]) map[r.elementId] = {};
+    map[r.elementId][r.animPhase] = {
+      enabled: true,
+      animType: r.animType,
+      durationMs: r.durationMs,
+      delayMs: r.delayMs,
+      easing: r.easing,
+      iterationCount: r.iterationCount,
+      customCssKeyframes:
+        r.animType === "custom-css" ? r.customCssKeyframes : null,
+    };
+  }
+  if (Object.keys(map).length === 0) return "";
+  try {
+    const json = JSON.stringify(map);
+    if (typeof btoa === "function") {
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 function buildPartnerPreviewParam(
   layout: PartnerStripLayoutRow | null,
   logos: ReadonlyArray<PartnerLogoRow>,
@@ -299,6 +464,46 @@ function buildPartnerPreviewParam(
   }
 }
 
+/**
+ * Wave 2 Stage 4 — seed an animation row map from initial DB rows +
+ * registered animatable element IDs. Every (elementId, phase) pair
+ * gets a row even when no DB row exists yet so the UI can offer
+ * "enable this phase" toggles without first loading from server.
+ */
+function seedAnimationRows(
+  registered: ReadonlyArray<{ elementId: string; kind?: string }>,
+  initial: ReadonlyArray<AnimationRow>,
+): AnimationRow[] {
+  const byKey = new Map<string, AnimationRow>();
+  for (const r of initial) {
+    byKey.set(`${r.elementId}::${r.animPhase}`, r);
+  }
+  const rows: AnimationRow[] = [];
+  for (const e of registered) {
+    for (const phase of ANIM_PHASES) {
+      const key = `${e.elementId}::${phase}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        rows.push(existing);
+      } else {
+        rows.push({
+          elementId: e.elementId,
+          animPhase: phase,
+          ...PHASE_DEFAULTS[phase],
+        });
+      }
+    }
+  }
+  // Append any rows from `initial` whose elementId is NOT in the
+  // registered list (orphan rows from a renamed element). Surfacing
+  // them lets admins clean up stale state.
+  for (const r of initial) {
+    const isRegistered = registered.some((e) => e.elementId === r.elementId);
+    if (!isRegistered) rows.push(r);
+  }
+  return rows;
+}
+
 export default function OverlayDesignEditor({
   overlayKey,
   variantId,
@@ -310,6 +515,8 @@ export default function OverlayDesignEditor({
   initialStripLayout,
   initialPartnerLogos,
   initialLogoOverrides,
+  animatableElements,
+  initialAnimations,
 }: EditorProps) {
   const [tokens, setTokens] = useState<Record<string, string>>(initialTokens);
   const [previewParam, setPreviewParam] = useState<string>(
@@ -337,6 +544,12 @@ export default function OverlayDesignEditor({
       initialLogoOverrides ?? [],
     ),
   );
+  const [animationRows, setAnimationRows] = useState<AnimationRow[]>(
+    seedAnimationRows(animatableElements ?? [], initialAnimations ?? []),
+  );
+  const [previewAnimParam, setPreviewAnimParam] = useState<string>(
+    buildAnimationsPreviewParam(initialAnimations ?? []),
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -345,6 +558,7 @@ export default function OverlayDesignEditor({
   const partnerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const animDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset state when overlay/variant context changes.
   useEffect(() => {
@@ -362,6 +576,10 @@ export default function OverlayDesignEditor({
         initialLogoOverrides ?? [],
       ),
     );
+    setAnimationRows(
+      seedAnimationRows(animatableElements ?? [], initialAnimations ?? []),
+    );
+    setPreviewAnimParam(buildAnimationsPreviewParam(initialAnimations ?? []));
     setSuccess(false);
     setError(null);
   }, [
@@ -372,6 +590,8 @@ export default function OverlayDesignEditor({
     initialStripLayout,
     initialPartnerLogos,
     initialLogoOverrides,
+    animatableElements,
+    initialAnimations,
   ]);
 
   const update = useCallback(
@@ -664,6 +884,94 @@ export default function OverlayDesignEditor({
     [logoOverrides, logos, stripLayout, overlayKey, variantId],
   );
 
+  /* ---------------- Wave 2 Stage 4 — animation edits ---------------- */
+
+  const updateAnimationRow = useCallback(
+    (elementId: string, phase: AnimPhase, patch: Partial<AnimationRow>) => {
+      setAnimationRows((prev) => {
+        const next = prev.map((r) =>
+          r.elementId === elementId && r.animPhase === phase
+            ? { ...r, ...patch }
+            : r,
+        );
+        if (animDebounceRef.current) clearTimeout(animDebounceRef.current);
+        animDebounceRef.current = setTimeout(() => {
+          setPreviewAnimParam(buildAnimationsPreviewParam(next));
+        }, 250);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const saveAnimationRow = useCallback(
+    (elementId: string, phase: AnimPhase) => {
+      setError(null);
+      setSuccess(false);
+      const row = animationRows.find(
+        (r) => r.elementId === elementId && r.animPhase === phase,
+      );
+      if (!row) return;
+      startTransition(async () => {
+        try {
+          const fd = new FormData();
+          fd.set("overlayKey", overlayKey);
+          fd.set("variantId", variantId);
+          fd.set("elementId", row.elementId);
+          fd.set("animPhase", row.animPhase);
+          fd.set("enabled", row.enabled ? "true" : "false");
+          fd.set("animType", row.animType);
+          fd.set("durationMs", String(row.durationMs));
+          fd.set("delayMs", String(row.delayMs));
+          fd.set("easing", row.easing);
+          fd.set("iterationCount", row.iterationCount);
+          if (row.animType === "custom-css" && row.customCssKeyframes) {
+            fd.set("customCssKeyframes", row.customCssKeyframes);
+          }
+          await setAnimationAction(fd);
+          setSuccess(true);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "save failed");
+        }
+      });
+    },
+    [animationRows, overlayKey, variantId],
+  );
+
+  const resetAnimationRow = useCallback(
+    (elementId: string, phase: AnimPhase) => {
+      setError(null);
+      setSuccess(false);
+      startTransition(async () => {
+        try {
+          const fd = new FormData();
+          fd.set("overlayKey", overlayKey);
+          fd.set("variantId", variantId);
+          fd.set("elementId", elementId);
+          fd.set("animPhase", phase);
+          await clearAnimationAction(fd);
+          setAnimationRows((prev) => {
+            const next = prev.map((r) =>
+              r.elementId === elementId && r.animPhase === phase
+                ? {
+                    elementId,
+                    animPhase: phase,
+                    ...PHASE_DEFAULTS[phase],
+                  }
+                : r,
+            );
+            setPreviewAnimParam(buildAnimationsPreviewParam(next));
+            return next;
+          });
+          setSuccess(true);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "reset failed");
+        }
+      });
+    },
+    [overlayKey, variantId],
+  );
+
   const previewSrc = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("demo", "1");
@@ -677,6 +985,10 @@ export default function OverlayDesignEditor({
     if (previewPartnerParam) {
       qs.set("previewPartnerTokens", previewPartnerParam);
     }
+    // Wave 2 Stage 4 — animation preview overrides.
+    if (previewAnimParam) {
+      qs.set("previewAnimTokens", previewAnimParam);
+    }
     return `/overlay/v2/${overlayKey}?${qs.toString()}`;
   }, [
     overlayKey,
@@ -684,6 +996,7 @@ export default function OverlayDesignEditor({
     previewParam,
     previewTextParam,
     previewPartnerParam,
+    previewAnimParam,
   ]);
 
   // Filter the catalog — image-typed tokens only render on overlays
@@ -749,6 +1062,14 @@ export default function OverlayDesignEditor({
           }}
           onRemoveLogo={removeLogo}
           onSetOverride={setOverride}
+        />
+
+        <AnimationsPanel
+          rows={animationRows}
+          pending={pending}
+          onUpdate={updateAnimationRow}
+          onSave={saveAnimationRow}
+          onReset={resetAnimationRow}
         />
 
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
@@ -2004,6 +2325,322 @@ function PartnerLogoUploader({
             {uploadError}
           </span>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 4 — Animations panel                                  *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Per-element animation editor. Renders one collapsed-by-default
+ * <details> per element_id; expanded state shows three phase tabs
+ * (Entry / Exit / Continuous) with type / duration / delay / easing /
+ * iterations / enabled / customCssKeyframes (when type='custom-css').
+ *
+ * Save persists a single (element_id, anim_phase) row via
+ * `setAnimationAction`. Reset soft-deletes the row via
+ * `clearAnimationAction` and resets local state to phase defaults.
+ *
+ * Live preview re-renders via `?previewAnimTokens=` (debounced 250 ms
+ * in the parent's `updateAnimationRow`).
+ */
+function AnimationsPanel({
+  rows,
+  pending,
+  onUpdate,
+  onSave,
+  onReset,
+}: {
+  rows: ReadonlyArray<AnimationRow>;
+  pending: boolean;
+  onUpdate: (
+    elementId: string,
+    phase: AnimPhase,
+    patch: Partial<AnimationRow>,
+  ) => void;
+  onSave: (elementId: string, phase: AnimPhase) => void;
+  onReset: (elementId: string, phase: AnimPhase) => void;
+}) {
+  const [activePhase, setActivePhase] = useState<
+    Record<string, AnimPhase>
+  >({});
+
+  // Group rows by element_id.
+  const byElement = useMemo(() => {
+    const m = new Map<string, AnimationRow[]>();
+    for (const r of rows) {
+      const arr = m.get(r.elementId) ?? [];
+      arr.push(r);
+      m.set(r.elementId, arr);
+    }
+    return Array.from(m.entries());
+  }, [rows]);
+
+  if (byElement.length === 0) {
+    return (
+      <div
+        className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+        data-testid="overlay-design-animations-panel"
+      >
+        <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+          Animations
+        </h3>
+        <p className="text-xs italic text-[var(--chalk-3)]">
+          No animatable elements registered for this overlay yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+      data-testid="overlay-design-animations-panel"
+    >
+      <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+        Animations — {byElement.length} element
+        {byElement.length === 1 ? "" : "s"}
+      </h3>
+      <p className="mb-4 text-xs text-[var(--chalk-3)]">
+        Add Entry, Continuous, and Exit animations per element. Live preview
+        re-fires with each change. Save persists the selected phase; Reset
+        clears that phase entirely.
+      </p>
+      <div className="space-y-3" data-testid="overlay-design-animation-rows">
+        {byElement.map(([elementId, elementRows]) => {
+          const phase = activePhase[elementId] ?? "entry";
+          const row =
+            elementRows.find((r) => r.animPhase === phase) ?? {
+              elementId,
+              animPhase: phase,
+              ...PHASE_DEFAULTS[phase],
+            };
+          const enabledPhases = elementRows
+            .filter((r) => r.enabled && r.animType !== "none")
+            .map((r) => r.animPhase);
+          return (
+            <details
+              key={elementId}
+              className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)]"
+              data-testid={`anim-element-${elementId}`}
+            >
+              <summary className="cursor-pointer list-none px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-1 items-center gap-2">
+                    <span className="font-mono text-xs text-[var(--chalk-0)]">
+                      {elementId}
+                    </span>
+                    {enabledPhases.length > 0 ? (
+                      <span className="rounded-sm border border-[var(--primary)] px-1.5 py-px text-[9px] uppercase tracking-[0.18em] text-[var(--signal)]">
+                        {enabledPhases.length} phase
+                        {enabledPhases.length === 1 ? "" : "s"}
+                      </span>
+                    ) : (
+                      <span className="rounded-sm border border-[var(--ink-4)] px-1.5 py-px text-[9px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                        none
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-[var(--chalk-3)]">▾</span>
+                </div>
+              </summary>
+              <div className="space-y-3 border-t border-[var(--ink-4)] px-3 py-3">
+                <div
+                  className="flex items-center gap-1"
+                  data-testid={`anim-phase-tabs-${elementId}`}
+                >
+                  {ANIM_PHASES.map((p) => {
+                    const isActive = p === phase;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() =>
+                          setActivePhase((prev) => ({
+                            ...prev,
+                            [elementId]: p,
+                          }))
+                        }
+                        className={`rounded-sm border px-2 py-1 text-[10px] uppercase tracking-[0.18em] ${
+                          isActive
+                            ? "border-[var(--primary)] bg-[var(--primary)]/20 text-[var(--signal)]"
+                            : "border-[var(--ink-4)] bg-[var(--ink-2)] text-[var(--chalk-3)]"
+                        }`}
+                        data-testid={`anim-phase-${elementId}-${p}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+                <AnimationPhaseEditor
+                  row={row}
+                  pending={pending}
+                  onUpdate={(patch) => onUpdate(elementId, phase, patch)}
+                  onSave={() => onSave(elementId, phase)}
+                  onReset={() => onReset(elementId, phase)}
+                />
+              </div>
+            </details>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AnimationPhaseEditor({
+  row,
+  pending,
+  onUpdate,
+  onSave,
+  onReset,
+}: {
+  row: AnimationRow;
+  pending: boolean;
+  onUpdate: (patch: Partial<AnimationRow>) => void;
+  onSave: () => void;
+  onReset: () => void;
+}) {
+  const labelStyle =
+    "block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]";
+  const inputStyle =
+    "w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 font-mono text-xs text-[var(--chalk-0)] focus:border-[var(--signal)] focus:outline-none";
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className={labelStyle}>Type</label>
+          <select
+            value={row.animType}
+            onChange={(e) =>
+              onUpdate({ animType: e.target.value as AnimType })
+            }
+            className={inputStyle}
+            data-testid={`anim-${row.elementId}-${row.animPhase}-type`}
+          >
+            {ANIM_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className={labelStyle}>Easing</label>
+          <select
+            value={row.easing}
+            onChange={(e) => onUpdate({ easing: e.target.value })}
+            className={inputStyle}
+            data-testid={`anim-${row.elementId}-${row.animPhase}-easing`}
+          >
+            {EASING_PRESETS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className={labelStyle}>Duration ms</label>
+          <input
+            type="number"
+            min={50}
+            max={5000}
+            step={10}
+            value={row.durationMs}
+            onChange={(e) =>
+              onUpdate({
+                durationMs: Number.isFinite(Number(e.target.value))
+                  ? Number(e.target.value)
+                  : 360,
+              })
+            }
+            className={inputStyle}
+            data-testid={`anim-${row.elementId}-${row.animPhase}-duration`}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className={labelStyle}>Delay ms</label>
+          <input
+            type="number"
+            min={0}
+            max={5000}
+            step={10}
+            value={row.delayMs}
+            onChange={(e) =>
+              onUpdate({
+                delayMs: Number.isFinite(Number(e.target.value))
+                  ? Number(e.target.value)
+                  : 0,
+              })
+            }
+            className={inputStyle}
+            data-testid={`anim-${row.elementId}-${row.animPhase}-delay`}
+          />
+        </div>
+        <div className="col-span-2 space-y-1">
+          <label className={labelStyle}>Iterations</label>
+          <input
+            type="text"
+            value={row.iterationCount}
+            onChange={(e) => onUpdate({ iterationCount: e.target.value })}
+            placeholder="1 or 'infinite'"
+            className={inputStyle}
+            maxLength={10}
+            data-testid={`anim-${row.elementId}-${row.animPhase}-iterations`}
+          />
+        </div>
+      </div>
+      {row.animType === "custom-css" ? (
+        <div className="space-y-1">
+          <label className={labelStyle}>Custom CSS keyframes</label>
+          <textarea
+            value={row.customCssKeyframes ?? ""}
+            onChange={(e) =>
+              onUpdate({
+                customCssKeyframes: e.target.value === "" ? null : e.target.value,
+              })
+            }
+            placeholder="0% { opacity: 0 } 100% { opacity: 1 }"
+            rows={4}
+            className={`${inputStyle} resize-y font-mono`}
+            maxLength={4096}
+            data-testid={`anim-${row.elementId}-${row.animPhase}-keyframes`}
+          />
+          <p className="text-[10px] italic text-[var(--chalk-3)]">
+            Allowed props: opacity, transform, filter, letter-spacing, color,
+            background-color, border-color, text-shadow, box-shadow. No url(),
+            no @-rules.
+          </p>
+        </div>
+      ) : null}
+      <div className="flex items-center gap-2 pt-1">
+        <PrimaryButton type="button" size="sm" disabled={pending} onClick={onSave}>
+          Save
+        </PrimaryButton>
+        <SecondaryButton
+          type="button"
+          size="sm"
+          disabled={pending}
+          onClick={onReset}
+        >
+          Reset
+        </SecondaryButton>
+        <label className="ml-auto inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+          <input
+            type="checkbox"
+            checked={row.enabled}
+            onChange={(e) => onUpdate({ enabled: e.target.checked })}
+            className="h-3.5 w-3.5 cursor-pointer accent-[var(--primary)]"
+            data-testid={`anim-${row.elementId}-${row.animPhase}-enabled`}
+          />
+          Enabled
+        </label>
       </div>
     </div>
   );

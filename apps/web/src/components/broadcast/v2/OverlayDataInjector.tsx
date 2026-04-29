@@ -292,6 +292,66 @@ export type OverlayDataInjectorProps = {
       sort?: number;
     }>;
   };
+  /**
+   * Wave 2 Stage 4 — element-animation overrides resolved server-side
+   * from `overlay_element_animations`. Shape:
+   *   {
+   *     '<elementId>': {
+   *       entry?:      { animType, durationMs, delayMs, easing, iterationCount, customCssKeyframes? },
+   *       exit?:       { ... },
+   *       continuous?: { ... }
+   *     }
+   *   }
+   * Encoded as base64-JSON onto the iframe URL as `?animTokens=<b64>`.
+   * The bootstrap script reads the param, generates `@keyframes` blocks
+   * (preset map for slide/fade/etc, sanitized custom-css for type =
+   * `custom-css`), and applies the rule with phase-aware selectors:
+   *   entry/continuous → `body.cade-visible [data-element-id="X"]`
+   *   exit             → `body.cade-exiting [data-element-id="X"]`
+   *
+   * Empty / undefined map → bootstrap emits no animation rules
+   * (backward-compat invariant #1).
+   */
+  designAnimTokens?: Record<
+    string,
+    Partial<
+      Record<
+        "entry" | "exit" | "continuous",
+        {
+          enabled?: boolean;
+          animType: string;
+          durationMs: number;
+          delayMs: number;
+          easing: string;
+          iterationCount: string;
+          customCssKeyframes?: string | null;
+        }
+      >
+    >
+  >;
+  /**
+   * Wave 2 Stage 4 — admin live-preview animation overrides. Same wire
+   * as `designAnimTokens` but encoded as `?previewAnimTokens=`. Bootstrap
+   * applies preview AFTER design so preview wins source-order on
+   * identical selectors (later <style> block wins).
+   */
+  previewAnimTokens?: Record<
+    string,
+    Partial<
+      Record<
+        "entry" | "exit" | "continuous",
+        {
+          enabled?: boolean;
+          animType: string;
+          durationMs: number;
+          delayMs: number;
+          easing: string;
+          iterationCount: string;
+          customCssKeyframes?: string | null;
+        }
+      >
+    >
+  >;
 };
 
 /**
@@ -357,6 +417,8 @@ export default function OverlayDataInjector({
   previewTextTokens,
   designPartnerTokens,
   previewPartnerTokens,
+  designAnimTokens,
+  previewAnimTokens,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -855,6 +917,23 @@ export default function OverlayDataInjector({
       previewPartnerTokens as unknown as Record<string, unknown>,
     );
     if (enc) params.set("previewPartnerTokens", enc);
+  }
+  // Wave 2 Stage 4 — element-animation overrides ride the same b64-JSON
+  // wire as text/partner tokens. Bootstrap decodes the param and emits
+  // <style id="cade-injected-anim-keyframes"> + <style id="cade-injected-
+  // anim-rules"> blocks scoped to body.cade-visible / body.cade-exiting
+  // for phase-aware triggering.
+  if (designAnimTokens && Object.keys(designAnimTokens).length > 0) {
+    const enc = encodeTextTokensParam(
+      designAnimTokens as unknown as Record<string, unknown>,
+    );
+    if (enc) params.set("animTokens", enc);
+  }
+  if (previewAnimTokens && Object.keys(previewAnimTokens).length > 0) {
+    const enc = encodeTextTokensParam(
+      previewAnimTokens as unknown as Record<string, unknown>,
+    );
+    if (enc) params.set("previewAnimTokens", enc);
   }
   const qs = params.toString();
   const src = `/overlays/v2/${overlayKey}/index.html${qs ? `?${qs}` : ""}`;
