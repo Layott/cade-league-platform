@@ -492,3 +492,51 @@ So I extended Option A: the ambient resolver picks the live session with the mos
 - [x] Verify locally — `npm run test --run`, `npm run lint`, `npm run build`.
 - [x] Commit + push + Vercel verify with Claude-in-Chrome.
 
+## Player squad — match-day picker — review
+
+**Wave commits:**
+| SHA | Author | Notes |
+|-----|--------|-------|
+| `acbebb25` | claude | Initial Plan 56 ship: server helpers, picker UI, page rewrite, admin parity, unit + E2E tests, lessons entry |
+| `5ad14d70` | layott | Hot-fix: refactor inline arrow `submitAction` to bare ref + add `matchDayId` prop on SquadPickerBuilder (Server Action serialization rule) |
+| `971f3f80` | claude | Type fix: widen `SubmitPickerActionPayload.matchDayId` to `string \| null` so the picker's `?? null` forwarding compiles |
+| `1efe32f7` | layott | Final type narrow: drop `\| null` everywhere → consistent `string \| undefined` (Vercel build refused null-vs-undefined assignment) |
+
+**Verification — prod, logged in as Faruk via Claude-in-Chrome (`https://cade-league.vercel.app/...`):**
+
+| Path | Result |
+|------|--------|
+| `/player/squad` | Picker renders with 8 match-day rows. Buckets: "This week" + "Upcoming". Statuses: 1× `submitted` + 7× `open`. No console errors. |
+| `/player/squad?matchDay=ca3f72e1-95d9-4398-b455-4e8494e1ba45` (Faruk's submitted MD, 2026-04-26) | `squad-existing-summary` testid present, title "Squad for 2026-04-26", SquadPitchView renders 11 cards in 4-1-2-1-2 formation. Back link present. |
+| `/player/squad?matchDay=6dafff21-90e3-4d48-bf5a-dd066619f7df` (open MD, 2026-05-02) | `squad-match-day-picker` + `pitch-layout` + `formation-switcher` testids present. Title "Squad for 2026-05-02". No error banner. SquadPickerBuilder mounts cleanly with `matchDayId={selected.matchDayId}` plumbed via prop. |
+| `/player/squad?matchDay=00000000-0000-0000-0000-000000000000` (bogus UUID) | Falls back to the picker list (`squad-match-day-picker` testid). Title "My squads". |
+| `/admin/squads` | New "Match day" column rendered between "Submitted (WAT)" and "Status". Empty cells show "—" for legacy weekly rows. |
+| `/admin/squads/70b1b9d7-61a8-4609-afa7-6f4f39c97f75` | Eyebrow correctly reads `WEEK OF 2026-04-23` for legacy weekly submission. (When a stamped MD submission is reviewed, eyebrow flips to `Match day · YYYY-MM-DD · venue`.) |
+
+**Player↔admin parity:** complete. Admin reads `match_day_id` on `/admin/squads` list (new column) + on `/admin/squads/[id]` detail header (eyebrow swap). The `match_day_id` field is OPTIONAL on submissions; legacy weekly rows keep the "Week of …" eyebrow.
+
+**Files changed (all 4 commits):**
+- `apps/web/src/server/squads/list.ts` — new `listSubmissionsForPlayerInSeason` + `getSubmissionForPlayerAndMatchDay` + `match_day_id` on `SubmissionRow` + every `select(...)` clause.
+- `apps/web/src/server/squads/index.ts` — re-export the new helpers + `PlayerSubmissionSummary` type.
+- `apps/web/src/server/squads/list.test.ts` — 3 new unit tests (group by match_day_id with legacy fallback; direct lookup with items; null fallback).
+- `apps/web/src/components/player/SquadMatchDayPicker.tsx` — new component; status pills + CTAs per row; bucketed by past / this_week / upcoming.
+- `apps/web/src/components/player/SquadMatchDayPicker.test.tsx` — 7 new RTL tests (empty state, 3 buckets, all 4 status variants, rejected pill).
+- `apps/web/src/components/squads/SquadPickerBuilder.tsx` — accepts new `matchDayId?: string` prop + merges it into `submitAction` payload at call site.
+- `apps/web/src/app/player/squad/page.tsx` — full rewrite: ALWAYS lists every match day; classifies each as submitted/open/closed/upcoming; `?matchDay=<id>` scopes to detail view (4 variants).
+- `apps/web/src/app/player/squad/actions.ts` — `SubmitPickerActionPayload.matchDayId` typed `string | undefined` (final shape after wave).
+- `apps/web/src/app/admin/squads/page.tsx` — new "Match day" column; resolves match-day dates in one query.
+- `apps/web/src/app/admin/squads/[id]/page.tsx` — header eyebrow + description swap when submission is stamped with `match_day_id`.
+- `apps/web/tests/e2e/squad-match-day-picker.spec.ts` — new E2E spec (3 cases: list renders, detail link, bogus uuid).
+- `apps/web/tests/e2e/squad-picker.spec.ts` — accept new `squad-match-day-picker` testid alongside legacy ones.
+- `tasks/lessons.md` — entry on `Edit replace_all` not catching divergent indentation.
+- `tasks/todo.md` — this review section.
+
+**Test count delta:** 1778 → 1791 (+13: 3 list helpers + 7 picker RTL + 3 picker open/closed/upcoming variants).
+
+**Verification gate:** `npm run test --run` 1791/1791, `npm run lint` 0 errors, `npm run build` clean (final commit `1efe32f7`).
+
+**Lessons captured (`tasks/lessons.md`):**
+- `Edit replace_all` returns "All occurrences successfully replaced" but only updates occurrences whose surrounding indentation matches; check via Grep after.
+- Server Action serialization across Server → Client component boundary: pass extra args via dedicated props, never wrap in inline arrows. The "Functions cannot be passed directly to Client Components" error reproduces only at runtime — `next build` and unit tests both pass.
+- TS strict-mode `null` vs `undefined`: pick ONE shape per call-graph edge and stay consistent — drift between `string | null` (DB-style) and `string | undefined` (TS-optional) costs a Vercel build cycle.
+
