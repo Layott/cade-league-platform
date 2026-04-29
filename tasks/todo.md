@@ -993,3 +993,56 @@ The repo had pre-existing modifications from another agent on H2H components + A
   - `curl https://cade-league.vercel.app/api/broadcast/v2/sessions/8018f9e3-2018-4532-a6c0-6418463be0db/orgs?t=<view_token>` → expect `payload.orgs[].players` populated + `logoUrl` non-null for orgs that have a logo.
   - Visit `/overlay/v2/04-h2h-2?session=...` + trigger from broadcast control panel → win-prob displays correct integer percent (not "0%").
   - Visit `/overlay/v2/15-orgs?session=...` → player chips render in each org card (not empty).
+
+---
+
+## Bug #23 — review
+
+### Status
+
+**Already shipped** in commit `a8fb24aa` ("fix: React #418 hydration on countdowns + coaches endpoint columns (Bugs #23 + #27)") on Apr 29 21:44 WAT. Latest production deployment `dpl_C6U2sAotLNxPjd6azoGNtsJiX11m` (READY, target=production) carries the fix. Verified live on https://cade-league.vercel.app — no React #418 errors fire on any admin route exercised. This review is the documentation slice the original commit message + tasks/todo.md entry was missing.
+
+### Root cause (one-liner)
+
+Three client components used `useState<number>(() => Date.now())` as a lazy initializer to seed a tick clock. Lazy initializers run on BOTH the SSR pass and the first CSR render — server clock and client browser clock are skewed by the network round-trip, so the two `Date.now()` results differ. React's hydration pass compares the SSR-rendered output to the client-rendered output, finds the resulting countdown / tone label has shifted, and throws **Minified React error #418** (`?args[]=text&args[]=` — text-content mismatch where one side rendered different text than the other). The SSR'd subtree gets discarded and React re-renders client-side from scratch, costing extra paint cycles + invalidating any nested suspended states.
+
+### Fix description
+
+Three components patched to use a **deterministic initial value** (the deadline / target instant) so SSR + first CSR render produce IDENTICAL output. After hydration, a `useEffect` swaps in `Date.now()` and starts the recurring `setInterval` tick. The first paint matches the server, the next tick (~1s for countdowns, ~30s for badges) starts the live update.
+
+Files changed in `a8fb24aa`:
+- `apps/web/src/components/admin/DeadlineBadge.tsx` — `useState<number>(() => Date.now())` → `useState<number>(deadlineMs)` + `useEffect(() => { setNowMs(Date.now()); ... })`. Used by `/admin/discipline/appeals`, `/admin/discipline/appeals/[id]`, `/player/cases`.
+- `apps/web/src/components/profile/SquadDueCountdown.tsx` — same pattern. Used inside `SquadDueCard` + `SquadDueBanner` on `/profile`, `/player`.
+- `apps/web/src/components/squads/CountdownBadge.tsx` — same pattern. Used on `/player/squad/change` (Friday change-window CTA).
+
+`Date.now()` calls inside `useEffect` are SAFE because effects run only on the client AFTER hydration completes — the server never executes them.
+
+### Why the verification report flagged `/admin/match-days` + `/admin/squads`
+
+The pre-fix verification report (commit `3f05e44b`) listed "React #418 hydration error" against `/admin/match-days` + `/admin/squads`. Those routes don't render `DeadlineBadge` directly. The error propagated from a previous page navigation in the test session — the verification report's note says "(persisted from prior page)" against `/admin/squads`. React 19 logs recoverable errors in the console as `[EXCEPTION]` events that visually carry across SPA route changes if the user doesn't clear DevTools. Once the three countdown components were fixed, no admin page in any flow re-emits the error.
+
+### Verification (post-deploy, this slice)
+
+Tested on production https://cade-league.vercel.app via Claude-in-Chrome with `admin@cade.local`:
+
+| Route | Fresh hard reload | React #418 | Console |
+|---|---|---|---|
+| `/admin/match-days` | yes (`location.replace`) | NONE | clean |
+| `/admin/squads` | yes | NONE | clean |
+| `/admin/tournament/standings` | yes | NONE | clean |
+| `/admin/tournament/walkovers` | yes | NONE | clean |
+| `/admin/discipline` (→ punishments) | yes | NONE | clean |
+| `/admin/discipline/appeals` (DeadlineBadge user) | yes | NONE | clean |
+| `/admin/people` (→ players) | yes | NONE | clean |
+
+Verification method: install patched `console.error` capture + `window.addEventListener('error', ...)` + chrome console-message reader before navigation. Trigger console marker (`console.error('=== TEST: <route> ===')`), navigate via `location.replace()` to force full page load (not soft router push), wait for hydration, read console for any `Minified React error #418` exception. Zero errors observed across all 7 routes. The previously-captured #418 occurrences during this session were all from `iframe.contentDocument.write()` test artifacts (iframe URL was the parent's URL but SSR HTML was for a different route, causing `usePathname()` to disagree with the SSR'd `aria-current` state — that artifact does NOT exist in real navigation).
+
+Latest commit on `main` is already `a8fb24aa`, the Vercel production alias points at `dpl_C6U2sAotLNxPjd6azoGNtsJiX11m` (commit `a8fb24aaff2e0b66daa62b86ab2675255b6df662`, state READY, target=production), and the bug is RESOLVED.
+
+### Files changed (this commit, docs only)
+
+- `tasks/todo.md` — this review section.
+
+### Lessons (already in `tasks/lessons.md`)
+
+The portal-mismatch lesson (line 298-299) covers the "always gate post-hydration DOM mutations behind a `mounted` flag" pattern. The countdown clock-skew issue is a closely-related variant: any **lazy state initializer** that reads a non-deterministic source (`Date.now()`, `Math.random()`, `crypto.randomUUID()`, `navigator.language`, `window.innerWidth`, etc.) is a hydration hazard in a Client Component rendered inside an SSR tree. Pre-flight check: `grep -rn "useState.*=>.*Date.now()" apps/web/src` and `grep -rn "useState(Date.now())" apps/web/src` — both should be empty for any state used in render output. (`Date.now()` is fine inside `useEffect`, just never in the initial render path.)
