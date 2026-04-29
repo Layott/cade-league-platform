@@ -35,10 +35,26 @@ const MAX_SUBS = 7;
 export type SquadPickerBuilderProps = {
   weekStartDate: string;
   rule: LiveTotalsRule | null;
+  /**
+   * Optional pin: when provided, the builder threads this match-day id
+   * through to the server action so the resulting submission row is stamped
+   * `match_day_id = matchDayId`. Required for the per-match-day submit flow
+   * introduced 2026-04-29 (`/player/squad?matchDay=<id>`).
+   */
+  matchDayId?: string | null;
+  /**
+   * Server Action — must be a real "use server" function reference, NOT an
+   * inline arrow that wraps one. Wrapping an action in a sync arrow at the
+   * call site (e.g. `submitAction={(p) => action({ ...p, x })}`) violates
+   * the Next.js Server Action serialization rule and triggers "Functions
+   * cannot be passed directly to Client Components" at runtime. To bind
+   * extra args (like matchDayId) use the separate prop above.
+   */
   submitAction: (payload: {
     weekStartDate: string;
     futbinScreenshotPath: string;
     slots: Array<{ slotIndex: number; fcdbPlayerId: string; positionInLineup: string }>;
+    matchDayId?: string | null;
   }) => Promise<void>;
   requestUploadUrlAction: (input: { extension: "png" | "jpg" | "webp" }) => Promise<{
     path: string;
@@ -51,6 +67,7 @@ export type SquadPickerBuilderProps = {
 export function SquadPickerBuilder({
   weekStartDate,
   rule,
+  matchDayId,
   submitAction,
   requestUploadUrlAction,
 }: SquadPickerBuilderProps) {
@@ -357,6 +374,7 @@ export function SquadPickerBuilder({
           weekStartDate,
           futbinScreenshotPath: screenshotPath,
           slots: [...starterRows, ...subRows],
+          matchDayId: matchDayId ?? null,
         });
       } catch (e) {
         setError((e as Error).message);

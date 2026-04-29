@@ -241,12 +241,8 @@ export default async function PlayerSquadPage({
             <SquadPickerBuilder
               weekStartDate={matchDayWeekStart}
               rule={rule}
-              submitAction={(payload) =>
-                submitPickerAction({
-                  ...payload,
-                  matchDayId: selected.matchDayId,
-                })
-              }
+              matchDayId={selected.matchDayId}
+              submitAction={submitPickerAction}
               requestUploadUrlAction={requestUploadUrlAction}
             />
           </section>
