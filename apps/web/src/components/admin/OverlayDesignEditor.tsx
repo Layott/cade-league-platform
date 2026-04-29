@@ -226,7 +226,7 @@ export default function OverlayDesignEditor({
             style={{
               width: "1920px",
               height: "1080px",
-              transform: "scale(calc(100cqi / 1920))",
+              transform: "scale(calc(100cqi / 1920px))",
               transformOrigin: "top left",
               border: "none",
             }}

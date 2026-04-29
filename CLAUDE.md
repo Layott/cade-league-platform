@@ -262,7 +262,7 @@ The static HTML keeps `:root { --overlay-X: <hard-coded fallback> }` so OBS brow
   <iframe style={{
     width: "1920px",
     height: "1080px",
-    transform: "scale(calc(100cqi / 1920))",
+    transform: "scale(calc(100cqi / 1920px))",
     transformOrigin: "top left",
   }} />
 </div>
