@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   decodePreviewTokens,
   decodePreviewTextTokens,
+  decodePreviewPartnerTokens,
   encodePreviewTokens,
   escapeCssValue,
 } from "./preview";
@@ -223,5 +224,148 @@ describe("decodePreviewTextTokens (Wave 2 Stage 2)", () => {
     }
     const b64 = b64encode(payload);
     expect(await decodePreviewTextTokens(b64)).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 3 — partner token decoder                             *
+ * ------------------------------------------------------------------ */
+
+describe("decodePreviewPartnerTokens", () => {
+  const validLayout = {
+    visible: true,
+    positionXPx: 0,
+    positionYPx: 1020,
+    anchor: "bottom-center",
+    orientation: "horizontal",
+    scalePct: 100,
+    itemSpacingPx: 64,
+    justification: "center",
+    zIndex: 12,
+  };
+  const validLogo = {
+    partnerKey: "gameevo",
+    label: "GameEvo Esports",
+    alt: "GameEvo Esports",
+    fileUrl: "/overlays/v2/_assets/logos/processed/gameevo.png",
+    visible: true,
+    sort: 0,
+  };
+
+  it("returns null when raw is undefined", async () => {
+    expect(await decodePreviewPartnerTokens(undefined)).toBeNull();
+  });
+
+  it("decodes a valid layout-only payload", async () => {
+    const b64 = b64encode({ layout: validLayout });
+    const out = await decodePreviewPartnerTokens(b64);
+    expect(out).toEqual({ layout: validLayout });
+  });
+
+  it("decodes a valid logos-only payload", async () => {
+    const b64 = b64encode({ logos: [validLogo] });
+    const out = await decodePreviewPartnerTokens(b64);
+    expect(out).toEqual({ logos: [validLogo] });
+  });
+
+  it("decodes a combined layout + logos payload", async () => {
+    const payload = { layout: validLayout, logos: [validLogo] };
+    const b64 = b64encode(payload);
+    const out = await decodePreviewPartnerTokens(b64);
+    expect(out).toEqual(payload);
+  });
+
+  it("rejects unknown anchor values", async () => {
+    const b64 = b64encode({
+      layout: { ...validLayout, anchor: "way-off" },
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects scalePct out of range", async () => {
+    const b64 = b64encode({ layout: { ...validLayout, scalePct: 999 } });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects negative item spacing", async () => {
+    const b64 = b64encode({
+      layout: { ...validLayout, itemSpacingPx: -10 },
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects logos with non-kebab-case partnerKey", async () => {
+    const b64 = b64encode({
+      logos: [{ ...validLogo, partnerKey: "Bad Key With Spaces" }],
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects logos with CSS metacharacters in fileUrl", async () => {
+    const b64 = b64encode({
+      logos: [{ ...validLogo, fileUrl: "/x.png; }/*hack" }],
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects logos with HTML metacharacters in label", async () => {
+    const b64 = b64encode({
+      logos: [{ ...validLogo, label: "<script>alert(1)</script>" }],
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects logos with javascript: URL", async () => {
+    const b64 = b64encode({
+      logos: [{ ...validLogo, fileUrl: "javascript:alert(1)" }],
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects oversized logo arrays (>32)", async () => {
+    const logos = Array.from({ length: 33 }, (_, i) => ({
+      ...validLogo,
+      partnerKey: `partner-${i}`,
+    }));
+    const b64 = b64encode({ logos });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("rejects unknown top-level keys (strict)", async () => {
+    const b64 = b64encode({
+      layout: validLayout,
+      hostile: { foo: "bar" },
+    });
+    expect(await decodePreviewPartnerTokens(b64)).toBeNull();
+  });
+
+  it("returns null on malformed base64", async () => {
+    expect(await decodePreviewPartnerTokens("not!!!base64???")).toBeNull();
+  });
+
+  it("returns null on malformed JSON", async () => {
+    const fake = Buffer.from("not-json-at-all", "utf-8")
+      .toString("base64")
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replaceAll("=", "");
+    expect(await decodePreviewPartnerTokens(fake)).toBeNull();
+  });
+
+  it("accepts an empty object (no layout, no logos)", async () => {
+    const b64 = b64encode({});
+    const out = await decodePreviewPartnerTokens(b64);
+    expect(out).toEqual({});
+  });
+
+  it("decodes both http(s) URLs and root-relative URLs", async () => {
+    const httpsLogo = {
+      ...validLogo,
+      partnerKey: "external",
+      fileUrl: "https://cdn.example.com/x.png",
+    };
+    const b64 = b64encode({ logos: [validLogo, httpsLogo] });
+    const out = await decodePreviewPartnerTokens(b64);
+    expect(out?.logos).toHaveLength(2);
   });
 });

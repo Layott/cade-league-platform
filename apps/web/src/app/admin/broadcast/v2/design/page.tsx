@@ -8,11 +8,19 @@ import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import OverlayDesignEditor, {
   type CatalogEntry,
   type TextElementRow,
+  type PartnerStripLayoutRow,
+  type PartnerLogoRow,
+  type PartnerLogoOverrideRow,
 } from "@/components/admin/OverlayDesignEditor";
 import { resolveTokens } from "@/server/overlays/design/tokens";
 import { listTemplates } from "@/server/overlays/design/templates";
 import { listHistory } from "@/server/overlays/design/history";
 import { listTextElements } from "@/server/overlays/text/elements";
+import { getStripLayout } from "@/server/overlays/partners/strip";
+import {
+  listPartnerLogos,
+  getOverrides,
+} from "@/server/overlays/partners/logos";
 import {
   OVERLAY_KEYS,
   TOKEN_CATALOG,
@@ -137,6 +145,48 @@ export default async function OverlayDesignPage({
     zIndex: r.zIndex,
   }));
 
+  // Wave 2 Stage 3 — partner-strip layout + logo roster + per-overlay
+  // overrides for the new Partners panel. All three resolve to empty /
+  // null when the DB has no rows so the editor uses defaults.
+  const stripRow = await getStripLayout(
+    sb,
+    selectedOverlay,
+    selectedVariantId,
+  ).catch(() => null);
+  const stripLayout: PartnerStripLayoutRow | null = stripRow
+    ? {
+        visible: stripRow.visible,
+        positionXPx: stripRow.positionXPx,
+        positionYPx: stripRow.positionYPx,
+        anchor: stripRow.anchor,
+        orientation: stripRow.orientation,
+        scalePct: stripRow.scalePct,
+        itemSpacingPx: stripRow.itemSpacingPx,
+        justification: stripRow.justification,
+        zIndex: stripRow.zIndex,
+      }
+    : null;
+  const partnerLogos: PartnerLogoRow[] = (await listPartnerLogos(sb).catch(
+    () => [],
+  )).map((l) => ({
+    partnerKey: l.partnerKey,
+    label: l.label,
+    alt: l.alt,
+    fileUrl: l.fileUrl,
+    sortOrder: l.sortOrder,
+    dimensionWPx: l.dimensionWPx,
+    dimensionHPx: l.dimensionHPx,
+  }));
+  const logoOverrides: PartnerLogoOverrideRow[] = (await getOverrides(
+    sb,
+    selectedOverlay,
+    selectedVariantId,
+  ).catch(() => [])).map((o) => ({
+    partnerKey: o.partnerKey,
+    visible: o.visible,
+    sortOverride: o.sortOverride,
+  }));
+
   const catalog: CatalogEntry[] = TOKEN_CATALOG.map((c) => ({
     tokenKey: c.tokenKey,
     tokenType: c.tokenType,
@@ -215,6 +265,9 @@ export default async function OverlayDesignPage({
         fontOptions={FONT_VALUES}
         patternOptions={PATTERN_VALUES}
         initialTextElements={textElements}
+        initialStripLayout={stripLayout}
+        initialPartnerLogos={partnerLogos}
+        initialLogoOverrides={logoOverrides}
       />
 
       <section className="space-y-3">

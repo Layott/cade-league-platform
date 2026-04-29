@@ -13,6 +13,10 @@ import {
   uploadOverlayBgAction,
   setTextElementAction,
   clearTextElementAction,
+  setStripLayoutAction,
+  uploadPartnerLogoAction,
+  removePartnerLogoAction,
+  setLogoOverrideAction,
 } from "@/app/admin/broadcast/v2/design/actions";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import { supportsBgImage } from "@/server/overlays/design/defaults";
@@ -72,6 +76,52 @@ export type TextElementRow = {
   zIndex: number | null;
 };
 
+/**
+ * Wave 2 Stage 3 — partner-strip layout row.
+ */
+export type PartnerStripLayoutRow = {
+  visible: boolean;
+  positionXPx: number;
+  positionYPx: number;
+  anchor:
+    | "top-left"
+    | "top-center"
+    | "top-right"
+    | "middle-left"
+    | "middle-center"
+    | "middle-right"
+    | "bottom-left"
+    | "bottom-center"
+    | "bottom-right";
+  orientation: "horizontal" | "vertical";
+  scalePct: number;
+  itemSpacingPx: number;
+  justification: "start" | "center" | "end" | "space-between";
+  zIndex: number;
+};
+
+/**
+ * Wave 2 Stage 3 — global partner-logo roster row.
+ */
+export type PartnerLogoRow = {
+  partnerKey: string;
+  label: string;
+  alt: string;
+  fileUrl: string;
+  sortOrder: number;
+  dimensionWPx: number;
+  dimensionHPx: number;
+};
+
+/**
+ * Wave 2 Stage 3 — per-overlay logo override row.
+ */
+export type PartnerLogoOverrideRow = {
+  partnerKey: string;
+  visible: boolean;
+  sortOverride: number | null;
+};
+
 export type EditorProps = {
   overlayKey: string;
   variantId: string;
@@ -87,6 +137,27 @@ export type EditorProps = {
    * Sourced from `listTextElements` in the page server component.
    */
   initialTextElements?: ReadonlyArray<TextElementRow>;
+  /**
+   * Wave 2 Stage 3 — partner strip layout for this overlay+variant
+   * (null when no DB row, falls back to defaults).
+   */
+  initialStripLayout?: PartnerStripLayoutRow | null;
+  /** Wave 2 Stage 3 — global partner logo roster. */
+  initialPartnerLogos?: ReadonlyArray<PartnerLogoRow>;
+  /** Wave 2 Stage 3 — per-overlay logo overrides. */
+  initialLogoOverrides?: ReadonlyArray<PartnerLogoOverrideRow>;
+};
+
+const DEFAULT_STRIP_LAYOUT: PartnerStripLayoutRow = {
+  visible: true,
+  positionXPx: 0,
+  positionYPx: 1020,
+  anchor: "bottom-center",
+  orientation: "horizontal",
+  scalePct: 100,
+  itemSpacingPx: 64,
+  justification: "center",
+  zIndex: 12,
 };
 
 /** Wave 2 Stage 2 — preview-text-tokens shape that goes onto the iframe URL. */
@@ -167,6 +238,67 @@ function buildTextPreviewParam(
   }
 }
 
+/**
+ * Wave 2 Stage 3 — encode the partner tokens map for the iframe URL.
+ * Builds the same shape the bootstrap script reads
+ * (`{layout, logos[]}`).
+ */
+type PartnerPreviewTokens = {
+  layout?: PartnerStripLayoutRow;
+  logos?: Array<{
+    partnerKey: string;
+    label: string;
+    alt: string;
+    fileUrl: string;
+    visible: boolean;
+    sort: number;
+  }>;
+};
+
+function buildPartnerPreviewParam(
+  layout: PartnerStripLayoutRow | null,
+  logos: ReadonlyArray<PartnerLogoRow>,
+  overrides: ReadonlyArray<PartnerLogoOverrideRow>,
+): string {
+  const overrideMap = new Map<string, PartnerLogoOverrideRow>();
+  for (const o of overrides) overrideMap.set(o.partnerKey, o);
+
+  const visibleLogos: PartnerPreviewTokens["logos"] = logos
+    .filter((l) => {
+      const o = overrideMap.get(l.partnerKey);
+      return !o || o.visible !== false;
+    })
+    .map((l) => {
+      const o = overrideMap.get(l.partnerKey);
+      const sort = o?.sortOverride != null ? o.sortOverride : l.sortOrder;
+      return {
+        partnerKey: l.partnerKey,
+        label: l.label,
+        alt: l.alt,
+        fileUrl: l.fileUrl,
+        visible: true,
+        sort,
+      };
+    });
+
+  const tokens: PartnerPreviewTokens = {};
+  if (layout) tokens.layout = layout;
+  if (visibleLogos.length > 0) tokens.logos = visibleLogos;
+  if (!tokens.layout && (!tokens.logos || tokens.logos.length === 0)) {
+    return "";
+  }
+
+  try {
+    const json = JSON.stringify(tokens);
+    if (typeof btoa === "function") {
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 export default function OverlayDesignEditor({
   overlayKey,
   variantId,
@@ -175,6 +307,9 @@ export default function OverlayDesignEditor({
   fontOptions,
   patternOptions,
   initialTextElements,
+  initialStripLayout,
+  initialPartnerLogos,
+  initialLogoOverrides,
 }: EditorProps) {
   const [tokens, setTokens] = useState<Record<string, string>>(initialTokens);
   const [previewParam, setPreviewParam] = useState<string>(
@@ -186,11 +321,30 @@ export default function OverlayDesignEditor({
   const [previewTextParam, setPreviewTextParam] = useState<string>(
     buildTextPreviewParam(initialTextElements ?? []),
   );
+  const [stripLayout, setStripLayout] = useState<PartnerStripLayoutRow>(
+    initialStripLayout ?? DEFAULT_STRIP_LAYOUT,
+  );
+  const [logos, setLogos] = useState<PartnerLogoRow[]>(
+    [...(initialPartnerLogos ?? [])],
+  );
+  const [logoOverrides, setLogoOverrides] = useState<PartnerLogoOverrideRow[]>(
+    [...(initialLogoOverrides ?? [])],
+  );
+  const [previewPartnerParam, setPreviewPartnerParam] = useState<string>(
+    buildPartnerPreviewParam(
+      initialStripLayout ?? null,
+      initialPartnerLogos ?? [],
+      initialLogoOverrides ?? [],
+    ),
+  );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const partnerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Reset state when overlay/variant context changes.
   useEffect(() => {
@@ -198,9 +352,27 @@ export default function OverlayDesignEditor({
     setPreviewParam(encodeForPreview(initialTokens));
     setTextRows([...(initialTextElements ?? [])]);
     setPreviewTextParam(buildTextPreviewParam(initialTextElements ?? []));
+    setStripLayout(initialStripLayout ?? DEFAULT_STRIP_LAYOUT);
+    setLogos([...(initialPartnerLogos ?? [])]);
+    setLogoOverrides([...(initialLogoOverrides ?? [])]);
+    setPreviewPartnerParam(
+      buildPartnerPreviewParam(
+        initialStripLayout ?? null,
+        initialPartnerLogos ?? [],
+        initialLogoOverrides ?? [],
+      ),
+    );
     setSuccess(false);
     setError(null);
-  }, [overlayKey, variantId, initialTokens, initialTextElements]);
+  }, [
+    overlayKey,
+    variantId,
+    initialTokens,
+    initialTextElements,
+    initialStripLayout,
+    initialPartnerLogos,
+    initialLogoOverrides,
+  ]);
 
   const update = useCallback(
     (key: string, value: string) => {
@@ -366,6 +538,132 @@ export default function OverlayDesignEditor({
     [overlayKey, variantId, textRows],
   );
 
+  /* ---------------- Wave 2 Stage 3 — partner edits ---------------- */
+
+  const updateStripLayout = useCallback(
+    (patch: Partial<PartnerStripLayoutRow>) => {
+      setStripLayout((prev) => {
+        const next = { ...prev, ...patch };
+        if (partnerDebounceRef.current) {
+          clearTimeout(partnerDebounceRef.current);
+        }
+        partnerDebounceRef.current = setTimeout(() => {
+          setPreviewPartnerParam(
+            buildPartnerPreviewParam(next, logos, logoOverrides),
+          );
+        }, 250);
+        return next;
+      });
+    },
+    [logos, logoOverrides],
+  );
+
+  const saveStripLayout = useCallback(() => {
+    setError(null);
+    setSuccess(false);
+    startTransition(async () => {
+      try {
+        const fd = new FormData();
+        fd.set("overlayKey", overlayKey);
+        fd.set("variantId", variantId);
+        fd.set("visible", stripLayout.visible ? "true" : "false");
+        fd.set("positionXPx", String(stripLayout.positionXPx));
+        fd.set("positionYPx", String(stripLayout.positionYPx));
+        fd.set("anchor", stripLayout.anchor);
+        fd.set("orientation", stripLayout.orientation);
+        fd.set("scalePct", String(stripLayout.scalePct));
+        fd.set("itemSpacingPx", String(stripLayout.itemSpacingPx));
+        fd.set("justification", stripLayout.justification);
+        fd.set("zIndex", String(stripLayout.zIndex));
+        await setStripLayoutAction(fd);
+        setSuccess(true);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "save failed");
+      }
+    });
+  }, [overlayKey, variantId, stripLayout]);
+
+  const removeLogo = useCallback(
+    (partnerKey: string) => {
+      setError(null);
+      setSuccess(false);
+      startTransition(async () => {
+        try {
+          const fd = new FormData();
+          fd.set("partnerKey", partnerKey);
+          await removePartnerLogoAction(fd);
+          setLogos((prev) =>
+            prev.filter((l) => l.partnerKey !== partnerKey),
+          );
+          setLogoOverrides((prev) =>
+            prev.filter((o) => o.partnerKey !== partnerKey),
+          );
+          setSuccess(true);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "remove failed");
+        }
+      });
+    },
+    [],
+  );
+
+  const setOverride = useCallback(
+    (
+      partnerKey: string,
+      patch: { visible?: boolean; sortOverride?: number | null },
+    ) => {
+      setError(null);
+      setSuccess(false);
+      const existing = logoOverrides.find((o) => o.partnerKey === partnerKey);
+      const next: PartnerLogoOverrideRow = {
+        partnerKey,
+        visible:
+          patch.visible !== undefined
+            ? patch.visible
+            : existing?.visible ?? true,
+        sortOverride:
+          patch.sortOverride !== undefined
+            ? patch.sortOverride
+            : existing?.sortOverride ?? null,
+      };
+      setLogoOverrides((prev) => {
+        const without = prev.filter((o) => o.partnerKey !== partnerKey);
+        return [...without, next];
+      });
+      // Live preview: rebuild now (debounced).
+      if (partnerDebounceRef.current) {
+        clearTimeout(partnerDebounceRef.current);
+      }
+      partnerDebounceRef.current = setTimeout(() => {
+        const newOverrides = [
+          ...logoOverrides.filter((o) => o.partnerKey !== partnerKey),
+          next,
+        ];
+        setPreviewPartnerParam(
+          buildPartnerPreviewParam(stripLayout, logos, newOverrides),
+        );
+      }, 250);
+      // Persist.
+      startTransition(async () => {
+        try {
+          const fd = new FormData();
+          fd.set("overlayKey", overlayKey);
+          fd.set("variantId", variantId);
+          fd.set("partnerKey", partnerKey);
+          fd.set("visible", next.visible ? "true" : "false");
+          if (next.sortOverride != null) {
+            fd.set("sortOverride", String(next.sortOverride));
+          }
+          await setLogoOverrideAction(fd);
+          setSuccess(true);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "override failed");
+        }
+      });
+    },
+    [logoOverrides, logos, stripLayout, overlayKey, variantId],
+  );
+
   const previewSrc = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("demo", "1");
@@ -375,8 +673,18 @@ export default function OverlayDesignEditor({
     if (previewParam) qs.set("previewTokens", previewParam);
     // Wave 2 Stage 2 — text-element preview overrides ride alongside.
     if (previewTextParam) qs.set("previewTextTokens", previewTextParam);
+    // Wave 2 Stage 3 — partner-strip + logo preview overrides.
+    if (previewPartnerParam) {
+      qs.set("previewPartnerTokens", previewPartnerParam);
+    }
     return `/overlay/v2/${overlayKey}?${qs.toString()}`;
-  }, [overlayKey, variantId, previewParam, previewTextParam]);
+  }, [
+    overlayKey,
+    variantId,
+    previewParam,
+    previewTextParam,
+    previewPartnerParam,
+  ]);
 
   // Filter the catalog — image-typed tokens only render on overlays
   // declared as full-canvas via `supportsBgImage`. Floating-UI overlays
@@ -426,6 +734,22 @@ export default function OverlayDesignEditor({
             </div>
           </div>
         ) : null}
+
+        <PartnersPanel
+          overlayKey={overlayKey}
+          variantId={variantId}
+          stripLayout={stripLayout}
+          logos={logos}
+          overrides={logoOverrides}
+          pending={pending}
+          onUpdateLayout={updateStripLayout}
+          onSaveLayout={saveStripLayout}
+          onUploaded={(newLogo) => {
+            setLogos((prev) => [...prev, newLogo]);
+          }}
+          onRemoveLogo={removeLogo}
+          onSetOverride={setOverride}
+        />
 
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
           <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
@@ -1135,5 +1459,552 @@ function TextElementEditorRow({
         </div>
       </div>
     </details>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 3 — Partners panel                                    *
+ * ------------------------------------------------------------------ */
+
+const ANCHOR_OPTIONS: PartnerStripLayoutRow["anchor"][] = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "middle-left",
+  "middle-center",
+  "middle-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+];
+const ORIENTATION_OPTIONS: PartnerStripLayoutRow["orientation"][] = [
+  "horizontal",
+  "vertical",
+];
+const JUSTIFICATION_OPTIONS: PartnerStripLayoutRow["justification"][] = [
+  "start",
+  "center",
+  "end",
+  "space-between",
+];
+
+function PartnersPanel({
+  overlayKey,
+  variantId,
+  stripLayout,
+  logos,
+  overrides,
+  pending,
+  onUpdateLayout,
+  onSaveLayout,
+  onUploaded,
+  onRemoveLogo,
+  onSetOverride,
+}: {
+  overlayKey: string;
+  variantId: string;
+  stripLayout: PartnerStripLayoutRow;
+  logos: ReadonlyArray<PartnerLogoRow>;
+  overrides: ReadonlyArray<PartnerLogoOverrideRow>;
+  pending: boolean;
+  onUpdateLayout: (patch: Partial<PartnerStripLayoutRow>) => void;
+  onSaveLayout: () => void;
+  onUploaded: (logo: PartnerLogoRow) => void;
+  onRemoveLogo: (partnerKey: string) => void;
+  onSetOverride: (
+    partnerKey: string,
+    patch: { visible?: boolean; sortOverride?: number | null },
+  ) => void;
+}) {
+  const labelStyle =
+    "block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]";
+  const inputStyle =
+    "w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 font-mono text-xs text-[var(--chalk-0)] focus:border-[var(--signal)] focus:outline-none";
+
+  const overrideMap = useMemo(() => {
+    const m = new Map<string, PartnerLogoOverrideRow>();
+    for (const o of overrides) m.set(o.partnerKey, o);
+    return m;
+  }, [overrides]);
+
+  return (
+    <div
+      className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+      data-testid="overlay-design-partners-panel"
+    >
+      <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+        Partners
+      </h3>
+      <p className="mb-4 text-xs text-[var(--chalk-3)]">
+        Tune partner-strip position + scale on this overlay, manage the
+        global logo roster, and toggle visibility per overlay. Live preview
+        updates on every change; Save persists.
+      </p>
+
+      {/* Strip layout */}
+      <div
+        className="space-y-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-3"
+        data-testid="overlay-design-partners-layout"
+      >
+        <div className="flex items-center justify-between">
+          <h4 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-2)]">
+            Strip layout · {overlayKey} · {variantId}
+          </h4>
+          <label className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+            <input
+              type="checkbox"
+              checked={stripLayout.visible}
+              onChange={(e) =>
+                onUpdateLayout({ visible: e.target.checked })
+              }
+              className="h-3.5 w-3.5 cursor-pointer accent-[var(--primary)]"
+              data-testid="strip-layout-visible"
+            />
+            Visible
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className={labelStyle}>Anchor</label>
+            <select
+              value={stripLayout.anchor}
+              onChange={(e) =>
+                onUpdateLayout({
+                  anchor: e.target.value as PartnerStripLayoutRow["anchor"],
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-anchor"
+            >
+              {ANCHOR_OPTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Orientation</label>
+            <select
+              value={stripLayout.orientation}
+              onChange={(e) =>
+                onUpdateLayout({
+                  orientation: e.target
+                    .value as PartnerStripLayoutRow["orientation"],
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-orientation"
+            >
+              {ORIENTATION_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Position X (px)</label>
+            <input
+              type="number"
+              min={-1920}
+              max={1920}
+              step={1}
+              value={stripLayout.positionXPx}
+              onChange={(e) =>
+                onUpdateLayout({
+                  positionXPx: Number.isFinite(Number(e.target.value))
+                    ? Number(e.target.value)
+                    : 0,
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-pos-x"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Position Y (px)</label>
+            <input
+              type="number"
+              min={-1080}
+              max={1080}
+              step={1}
+              value={stripLayout.positionYPx}
+              onChange={(e) =>
+                onUpdateLayout({
+                  positionYPx: Number.isFinite(Number(e.target.value))
+                    ? Number(e.target.value)
+                    : 0,
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-pos-y"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Scale (%)</label>
+            <input
+              type="number"
+              min={50}
+              max={200}
+              step={1}
+              value={stripLayout.scalePct}
+              onChange={(e) =>
+                onUpdateLayout({
+                  scalePct: Number.isFinite(Number(e.target.value))
+                    ? Number(e.target.value)
+                    : 100,
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-scale"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Item spacing (px)</label>
+            <input
+              type="number"
+              min={0}
+              max={256}
+              step={1}
+              value={stripLayout.itemSpacingPx}
+              onChange={(e) =>
+                onUpdateLayout({
+                  itemSpacingPx: Number.isFinite(Number(e.target.value))
+                    ? Number(e.target.value)
+                    : 0,
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-spacing"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Justification</label>
+            <select
+              value={stripLayout.justification}
+              onChange={(e) =>
+                onUpdateLayout({
+                  justification: e.target
+                    .value as PartnerStripLayoutRow["justification"],
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-justification"
+            >
+              {JUSTIFICATION_OPTIONS.map((j) => (
+                <option key={j} value={j}>
+                  {j}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Z-index</label>
+            <input
+              type="number"
+              min={0}
+              max={40}
+              step={1}
+              value={stripLayout.zIndex}
+              onChange={(e) =>
+                onUpdateLayout({
+                  zIndex: Number.isFinite(Number(e.target.value))
+                    ? Number(e.target.value)
+                    : 12,
+                })
+              }
+              className={inputStyle}
+              data-testid="strip-layout-z-index"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          <PrimaryButton
+            type="button"
+            size="sm"
+            disabled={pending}
+            onClick={onSaveLayout}
+            data-testid="strip-layout-save"
+          >
+            Save layout
+          </PrimaryButton>
+        </div>
+      </div>
+
+      {/* Logo roster */}
+      <div
+        className="mt-4 space-y-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] p-3"
+        data-testid="overlay-design-partners-roster"
+      >
+        <h4 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-2)]">
+          Partner logos · global
+        </h4>
+        {logos.length === 0 ? (
+          <p className="text-xs italic text-[var(--chalk-3)]">
+            No partner logos uploaded yet. Upload one below.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {logos.map((logo) => {
+              const o = overrideMap.get(logo.partnerKey);
+              const enabled = o ? o.visible !== false : true;
+              return (
+                <li
+                  key={logo.partnerKey}
+                  className="flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-2"
+                  data-testid={`partner-logo-${logo.partnerKey}`}
+                >
+                  <div className="flex h-9 w-16 flex-none items-center justify-center overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logo.fileUrl}
+                      alt={logo.alt}
+                      className="h-full w-full object-contain"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display =
+                          "none";
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-xs font-mono text-[var(--chalk-0)]">
+                      {logo.partnerKey}
+                    </span>
+                    <span className="text-[10px] text-[var(--chalk-3)]">
+                      {logo.label} · {logo.dimensionWPx}×{logo.dimensionHPx}
+                    </span>
+                  </div>
+                  <label className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(e) =>
+                        onSetOverride(logo.partnerKey, {
+                          visible: e.target.checked,
+                        })
+                      }
+                      className="h-3.5 w-3.5 cursor-pointer accent-[var(--primary)]"
+                      data-testid={`partner-logo-${logo.partnerKey}-enabled`}
+                    />
+                    On
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={999}
+                    step={1}
+                    placeholder={String(logo.sortOrder)}
+                    value={o?.sortOverride ?? ""}
+                    onChange={(e) =>
+                      onSetOverride(logo.partnerKey, {
+                        sortOverride:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                    className="w-14 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-1 py-0.5 text-center font-mono text-xs text-[var(--chalk-0)] focus:border-[var(--signal)] focus:outline-none"
+                    title="Per-overlay sort override (empty = use global sort_order)"
+                    data-testid={`partner-logo-${logo.partnerKey}-sort`}
+                  />
+                  <SecondaryButton
+                    type="button"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => onRemoveLogo(logo.partnerKey)}
+                    data-testid={`partner-logo-${logo.partnerKey}-remove`}
+                  >
+                    Remove
+                  </SecondaryButton>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <PartnerLogoUploader pending={pending} onUploaded={onUploaded} />
+
+        <p className="text-[10px] italic text-[var(--chalk-3)]">
+          ~600×300 PNG/JPG/WebP/SVG, ≤500 KB. Transparent bg recommended.
+          Tolerance ±10% on dimensions.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Upload widget for new partner logos. Accepts file + label/alt/key/
+ * sort then calls `uploadPartnerLogoAction`. On success the parent
+ * appends the new row to its local roster state so the live preview
+ * picks it up immediately.
+ */
+function PartnerLogoUploader({
+  pending,
+  onUploaded,
+}: {
+  pending: boolean;
+  onUploaded: (logo: PartnerLogoRow) => void;
+}) {
+  const [partnerKey, setPartnerKey] = useState("");
+  const [label, setLabel] = useState("");
+  const [alt, setAlt] = useState("");
+  const [sortOrder, setSortOrder] = useState("99");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const labelStyle =
+    "block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]";
+  const inputStyle =
+    "w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 font-mono text-xs text-[var(--chalk-0)] focus:border-[var(--signal)] focus:outline-none";
+
+  const handleUpload = useCallback(async () => {
+    setUploadError(null);
+    const f = fileInputRef.current?.files?.[0];
+    if (!f) {
+      setUploadError("Select a file first");
+      return;
+    }
+    if (!partnerKey || !label || !alt) {
+      setUploadError("partnerKey, label, alt are all required");
+      return;
+    }
+    const ALLOWED = new Set([
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/svg+xml",
+    ]);
+    if (!ALLOWED.has(f.type)) {
+      setUploadError(`Unsupported type ${f.type}`);
+      return;
+    }
+    if (f.size > 500 * 1024) {
+      setUploadError(
+        `File too large (${(f.size / 1024).toFixed(0)} KB; max 500 KB)`,
+      );
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.set("partnerKey", partnerKey);
+      fd.set("label", label);
+      fd.set("alt", alt);
+      fd.set("sortOrder", sortOrder);
+      fd.set("file", f);
+      const res = await uploadPartnerLogoAction(fd);
+      if (!res.ok) {
+        setUploadError(res.error);
+      } else {
+        onUploaded({
+          partnerKey: res.partnerKey,
+          label,
+          alt,
+          fileUrl: res.fileUrl,
+          sortOrder: Number(sortOrder),
+          // Provisional dimensions — server-side row carries the
+          // probed values, but we don't have them here. The page will
+          // re-resolve on next render.
+          dimensionWPx: 600,
+          dimensionHPx: 300,
+        });
+        // Reset.
+        setPartnerKey("");
+        setLabel("");
+        setAlt("");
+        setSortOrder("99");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : "upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }, [partnerKey, label, alt, sortOrder, onUploaded]);
+
+  return (
+    <div
+      className="space-y-2 rounded-sm border border-dashed border-[var(--ink-4)] bg-[var(--ink-2)] p-2"
+      data-testid="partner-logo-uploader"
+    >
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className={labelStyle}>Partner key</label>
+          <input
+            type="text"
+            value={partnerKey}
+            onChange={(e) => setPartnerKey(e.target.value)}
+            placeholder="my-new-partner"
+            className={inputStyle}
+            data-testid="partner-uploader-key"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className={labelStyle}>Sort order</label>
+          <input
+            type="number"
+            min={0}
+            max={999}
+            step={1}
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className={inputStyle}
+            data-testid="partner-uploader-sort"
+          />
+        </div>
+        <div className="col-span-2 space-y-1">
+          <label className={labelStyle}>Label</label>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="My New Partner"
+            className={inputStyle}
+            data-testid="partner-uploader-label"
+          />
+        </div>
+        <div className="col-span-2 space-y-1">
+          <label className={labelStyle}>Alt text</label>
+          <input
+            type="text"
+            value={alt}
+            onChange={(e) => setAlt(e.target.value)}
+            placeholder="My New Partner logo"
+            className={inputStyle}
+            data-testid="partner-uploader-alt"
+          />
+        </div>
+        <div className="col-span-2 space-y-1">
+          <label className={labelStyle}>File</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            disabled={uploading}
+            data-testid="partner-uploader-file"
+            className="block w-full text-[10px] text-[var(--chalk-2)] file:mr-2 file:rounded-sm file:border file:border-[var(--ink-4)] file:bg-[var(--ink-1)] file:px-2 file:py-1 file:text-[10px] file:font-semibold file:uppercase file:tracking-[0.18em] file:text-[var(--chalk-1)] hover:file:border-[var(--signal)] hover:file:text-[var(--signal)]"
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <PrimaryButton
+          type="button"
+          size="sm"
+          disabled={uploading || pending}
+          onClick={handleUpload}
+          data-testid="partner-uploader-upload"
+        >
+          {uploading ? "Uploading…" : "Upload partner logo"}
+        </PrimaryButton>
+        {uploadError ? (
+          <span
+            className="text-xs text-[var(--flare)]"
+            data-testid="partner-uploader-error"
+          >
+            {uploadError}
+          </span>
+        ) : null}
+      </div>
+    </div>
   );
 }

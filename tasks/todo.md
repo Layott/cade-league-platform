@@ -671,3 +671,47 @@ Per scope discipline (Stage 1 is backend-only):
 - **130 seed rows without HTML attrs** — designers will progressively add `data-element-id` attrs as they touch overlays in subsequent waves. Linter surfaces these as warnings, not errors. Most-edited elements (titles, eyebrows, subtitles, season-marks, partners-strip) ARE attached on the 14 overlays where they exist as discrete DOM nodes.
 - **Adding runtime text elements from the admin UI** — the server action accepts runtime origin + position payload, but the UI doesn't yet render an "Add element" button. Deferred to Stage 3 (where the partner-strip add modal already establishes the pattern).
 - **`ResolvedTextElement.origin` shape mismatch** — the resolver in Stage 1 returns `origin` only on the typed result; the bootstrap doesn't actually need origin (only for the runtime-DOM-injection path which is deferred). Type-safe today; might tighten in Stage 3.
+
+## Wave 2 Stage 3 — Partner strip + logo manager (in flight)
+
+Spec: `docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md` §5.2, §6, §7, §8.
+
+### Plan
+
+- [ ] A. Server actions in `apps/web/src/app/admin/broadcast/v2/design/actions.ts`:
+  - `setStripLayoutAction(formData)` — perm-gated, writes via `upsertStripLayout`.
+  - `uploadPartnerLogoAction(formData)` — file upload with `sharp` dimension probe, ≈600×300 ±10%, ≤500KB, MIME allowlist; writes file to `partner-logos` bucket + DB row via `createPartnerLogo`.
+  - `removePartnerLogoAction(formData)` — soft-delete via `deletePartnerLogo`.
+  - `setLogoOverrideAction(formData)` — per-overlay enable + sort.
+  - All gate via `gate()` (perm + rate-limit) and `revalidatePath` to design page + overlay route.
+- [ ] B. `apps/web/src/server/overlays/design/preview.ts`:
+  - Add `decodePreviewPartnerTokens` — base64-JSON shape allowlist (layout block + logos array).
+- [ ] C. `apps/web/src/app/(overlay)/overlay/v2/[key]/page.tsx`:
+  - Resolve `partnerStrip` via `resolveStripLayout` + `partnerLogos` via `resolvePartnerLogos`.
+  - Decode `previewPartnerTokens` searchParam.
+  - Pass merged map (`layout` + `logos`) onto `OverlayDataInjector` as new props.
+- [ ] D. `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx`:
+  - Accept `designPartnerTokens` + `previewPartnerTokens` props.
+  - Encode + append to iframe URL as `?partnerTokens=` + `?previewPartnerTokens=`.
+- [ ] E. `apps/web/src/components/admin/OverlayDesignEditor.tsx`:
+  - New "Partners" panel between Text + Tokens.
+  - Strip layout: anchor / X / Y / orientation / scale / spacing / justification / z-index / visible toggle.
+  - Logo roster: list, upload widget (file + label/alt/key/sort), remove.
+  - Per-overlay overrides: enable toggle + sort override per logo.
+  - Live preview re-encodes partner tokens (debounce 250 ms).
+- [ ] F. Bootstrap script in `apps/web/scripts/_extend-bootstrap-script.mjs`:
+  - Add partner-token decode + apply (rebuild `<img>` children of `[data-element-id="partners-strip"]`, write inline CSS for layout: position/transform/orientation/spacing).
+  - Re-run script on all 16 overlays at `KNOWLEDGE/...` and re-sync to `apps/web/public/overlays/v2/...`.
+  - Add `data-element-id="partners-strip"` to overlays missing it (06-h2h-5, 10-up-next-bug, 17-penalties).
+- [ ] G. Tests:
+  - `actions.test.ts` — extend with new action perm/rate-limit/dimension tests.
+  - `OverlayDesignEditor.test.tsx` — extend with Partners section render + save.
+  - `preview.test.ts` (or inline in existing) — `decodePreviewPartnerTokens` shape validation.
+  - E2E `apps/web/tests/e2e/overlay-design-partners.spec.ts` — login admin, upload PNG, enable for overlay, reposition, assert iframe re-renders.
+- [ ] H. Verification:
+  - `npx vitest run` — all green.
+  - `npm run lint` — clean.
+  - `npm run build` — clean.
+  - `node apps/web/scripts/_check-element-id-parity.mjs` — should reduce warnings.
+  - Manual smoke via Claude-in-Chrome: admin upload PNG → enable on `01-brb` → reposition strip → confirm iframe re-renders.
+- [ ] I. Commit + push.

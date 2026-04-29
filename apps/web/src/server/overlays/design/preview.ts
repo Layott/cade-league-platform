@@ -239,3 +239,138 @@ export async function decodePreviewTextTokens(
   if (!result.success) return null;
   return result.data;
 }
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 3 — partner-strip preview decoder                     *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Strip-layout shape mirrors `PartnerStripLayout` from
+ * `apps/web/src/server/overlays/partners/strip.ts`. Strict so unknown
+ * keys (typos / hostile input) drop the whole map silently to null.
+ *
+ * Anchor / orientation / justification enums match the DB CHECK
+ * constraints (migration `20260620000002`). Numeric ranges mirror the
+ * server-side `validateInput()` so an admin live-preview cannot push
+ * out-of-range layouts.
+ */
+const PARTNER_ANCHOR_VALUES = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "middle-left",
+  "middle-center",
+  "middle-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+] as const;
+const PARTNER_ORIENTATION_VALUES = ["horizontal", "vertical"] as const;
+const PARTNER_JUSTIFICATION_VALUES = [
+  "start",
+  "center",
+  "end",
+  "space-between",
+] as const;
+
+const PartnerStripLayoutSchema = z
+  .object({
+    visible: z.boolean(),
+    positionXPx: z.number().int().min(-1920).max(1920),
+    positionYPx: z.number().int().min(-1080).max(1080),
+    anchor: z.enum(
+      PARTNER_ANCHOR_VALUES as readonly string[] as [string, ...string[]],
+    ),
+    orientation: z.enum(
+      PARTNER_ORIENTATION_VALUES as readonly string[] as [string, ...string[]],
+    ),
+    scalePct: z.number().int().min(50).max(200),
+    itemSpacingPx: z.number().int().min(0).max(256),
+    justification: z.enum(
+      PARTNER_JUSTIFICATION_VALUES as readonly string[] as [string, ...string[]],
+    ),
+    zIndex: z.number().int().min(0).max(40),
+  })
+  .strict();
+
+/**
+ * Logo entry for the preview channel. `fileUrl` is rendered straight
+ * into the iframe so we screen for CSS / HTML metacharacters AND require
+ * a valid http(s) or root-relative URL — defence-in-depth on top of the
+ * server-side validation in `partners/logos.ts::validateLogoInput`.
+ *
+ * `partnerKey` MUST match the kebab-case rule from the DB unique index
+ * so a hostile preview can't synthesise a logo with `;evil` characters.
+ */
+const URL_RE = /^(\/[^?]*|https?:\/\/[^\s<>"']{1,500})$/;
+const PARTNER_KEY_RE = /^[a-z][a-z0-9-]{0,63}$/;
+
+const PartnerLogoEntrySchema = z
+  .object({
+    partnerKey: z.string().regex(PARTNER_KEY_RE),
+    label: z
+      .string()
+      .max(200)
+      .refine((v) => !/[<>]/.test(v), {
+        message: "label cannot contain < or >",
+      }),
+    alt: z
+      .string()
+      .max(200)
+      .refine((v) => !/[<>]/.test(v), {
+        message: "alt cannot contain < or >",
+      }),
+    fileUrl: z
+      .string()
+      .max(1000)
+      .refine((v) => URL_RE.test(v), { message: "fileUrl must be url" })
+      .refine((v) => !FORBIDDEN_CHARS.test(v), {
+        message: "fileUrl contains forbidden CSS/HTML metacharacter",
+      }),
+    visible: z.boolean().optional(),
+    sort: z.number().int().min(0).max(999).optional(),
+  })
+  .strict();
+
+const PreviewPartnerTokensSchema = z
+  .object({
+    layout: PartnerStripLayoutSchema.optional(),
+    logos: z.array(PartnerLogoEntrySchema).max(32).optional(),
+  })
+  .strict();
+
+export type PreviewPartnerTokens = z.infer<typeof PreviewPartnerTokensSchema>;
+
+/**
+ * Decode `?previewPartnerTokens=<base64>` into a typed map. Returns
+ * null on any failure (missing param, malformed b64/JSON, schema
+ * mismatch). Used by the admin live-preview path so dragging the
+ * partner-strip position slider re-renders the iframe without saving.
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.6, §6.2
+ */
+export async function decodePreviewPartnerTokens(
+  raw: string | undefined | null,
+): Promise<PreviewPartnerTokens | null> {
+  if (!raw) return null;
+  let json: string;
+  try {
+    const padded = raw.replaceAll("-", "+").replaceAll("_", "/");
+    const padLen = padded.length % 4 === 0 ? 0 : 4 - (padded.length % 4);
+    const fullPadded = padded + "=".repeat(padLen);
+    json = Buffer.from(fullPadded, "base64").toString("utf-8");
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  const result = PreviewPartnerTokensSchema.safeParse(parsed);
+  if (!result.success) return null;
+  return result.data;
+}

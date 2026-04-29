@@ -231,6 +231,67 @@ export type OverlayDataInjectorProps = {
       styles?: Record<string, string | number>;
     }
   >;
+  /**
+   * Wave 2 Stage 3 — partner-strip layout + logo roster resolved
+   * server-side from `overlay_partner_strip_layout` +
+   * `overlay_partner_logos` + `overlay_partner_logo_overrides`. Encoded
+   * onto the iframe URL as `?partnerTokens=<b64>`. The bootstrap
+   * decodes the param, rebuilds `<img>` children of the
+   * `[data-element-id="partners-strip"]` container, and applies the
+   * layout's anchor / position / scale / orientation / spacing as
+   * inline CSS.
+   *
+   * Empty / undefined map → bootstrap leaves the overlay's hard-coded
+   * default partner imagery in place (backward-compat invariant #1).
+   */
+  designPartnerTokens?: {
+    layout?: {
+      visible: boolean;
+      positionXPx: number;
+      positionYPx: number;
+      anchor: string;
+      orientation: string;
+      scalePct: number;
+      itemSpacingPx: number;
+      justification: string;
+      zIndex: number;
+    };
+    logos?: ReadonlyArray<{
+      partnerKey: string;
+      label: string;
+      alt: string;
+      fileUrl: string;
+      visible?: boolean;
+      sort?: number;
+    }>;
+  };
+  /**
+   * Wave 2 Stage 3 — admin live-preview partner overrides. Same wire as
+   * `designPartnerTokens` but encoded as `?previewPartnerTokens=`. The
+   * bootstrap re-runs the partner-rebuild handler so preview wins by
+   * being applied second.
+   */
+  previewPartnerTokens?: {
+    layout?: {
+      visible: boolean;
+      positionXPx: number;
+      positionYPx: number;
+      anchor: string;
+      orientation: string;
+      scalePct: number;
+      itemSpacingPx: number;
+      justification: string;
+      zIndex: number;
+    };
+    logos?: ReadonlyArray<{
+      partnerKey: string;
+      label: string;
+      alt: string;
+      fileUrl: string;
+      visible?: boolean;
+      sort?: number;
+    }>;
+  };
 };
 
 /**
@@ -294,6 +355,8 @@ export default function OverlayDataInjector({
   previewTokens,
   designTextTokens,
   previewTextTokens,
+  designPartnerTokens,
+  previewPartnerTokens,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -767,6 +830,31 @@ export default function OverlayDataInjector({
       previewTextTokens as unknown as Record<string, unknown>,
     );
     if (enc) params.set("previewTextTokens", enc);
+  }
+  // Wave 2 Stage 3 — partner-strip + logo roster overrides.
+  // Bootstrap rebuilds the partner-strip container's <img> children +
+  // applies layout CSS (transform / orientation / spacing / position).
+  // Empty maps skip the URL param to keep the iframe URL clean.
+  if (
+    designPartnerTokens &&
+    (designPartnerTokens.layout != null ||
+      (designPartnerTokens.logos && designPartnerTokens.logos.length > 0))
+  ) {
+    const enc = encodeTextTokensParam(
+      designPartnerTokens as unknown as Record<string, unknown>,
+    );
+    if (enc) params.set("partnerTokens", enc);
+  }
+  if (
+    previewPartnerTokens &&
+    (previewPartnerTokens.layout != null ||
+      (previewPartnerTokens.logos &&
+        previewPartnerTokens.logos.length > 0))
+  ) {
+    const enc = encodeTextTokensParam(
+      previewPartnerTokens as unknown as Record<string, unknown>,
+    );
+    if (enc) params.set("previewPartnerTokens", enc);
   }
   const qs = params.toString();
   const src = `/overlays/v2/${overlayKey}/index.html${qs ? `?${qs}` : ""}`;

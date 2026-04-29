@@ -54,9 +54,24 @@ vi.mock("@/lib/supabase/server", () => ({
   getServerSupabase: () => userClientMock,
 }));
 
-const serviceClientMock = vi.hoisted(() => ({}));
+const storageUploadMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ data: {}, error: null }),
+);
+const storagePublicUrlMock = vi.hoisted(() =>
+  vi.fn().mockReturnValue({
+    data: { publicUrl: "https://supabase.local/partner-logos/test.png" },
+  }),
+);
+const storageFromMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    upload: storageUploadMock,
+    getPublicUrl: storagePublicUrlMock,
+  })),
+);
 vi.mock("@/lib/supabase/service", () => ({
-  getServiceRoleSupabase: () => serviceClientMock,
+  getServiceRoleSupabase: () => ({
+    storage: { from: storageFromMock },
+  }),
 }));
 
 const { requirePermAsyncMock, FakePermissionError } = vi.hoisted(() => {
@@ -108,12 +123,51 @@ vi.mock("@/server/overlays/text/elements", () => ({
   getTextElement: getTextElementMock,
 }));
 
+// Wave 2 Stage 3 — partner-strip + logo CRUD mocks.
+const upsertStripLayoutMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ id: "row-1" }),
+);
+vi.mock("@/server/overlays/partners/strip", () => ({
+  upsertStripLayout: upsertStripLayoutMock,
+}));
+
+const createPartnerLogoMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ id: "row-1", partnerKey: "p" }),
+);
+const deletePartnerLogoMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const setLogoOverrideMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ id: "row-1" }),
+);
+vi.mock("@/server/overlays/partners/logos", () => ({
+  createPartnerLogo: createPartnerLogoMock,
+  deletePartnerLogo: deletePartnerLogoMock,
+  setLogoOverride: setLogoOverrideMock,
+}));
+
+// `sharp` mock — yields configurable metadata so we can simulate good
+// dimensions (600×300), under-sized, oversize, and "could not read".
+const sharpMetadataMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ width: 600, height: 300 }),
+);
+const sharpDefaultMock = vi.hoisted(() => {
+  return vi.fn(() => ({
+    metadata: sharpMetadataMock,
+  }));
+});
+vi.mock("sharp", () => ({ default: sharpDefaultMock }));
+
 import {
   saveTokensAction,
   setActiveTemplateAction,
   revertToSnapshotAction,
   setTextElementAction,
   clearTextElementAction,
+  setStripLayoutAction,
+  uploadPartnerLogoAction,
+  removePartnerLogoAction,
+  setLogoOverrideAction,
 } from "./actions";
 
 beforeEach(() => {
@@ -127,6 +181,20 @@ beforeEach(() => {
   revertToSnapshotMock.mockClear().mockResolvedValue(undefined);
   upsertTextElementMock.mockReset().mockResolvedValue({ id: "row-1" });
   getTextElementMock.mockReset().mockResolvedValue(null);
+  upsertStripLayoutMock.mockReset().mockResolvedValue({ id: "row-1" });
+  createPartnerLogoMock.mockReset().mockResolvedValue({
+    id: "row-1",
+    partnerKey: "p",
+  });
+  deletePartnerLogoMock.mockReset().mockResolvedValue(undefined);
+  setLogoOverrideMock.mockReset().mockResolvedValue({ id: "row-1" });
+  sharpMetadataMock.mockReset().mockResolvedValue({ width: 600, height: 300 });
+  sharpDefaultMock.mockClear();
+  storageUploadMock.mockReset().mockResolvedValue({ data: {}, error: null });
+  storagePublicUrlMock.mockReset().mockReturnValue({
+    data: { publicUrl: "https://supabase.local/partner-logos/test.png" },
+  });
+  storageFromMock.mockClear();
 });
 
 function fdSave(overlayKey: string, variantId: string, tokens: object): FormData {
@@ -502,5 +570,352 @@ describe("clearTextElementAction (Wave 2 Stage 2)", () => {
       fontSizePx: null,
       color: null,
     });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 3 — partner strip + logo manager                      *
+ * ------------------------------------------------------------------ */
+
+function fdLayout(
+  overlayKey: string,
+  fields: Partial<{
+    variantId: string;
+    visible: string;
+    positionXPx: string;
+    positionYPx: string;
+    anchor: string;
+    orientation: string;
+    scalePct: string;
+    itemSpacingPx: string;
+    justification: string;
+    zIndex: string;
+  }> = {},
+): FormData {
+  const fd = new FormData();
+  fd.set("overlayKey", overlayKey);
+  fd.set("variantId", fields.variantId ?? "default");
+  fd.set("visible", fields.visible ?? "true");
+  fd.set("positionXPx", fields.positionXPx ?? "0");
+  fd.set("positionYPx", fields.positionYPx ?? "1020");
+  fd.set("anchor", fields.anchor ?? "bottom-center");
+  fd.set("orientation", fields.orientation ?? "horizontal");
+  fd.set("scalePct", fields.scalePct ?? "100");
+  fd.set("itemSpacingPx", fields.itemSpacingPx ?? "64");
+  fd.set("justification", fields.justification ?? "center");
+  fd.set("zIndex", fields.zIndex ?? "12");
+  return fd;
+}
+
+describe("setStripLayoutAction (Wave 2 Stage 3)", () => {
+  it("rejects when actor lacks overlay.design.manage", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new FakePermissionError("missing permission: overlay.design.manage"),
+    );
+    await expect(setStripLayoutAction(fdLayout("01-brb"))).rejects.toThrow(
+      /Forbidden|overlay\.design\.manage/,
+    );
+    expect(upsertStripLayoutMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown overlayKey", async () => {
+    await expect(
+      setStripLayoutAction(fdLayout("not-a-real-key")),
+    ).rejects.toThrow();
+    expect(upsertStripLayoutMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown anchor", async () => {
+    await expect(
+      setStripLayoutAction(fdLayout("01-brb", { anchor: "way-off" })),
+    ).rejects.toThrow();
+  });
+
+  it("rejects scale out of range", async () => {
+    await expect(
+      setStripLayoutAction(fdLayout("01-brb", { scalePct: "999" })),
+    ).rejects.toThrow();
+  });
+
+  it("propagates rate_limited", async () => {
+    enforceAuthedWriteMock.mockResolvedValueOnce(true);
+    await expect(setStripLayoutAction(fdLayout("01-brb"))).rejects.toThrow(
+      /rate_limited/,
+    );
+  });
+
+  it("delegates to upsertStripLayout on success + revalidates", async () => {
+    await setStripLayoutAction(
+      fdLayout("01-brb", {
+        anchor: "top-right",
+        positionXPx: "1820",
+        positionYPx: "100",
+        scalePct: "150",
+      }),
+    );
+    expect(upsertStripLayoutMock).toHaveBeenCalledTimes(1);
+    const call = upsertStripLayoutMock.mock.calls[0];
+    expect(call[2]).toMatchObject({
+      overlayKey: "01-brb",
+      variantId: "default",
+      anchor: "top-right",
+      positionXPx: 1820,
+      positionYPx: 100,
+      scalePct: 150,
+      visible: true,
+    });
+    expect(revalidateMock).toHaveBeenCalledWith(
+      "/admin/broadcast/v2/design",
+    );
+    expect(revalidateMock).toHaveBeenCalledWith("/overlay/v2/01-brb", "page");
+  });
+});
+
+function makeFile(
+  bytes: number,
+  type: string,
+  name = "logo.png",
+): File {
+  const arr = new Uint8Array(bytes);
+  return new File([arr], name, { type });
+}
+
+function fdUpload(
+  overrides: Partial<{
+    partnerKey: string;
+    label: string;
+    alt: string;
+    sortOrder: string;
+    file: File | string | null;
+  }> = {},
+): FormData {
+  const fd = new FormData();
+  fd.set("partnerKey", overrides.partnerKey ?? "newpartner");
+  fd.set("label", overrides.label ?? "New Partner");
+  fd.set("alt", overrides.alt ?? "New Partner logo");
+  fd.set("sortOrder", overrides.sortOrder ?? "5");
+  if (overrides.file !== null) {
+    const f =
+      overrides.file instanceof File
+        ? overrides.file
+        : makeFile(2048, "image/png");
+    fd.set("file", f);
+  }
+  return fd;
+}
+
+describe("uploadPartnerLogoAction (Wave 2 Stage 3)", () => {
+  it("rejects bad partnerKey", async () => {
+    const r = await uploadPartnerLogoAction(
+      fdUpload({ partnerKey: "Bad Key" }),
+    );
+    expect(r.ok).toBe(false);
+    expect(createPartnerLogoMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty label", async () => {
+    const r = await uploadPartnerLogoAction(fdUpload({ label: "" }));
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects unsupported MIME", async () => {
+    const r = await uploadPartnerLogoAction(
+      fdUpload({ file: makeFile(2048, "application/pdf", "x.pdf") }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/MIME/i);
+  });
+
+  it("rejects oversize file (>500 KB)", async () => {
+    const big = makeFile(600 * 1024, "image/png");
+    const r = await uploadPartnerLogoAction(fdUpload({ file: big }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/too large/i);
+  });
+
+  it("rejects empty file", async () => {
+    const empty = makeFile(0, "image/png");
+    const r = await uploadPartnerLogoAction(fdUpload({ file: empty }));
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects under-sized image", async () => {
+    sharpMetadataMock.mockResolvedValueOnce({ width: 200, height: 100 });
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toMatch(/600.*300/);
+      expect(r.actualDimensions).toEqual({ w: 200, h: 100 });
+    }
+  });
+
+  it("rejects oversized image", async () => {
+    sharpMetadataMock.mockResolvedValueOnce({ width: 1200, height: 600 });
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.actualDimensions).toEqual({ w: 1200, h: 600 });
+  });
+
+  it("accepts on-tolerance image (660 × 270)", async () => {
+    sharpMetadataMock.mockResolvedValueOnce({ width: 660, height: 270 });
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(true);
+    expect(createPartnerLogoMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("bypasses dimension check for SVG", async () => {
+    // SVG path skips sharp probe entirely; dimensions default to 600×300.
+    const svg = makeFile(2048, "image/svg+xml", "x.svg");
+    const r = await uploadPartnerLogoAction(fdUpload({ file: svg }));
+    expect(r.ok).toBe(true);
+    expect(sharpDefaultMock).not.toHaveBeenCalled();
+    expect(createPartnerLogoMock).toHaveBeenCalledTimes(1);
+    const callInput = createPartnerLogoMock.mock.calls[0][2];
+    expect(callInput).toMatchObject({
+      partnerKey: "newpartner",
+      dimensionWPx: 600,
+      dimensionHPx: 300,
+    });
+  });
+
+  it("rejects when actor lacks overlay.design.manage", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new FakePermissionError("missing permission: overlay.design.manage"),
+    );
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(false);
+    expect(createPartnerLogoMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates rate_limited", async () => {
+    enforceAuthedWriteMock.mockResolvedValueOnce(true);
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/rate_limited/);
+  });
+
+  it("returns ok + URL on success and revalidates", async () => {
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.partnerKey).toBe("newpartner");
+      expect(r.fileUrl).toContain("supabase.local");
+    }
+    expect(storageUploadMock).toHaveBeenCalledTimes(1);
+    expect(createPartnerLogoMock).toHaveBeenCalledTimes(1);
+    expect(revalidateMock).toHaveBeenCalledWith(
+      "/admin/broadcast/v2/design",
+    );
+  });
+
+  it("surfaces storage upload errors", async () => {
+    storageUploadMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "bucket full" },
+    });
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/bucket full/);
+    expect(createPartnerLogoMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("removePartnerLogoAction (Wave 2 Stage 3)", () => {
+  it("rejects bad partnerKey", async () => {
+    const fd = new FormData();
+    fd.set("partnerKey", "Bad Key");
+    await expect(removePartnerLogoAction(fd)).rejects.toThrow();
+    expect(deletePartnerLogoMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects when actor lacks perm", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new FakePermissionError("missing permission: overlay.design.manage"),
+    );
+    const fd = new FormData();
+    fd.set("partnerKey", "gameevo");
+    await expect(removePartnerLogoAction(fd)).rejects.toThrow(
+      /Forbidden|overlay\.design\.manage/,
+    );
+  });
+
+  it("delegates to deletePartnerLogo on success", async () => {
+    const fd = new FormData();
+    fd.set("partnerKey", "gameevo");
+    await removePartnerLogoAction(fd);
+    expect(deletePartnerLogoMock).toHaveBeenCalledTimes(1);
+    expect(deletePartnerLogoMock.mock.calls[0][2]).toBe("gameevo");
+    expect(revalidateMock).toHaveBeenCalledWith(
+      "/admin/broadcast/v2/design",
+    );
+  });
+});
+
+describe("setLogoOverrideAction (Wave 2 Stage 3)", () => {
+  function fdOverride(
+    overrides: Partial<{
+      overlayKey: string;
+      variantId: string;
+      partnerKey: string;
+      visible: string;
+      sortOverride: string;
+    }> = {},
+  ): FormData {
+    const fd = new FormData();
+    fd.set("overlayKey", overrides.overlayKey ?? "01-brb");
+    fd.set("variantId", overrides.variantId ?? "default");
+    fd.set("partnerKey", overrides.partnerKey ?? "gameevo");
+    fd.set("visible", overrides.visible ?? "true");
+    if (overrides.sortOverride != null) {
+      fd.set("sortOverride", overrides.sortOverride);
+    }
+    return fd;
+  }
+
+  it("rejects unknown overlayKey", async () => {
+    await expect(
+      setLogoOverrideAction(fdOverride({ overlayKey: "not-a-real-key" })),
+    ).rejects.toThrow();
+  });
+
+  it("rejects bad partnerKey", async () => {
+    await expect(
+      setLogoOverrideAction(fdOverride({ partnerKey: "Bad Key" })),
+    ).rejects.toThrow();
+  });
+
+  it("rejects sortOverride out of range", async () => {
+    await expect(
+      setLogoOverrideAction(fdOverride({ sortOverride: "1500" })),
+    ).rejects.toThrow();
+  });
+
+  it("upserts override (visible=false) on success", async () => {
+    await setLogoOverrideAction(fdOverride({ visible: "false" }));
+    expect(setLogoOverrideMock).toHaveBeenCalledTimes(1);
+    const callInput = setLogoOverrideMock.mock.calls[0][2];
+    expect(callInput).toMatchObject({
+      overlayKey: "01-brb",
+      variantId: "default",
+      partnerKey: "gameevo",
+      visible: false,
+      sortOverride: null,
+    });
+    expect(revalidateMock).toHaveBeenCalledWith("/overlay/v2/01-brb", "page");
+  });
+
+  it("accepts numeric sortOverride", async () => {
+    await setLogoOverrideAction(fdOverride({ sortOverride: "3" }));
+    const callInput = setLogoOverrideMock.mock.calls[0][2];
+    expect(callInput).toMatchObject({ sortOverride: 3 });
+  });
+
+  it("rejects when actor lacks perm", async () => {
+    requirePermAsyncMock.mockRejectedValueOnce(
+      new FakePermissionError("missing permission: overlay.design.manage"),
+    );
+    await expect(setLogoOverrideAction(fdOverride())).rejects.toThrow(
+      /Forbidden|overlay\.design\.manage/,
+    );
   });
 });

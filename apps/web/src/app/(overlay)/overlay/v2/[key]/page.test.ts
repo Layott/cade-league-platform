@@ -77,6 +77,18 @@ vi.mock("@/server/overlays/text/elements", () => ({
   resolveTextElements: resolveTextElementsMock,
 }));
 
+// Wave 2 Stage 3 — overlay route now resolves partner-strip layout +
+// logo roster alongside the other tokens. Mock null/empty so the
+// existing snapshot tests still see the design-token block populate.
+const resolveStripLayoutMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+vi.mock("@/server/overlays/partners/strip", () => ({
+  resolveStripLayout: resolveStripLayoutMock,
+}));
+const resolvePartnerLogosMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock("@/server/overlays/partners/logos", () => ({
+  resolvePartnerLogos: resolvePartnerLogosMock,
+}));
+
 import OverlayV2Page from "./page";
 
 beforeEach(() => {
@@ -84,6 +96,8 @@ beforeEach(() => {
   resolveTokensMock.mockClear();
   getActiveTemplateVariantMock.mockClear();
   resolveTextElementsMock.mockClear();
+  resolveStripLayoutMock.mockReset().mockResolvedValue(null);
+  resolvePartnerLogosMock.mockReset().mockResolvedValue([]);
 });
 
 /** Render the React tree to a flat string of element tags + props text. */

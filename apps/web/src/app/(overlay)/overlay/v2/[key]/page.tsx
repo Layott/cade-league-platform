@@ -10,10 +10,20 @@ import { getActiveTemplateVariant } from "@/server/overlays/design/templates";
 import {
   decodePreviewTokens,
   decodePreviewTextTokens,
+  decodePreviewPartnerTokens,
   escapeCssValue,
   type PreviewTextTokens,
+  type PreviewPartnerTokens,
 } from "@/server/overlays/design/preview";
 import { resolveTextElements, type ResolvedTextElement } from "@/server/overlays/text/elements";
+import {
+  resolveStripLayout,
+  type PartnerStripLayout,
+} from "@/server/overlays/partners/strip";
+import {
+  resolvePartnerLogos,
+  type PartnerLogo,
+} from "@/server/overlays/partners/logos";
 
 /**
  * Resolve the active season for a given broadcast session via
@@ -124,6 +134,7 @@ type SearchParams = {
   variant?: string;
   previewTokens?: string;
   previewTextTokens?: string;
+  previewPartnerTokens?: string;
 };
 
 /**
@@ -159,6 +170,7 @@ export default async function OverlayV2Page({
     variant,
     previewTokens: previewTokensRaw,
     previewTextTokens: previewTextTokensRaw,
+    previewPartnerTokens: previewPartnerTokensRaw,
   } = await searchParams;
   if (!ALLOWED_KEYS.has(key)) {
     const alias = KEY_ALIASES[key];
@@ -176,6 +188,12 @@ export default async function OverlayV2Page({
   let designTokens: Record<string, string> = {};
   let activeVariantId: string | null = null;
   let designTextTokens: Record<string, ResolvedTextElement> = {};
+  // Wave 2 Stage 3 — partner-strip layout + logo roster.
+  // Bootstrap rebuilds the partner-strip container's <img> children +
+  // applies layout CSS. Empty maps preserve hard-coded HTML defaults
+  // (backward-compat invariant #1).
+  let partnerStrip: PartnerStripLayout | null = null;
+  let partnerLogos: PartnerLogo[] = [];
   try {
     const sbDesign = getServiceRoleSupabase();
     const variantRow = variant
@@ -188,16 +206,53 @@ export default async function OverlayV2Page({
     // admin has touched a text element yet — keeps backward-compat
     // invariant #1 (default render is byte-identical pre-Wave-2).
     designTextTokens = await resolveTextElements(sbDesign, key, activeVariantId);
+    partnerStrip = await resolveStripLayout(sbDesign, key, activeVariantId);
+    partnerLogos = await resolvePartnerLogos(sbDesign, key, activeVariantId);
   } catch {
     // Token resolution failure must not break the overlay route. Fall
     // back to the canonical HTML defaults.
     designTokens = {};
     designTextTokens = {};
+    partnerStrip = null;
+    partnerLogos = [];
   }
   const previewTokens = await decodePreviewTokens(previewTokensRaw);
   const previewTextTokens: PreviewTextTokens | null = await decodePreviewTextTokens(
     previewTextTokensRaw,
   );
+  const previewPartnerTokens: PreviewPartnerTokens | null =
+    await decodePreviewPartnerTokens(previewPartnerTokensRaw);
+
+  // Build the merged partner token map for the iframe bootstrap. Only
+  // surface the param when the admin has actually persisted layout /
+  // logos OR the resolver returned at least one logo (the seed has 5
+  // logos). Empty map → bootstrap leaves HTML defaults alone.
+  const designPartnerTokens =
+    partnerStrip || partnerLogos.length > 0
+      ? {
+          layout: partnerStrip
+            ? {
+                visible: partnerStrip.visible,
+                positionXPx: partnerStrip.positionXPx,
+                positionYPx: partnerStrip.positionYPx,
+                anchor: partnerStrip.anchor,
+                orientation: partnerStrip.orientation,
+                scalePct: partnerStrip.scalePct,
+                itemSpacingPx: partnerStrip.itemSpacingPx,
+                justification: partnerStrip.justification,
+                zIndex: partnerStrip.zIndex,
+              }
+            : undefined,
+          logos: partnerLogos.map((l, i) => ({
+            partnerKey: l.partnerKey,
+            label: l.label,
+            alt: l.alt,
+            fileUrl: l.fileUrl,
+            visible: true,
+            sort: l.sortOrder ?? i,
+          })),
+        }
+      : undefined;
   const cssVarRule = buildCssVarRule(designTokens);
   const previewVarRule = previewTokens ? buildCssVarRule(previewTokens) : null;
 
@@ -322,6 +377,8 @@ export default async function OverlayV2Page({
         previewTokens={previewTokens ?? undefined}
         designTextTokens={designTextTokens}
         previewTextTokens={previewTextTokens ?? undefined}
+        designPartnerTokens={designPartnerTokens}
+        previewPartnerTokens={previewPartnerTokens ?? undefined}
       />
     </>
   );

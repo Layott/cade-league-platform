@@ -40,34 +40,107 @@ const SEED_PATH = resolve(
   "20260620000007_overlay_text_elements_seed.sql",
 );
 
+/**
+ * Additional seed augments — Stage 3 added partners-strip rows for
+ * 06-h2h-5 + 17-penalties via a follow-up migration so the original
+ * 20260620000007 stays immutable on already-deployed envs.
+ */
+const SEED_AUGMENTS = [
+  resolve(
+    REPO_ROOT,
+    "supabase",
+    "migrations",
+    "20260620000009_overlay_text_elements_partners_strip_extra.sql",
+  ),
+];
+
 /** Extract every (overlay_key, element_id) tuple from the seed migration. */
 async function loadSeedCatalog() {
   if (!existsSync(SEED_PATH)) {
     throw new Error(`seed migration not found: ${SEED_PATH}`);
   }
-  const sql = await readFile(SEED_PATH, "utf8");
+  const out = new Map();
   // INSERT VALUES rows look like:
   //   ('01-brb', 'default', 'kicker', 'seed', 'eyebrow', '', v_set_by),
   // Tolerate whitespace / column count drift via a relaxed regex.
   const ROW_RE =
     /\(\s*'([0-9]{2}-[a-z0-9-]+)'\s*,\s*'[^']*'\s*,\s*'([a-z][a-z0-9-]*)'/g;
-  const out = new Map();
-  for (const m of sql.matchAll(ROW_RE)) {
-    const overlay = m[1];
-    const elementId = m[2];
-    if (!out.has(overlay)) out.set(overlay, new Set());
-    out.get(overlay).add(elementId);
+
+  for (const path of [SEED_PATH, ...SEED_AUGMENTS]) {
+    if (!existsSync(path)) continue;
+    const sql = await readFile(path, "utf8");
+    for (const m of sql.matchAll(ROW_RE)) {
+      const overlay = m[1];
+      const elementId = m[2];
+      if (!out.has(overlay)) out.set(overlay, new Set());
+      out.get(overlay).add(elementId);
+    }
   }
   return out;
 }
 
-/** Extract every `data-element-id="..."` from a single HTML file. */
+/**
+ * Extract every `data-element-id="..."` from a single HTML file.
+ *
+ * Strips `<!-- ... -->` comments AND `<script>...</script>` blocks
+ * before scanning so the inline cade-token-bootstrap script (which
+ * contains the literal `data-element-id="partners-strip"` selector)
+ * doesn't masquerade as a real DOM attr. Comments first because some
+ * overlays embed `<script>` strings inside `<!-- ... -->` blocks
+ * (e.g. design notes referencing the bootstrap), which would otherwise
+ * confuse the script-stripping regex.
+ */
 async function readHtmlElementIds(htmlPath) {
   if (!existsSync(htmlPath)) return new Set();
-  const html = await readFile(htmlPath, "utf8");
+  let html = await readFile(htmlPath, "utf8");
+  // 1. Strip HTML comments first.
+  html = html.replace(/<!--[\s\S]*?-->/g, "");
+  // 2. Iterative strip: walk forward, find the next opening
+  //    `<script>` or `<style>` tag, take whichever comes FIRST, and
+  //    strip up to its closing tag. Then repeat. This handles the
+  //    awkward case where a JS string inside a <script> contains the
+  //    literal "<style>" (e.g. comments referencing the bootstrap)
+  //    OR a CSS `/* ... */` block contains "<script>" (e.g. design
+  //    notes). The naive two-pass strip mis-pairs those.
+  let cleaned = "";
+  let i = 0;
+  while (i < html.length) {
+    // Find next <script or <style (case-insensitive).
+    const nextScript = html.toLowerCase().indexOf("<script", i);
+    const nextStyle = html.toLowerCase().indexOf("<style", i);
+    let nextOpen = -1;
+    let closeTag = "";
+    if (nextScript === -1 && nextStyle === -1) {
+      cleaned += html.slice(i);
+      break;
+    }
+    if (nextScript === -1) {
+      nextOpen = nextStyle;
+      closeTag = "</style>";
+    } else if (nextStyle === -1) {
+      nextOpen = nextScript;
+      closeTag = "</script>";
+    } else {
+      if (nextScript < nextStyle) {
+        nextOpen = nextScript;
+        closeTag = "</script>";
+      } else {
+        nextOpen = nextStyle;
+        closeTag = "</style>";
+      }
+    }
+    cleaned += html.slice(i, nextOpen);
+    // Skip past the matching closing tag.
+    const close = html.toLowerCase().indexOf(closeTag, nextOpen);
+    if (close === -1) {
+      // Unclosed tag — bail and append the rest.
+      break;
+    }
+    i = close + closeTag.length;
+  }
   const out = new Set();
   const RE = /data-element-id\s*=\s*["']([a-z][a-z0-9-]*)["']/g;
-  for (const m of html.matchAll(RE)) {
+  for (const m of cleaned.matchAll(RE)) {
     out.add(m[1]);
   }
   return out;

@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import OverlayDesignEditor, {
   type CatalogEntry,
+  type PartnerLogoRow,
+  type PartnerStripLayoutRow,
   type TextElementRow,
 } from "./OverlayDesignEditor";
 
@@ -36,12 +38,32 @@ const saveTokensMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const uploadOverlayBgMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ ok: true, url: "/x.png" }),
 );
+const setStripLayoutMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const uploadPartnerLogoMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    ok: true,
+    partnerKey: "newpartner",
+    fileUrl: "https://supabase.local/x.png",
+  }),
+);
+const removePartnerLogoMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
+const setLogoOverrideMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined),
+);
 
 vi.mock("@/app/admin/broadcast/v2/design/actions", () => ({
   saveTokensAction: saveTokensMock,
   uploadOverlayBgAction: uploadOverlayBgMock,
   setTextElementAction: setTextElementMock,
   clearTextElementAction: clearTextElementMock,
+  setStripLayoutAction: setStripLayoutMock,
+  uploadPartnerLogoAction: uploadPartnerLogoMock,
+  removePartnerLogoAction: removePartnerLogoMock,
+  setLogoOverrideAction: setLogoOverrideMock,
 }));
 
 const CATALOG: CatalogEntry[] = [
@@ -76,6 +98,10 @@ beforeEach(() => {
   setTextElementMock.mockClear();
   clearTextElementMock.mockClear();
   saveTokensMock.mockClear();
+  setStripLayoutMock.mockClear();
+  uploadPartnerLogoMock.mockClear();
+  removePartnerLogoMock.mockClear();
+  setLogoOverrideMock.mockClear();
 });
 
 afterEach(() => cleanup());
@@ -209,5 +235,221 @@ describe("OverlayDesignEditor — Text section (Wave 2 Stage 2)", () => {
     expect(clearTextElementMock).toHaveBeenCalledTimes(1);
     const fd = clearTextElementMock.mock.calls[0][0] as FormData;
     expect(fd.get("elementId")).toBe("title");
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 3 — Partners panel                                    *
+ * ------------------------------------------------------------------ */
+
+const SAMPLE_LAYOUT: PartnerStripLayoutRow = {
+  visible: true,
+  positionXPx: 0,
+  positionYPx: 1020,
+  anchor: "bottom-center",
+  orientation: "horizontal",
+  scalePct: 100,
+  itemSpacingPx: 64,
+  justification: "center",
+  zIndex: 12,
+};
+
+const SAMPLE_LOGO: PartnerLogoRow = {
+  partnerKey: "gameevo",
+  label: "GameEvo",
+  alt: "GameEvo Esports",
+  fileUrl: "/logos/gameevo.png",
+  sortOrder: 0,
+  dimensionWPx: 600,
+  dimensionHPx: 300,
+};
+
+describe("OverlayDesignEditor — Partners panel (Wave 2 Stage 3)", () => {
+  it("renders the Partners panel with strip layout + roster", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[SAMPLE_LOGO]}
+        initialLogoOverrides={[]}
+      />,
+    );
+    expect(screen.getByTestId("overlay-design-partners-panel")).toBeTruthy();
+    expect(screen.getByTestId("overlay-design-partners-layout")).toBeTruthy();
+    expect(screen.getByTestId("overlay-design-partners-roster")).toBeTruthy();
+    expect(screen.getByTestId("partner-logo-gameevo")).toBeTruthy();
+  });
+
+  it("falls back to default layout when initialStripLayout is null", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={null}
+        initialPartnerLogos={[]}
+      />,
+    );
+    const anchor = screen.getByTestId(
+      "strip-layout-anchor",
+    ) as HTMLSelectElement;
+    expect(anchor.value).toBe("bottom-center");
+    const scale = screen.getByTestId(
+      "strip-layout-scale",
+    ) as HTMLInputElement;
+    expect(scale.value).toBe("100");
+  });
+
+  it("changing layout fields updates inputs", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[]}
+      />,
+    );
+    const anchor = screen.getByTestId(
+      "strip-layout-anchor",
+    ) as HTMLSelectElement;
+    fireEvent.change(anchor, { target: { value: "top-right" } });
+    expect(anchor.value).toBe("top-right");
+    const scale = screen.getByTestId(
+      "strip-layout-scale",
+    ) as HTMLInputElement;
+    fireEvent.change(scale, { target: { value: "150" } });
+    expect(scale.value).toBe("150");
+  });
+
+  it("Save layout calls setStripLayoutAction with the FormData", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[]}
+      />,
+    );
+    const anchor = screen.getByTestId(
+      "strip-layout-anchor",
+    ) as HTMLSelectElement;
+    fireEvent.change(anchor, { target: { value: "top-right" } });
+    const saveBtn = screen.getByTestId("strip-layout-save");
+    fireEvent.click(saveBtn);
+    expect(setStripLayoutMock).toHaveBeenCalledTimes(1);
+    const fd = setStripLayoutMock.mock.calls[0][0] as FormData;
+    expect(fd.get("overlayKey")).toBe("01-brb");
+    expect(fd.get("anchor")).toBe("top-right");
+    expect(fd.get("scalePct")).toBe("100");
+  });
+
+  it("toggling per-overlay enable calls setLogoOverrideAction", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[SAMPLE_LOGO]}
+        initialLogoOverrides={[]}
+      />,
+    );
+    const toggle = screen.getByTestId(
+      "partner-logo-gameevo-enabled",
+    ) as HTMLInputElement;
+    fireEvent.click(toggle);
+    expect(setLogoOverrideMock).toHaveBeenCalledTimes(1);
+    const fd = setLogoOverrideMock.mock.calls[0][0] as FormData;
+    expect(fd.get("partnerKey")).toBe("gameevo");
+    expect(fd.get("visible")).toBe("false");
+  });
+
+  it("Remove button calls removePartnerLogoAction", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[SAMPLE_LOGO]}
+      />,
+    );
+    const removeBtn = screen.getByTestId(
+      "partner-logo-gameevo-remove",
+    );
+    fireEvent.click(removeBtn);
+    expect(removePartnerLogoMock).toHaveBeenCalledTimes(1);
+    const fd = removePartnerLogoMock.mock.calls[0][0] as FormData;
+    expect(fd.get("partnerKey")).toBe("gameevo");
+  });
+
+  it("uploader rejects empty file selection", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("partner-uploader-upload"));
+    expect(uploadPartnerLogoMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("partner-uploader-error").textContent).toMatch(
+      /Select a file/i,
+    );
+  });
+
+  it("uploader requires partnerKey + label + alt before uploading", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[]}
+      />,
+    );
+    const fileInput = screen.getByTestId(
+      "partner-uploader-file",
+    ) as HTMLInputElement;
+    const file = new File([new Uint8Array(100)], "logo.png", {
+      type: "image/png",
+    });
+    Object.defineProperty(fileInput, "files", { value: [file] });
+    fireEvent.change(fileInput);
+    fireEvent.click(screen.getByTestId("partner-uploader-upload"));
+    expect(uploadPartnerLogoMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("partner-uploader-error").textContent).toMatch(
+      /required/i,
+    );
   });
 });

@@ -26,6 +26,17 @@ import {
   type TextAlignment,
   type TextKind,
 } from "@/server/overlays/text/elements";
+import {
+  upsertStripLayout,
+  type PartnerStripAnchor,
+  type PartnerStripJustification,
+  type PartnerStripOrientation,
+} from "@/server/overlays/partners/strip";
+import {
+  createPartnerLogo,
+  deletePartnerLogo,
+  setLogoOverride,
+} from "@/server/overlays/partners/logos";
 
 /**
  * Phase 3 — overlay design admin server actions.
@@ -654,6 +665,429 @@ export async function clearTextElementAction(formData: FormData) {
     zIndex: null,
     sortOrder: existing.sortOrder,
   });
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+}
+
+/* ------------------------------------------------------------------ *
+ * Wave 2 Stage 3 — partner-strip + logo manager                      *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Strip-layout enums mirror the DB CHECK constraints (migration
+ * `20260620000002_overlay_partner_strip_layout.sql`) and the server
+ * module's runtime validator (`partners/strip.ts::validateInput`).
+ *
+ * The Zod schema accepts FormData strings, then coerces to typed
+ * numbers / enums before calling `upsertStripLayout`.
+ */
+const PARTNER_ANCHOR = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "middle-left",
+  "middle-center",
+  "middle-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+] as const satisfies readonly PartnerStripAnchor[];
+const PARTNER_ORIENTATION = [
+  "horizontal",
+  "vertical",
+] as const satisfies readonly PartnerStripOrientation[];
+const PARTNER_JUSTIFICATION = [
+  "start",
+  "center",
+  "end",
+  "space-between",
+] as const satisfies readonly PartnerStripJustification[];
+
+const SetStripLayoutSchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  visible: z.enum(["true", "false"]),
+  positionXPx: z.coerce.number().int().min(-1920).max(1920),
+  positionYPx: z.coerce.number().int().min(-1080).max(1080),
+  anchor: z.enum(PARTNER_ANCHOR as readonly string[] as [string, ...string[]]),
+  orientation: z.enum(
+    PARTNER_ORIENTATION as readonly string[] as [string, ...string[]],
+  ),
+  scalePct: z.coerce.number().int().min(50).max(200),
+  itemSpacingPx: z.coerce.number().int().min(0).max(256),
+  justification: z.enum(
+    PARTNER_JUSTIFICATION as readonly string[] as [string, ...string[]],
+  ),
+  zIndex: z.coerce.number().int().min(0).max(40),
+});
+
+/**
+ * Persist the partner-strip layout for an overlay+variant. Idempotent
+ * upsert keyed on (overlay_key, variant_id). The bootstrap script reads
+ * the row and applies anchor → top/bottom/left/right computation
+ * client-side (see spec §6.2).
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.4
+ */
+export async function setStripLayoutAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    visible: String(formData.get("visible") ?? "true"),
+    positionXPx: String(formData.get("positionXPx") ?? "0"),
+    positionYPx: String(formData.get("positionYPx") ?? "1020"),
+    anchor: String(formData.get("anchor") ?? "bottom-center"),
+    orientation: String(formData.get("orientation") ?? "horizontal"),
+    scalePct: String(formData.get("scalePct") ?? "100"),
+    itemSpacingPx: String(formData.get("itemSpacingPx") ?? "64"),
+    justification: String(formData.get("justification") ?? "center"),
+    zIndex: String(formData.get("zIndex") ?? "12"),
+  };
+  const parsed = SetStripLayoutSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid strip layout payload: ${parsed.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ")}`,
+    );
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  await upsertStripLayout(
+    sb,
+    { userId: publicUserId, roles },
+    {
+      overlayKey: parsed.data.overlayKey,
+      variantId: parsed.data.variantId,
+      visible: parsed.data.visible === "true",
+      positionXPx: parsed.data.positionXPx,
+      positionYPx: parsed.data.positionYPx,
+      anchor: parsed.data.anchor as PartnerStripAnchor,
+      orientation: parsed.data.orientation as PartnerStripOrientation,
+      scalePct: parsed.data.scalePct,
+      itemSpacingPx: parsed.data.itemSpacingPx,
+      justification: parsed.data.justification as PartnerStripJustification,
+      zIndex: parsed.data.zIndex,
+    },
+  );
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+}
+
+/* ----- Logo upload ----- */
+
+const PARTNER_LOGO_BUCKET = "partner-logos";
+const PARTNER_LOGO_MAX_BYTES = 500 * 1024; // 500 KB per spec §7
+const PARTNER_LOGO_ALLOWED_MIME = new Set<string>([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+]);
+
+/**
+ * Spec §7 dimension contract: 600 × 300 ±10% (i.e. 540..660 wide,
+ * 270..330 tall). SVG bypasses the check (vector — sized via
+ * `scalePct`).
+ */
+const PARTNER_LOGO_MIN_W = 540;
+const PARTNER_LOGO_MAX_W = 660;
+const PARTNER_LOGO_MIN_H = 270;
+const PARTNER_LOGO_MAX_H = 330;
+
+const PARTNER_KEY_RE = /^[a-z][a-z0-9-]{0,63}$/;
+
+function partnerLogoExtForMime(mime: string): string {
+  switch (mime) {
+    case "image/png":
+      return "png";
+    case "image/jpeg":
+      return "jpg";
+    case "image/webp":
+      return "webp";
+    case "image/svg+xml":
+      return "svg";
+    default:
+      return "bin";
+  }
+}
+
+export type UploadPartnerLogoResult =
+  | { ok: true; partnerKey: string; fileUrl: string }
+  | {
+      ok: false;
+      error: string;
+      actualDimensions?: { w: number; h: number };
+    };
+
+/**
+ * Upload a partner logo to the `partner-logos` bucket and create a row
+ * in `overlay_partner_logos`. Validates MIME / size / dimensions
+ * (≈600×300 ±10%, SVG bypasses dimension check). Returns a
+ * discriminated union so the modal can surface the actual measured
+ * dimensions on rejection.
+ *
+ * Form fields:
+ *   - file        — required; PNG/JPG/WebP/SVG ≤ 500 KB
+ *   - partnerKey  — required; kebab-case, unique
+ *   - label       — required; ≤ 200 chars
+ *   - alt         — required; ≤ 200 chars
+ *   - sortOrder   — optional; integer 0..999, default 0
+ *
+ * Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §5.4, §7
+ */
+export async function uploadPartnerLogoAction(
+  formData: FormData,
+): Promise<UploadPartnerLogoResult> {
+  const partnerKey = String(formData.get("partnerKey") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim();
+  const alt = String(formData.get("alt") ?? "").trim();
+  const sortOrderRaw = String(formData.get("sortOrder") ?? "0");
+  const file = formData.get("file");
+
+  // 1. Field gates.
+  if (!PARTNER_KEY_RE.test(partnerKey)) {
+    return {
+      ok: false,
+      error:
+        "partnerKey must be kebab-case (lowercase letter then a-z, 0-9, -)",
+    };
+  }
+  if (!label || label.length > 200) {
+    return { ok: false, error: "label required (1..200 chars)" };
+  }
+  if (!alt || alt.length > 200) {
+    return { ok: false, error: "alt required (1..200 chars)" };
+  }
+  const sortOrder = Number(sortOrderRaw);
+  if (!Number.isFinite(sortOrder) || sortOrder < 0 || sortOrder > 999) {
+    return { ok: false, error: "sortOrder must be integer 0..999" };
+  }
+
+  // 2. File gates.
+  if (!file || typeof file === "string" || !(file instanceof File)) {
+    return { ok: false, error: "missing or invalid file field" };
+  }
+  if (!PARTNER_LOGO_ALLOWED_MIME.has(file.type)) {
+    return {
+      ok: false,
+      error: `unsupported MIME type ${file.type} (allowed: png, jpeg, webp, svg+xml)`,
+    };
+  }
+  if (file.size === 0) {
+    return { ok: false, error: "empty file" };
+  }
+  if (file.size > PARTNER_LOGO_MAX_BYTES) {
+    return {
+      ok: false,
+      error: `file too large (${file.size} bytes; max ${PARTNER_LOGO_MAX_BYTES})`,
+    };
+  }
+
+  // 3. Probe dimensions via `sharp` (skip for SVG — vector).
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const isVector = file.type === "image/svg+xml";
+  let dimensionWPx = 600;
+  let dimensionHPx = 300;
+  if (!isVector) {
+    try {
+      // dynamic import keeps `sharp` out of the cold-start path for actions
+      // that never touch image bytes.
+      const sharp = (await import("sharp")).default;
+      const meta = await sharp(buffer).metadata();
+      if (!meta.width || !meta.height) {
+        return { ok: false, error: "could not read image dimensions" };
+      }
+      dimensionWPx = meta.width;
+      dimensionHPx = meta.height;
+    } catch (e) {
+      return {
+        ok: false,
+        error: `image probe failed: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+
+    if (
+      dimensionWPx < PARTNER_LOGO_MIN_W ||
+      dimensionWPx > PARTNER_LOGO_MAX_W ||
+      dimensionHPx < PARTNER_LOGO_MIN_H ||
+      dimensionHPx > PARTNER_LOGO_MAX_H
+    ) {
+      return {
+        ok: false,
+        error: `Got ${dimensionWPx}×${dimensionHPx}, expected 600×300 ±10% (${PARTNER_LOGO_MIN_W}..${PARTNER_LOGO_MAX_W} × ${PARTNER_LOGO_MIN_H}..${PARTNER_LOGO_MAX_H})`,
+        actualDimensions: { w: dimensionWPx, h: dimensionHPx },
+      };
+    }
+  }
+
+  // 4. Auth + rate-limit.
+  let gateResult: GateResult;
+  try {
+    gateResult = await gate();
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "auth gate failed",
+    };
+  }
+  const { sb, publicUserId, roles } = gateResult;
+
+  // 5. Upload to Storage. `<partnerKey>-<ts>.<ext>` filename ensures a
+  // re-upload of the same key replaces the previous file conceptually
+  // (the DB row carries the file_url so we don't need to delete the old
+  // blob — Storage retains it for forensics + as a fallback).
+  const ext = partnerLogoExtForMime(file.type);
+  const ts = Date.now();
+  const filename = `${partnerKey}-${ts}.${ext}`;
+  const { error: uploadErr } = await sb.storage
+    .from(PARTNER_LOGO_BUCKET)
+    .upload(filename, buffer, {
+      contentType: file.type,
+      cacheControl: "3600",
+      upsert: false,
+    });
+  if (uploadErr) {
+    return {
+      ok: false,
+      error: `storage upload failed: ${uploadErr.message}`,
+    };
+  }
+
+  const { data: publicUrlData } = sb.storage
+    .from(PARTNER_LOGO_BUCKET)
+    .getPublicUrl(filename);
+  const publicUrl = publicUrlData?.publicUrl ?? "";
+  if (!publicUrl) {
+    return { ok: false, error: "could not resolve public URL after upload" };
+  }
+  if (/[;{}<>"']/.test(publicUrl)) {
+    return {
+      ok: false,
+      error: "rejected public URL contains forbidden characters",
+    };
+  }
+
+  // 6. Persist the row.
+  try {
+    await createPartnerLogo(
+      sb,
+      { userId: publicUserId, roles },
+      {
+        partnerKey,
+        label,
+        alt,
+        fileUrl: publicUrl,
+        fileSizeBytes: file.size,
+        dimensionWPx,
+        dimensionHPx,
+        sortOrder,
+      },
+    );
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "createPartnerLogo failed",
+    };
+  }
+
+  revalidatePath("/admin/broadcast/v2/design");
+  return { ok: true, partnerKey, fileUrl: publicUrl };
+}
+
+/* ----- Logo soft-delete ----- */
+
+const RemovePartnerLogoSchema = z.object({
+  partnerKey: z.string().regex(PARTNER_KEY_RE, {
+    message: "partnerKey must be kebab-case",
+  }),
+});
+
+/**
+ * Soft-delete a partner logo (`overlay_partner_logos.deleted_at`). The
+ * partial unique index allows the same `partner_key` to be re-uploaded
+ * after a soft delete because it filters on `deleted_at IS NULL`.
+ */
+export async function removePartnerLogoAction(formData: FormData) {
+  const raw = {
+    partnerKey: String(formData.get("partnerKey") ?? ""),
+  };
+  const parsed = RemovePartnerLogoSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid remove payload: ${parsed.error.issues
+        .map((i) => i.message)
+        .join("; ")}`,
+    );
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  await deletePartnerLogo(
+    sb,
+    { userId: publicUserId, roles },
+    parsed.data.partnerKey,
+  );
+
+  revalidatePath("/admin/broadcast/v2/design");
+}
+
+/* ----- Per-overlay logo override ----- */
+
+const SetLogoOverrideSchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  partnerKey: z.string().regex(PARTNER_KEY_RE),
+  visible: z.enum(["true", "false"]),
+  // Empty string = no sort override; falls back to global sort_order.
+  sortOverride: z.string().optional(),
+});
+
+/**
+ * Per-overlay-per-variant override row in
+ * `overlay_partner_logo_overrides`. Toggle visibility + optionally
+ * pin a sort position. Empty `sortOverride` field clears the override
+ * (sets DB column to NULL via the server module).
+ */
+export async function setLogoOverrideAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    partnerKey: String(formData.get("partnerKey") ?? ""),
+    visible: String(formData.get("visible") ?? "true"),
+    sortOverride: (formData.get("sortOverride") as string | null) ?? "",
+  };
+  const parsed = SetLogoOverrideSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid override payload: ${parsed.error.issues
+        .map((i) => i.message)
+        .join("; ")}`,
+    );
+  }
+
+  let sortOverride: number | null = null;
+  if (parsed.data.sortOverride && parsed.data.sortOverride !== "") {
+    const n = Number(parsed.data.sortOverride);
+    if (!Number.isFinite(n) || n < 0 || n > 999) {
+      throw new Error("sortOverride must be integer 0..999");
+    }
+    sortOverride = Math.trunc(n);
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  await setLogoOverride(
+    sb,
+    { userId: publicUserId, roles },
+    {
+      overlayKey: parsed.data.overlayKey,
+      variantId: parsed.data.variantId,
+      partnerKey: parsed.data.partnerKey,
+      visible: parsed.data.visible === "true",
+      sortOverride,
+    },
+  );
 
   revalidatePath("/admin/broadcast/v2/design");
   revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
