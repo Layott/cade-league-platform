@@ -676,4 +676,21 @@ The duplicate match `63968865-7c26-4c23-a2ed-6bc6c20a314f` had `deleted_at = 202
 4. **Storage upload server actions** must validate ALL of: MIME (allowlist), byte size, overlayKey (capability gate via `supportsBgImage`). Plus a defence-in-depth check on the public URL before persisting (no CSS metacharacters) — the URL becomes a token value that lands in a `:root{}` rule.
 5. **Multi-file HTML mutations across source + public mirror** must use a one-shot script under `apps/web/scripts/_*.mjs` to keep the change byte-identical and idempotent. Run, verify, `rm`. Never commit the script — the change is the artifact.
 
+**Date:** 2026-04-29
+**Context:** Phase B1 + B2 overlay polish. The brief instructed me to verify "byte-identical" between `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` and `apps/web/public/overlays/v2/<key>/index.html`. After running `node apps/web/scripts/sync-v2-overlays.mjs`, `diff` still showed differences — most lines around `../../../<bucket>/...` vs `/overlays/v2/_assets/<bucket>/...`.
+**Mistake:** I almost rolled back the sync, thinking it had failed, before reading the script source. The sync script's `rewritePaths()` regex INTENTIONALLY rewrites source-relative paths (`../../../fonts/...`) to absolute web-served paths (`/overlays/v2/_assets/fonts/...`) during the mirror copy. So source and mirror are NEVER byte-identical for overlays that reference `../../../<bucket>/`. The brief's "byte-identical" instruction was based on a stale model.
+**Correction:** The verification gate for sync should be: `diff source mirror` produces ONLY lines containing `../../../<bucket>/` on one side and `/overlays/v2/_assets/<bucket>/` on the other side. Any other diff = unmirrored source change OR a divergent edit landed only in one tree.
+**Rule for future:**
+- Read `apps/web/scripts/sync-v2-overlays.mjs` (specifically the `rewritePaths` function, currently regex `/\.\.\/\.\.\/\.\.\/(fonts|logos|players|Orgs|designsample)\//g` → `/overlays/v2/_assets/$1/`) before claiming source/mirror parity.
+- The sync script also handles `chokidar` watch mode + asset bucket copying; running the script is the safest way to ensure both copies are aligned. Manual `cp` invites missed path rewrites.
+
+**Date:** 2026-04-29
+**Context:** Phase B1 + B2 commit. When I ran `git stash --include-untracked --keep-index` to test the build state without my changes, on `git stash pop` I unexpectedly got modifications to `KNOWLEDGE/brand-assets/elements/v2/04-h2h-2/index.html` and `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx` — files I had NOT edited. There was a pre-existing stash `pre-slice3-wip` (stash@{1}) on the workspace from another agent's session.
+**Mistake:** Used `git add` against specific files (so the commit stayed clean), but if I had done `git add -A` the commit would have swept in B4-B5 work-in-flight from another agent. That would have created a Frankenstein commit + likely broken main due to the untracked `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.ts` shipping a TypeScript error.
+**Correction:** Always stage explicitly by file path when other agents may have churn in the workspace. Pre-commit pre-flight: `git status --short | grep "^M "` to see only what's already staged; `git diff --staged --stat` to see what will land in the commit.
+**Rule for future:**
+- NEVER use `git add -A` or `git add .` when the workspace contains modifications you didn't make. Always pass explicit file paths.
+- Before `git stash`, check `git stash list` — an existing stash `pre-<something>` from another agent means popping or applying stashes is risky. Prefer NOT to stash; instead use `git status` snapshot + verify changes manually.
+- After ANY stash operation that touched untracked files, re-run `git status` to see if files appeared that weren't there before. Cross-reference against your own edit log.
+
 

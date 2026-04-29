@@ -214,3 +214,37 @@ The bootstrap script also has a subtle ordering bug — running synchronously du
 - **Phase B+C:** the H2H pinned-player source, anchored-overlay token wiring (score-bug / up-next / lower-third / timer), and animation polish are still queued per the Locked Decisions §1-3 above.
 - **Visual screenshot:** the brief calls for screenshot-comparison QA per CLAUDE.md §4b. Localhost iframe inspection confirmed the propagation works at the CSS-variable level; visual diff against `/wallets`-quality reference is still owed for the 7 overlay variants (07-leaderboard's bg-fill swap especially).
 
+## Phase B1 + B2 — review
+
+Bug 5 + 6 (07-leaderboard) and Bug 8 (11-match-scores-day) cleanups requested in the user brief. Both files mirror to `apps/web/public/overlays/v2/<key>/index.html` via `node apps/web/scripts/sync-v2-overlays.mjs` (the script intentionally rewrites `../../../<bucket>/...` paths to `/overlays/v2/_assets/<bucket>/...` in the mirror — source and mirror are NOT byte-identical, that's by design).
+
+### B1 — `KNOWLEDGE/brand-assets/elements/v2/07-leaderboard/index.html`
+
+- **a) `.partner--oas` chip dropped.** The OAS PNG is already transparent — the previous `background: rgba(255,255,255,0.92); border-radius: 6px; padding: 6px 16px; box-shadow: ...` chip was cosmetic noise on the dark backdrop. Now inherits standard `.partner` styling (height: 58px only).
+- **b) `.bg-fill` already wired to ELITE S2 BG via Phase A.** No change needed; confirmed at line 250-256 — `background-image: var(--overlay-bg-image, url('../../../designsample/ELITE%20S2%20BG.png'))`.
+- **c) `.bg-halftone` element + CSS rule + selectors deleted.** Was previously `display: none` from Phase A but kept in DOM "for back-compat". Per brief, removed entirely: deleted the `<div class="bg-halftone" aria-hidden="true">` element, the `.bg-halftone { display: none }` rule, the `@keyframes halftone-drift` block, and removed `.bg-halftone` from the gate selectors (cade-visible / cade-exiting CSS rules) AND from the `cade-visible-gate-observer-v2` `SEL` constant.
+- **d) `.bg-vignette` simplified for dark bg.** The previous multi-stop `radial-gradient(ellipse...) + linear-gradient(to bottom...)` was tuned for the green-wall variant and was over-darkening the corners on the dark ELITE S2 BG. Replaced with a single subtle `radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.4) 100%)` — clean center-out falloff that reads on dark backdrop.
+- **e) `.matchday-mark` + `.season-mark` text colors flipped.** Was `rgba(0,0,0,0.55)` (dark on green) — invisible on dark bg. Now `rgba(255,255,255,0.85)` (pale ink). Confirmed all other `rgba(0,0,0,...)` instances are `text-shadow` / `box-shadow` / `drop-shadow` / `.row.is-top` (top-2 rows on green chip want black text — kept).
+
+### B2 — `KNOWLEDGE/brand-assets/elements/v2/11-match-scores-day/index.html`
+
+- **a) Demo loop `?demo=1` guard already present.** The `<script data-tag="cade-demo-mode">` block at line 1492 already starts with `if (new URLSearchParams(location.search).get('demo') !== '1') return;` — no change needed. The brief request was based on a stale view of the file; the §14 contract is satisfied.
+- **b) `cade-rendered` single-play guard added to `show()`.** Was: every `show` postMessage ran `el.style.animation = 'none'; void offsetHeight; el.style.animation = orig` to FORCE-RESTART the entry animations, so each cycle visibly replayed the entry choreography. Now: a top-level `var hasRenderedOnce = false` gates the restart dance — first `show` adds `cade-rendered` body class + runs the restart loop; subsequent `show` calls just toggle `cade-visible` without re-firing entry animations. `hide` does NOT reset the flag (animations stay played for the lifetime of the page).
+- **c) `infinite` keyword dropped from `header-loop`, `title-loop`, `row-enter`, `footer-loop`.** Was previously `animation: <name> var(--cycle) cubic-bezier(...) infinite` paired with `--cycle: 13s` — would replay every 13s. Now `animation: <name> var(--cycle) cubic-bezier(...)` — defaults to single-play (iteration-count: 1), matching the b) guard. Marquee at line 837 stays `infinite` per user feedback ("marquee is fine").
+- **d) Background already on ELITE S2 BG via Phase A.** Confirmed at line 302 — `background-image: var(--overlay-bg-image, url('../../../designsample/ELITE%20S2%20BG.png'))`.
+
+### Verification gate (CLAUDE.md §11 + §12)
+
+| Check | Result |
+|---|---|
+| `npm run test --run` | 1763 / 1763 passed |
+| `npm run lint` | clean (0 errors, 14 pre-existing warnings) |
+| `npm run build` (apps/web) | local build hits a TypeScript error in an UNTRACKED file `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.ts` (Phase B4 in-flight from another session — `let ids: string[]` rejects `null` return). Not in my commit; Vercel build runs only against pushed tree so my push won't include it. |
+| Sync script | `node apps/web/scripts/sync-v2-overlays.mjs` reports 16/16 HTML synced; source vs mirror diff for both files contains only the expected `../../../<bucket>/` → `/overlays/v2/_assets/<bucket>/` path rewrites. |
+| Phase B markers | 1 marker in `07-leaderboard/index.html`, 5 in `11-match-scores-day/index.html`; both mirrored. |
+
+### Lessons captured
+
+- The sync script intentionally rewrites paths during mirror — "byte-identical" is impossible by design. Verify by running the sync, then diff and confirm only path rewrites differ. Captured in `tasks/lessons.md` 2026-04-29.
+- `git stash --include-untracked` plus an existing pre-session stash (`pre-slice3-wip`) on the same workspace is risky: pop can pull in unrelated working-tree changes from other agents' WIP slices. Always verify the post-pop diff includes only your own work; stage explicitly with `git add <file>` rather than `git add -A` to avoid accidentally committing other agents' in-flight code. Captured in `tasks/lessons.md` 2026-04-29.
+

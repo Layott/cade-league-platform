@@ -202,9 +202,8 @@
   body { opacity: 1 !important; }
 
   /* Gate inner content until cade-visible. Background stays gated too
-     so the green wall doesn't leak when the overlay is dormant. */
+     so the ELITE S2 BG doesn't leak when the overlay is dormant. */
   body:not(.cade-visible):not(.cade-exiting) .bg-fill,
-  body:not(.cade-visible):not(.cade-exiting) .bg-halftone,
   body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .corner-badge,
@@ -219,7 +218,6 @@
     opacity: 0 !important;
   }
   body.cade-exiting .bg-fill,
-  body.cade-exiting .bg-halftone,
   body.cade-exiting .bg-vignette,
   body.cade-exiting .top-band,
   body.cade-exiting .corner-badge,
@@ -244,10 +242,9 @@
   /* ============================================================
      BACKGROUND — ELITE S2 BG (matches the rest of the v2 family).
      Phase A — admins can override `--overlay-bg-image` per variant.
-     The fallback was the green linear-gradient + halftone-dot pair;
-     the ELITE S2 BG already carries its own texture so the .bg-halftone
-     element is hidden by default (kept in the DOM for back-compat with
-     existing templates that target it via realtime postMessages).
+     Phase B1 — dropped the legacy green-wall + halftone-dot pair;
+     ELITE S2 BG already carries its own texture so no overlay
+     pattern element is needed.
   ============================================================ */
   .bg-fill {
     position: absolute; inset: 0;
@@ -257,24 +254,14 @@
     background-repeat: no-repeat;
     z-index: 0;
   }
-  .bg-halftone {
-    /* Disabled by default — ELITE S2 BG carries the texture. Producers
-       can re-enable via a future `--overlay-pattern: halftone` token if
-       a custom (un-textured) bg-image is uploaded. */
-    display: none;
-  }
-  @keyframes halftone-drift {
-    0%   { transform: translate(0, 0) scale(1); }
-    100% { transform: translate(-12px, -8px) scale(1.04); }
-  }
   .bg-vignette {
     position: absolute; inset: 0;
-    /* Stronger vignette than the green-wall variant — dark ELITE S2 bg
-       needs less inner contrast push but readability at the bottom row
-       benefits from a deeper falloff. */
+    /* Subtle radial fade tuned for dark ELITE S2 BG — the original
+       multi-stop gradient was tuned for the green-wall variant and
+       was over-darkening the corners. Simple center-out falloff
+       reads cleanly on the dark backdrop. */
     background:
-      radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.55) 100%),
-      linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.10) 60%, rgba(0,0,0,0.45) 100%);
+      radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.4) 100%);
     z-index: 2;
     pointer-events: none;
   }
@@ -536,13 +523,10 @@
       drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))
       drop-shadow(0 0 1px rgba(0, 0, 0, 0.20));
   }
-  /* OAS logo on a green bg looks washed: lift it slightly with a backdrop chip */
+  /* OAS logo PNG is already transparent — no backdrop chip needed.
+     Inherits the standard `.partner` styling above (transparent bg). */
   .partners .partner--oas {
     height: 58px;
-    background: rgba(255, 255, 255, 0.92);
-    border-radius: 6px;
-    padding: 6px 16px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
   }
 
   /* ============================================================
@@ -554,7 +538,8 @@
     font-family: var(--accent);
     font-weight: 700; font-size: 12px;
     letter-spacing: 0.40em;
-    color: rgba(0, 0, 0, 0.55);
+    /* Dark backdrop — pale ink reads where rgba(0,0,0,0.55) disappeared. */
+    color: rgba(255, 255, 255, 0.85);
     text-transform: uppercase;
     z-index: 12;
   }
@@ -564,7 +549,8 @@
     font-family: var(--accent);
     font-weight: 700; font-size: 12px;
     letter-spacing: 0.40em;
-    color: rgba(0, 0, 0, 0.55);
+    /* Dark backdrop — pale ink reads where rgba(0,0,0,0.55) disappeared. */
+    color: rgba(255, 255, 255, 0.85);
     text-transform: uppercase;
     z-index: 12;
   }
@@ -573,9 +559,8 @@
 <body>
   <main class="stage">
 
-    <!-- BG : green wall + halftone dots + soft vignette -->
+    <!-- BG : ELITE S2 BG image + soft vignette for dark-bg readability -->
     <div class="bg-fill" aria-hidden="true"></div>
-    <div class="bg-halftone" aria-hidden="true"></div>
     <div class="bg-vignette" aria-hidden="true"></div>
 
     <!-- Corner marks -->
@@ -818,7 +803,7 @@
   /* Top-level gated containers — these must be hidden by CSS rule when no
      cade-visible class on body. Force-set to opacity:1 on cade-visible so
      Chrome cross-origin iframe stuck-transition bug cannot leave them at 0. */
-  var SEL = '.bg-fill,.bg-halftone,.bg-vignette,.col-headers,.headline,.matchday-mark,.partners,.row,.rows,.season-mark,.table-block,.top-band,.corner-badge';
+  var SEL = '.bg-fill,.bg-vignette,.col-headers,.headline,.matchday-mark,.partners,.row,.rows,.season-mark,.table-block,.top-band,.corner-badge';
   /* Inner row internals — when the row's own entrance transition has
      burnt out before cade-visible, force-set opacity 1.
      NB: `.row` itself is omitted — its slide-in transition animates
