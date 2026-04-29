@@ -254,6 +254,22 @@ The static HTML keeps `:root { --overlay-X: <hard-coded fallback> }` so OBS brow
 
 **§14 frozen contract still applies.** Every template variant HTML MUST satisfy the §14 list (color-scheme dark meta, transparent body, observer script, demo guard, brand fonts, asset paths). The design system layers ON TOP of §14 — it does not relax it.
 
+**Live-preview iframe scaling rule (added 2026-04-29).** The `/admin/broadcast/v2/design` preview iframe in `apps/web/src/components/admin/OverlayDesignEditor.tsx` MUST render the FULL 1920×1080 canvas, scaled to fit the container width without truncation. Implementation:
+
+```tsx
+<div style={{ aspectRatio: "16 / 9", containerType: "inline-size" }}
+     className="relative w-full overflow-hidden ...">
+  <iframe style={{
+    width: "1920px",
+    height: "1080px",
+    transform: "scale(calc(100cqi / 1920))",
+    transformOrigin: "top left",
+  }} />
+</div>
+```
+
+`100cqi` is the inline-size of the container (set via `container-type: inline-size`); dividing by 1920 yields the exact scale needed to make the iframe's 1920px width fill the container. `aspect-ratio: 16/9` keeps the container's height proportional. Do NOT replace this with a hard-coded `scale(0.4)` — admins see the entire overlay regardless of viewport width. If you need to support a fixed-width preview (e.g. 50% of canvas) for a specific designer workflow, add a NEW container with its own scale, do not break the responsive behaviour of the main editor preview.
+
 **Smoke / E2E:**
 - E2E: `apps/web/tests/e2e/overlay-design-tokens.spec.ts` — login → save accent token → assert SSR style block on overlay route → revert → assert restored.
 - Smoke (one-shot, deleted after run): pattern lives at `apps/web/scripts/_overlay-design-smoke.mjs` — fetches `/overlay/v2/<key>?demo=1` for all 16 keys against the live Vercel URL and asserts the SSR token block contains `--overlay-bg-color`.
