@@ -282,3 +282,57 @@ Brief: smooth out 09-secondary-score-bug entry crack (B3) + clear top-scorers de
 - Static-HTML "designer-time" placeholders (`data-target="22"`) are NOT inert in production. They survive page load and bleed through OBS until JS overwrites them. Add a `?demo=1`-gated clear pass that strips placeholder data before any animation triggers. Captured in `tasks/lessons.md` 2026-04-28 (Phase B6 lesson).
 - For "enter from off-screen" reveals, prefer single ease-out curves over multi-stop anticipation/overshoot keyframes. Concurrent infinite animations (glowPulse, breathe) on the entering element MUST be gated on a post-entry class — `animation-delay` doesn't pause GPU paint. `animationend` listeners must filter on `event.animationName` to avoid pulseRing/scorePop triggering them early. Captured in `tasks/lessons.md` 2026-04-28 (Phase B3 lesson).
 
+## Phase B4 + B5 + C — review (2026-04-28)
+
+### Shipped
+
+**New endpoint (1 file):**
+- `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.ts` — view-token-gated GET. Accepts `?ids=A,B[,C][,D][,E]` (explicit) OR `?key=04-h2h-2|05-h2h-3|06-h2h-5` (resolves pinned players from latest `overlay_events.payload.players[].displayName` → `users.gamer_tag` → `players.id` chain). Returns `{cards: H2HCard[], seasonId, channel: "public:standings:<seasonId>"}`. Idempotent + `Cache-Control: no-store`.
+
+**Endpoint test (1 file, 10 cases):**
+- `apps/web/src/app/api/broadcast/sessions/[id]/h2h/route.test.ts` — verifies view-token gate / 404 / empty-cards / explicit-ids happy / invalid UUID / >5 ids / missing-ids+missing-key / key-no-overlay-row / key-resolves-displayName-chain / buildH2HCards-throws.
+
+**Injector wiring (1 file):**
+- `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx`:
+  - `INITIAL_FETCH_PATH` extended to take `(sessionId, overlayKey)` (was `(sessionId)` only). All three call sites updated to pass `overlayKey`.
+  - Three new entries: `04-h2h-2`, `05-h2h-3`, `06-h2h-5` → `/api/broadcast/sessions/<id>/h2h?key=<key>`.
+  - `REALTIME_KEY_EVENTS` extended with the same three keys → `["standings.changed"]` so stat cells repaint mid-stream when match results post.
+
+**H2H 2-player overlay (`04-h2h-2/index.html` + public mirror):**
+- Strengthened entry: player columns slide from `-300px / +300px` with `scale(0.92)→1.0` punch (was `-180/+180` with no scale). Single play.
+- Drop exit slide: `body.cade-exiting .player-col { animation: none; opacity: 0; transition: opacity 0.3s }`. Only the player columns get fade-only — the rest (top-band, kicker, stats-card, partners, etc.) keep the existing `cade-fade-out` translateY exit.
+- Stat-row wiring: 9 `data-stat="<key>"` attributes added to value cells (`position`, `played`, `wins`, `draws`, `losses`, `gf`, `ga`, `gd`, `points`) plus `data-stat="win-prob"` on each winprob value. New `applyStatsToSide(info, side)` helper renders from `info.stats.<key>`. `update(data)` accepts BOTH `{players: [{slug,name}]}` (postMessage) AND `{cards: H2HCard[]}` (server) — readPlayer normalizes both into a single `info.stats` bag.
+- Gate observer scope: `.player-col` REMOVED from observer SEL list so the keyframe `from-opacity:0` step actually paints on cade-visible (was being clobbered by `style.opacity = '1' !important` immediately after class add).
+
+**H2H 3-player overlay (`05-h2h-3/index.html` + public mirror):**
+- Strengthened entry: c1 from `-250px`, c2 from below (existing punch keyframe), c3 from `+250px`, all with `scale(0.92)→1.0`. 100ms stagger between cards (`0.55s / 0.65s / 0.75s`).
+- Drop exit slide: `body.cade-exiting .player-card { animation: none; opacity: 0; transition: opacity 0.3s }`.
+- Stat wiring: `data-stat` attrs on Pos / P / W-D-L / Pts / GF / GA / GD value cells + win-pill `.val`. New `applyStatsToCard(cardEl, info)` helper. The synthetic `wdl` key concatenates `wins-draws-losses`. `update(data)` accepts both shapes.
+- Gate observer: `.player-card` REMOVED from SEL list (same reason as B4).
+
+**H2H 5-player overlay (`06-h2h-5/index.html` + public mirror):**
+- Strengthened entry: c1 from `-400px`, c2 from `-200px+staircase`, c3 anchor, c4 from `+200px+staircase`, c5 from `+400px`. 50ms stagger. New `card-in-c1`..`card-in-c5` keyframes — old single `card-in` rule + duplicate `.grid .card { animation: card-in ... }` block REMOVED to prevent re-overwrite.
+- Drop exit slide: `body.cade-exiting .card { animation: none; opacity: 0; transition: opacity 0.3s }`.
+- Stat wiring: `data-stat` attrs on every `.stats > .stat-value` (P / Pts / W-D-L / GF / GA / Win Prob) + `data-stat="position"` on the pos-chip number. New dynamic `Win Prob · GD <±N>` label via `data-stat-label="wp-gd"` (renders signed GD).
+- Gate observer: `.card` REMOVED from SEL list.
+
+**Docs:**
+- CLAUDE.md §14 — new HARD RULE table listing all auto-update overlays + their `INITIAL_FETCH_PATH` + `REALTIME_KEY_EVENTS` wiring. Spells out the contract: view-token gated (NOT perm gated), `{seasonId, channel, cards|payload|rows}` response shape, no-store cache, dual-shape `update(data)` handler.
+
+### Verification gate
+
+| Check | Result |
+|---|---|
+| `npm run test --run` | 1773 / 1773 passed (was 1763 — 10 new H2H endpoint tests) |
+| `npm run lint` | clean (0 errors, only pre-existing warnings unchanged from prior commit) |
+| `npm run build` | clean (Compiled successfully in ~10s; pre-existing UserBadge dynamic-server warnings unchanged) |
+| Sync script | `node apps/web/scripts/sync-v2-overlays.mjs` → 16/16 HTML synced + assets copied |
+| Source/mirror parity | `wc -l` confirms byte-identical between `KNOWLEDGE/brand-assets/elements/v2/<key>` and `apps/web/public/overlays/v2/<key>` for all three H2H keys |
+| H2H endpoint isolated | 10/10 tests green for `/api/broadcast/sessions/[id]/h2h/route.test.ts` |
+
+### Lessons captured
+
+- **Auto-update overlay HARD RULE.** Any overlay rendering live league data MUST be wired in `OverlayDataInjector` `INITIAL_FETCH_PATH` (mount-time seed) + `REALTIME_KEY_EVENTS` (mid-stream repaint). Endpoint must be view-token gated (NOT perm-gated — these serve unauthenticated OBS browser sources). Static HTML's `update(data)` must accept BOTH the postMessage shape AND the server response shape, normalizing both into a unified per-player `info.stats` bag. Skipping any of the three (endpoint / wiring / dual-shape handler) leaves the overlay frozen on hardcoded placeholder values forever — exactly the H2H stats bug. Captured in `tasks/lessons.md` 2026-04-28 (Phase C lesson).
+- **Gate observer must NOT clobber CSS keyframe `from-opacity:0` steps.** The `cade-visible-gate-observer-v2` script forces inline `opacity: 1 !important` on every selector match the moment `cade-visible` is added. If the same element has a CSS keyframe entry animation (e.g. `player-a-in { 0% { opacity: 0 } 100% { opacity: 1 } }`), the observer wins (both `!important`, but inline beats stylesheet) and the from-step is never visible. Fix: exclude entry-animated containers from the observer SEL list. They're still gated via the `body.cade-visible` CSS rule which ALSO uses opacity:0/1 — but the keyframe runs ON TOP because the CSS class doesn't have `!important`. Captured 2026-04-28 (Phase B4 lesson).
+- **TypeScript strict mode catches `let foo: T; foo = maybeReturnsTOrNull()` even when guarded by an immediate `if (foo === null) return`.** Have to assign through a temporary `const parsed = ...` first, narrow with the if-return, then assign to the typed var. Caught by `next build`'s tsc pass, NOT by `npm run lint` (eslint doesn't follow type narrowing across reassignment). Captured 2026-04-28 (Phase C type-narrowing lesson).
+

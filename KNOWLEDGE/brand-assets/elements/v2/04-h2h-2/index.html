@@ -1153,59 +1153,61 @@
         </header>
 
         <div class="stats-rows">
+          <!-- Phase B4 — data-stat="<key>" attributes drive the JS update()
+               function. See bottom-of-file inline <script>. -->
           <!-- Row 1: Position (lower = better) -->
           <div class="stat-row r1">
-            <span class="stat-val stat-val--a tie">—</span>
+            <span class="stat-val stat-val--a tie" data-stat="position">—</span>
             <span class="stat-label">Position</span>
-            <span class="stat-val stat-val--b tie">—</span>
+            <span class="stat-val stat-val--b tie" data-stat="position">—</span>
           </div>
           <!-- Row 2: P (tie) -->
           <div class="stat-row r2">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="played">0</span>
             <span class="stat-label">Played</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="played">0</span>
           </div>
           <!-- Row 3: W -->
           <div class="stat-row r3">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="wins">0</span>
             <span class="stat-label">Wins</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="wins">0</span>
           </div>
           <!-- Row 4: D -->
           <div class="stat-row r4">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="draws">0</span>
             <span class="stat-label">Draws</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="draws">0</span>
           </div>
           <!-- Row 5: L (lower = better) -->
           <div class="stat-row r5">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="losses">0</span>
             <span class="stat-label">Losses</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="losses">0</span>
           </div>
           <!-- Row 6: GF -->
           <div class="stat-row r6">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="gf">0</span>
             <span class="stat-label">Goals For</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="gf">0</span>
           </div>
           <!-- Row 7: GA (lower = better) -->
           <div class="stat-row r7">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="ga">0</span>
             <span class="stat-label">Goals Against</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="ga">0</span>
           </div>
           <!-- Row 8: GD -->
           <div class="stat-row r8">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="gd">0</span>
             <span class="stat-label">Goal Diff</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="gd">0</span>
           </div>
           <!-- Row 9: Total Pts -->
           <div class="stat-row r9">
-            <span class="stat-val stat-val--a tie">0</span>
+            <span class="stat-val stat-val--a tie" data-stat="points">0</span>
             <span class="stat-label">Total Pts</span>
-            <span class="stat-val stat-val--b tie">0</span>
+            <span class="stat-val stat-val--b tie" data-stat="points">0</span>
           </div>
         </div>
 
@@ -1213,8 +1215,8 @@
         <div class="winprob">
           <div class="winprob-label">Win Probability</div>
           <div class="winprob-values">
-            <span class="winprob-val winprob-val--a">50%</span>
-            <span class="winprob-val winprob-val--b">50%</span>
+            <span class="winprob-val winprob-val--a" data-stat="win-prob">50%</span>
+            <span class="winprob-val winprob-val--b" data-stat="win-prob">50%</span>
           </div>
           <div class="winprob-bar" aria-hidden="true">
             <span class="winprob-bar-a"></span>
@@ -1320,7 +1322,10 @@
       };
       function readPlayer(p) {
         if (!p) return null;
-        var rawName = p.displayName || p.name || '';
+        // 2026-04-28 Phase B4 — endpoint returns `gamerTag` (canonical) +
+        // `name` (display). Control-panel postMessage uses `displayName`.
+        // Pick the first non-empty in priority order.
+        var rawName = p.displayName || p.name || p.gamerTag || '';
         var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
         if (!slug && rawName) {
           var canon = NAME_TO_SLUG[rawName.toString().trim().toUpperCase()];
@@ -1328,12 +1333,33 @@
         }
         var name = rawName || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
         // Server payload photoUrl/orgLogoUrl (when present) win over the static slug map.
+        // Phase B4 — pick up stat fields off either shape:
+        //   server (H2HCard): pos, played, wins, draws, losses, gf, ga, gd, pts, winProbPct
+        //   nested (postMessage from a future shape): p.stats = {...}
+        var stats = (p.stats && typeof p.stats === 'object') ? p.stats : null;
         return {
           slug: slug,
           name: name,
           photoUrl: p.photoUrl || null,
-          orgLogoUrl: p.orgLogoUrl || null
+          orgLogoUrl: p.orgLogoUrl || null,
+          stats: {
+            position:    pickStat(stats, 'position', p.pos),
+            played:      pickStat(stats, 'played',   p.played),
+            wins:        pickStat(stats, 'wins',     p.wins),
+            draws:       pickStat(stats, 'draws',    p.draws),
+            losses:      pickStat(stats, 'losses',   p.losses),
+            gf:          pickStat(stats, 'gf',       p.gf),
+            ga:          pickStat(stats, 'ga',       p.ga),
+            gd:          pickStat(stats, 'gd',       p.gd),
+            points:      pickStat(stats, 'points',   p.pts != null ? p.pts : p.points),
+            winProbPct:  pickStat(stats, 'winProbPct', p.winProbPct)
+          }
         };
+      }
+      function pickStat(stats, key, fallback) {
+        if (stats && stats[key] !== undefined && stats[key] !== null) return stats[key];
+        if (fallback !== undefined && fallback !== null) return fallback;
+        return null;
       }
 
       function applyToCol(colEl, info) {
@@ -1367,6 +1393,55 @@
         if (fbEl && info.name) fbEl.textContent = info.name.charAt(0).toUpperCase();
       }
 
+      /**
+       * Phase B4 — render stat-row cells from info.stats. The center
+       * stats-card has a single set of cells per row spanning both
+       * players; we look up `data-stat="<key>"` on the matching side
+       * (--a / --b) of every row. Side is passed in.
+       */
+      function applyStatsToSide(info, side) {
+        if (!info || !info.stats) return;
+        var sel = '.stats-card .stat-val--' + side + '[data-stat]';
+        var nodes = document.querySelectorAll(sel);
+        if (!nodes || nodes.length === 0) return;
+        var s = info.stats;
+        nodes.forEach(function (el) {
+          var key = el.getAttribute('data-stat');
+          var val = (key === 'win-prob') ? s.winProbPct : s[key];
+          if (val === null || val === undefined) {
+            el.textContent = '—';
+          } else if (key === 'win-prob') {
+            // Round to nearest int + suffix.
+            var n = Number(val);
+            if (!isFinite(n)) { el.textContent = '—'; return; }
+            el.textContent = String(Math.round(n)) + '%';
+          } else {
+            el.textContent = String(val);
+          }
+        });
+        // Also paint the win-probability bar widths if both sides are
+        // resolved by the time this fires.
+        var aPct = readWinProb('a');
+        var bPct = readWinProb('b');
+        if (aPct != null && bPct != null) {
+          var stage = document.querySelector('.stage');
+          if (stage) {
+            stage.style.setProperty('--winA-pct', aPct + '%');
+            stage.style.setProperty('--winB-pct', bPct + '%');
+          }
+        }
+      }
+      function readWinProb(side) {
+        var el = document.querySelector(
+          '.stats-card .winprob-val--' + side + '[data-stat="win-prob"]'
+        );
+        if (!el) return null;
+        var t = (el.textContent || '').trim();
+        if (!t || t === '—') return null;
+        var n = parseFloat(t);
+        return isFinite(n) ? n : null;
+      }
+
       function applyHeader(info, side) {
         var hdr = document.querySelector('.stats-header .col-name--' + side);
         if (hdr) hdr.textContent = (info && info.name) || '';
@@ -1374,14 +1449,29 @@
 
       function update(data) {
         if (!data) return;
-        var players = Array.isArray(data.players) ? data.players : null;
+        // Phase B4 — accept both shapes:
+        //   { players: [{slug,name,...}] }    (postMessage from control panel)
+        //   { cards:   [{playerId,name,...}] } (server endpoint H2HCard[])
+        var players = Array.isArray(data.players)
+          ? data.players
+          : Array.isArray(data.cards)
+            ? data.cards
+            : null;
         if (!players) return;
         var a = readPlayer(players[0]);
         var b = readPlayer(players[1]);
         var colA = document.querySelector('.player-col--a');
         var colB = document.querySelector('.player-col--b');
-        if (a) { applyToCol(colA, a); applyHeader(a, 'a'); }
-        if (b) { applyToCol(colB, b); applyHeader(b, 'b'); }
+        if (a) {
+          applyToCol(colA, a);
+          applyHeader(a, 'a');
+          applyStatsToSide(a, 'a');
+        }
+        if (b) {
+          applyToCol(colB, b);
+          applyHeader(b, 'b');
+          applyStatsToSide(b, 'b');
+        }
       }
 
       function show() {
@@ -1429,7 +1519,14 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.player-col,.season-mark,.stat-row,.stats-card,.top-band,.winprob-bar-block';
+  // Phase B4 — `.player-col` REMOVED from SEL so the keyframe entry slide
+  // (player-a-in / player-b-in starting from opacity:0) gets to play.
+  // The gate observer was forcing `opacity: 1 !important` immediately on
+  // cade-visible add, which clobbered the keyframe `from-opacity:0` step
+  // and left the entry feeling muted. Visibility is still gated via the
+  // `body.cade-visible` CSS rule on `.player-col` itself + the keyframe
+  // animation handles the from-state.
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.season-mark,.stat-row,.stats-card,.top-band,.winprob-bar-block';
   function apply() {
     var b = document.body;
     if (!b) return;

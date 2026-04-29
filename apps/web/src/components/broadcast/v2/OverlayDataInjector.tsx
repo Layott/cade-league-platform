@@ -58,6 +58,13 @@ type KeyEvent =
   | "snapshot.captured";
 
 const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
+  // Phase B4-B5 + C — H2H overlays subscribe to standings.changed so the
+  // stat-row cells (Pos / P / W / D / L / GF / GA / GD / Pts / WinProb%)
+  // auto-update mid-stream when match results post. CLAUDE.md §14 hard
+  // rule: any auto-update overlay MUST be wired here.
+  "04-h2h-2": ["standings.changed"],
+  "05-h2h-3": ["standings.changed"],
+  "06-h2h-5": ["standings.changed"],
   "07-leaderboard": ["standings.changed", "snapshot.captured"],
   "09-secondary-score-bug": ["score.changed"],
   "10-up-next-bug": ["match.ended"],
@@ -78,7 +85,19 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
  * current payload before any Realtime event lands. Skipped when no
  * `sessionId` is supplied (standalone OBS smoke previews render empty).
  */
-const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string) => string>> = {
+const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey: string) => string>> = {
+  // Phase B4-B5 + C — H2H endpoint resolves the pinned players from the
+  // latest overlay_events row (broadcast control panel writes them on
+  // Trigger). The endpoint walks displayName → users.gamer_tag →
+  // players.id and returns the same H2HCard shape as
+  // `/api/tournament/h2h`. We pass `?key=<overlayKey>` so the route can
+  // pick the right template_key (`h2h_2` / `h2h_3` / `h2h_5`).
+  "04-h2h-2": (s, k) =>
+    `/api/broadcast/sessions/${s}/h2h?key=${encodeURIComponent(k)}`,
+  "05-h2h-3": (s, k) =>
+    `/api/broadcast/sessions/${s}/h2h?key=${encodeURIComponent(k)}`,
+  "06-h2h-5": (s, k) =>
+    `/api/broadcast/sessions/${s}/h2h?key=${encodeURIComponent(k)}`,
   "07-leaderboard": (s) => `/api/broadcast/sessions/${s}/leaderboard`,
   "11-match-scores-day": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
   "14-top-scorers": (s) => `/api/broadcast/sessions/${s}/top-scorers`,
@@ -359,7 +378,7 @@ export default function OverlayDataInjector({
     if (!iframeLoaded) return;
 
     let cancelled = false;
-    const url = builder(currentSessionId);
+    const url = builder(currentSessionId, overlayKey);
     // 2026-04-26 — the per-session feed endpoints accept the token via
     // `?t=<view_token>` (see `view_token_gate.ts`). Pass `currentToken`
     // (state) so an ambient hot-swap picks up the new session's token.
@@ -469,7 +488,7 @@ export default function OverlayDataInjector({
       // fall through to the original payload-only path.
       const builder = INITIAL_FETCH_PATH[overlayKey];
       if (builder && currentSessionId) {
-        const url = builder(currentSessionId);
+        const url = builder(currentSessionId, overlayKey);
         const fetchUrl = currentToken
           ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
           : url;
@@ -590,7 +609,7 @@ export default function OverlayDataInjector({
         return;
       }
       try {
-        const url = fetchBuilder(currentSessionId);
+        const url = fetchBuilder(currentSessionId, overlayKey);
         const fetchUrl = currentToken
           ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
           : url;

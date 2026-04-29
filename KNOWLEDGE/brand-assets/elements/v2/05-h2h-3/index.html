@@ -251,11 +251,16 @@
   body.cade-exiting .chevrons,
   body.cade-exiting .headline,
   body.cade-exiting .card-row,
-  body.cade-exiting .player-card,
   body.cade-exiting .winprob-bar,
   body.cade-exiting .partners,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
+  }
+  /* Phase B5 — player cards fade only on exit (no slide-out). */
+  body.cade-exiting .player-card {
+    animation: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease-out;
   }
   @keyframes cade-fade-out {
     0%   { opacity: 1; transform: translateY(0); }
@@ -509,6 +514,9 @@
   @keyframes divider-out { to { opacity: 0; } }
 
   /* angled-corner-cut card frame (clip-path) */
+  /* Phase B5 — strengthened horizontal slide-in: -250px / 0 / +250px
+     with 100ms stagger between cards. Auto-out keyframe dropped — exit
+     handled by `body.cade-exiting .player-card` fade rule above. */
   .player-card {
     position: relative;
     width: 100%;
@@ -531,21 +539,36 @@
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
     opacity: 0;
-    transform: translateY(60px) scale(0.92);
-    animation: card-in 0.7s cubic-bezier(.16,1.0,.4,1.0) forwards,
-               card-out 0.45s cubic-bezier(.55,.05,.7,.2) 12.05s forwards;
+    transform: translateY(0) scale(0.92);
+    animation: card-in 1.0s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
-  @keyframes card-in {
-    0%   { opacity: 0; transform: translateY(60px) scale(0.92); }
-    60%  { opacity: 1; transform: translateY(-6px) scale(1.02); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+  /* Per-side keyframes — left card slides from left, center from below,
+     right card slides from right. */
+  .player-card.c1 {
+    animation-name: card-in-left;
+    animation-delay: 0.55s;
   }
-  @keyframes card-out {
-    to { opacity: 0; transform: translateY(40px) scale(0.94); }
+  .player-card.c2 {
+    animation-name: card-in-center;
+    animation-delay: 0.65s;
   }
-  .player-card.c1 { animation-delay: 0.55s, 12.05s; }
-  .player-card.c2 { animation-delay: 0.75s, 12.15s; }
-  .player-card.c3 { animation-delay: 0.95s, 12.25s; }
+  .player-card.c3 {
+    animation-name: card-in-right;
+    animation-delay: 0.75s;
+  }
+  @keyframes card-in-left {
+    0%   { opacity: 0; transform: translateX(-250px) scale(0.92); }
+    100% { opacity: 1; transform: translateX(0)      scale(1.0);  }
+  }
+  @keyframes card-in-center {
+    0%   { opacity: 0; transform: translateY(60px)   scale(0.92); }
+    60%  { opacity: 1; transform: translateY(-6px)   scale(1.02); }
+    100% { opacity: 1; transform: translateY(0)      scale(1.0);  }
+  }
+  @keyframes card-in-right {
+    0%   { opacity: 0; transform: translateX(250px)  scale(0.92); }
+    100% { opacity: 1; transform: translateX(0)      scale(1.0);  }
+  }
 
   /* outline frame — drawn on top via inline SVG, same shape as clip */
   .player-card .frame {
@@ -1164,13 +1187,15 @@
           <span class="name">FARUK</span>
         </div>
         <div class="stat-block">
-          <div class="stat"><div class="label">Pos</div><div class="value">—</div></div>
-          <div class="stat"><div class="label">P</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;">0-0-0</div></div>
-          <div class="stat stat--pts"><div class="label">Pts</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">GF</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">GA</div><div class="value">0</div></div>
-          <div class="stat stat--gd"><div class="label">GD</div><div class="value">0</div></div>
+          <!-- Phase B5 — data-stat="<key>" attributes drive the JS update().
+               See bottom-of-file inline <script>. -->
+          <div class="stat"><div class="label">Pos</div><div class="value" data-stat="position">—</div></div>
+          <div class="stat"><div class="label">P</div><div class="value" data-stat="played">0</div></div>
+          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;" data-stat="wdl">0-0-0</div></div>
+          <div class="stat stat--pts"><div class="label">Pts</div><div class="value" data-stat="points">0</div></div>
+          <div class="stat"><div class="label">GF</div><div class="value" data-stat="gf">0</div></div>
+          <div class="stat"><div class="label">GA</div><div class="value" data-stat="ga">0</div></div>
+          <div class="stat stat--gd"><div class="label">GD</div><div class="value" data-stat="gd">0</div></div>
         </div>
         <div class="card-footer">
           <div class="org">
@@ -1179,7 +1204,7 @@
             <span class="org-name">OAS Esports</span>
           </div>
           <div class="win-pill">
-            <span class="lbl">Win</span><span class="val">33%</span>
+            <span class="lbl">Win</span><span class="val" data-stat="win-prob">33%</span>
           </div>
         </div>
       </article>
@@ -1206,13 +1231,13 @@
           <span class="name">ANIFE</span>
         </div>
         <div class="stat-block">
-          <div class="stat"><div class="label">Pos</div><div class="value">—</div></div>
-          <div class="stat"><div class="label">P</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;">0-0-0</div></div>
-          <div class="stat stat--pts"><div class="label">Pts</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">GF</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">GA</div><div class="value">0</div></div>
-          <div class="stat stat--gd"><div class="label">GD</div><div class="value">0</div></div>
+          <div class="stat"><div class="label">Pos</div><div class="value" data-stat="position">—</div></div>
+          <div class="stat"><div class="label">P</div><div class="value" data-stat="played">0</div></div>
+          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;" data-stat="wdl">0-0-0</div></div>
+          <div class="stat stat--pts"><div class="label">Pts</div><div class="value" data-stat="points">0</div></div>
+          <div class="stat"><div class="label">GF</div><div class="value" data-stat="gf">0</div></div>
+          <div class="stat"><div class="label">GA</div><div class="value" data-stat="ga">0</div></div>
+          <div class="stat stat--gd"><div class="label">GD</div><div class="value" data-stat="gd">0</div></div>
         </div>
         <div class="card-footer">
           <div class="org">
@@ -1221,7 +1246,7 @@
             <span class="org-name">Afropanda</span>
           </div>
           <div class="win-pill">
-            <span class="lbl">Win</span><span class="val">33%</span>
+            <span class="lbl">Win</span><span class="val" data-stat="win-prob">33%</span>
           </div>
         </div>
       </article>
@@ -1248,13 +1273,13 @@
           <span class="name">KAYKAY</span>
         </div>
         <div class="stat-block">
-          <div class="stat"><div class="label">Pos</div><div class="value">—</div></div>
-          <div class="stat"><div class="label">P</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;">0-0-0</div></div>
-          <div class="stat stat--pts"><div class="label">Pts</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">GF</div><div class="value">0</div></div>
-          <div class="stat"><div class="label">GA</div><div class="value">0</div></div>
-          <div class="stat stat--gd"><div class="label">GD</div><div class="value">0</div></div>
+          <div class="stat"><div class="label">Pos</div><div class="value" data-stat="position">—</div></div>
+          <div class="stat"><div class="label">P</div><div class="value" data-stat="played">0</div></div>
+          <div class="stat"><div class="label">W-D-L</div><div class="value" style="font-size:24px;" data-stat="wdl">0-0-0</div></div>
+          <div class="stat stat--pts"><div class="label">Pts</div><div class="value" data-stat="points">0</div></div>
+          <div class="stat"><div class="label">GF</div><div class="value" data-stat="gf">0</div></div>
+          <div class="stat"><div class="label">GA</div><div class="value" data-stat="ga">0</div></div>
+          <div class="stat stat--gd"><div class="label">GD</div><div class="value" data-stat="gd">0</div></div>
         </div>
         <div class="card-footer">
           <div class="org">
@@ -1263,7 +1288,7 @@
             <span class="org-name">Lumo Labs</span>
           </div>
           <div class="win-pill">
-            <span class="lbl">Win</span><span class="val">33%</span>
+            <span class="lbl">Win</span><span class="val" data-stat="win-prob">33%</span>
           </div>
         </div>
       </article>
@@ -1377,7 +1402,9 @@
       };
       function readPlayer(p) {
         if (!p) return null;
-        var rawName = p.displayName || p.name || '';
+        // 2026-04-28 Phase B5 — endpoint returns `gamerTag` + `name`;
+        // control panel postMessage uses `displayName`. Pick first non-empty.
+        var rawName = p.displayName || p.name || p.gamerTag || '';
         var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
         if (!slug && rawName) {
           var canon = NAME_TO_SLUG[rawName.toString().trim().toUpperCase()];
@@ -1385,12 +1412,31 @@
         }
         var name = rawName || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
         // Server payload photoUrl/orgLogoUrl (when present) win over the static slug map.
+        // Phase B5 — H2HCard fields normalized into a single .stats bag.
+        var stats = (p.stats && typeof p.stats === 'object') ? p.stats : null;
         return {
           slug: slug,
           name: name,
           photoUrl: p.photoUrl || null,
-          orgLogoUrl: p.orgLogoUrl || null
+          orgLogoUrl: p.orgLogoUrl || null,
+          stats: {
+            position:    pickStat(stats, 'position', p.pos),
+            played:      pickStat(stats, 'played',   p.played),
+            wins:        pickStat(stats, 'wins',     p.wins),
+            draws:       pickStat(stats, 'draws',    p.draws),
+            losses:      pickStat(stats, 'losses',   p.losses),
+            gf:          pickStat(stats, 'gf',       p.gf),
+            ga:          pickStat(stats, 'ga',       p.ga),
+            gd:          pickStat(stats, 'gd',       p.gd),
+            points:      pickStat(stats, 'points',   p.pts != null ? p.pts : p.points),
+            winProbPct:  pickStat(stats, 'winProbPct', p.winProbPct)
+          }
         };
+      }
+      function pickStat(stats, key, fallback) {
+        if (stats && stats[key] !== undefined && stats[key] !== null) return stats[key];
+        if (fallback !== undefined && fallback !== null) return fallback;
+        return null;
       }
 
       function applyToCard(cardEl, info) {
@@ -1421,11 +1467,59 @@
         }
         if (orgName) orgName.textContent = PLAYER_ORG_NAME[info.slug] || '';
         if (fbEl && info.name) fbEl.textContent = info.name.charAt(0).toUpperCase();
+        // Phase B5 — render stat-block cells.
+        applyStatsToCard(cardEl, info);
+      }
+
+      /**
+       * Phase B5 — render `.stat-block` cells from info.stats. Each stat
+       * value carries `data-stat="<key>"` matching the readPlayer keys.
+       * The synthetic `wdl` key concatenates W·D·L for the W-D-L row.
+       */
+      function applyStatsToCard(cardEl, info) {
+        if (!cardEl || !info || !info.stats) return;
+        var s = info.stats;
+        var cells = cardEl.querySelectorAll('[data-stat]');
+        cells.forEach(function (el) {
+          var key = el.getAttribute('data-stat');
+          var val;
+          if (key === 'win-prob') {
+            val = s.winProbPct;
+            if (val == null || !isFinite(Number(val))) {
+              el.textContent = '—';
+            } else {
+              el.textContent = String(Math.round(Number(val))) + '%';
+            }
+            return;
+          }
+          if (key === 'wdl') {
+            var w = s.wins, d = s.draws, l = s.losses;
+            if (w == null && d == null && l == null) {
+              el.textContent = '0-0-0';
+            } else {
+              el.textContent = [w || 0, d || 0, l || 0].join('-');
+            }
+            return;
+          }
+          val = s[key];
+          if (val === null || val === undefined) {
+            el.textContent = (key === 'position') ? '—' : '0';
+          } else {
+            el.textContent = String(val);
+          }
+        });
       }
 
       function update(data) {
         if (!data) return;
-        var players = Array.isArray(data.players) ? data.players : null;
+        // Phase B5 — accept both shapes:
+        //   { players: [{slug,name,...}] }    (postMessage from control panel)
+        //   { cards:   [{playerId,name,...}] } (server endpoint H2HCard[])
+        var players = Array.isArray(data.players)
+          ? data.players
+          : Array.isArray(data.cards)
+            ? data.cards
+            : null;
         if (!players) return;
         var classes = ['c1', 'c2', 'c3'];
         for (var i = 0; i < 3; i++) {
@@ -1480,7 +1574,11 @@
   // Top-level gated containers — these must be hidden by CSS rule when no
   // cade-visible class on body. Force-set to opacity:1 on cade-visible so
   // Chrome cross-origin iframe stuck-transition bug cannot leave them at 0.
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card-row,.chevrons,.headline,.partners,.player-card,.season-mark,.top-band,.winprob-bar';
+  // Phase B5 — `.player-card` REMOVED so the new keyframe entry slide
+  // (card-in-left / -center / -right starting from opacity:0) gets to play.
+  // Without this exclusion the observer forced opacity:1 immediately on
+  // cade-visible, which clobbered the keyframe `from-opacity:0` step.
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card-row,.chevrons,.headline,.partners,.season-mark,.top-band,.winprob-bar';
   // Inner descendants that have their own entrance animations — when the
   // page-load animation has already burnt out by the time cade-visible
   // arrives, Chrome leaves them at the animation's "to" state OR at the

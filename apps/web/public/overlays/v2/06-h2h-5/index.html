@@ -254,11 +254,16 @@
   body.cade-exiting .title-row,
   body.cade-exiting .chevrons,
   body.cade-exiting .grid,
-  body.cade-exiting .card,
   body.cade-exiting .wp-bar-block,
   body.cade-exiting .partners,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
+  }
+  /* Phase B5 — player cards fade only on exit (no slide-out). */
+  body.cade-exiting .card {
+    animation: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease-out;
   }
   @keyframes cade-fade-out {
     0%   { opacity: 1; transform: translateY(0); }
@@ -1029,36 +1034,59 @@
   }
 
   /* ── MASTER ANIMATION TIMELINE ──────────────────────────────── */
-  /*  Cards cascade L→R with 150ms stagger, each entering from below
-      with a slight scale punch. Stats cascade row-by-row across all
-      five players simultaneously — i.e. row 1 of card 1..5 lights at
-      the same time, then row 2 across all five, etc.                  */
+  /*  Phase B5 — strengthened horizontal slide stagger. Each card slides
+      from its outer offset toward the center: c1 from -400px, c2 from
+      -200px, c3 anchor, c4 from +200px, c5 from +400px. Stagger is 50ms
+      between cards so they overlap fluidly. Lower-staircase still ends
+      at +28px (preserves the bench-row shape). Stats cascade row-by-row
+      after all cards have docked. */
   .card {
     opacity: 0;
-    transform: translateY(48px) scale(0.96);
-    animation: card-in 0.7s cubic-bezier(.22,1,.36,1) forwards;
+    animation: card-in-c3 1.0s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
-  .card--lower {
-    /* keep the staircase drop on entry too (reduced for tighter clearance) */
-    transform: translateY(76px) scale(0.96);
+  .card:nth-child(1) {
+    animation-name: card-in-c1;
+    animation-delay: 0.50s;
   }
-  .card:nth-child(1) { animation-delay: 0.50s; }
-  .card:nth-child(2) { animation-delay: 0.65s; }
-  .card:nth-child(3) { animation-delay: 0.80s; }
-  .card:nth-child(4) { animation-delay: 0.95s; }
-  .card:nth-child(5) { animation-delay: 1.10s; }
+  .card:nth-child(2) {
+    animation-name: card-in-c2;
+    animation-delay: 0.55s;
+  }
+  .card:nth-child(3) {
+    animation-name: card-in-c3;
+    animation-delay: 0.60s;
+  }
+  .card:nth-child(4) {
+    animation-name: card-in-c4;
+    animation-delay: 0.65s;
+  }
+  .card:nth-child(5) {
+    animation-name: card-in-c5;
+    animation-delay: 0.70s;
+  }
 
-  @keyframes card-in {
-    from { opacity: 0; transform: translateY(48px) scale(0.96); }
-    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  /* Outer cards slide horizontally with a slight downward drift to
+     preserve the staircase silhouette. .card--lower siblings adjust
+     their final translateY in their own keyframes below. */
+  @keyframes card-in-c1 {
+    from { opacity: 0; transform: translateX(-400px) translateY(48px) scale(0.92); }
+    to   { opacity: 1; transform: translateX(0)      translateY(0)    scale(1);    }
   }
-  /* Lower-staircase cards finish at +28px so the wave shape is preserved. */
-  .card--lower {
-    animation-name: card-in-lower;
+  @keyframes card-in-c2 {
+    from { opacity: 0; transform: translateX(-200px) translateY(76px) scale(0.92); }
+    to   { opacity: 1; transform: translateX(0)      translateY(28px) scale(1);    }
   }
-  @keyframes card-in-lower {
-    from { opacity: 0; transform: translateY(76px) scale(0.96); }
-    to   { opacity: 1; transform: translateY(28px) scale(1);    }
+  @keyframes card-in-c3 {
+    from { opacity: 0; transform: translateY(48px)   scale(0.92); }
+    to   { opacity: 1; transform: translateY(0)      scale(1);    }
+  }
+  @keyframes card-in-c4 {
+    from { opacity: 0; transform: translateX(200px)  translateY(76px) scale(0.92); }
+    to   { opacity: 1; transform: translateX(0)      translateY(28px) scale(1);    }
+  }
+  @keyframes card-in-c5 {
+    from { opacity: 0; transform: translateX(400px)  translateY(48px) scale(0.92); }
+    to   { opacity: 1; transform: translateX(0)      translateY(0)    scale(1);    }
   }
 
   /* Stats row cascade: row 1 = .stat-row-1 across all five cards lights
@@ -1079,23 +1107,11 @@
      body class drives the exit via the SPLIT GATE rules below. */
 
   .card { animation-fill-mode: forwards; }
-  @keyframes card-out {
-    from { opacity: 1; transform: translateY(0)    scale(1);    }
-    to   { opacity: 0; transform: translateY(40px) scale(0.96); }
-  }
-  @keyframes card-out-lower {
-    from { opacity: 1; transform: translateY(28px) scale(1);    }
-    to   { opacity: 0; transform: translateY(76px) scale(0.96); }
-  }
-
-  /* Single-play entry — no auto-out. */
-  .grid .card { animation: card-in 0.7s cubic-bezier(.22,1,.36,1) forwards; }
-  .grid .card--lower { animation: card-in-lower 0.7s cubic-bezier(.22,1,.36,1) forwards; }
-  .grid .card:nth-child(5) { animation-delay: 1.10s; }
-  .grid .card:nth-child(4) { animation-delay: 0.95s; }
-  .grid .card:nth-child(3) { animation-delay: 0.80s; }
-  .grid .card:nth-child(2) { animation-delay: 0.65s; }
-  .grid .card:nth-child(1) { animation-delay: 0.50s; }
+  /* Phase B5 — old `.grid .card { animation: card-in ... }` rules removed.
+     Card entry is now driven by the per-position card-in-c1..c5 keyframes
+     above (left-to-right slide stagger). The legacy card-out keyframes are
+     also gone (they fired automatically on cycle-end which is now suppressed
+     via --cycle: 99999s). Exit is handled via `body.cade-exiting .card` fade. */
 
   /* WP bar — single-play entry */
   .wp-bar-block {
@@ -1211,7 +1227,7 @@
       <!-- ───── CARD 1 · FARUK · GREEN ───── -->
       <article class="card card--green" role="listitem">
         <div class="card-frame">
-          <div class="pos-chip"><span class="pos-label">Pos</span>2</div>
+          <div class="pos-chip"><span class="pos-label">Pos</span><span data-stat="position">2</span></div>
           <div class="photo-wrap">
             <div class="photo-halo" aria-hidden="true"></div>
             <div class="photo-disc">
@@ -1224,12 +1240,14 @@
             <span class="org-name">OAS Esports</span>
           </div>
           <div class="stats">
-            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD 0</span><span class="stat-value">20%</span></div>
+            <!-- Phase B5 — data-stat attributes drive the JS update().
+                 See bottom-of-file inline <script>. -->
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value" data-stat="played">0</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value" data-stat="points">0</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value" data-stat="wdl">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value" data-stat="gf">0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value" data-stat="ga">0</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label" data-stat-label="wp-gd">Win Prob · GD 0</span><span class="stat-value" data-stat="win-prob">20%</span></div>
           </div>
         </div>
       </article>
@@ -1237,7 +1255,7 @@
       <!-- ───── CARD 2 · ANIFE · PINK · LOWER ───── -->
       <article class="card card--pink card--lower" role="listitem">
         <div class="card-frame">
-          <div class="pos-chip"><span class="pos-label">Pos</span>—</div>
+          <div class="pos-chip"><span class="pos-label">Pos</span><span data-stat="position">—</span></div>
           <div class="photo-wrap">
             <div class="photo-halo" aria-hidden="true"></div>
             <div class="photo-disc">
@@ -1250,12 +1268,14 @@
             <span class="org-name">AfroPanda</span>
           </div>
           <div class="stats">
-            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD 0</span><span class="stat-value">20%</span></div>
+            <!-- Phase B5 — data-stat attributes drive the JS update().
+                 See bottom-of-file inline <script>. -->
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value" data-stat="played">0</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value" data-stat="points">0</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value" data-stat="wdl">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value" data-stat="gf">0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value" data-stat="ga">0</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label" data-stat-label="wp-gd">Win Prob · GD 0</span><span class="stat-value" data-stat="win-prob">20%</span></div>
           </div>
         </div>
       </article>
@@ -1263,7 +1283,7 @@
       <!-- ───── CARD 3 · KAYKAY · GREEN ───── -->
       <article class="card card--green" role="listitem">
         <div class="card-frame">
-          <div class="pos-chip"><span class="pos-label">Pos</span>—</div>
+          <div class="pos-chip"><span class="pos-label">Pos</span><span data-stat="position">—</span></div>
           <div class="photo-wrap">
             <div class="photo-halo" aria-hidden="true"></div>
             <div class="photo-disc">
@@ -1276,12 +1296,14 @@
             <span class="org-name">Lumo Labs</span>
           </div>
           <div class="stats">
-            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD 0</span><span class="stat-value">20%</span></div>
+            <!-- Phase B5 — data-stat attributes drive the JS update().
+                 See bottom-of-file inline <script>. -->
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value" data-stat="played">0</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value" data-stat="points">0</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value" data-stat="wdl">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value" data-stat="gf">0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value" data-stat="ga">0</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label" data-stat-label="wp-gd">Win Prob · GD 0</span><span class="stat-value" data-stat="win-prob">20%</span></div>
           </div>
         </div>
       </article>
@@ -1289,7 +1311,7 @@
       <!-- ───── CARD 4 · MR OGA · PINK · LOWER · INDEPENDENT ───── -->
       <article class="card card--pink card--lower" role="listitem">
         <div class="card-frame">
-          <div class="pos-chip"><span class="pos-label">Pos</span>—</div>
+          <div class="pos-chip"><span class="pos-label">Pos</span><span data-stat="position">—</span></div>
           <div class="photo-wrap">
             <div class="photo-halo" aria-hidden="true"></div>
             <div class="photo-disc">
@@ -1301,12 +1323,14 @@
             <span class="indep-badge">Independent</span>
           </div>
           <div class="stats">
-            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD 0</span><span class="stat-value">20%</span></div>
+            <!-- Phase B5 — data-stat attributes drive the JS update().
+                 See bottom-of-file inline <script>. -->
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value" data-stat="played">0</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value" data-stat="points">0</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value" data-stat="wdl">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value" data-stat="gf">0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value" data-stat="ga">0</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label" data-stat-label="wp-gd">Win Prob · GD 0</span><span class="stat-value" data-stat="win-prob">20%</span></div>
           </div>
         </div>
       </article>
@@ -1314,7 +1338,7 @@
       <!-- ───── CARD 5 · DADABOI · GREEN ───── -->
       <article class="card card--green" role="listitem">
         <div class="card-frame">
-          <div class="pos-chip"><span class="pos-label">Pos</span>—</div>
+          <div class="pos-chip"><span class="pos-label">Pos</span><span data-stat="position">—</span></div>
           <div class="photo-wrap">
             <div class="photo-halo" aria-hidden="true"></div>
             <div class="photo-disc">
@@ -1327,12 +1351,14 @@
             <span class="org-name">Outlaws</span>
           </div>
           <div class="stats">
-            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value">0</span></div>
-            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value">0</span></div>
-            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label">Win Prob · GD 0</span><span class="stat-value">20%</span></div>
+            <!-- Phase B5 — data-stat attributes drive the JS update().
+                 See bottom-of-file inline <script>. -->
+            <div class="stat stat-row-1"><span class="stat-label">P</span><span class="stat-value" data-stat="played">0</span></div>
+            <div class="stat stat-row-1"><span class="stat-label">Pts</span><span class="stat-value" data-stat="points">0</span></div>
+            <div class="stat stat--full stat--wdl stat-row-2"><span class="stat-label">W&nbsp;·&nbsp;D&nbsp;·&nbsp;L</span><span class="stat-value" data-stat="wdl">0&nbsp;-&nbsp;0&nbsp;-&nbsp;0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GF</span><span class="stat-value" data-stat="gf">0</span></div>
+            <div class="stat stat-row-3"><span class="stat-label">GA</span><span class="stat-value" data-stat="ga">0</span></div>
+            <div class="stat stat--full stat--wp stat-row-4"><span class="stat-label" data-stat-label="wp-gd">Win Prob · GD 0</span><span class="stat-value" data-stat="win-prob">20%</span></div>
           </div>
         </div>
       </article>
@@ -1450,7 +1476,9 @@
       };
       function readPlayer(p) {
         if (!p) return null;
-        var rawName = p.displayName || p.name || '';
+        // 2026-04-28 Phase B5 — endpoint returns `gamerTag` + `name`;
+        // control panel postMessage uses `displayName`. Pick first non-empty.
+        var rawName = p.displayName || p.name || p.gamerTag || '';
         var slug = (p.slug || '').toString().toLowerCase().replace(/[^a-z0-9]+/g, '_');
         if (!slug && rawName) {
           var canon = NAME_TO_SLUG[rawName.toString().trim().toUpperCase()];
@@ -1458,12 +1486,31 @@
         }
         var name = rawName || (slug ? slug.replace(/_/g, ' ').toUpperCase() : '');
         // Server payload photoUrl/orgLogoUrl (when present) win over the static slug map.
+        // Phase B5 — H2HCard fields normalized into a single .stats bag.
+        var stats = (p.stats && typeof p.stats === 'object') ? p.stats : null;
         return {
           slug: slug,
           name: name,
           photoUrl: p.photoUrl || null,
-          orgLogoUrl: p.orgLogoUrl || null
+          orgLogoUrl: p.orgLogoUrl || null,
+          stats: {
+            position:    pickStat(stats, 'position', p.pos),
+            played:      pickStat(stats, 'played',   p.played),
+            wins:        pickStat(stats, 'wins',     p.wins),
+            draws:       pickStat(stats, 'draws',    p.draws),
+            losses:      pickStat(stats, 'losses',   p.losses),
+            gf:          pickStat(stats, 'gf',       p.gf),
+            ga:          pickStat(stats, 'ga',       p.ga),
+            gd:          pickStat(stats, 'gd',       p.gd),
+            points:      pickStat(stats, 'points',   p.pts != null ? p.pts : p.points),
+            winProbPct:  pickStat(stats, 'winProbPct', p.winProbPct)
+          }
         };
+      }
+      function pickStat(stats, key, fallback) {
+        if (stats && stats[key] !== undefined && stats[key] !== null) return stats[key];
+        if (fallback !== undefined && fallback !== null) return fallback;
+        return null;
       }
 
       function applyToCard(cardEl, info) {
@@ -1488,11 +1535,67 @@
           if (orgName) orgName.style.display = 'none';
           if (indep) indep.style.display = '';
         }
+        // Phase B5 — render stat-block cells.
+        applyStatsToCard(cardEl, info);
+      }
+
+      /**
+       * Phase B5 — render `.stats` cells from info.stats. Each value carries
+       * `data-stat="<key>"`; the wp-gd label uses `data-stat-label="wp-gd"`
+       * and is dynamically retitled `Win Prob · GD <gd>`.
+       */
+      function applyStatsToCard(cardEl, info) {
+        if (!cardEl || !info || !info.stats) return;
+        var s = info.stats;
+        var cells = cardEl.querySelectorAll('[data-stat]');
+        cells.forEach(function (el) {
+          var key = el.getAttribute('data-stat');
+          var val;
+          if (key === 'win-prob') {
+            val = s.winProbPct;
+            if (val == null || !isFinite(Number(val))) {
+              el.textContent = '—';
+            } else {
+              el.textContent = String(Math.round(Number(val))) + '%';
+            }
+            return;
+          }
+          if (key === 'wdl') {
+            var w = s.wins, d = s.draws, l = s.losses;
+            if (w == null && d == null && l == null) {
+              el.textContent = '0 - 0 - 0';
+            } else {
+              el.textContent = (w || 0) + ' - ' + (d || 0) + ' - ' + (l || 0);
+            }
+            return;
+          }
+          val = s[key];
+          if (val === null || val === undefined) {
+            el.textContent = (key === 'position') ? '—' : '0';
+          } else {
+            el.textContent = String(val);
+          }
+        });
+        // Update the wp-gd label text "Win Prob · GD <n>".
+        var wpGdLabel = cardEl.querySelector('[data-stat-label="wp-gd"]');
+        if (wpGdLabel) {
+          var gdVal = s.gd;
+          var gdStr = (gdVal == null) ? '0' :
+            (gdVal > 0 ? '+' + gdVal : String(gdVal));
+          wpGdLabel.textContent = 'Win Prob · GD ' + gdStr;
+        }
       }
 
       function update(data) {
         if (!data) return;
-        var players = Array.isArray(data.players) ? data.players : null;
+        // Phase B5 — accept both shapes:
+        //   { players: [{slug,name,...}] }    (postMessage from control panel)
+        //   { cards:   [{playerId,name,...}] } (server endpoint H2HCard[])
+        var players = Array.isArray(data.players)
+          ? data.players
+          : Array.isArray(data.cards)
+            ? data.cards
+            : null;
         if (!players) return;
         var cards = document.querySelectorAll('.grid .card');
         for (var i = 0; i < Math.min(5, cards.length); i++) {
@@ -1543,7 +1646,13 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card,.chevrons,.grid,.partners,.season-mark,.title-row,.top-band,.wp-bar-block';
+  // Phase B5 — `.card` REMOVED so the new keyframe entry slide
+  // (card-in-c1..c5 starting from opacity:0) gets to play.
+  // The gate observer was forcing `opacity: 1 !important` immediately on
+  // cade-visible, which clobbered the keyframe `from-opacity:0` step and
+  // left the staggered slide invisible. Visibility is still gated via
+  // the `body.cade-visible` CSS rule on `.card` itself.
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.grid,.partners,.season-mark,.title-row,.top-band,.wp-bar-block';
   function apply() {
     var b = document.body;
     if (!b) return;

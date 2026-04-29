@@ -88,6 +88,24 @@ Locked across all phases — do not deviate without user approval:
     - Demo loop (the 13s preview cycle that auto-fires `show` then `hide`) MUST be guarded by `?demo=1` query string. No auto-show on default load.
     - Body width:1920px height:1080px overflow:hidden — canvas dimensions are locked to OBS browser source default.
 
+    **HARD RULE — auto-update overlays must consume their data feed via `INITIAL_FETCH_PATH` + `REALTIME_KEY_EVENTS`** (added 2026-04-28 Phase C). Any overlay that renders LIVE league data (standings, scores, top scorers, h2h stats, orgs roster, coaches, penalties) MUST be wired in `apps/web/src/components/broadcast/v2/OverlayDataInjector.tsx` so the iframe (a) seeds with current data on mount via a per-session feed endpoint, AND (b) repaints mid-stream when the matching Realtime event fires. Currently registered:
+
+    | Overlay key | INITIAL_FETCH_PATH endpoint | REALTIME_KEY_EVENTS |
+    |---|---|---|
+    | `04-h2h-2` | `/api/broadcast/sessions/<id>/h2h?key=04-h2h-2` | `standings.changed` |
+    | `05-h2h-3` | `/api/broadcast/sessions/<id>/h2h?key=05-h2h-3` | `standings.changed` |
+    | `06-h2h-5` | `/api/broadcast/sessions/<id>/h2h?key=06-h2h-5` | `standings.changed` |
+    | `07-leaderboard` | `/api/broadcast/sessions/<id>/leaderboard` | `standings.changed`, `snapshot.captured` |
+    | `09-secondary-score-bug` | — (event-driven only) | `score.changed` |
+    | `10-up-next-bug` | — (event-driven only) | `match.ended` |
+    | `11-match-scores-day` | `/api/broadcast/sessions/<id>/match-scores-day` | `score.changed`, `match.ended`, `standings.changed` |
+    | `14-top-scorers` | `/api/broadcast/sessions/<id>/top-scorers` | `match.ended`, `standings.changed` |
+    | `15-orgs` | `/api/broadcast/v2/sessions/<id>/orgs` | — (control-panel-driven) |
+    | `16-coaches` | `/api/broadcast/v2/sessions/<id>/coaches` | — (control-panel-driven) |
+    | `17-penalties` | `/api/broadcast/v2/sessions/<id>/penalties` | `standings.changed` |
+
+    Endpoints MUST be view-token gated via `checkViewToken()` (NOT `tournament.read` perm-gated — these are for unauthenticated OBS browser sources). Endpoints MUST return `{cards|payload|rows: ..., seasonId: string, channel: string}` so the injector can subscribe to the right Realtime channel. Endpoints MUST be idempotent + cache-busted with `Cache-Control: no-store`. The static HTML's `update(data)` function MUST accept BOTH the postMessage payload shape (`{players: [{slug,name}]}`) AND the server endpoint shape (`{cards: H2HCard[]}` / `{rows: ...}` / `{payload: ...}`) so a single `update()` call can render either. Adding a new auto-update overlay = endpoint + injector wiring + dual-shape handler in HTML, all three. Skipping any one of these means the overlay will stay on hardcoded placeholder values forever — which is exactly the bug Phase B4-B5+C fixed for h2h-2/3/5.
+
     **When prompting an external AI (Claude.ai, ChatGPT, etc.) to design a NEW overlay or modify an existing one** as a downloadable HTML mockup: paste the full prompt template at `docs/superpowers/specs/2026-04-26-overlay-design-prompt.md` into the chat. That template contains every rule above + asset path conventions + payload schema + animation guidelines so the AI's output drops into `KNOWLEDGE/brand-assets/elements/v2/<key>/index.html` without modification.
 
 ## Roles (post-Plan 9)
