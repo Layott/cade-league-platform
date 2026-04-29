@@ -205,6 +205,207 @@ const EASING_PRESETS = [
 
 const ANIM_PHASES: ReadonlyArray<AnimPhase> = ["entry", "exit", "continuous"];
 
+/* ------------------------------------------------------------------ *
+ * 2026-04-28 UX overhaul — accordion section types + helpers         *
+ * ------------------------------------------------------------------ */
+
+export type SectionId = "text" | "partners" | "animations" | "tokens";
+
+type SectionDef = {
+  id: SectionId;
+  title: string;
+  count: number;
+  hint: string;
+};
+
+/**
+ * Local-storage backed accordion state. One section open at a time;
+ * choice persists per overlay so admins resume where they left off.
+ *
+ * Falls back to `initial` if localStorage is unavailable (SSR /
+ * private browsing). On first client render after hydration, reads
+ * the stored value and updates state in a single effect so server +
+ * client trees match.
+ */
+function useAccordion(
+  storageKey: string,
+  initial: SectionId,
+): {
+  openSection: SectionId;
+  setOpenSection: (next: SectionId) => void;
+} {
+  const [openSection, setOpenSectionState] = useState<SectionId>(initial);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (
+        stored === "text" ||
+        stored === "partners" ||
+        stored === "animations" ||
+        stored === "tokens"
+      ) {
+        setOpenSectionState(stored);
+      }
+    } catch {
+      // localStorage unavailable — keep `initial`.
+    }
+  }, [storageKey]);
+
+  const setOpenSection = useCallback(
+    (next: SectionId) => {
+      setOpenSectionState(next);
+      try {
+        window.localStorage.setItem(storageKey, next);
+      } catch {
+        // ignore — best-effort persistence.
+      }
+    },
+    [storageKey],
+  );
+
+  return { openSection, setOpenSection };
+}
+
+/**
+ * Accordion shell — renders a horizontal tab strip + the children
+ * (each child should be a `<SectionPane>` matching one of the
+ * declared section ids). Only the pane whose `id` matches
+ * `openSection` is visible; the rest stay mounted but hidden so their
+ * local state (filters, accordion open-states inside) survives.
+ */
+function SectionAccordion({
+  sections,
+  openSection,
+  onToggle,
+  children,
+}: {
+  sections: ReadonlyArray<SectionDef>;
+  openSection: SectionId;
+  onToggle: (id: SectionId) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="space-y-3"
+      data-testid="overlay-design-accordion"
+      role="tablist"
+      aria-label="Overlay design sections"
+    >
+      <div
+        className="grid grid-cols-2 gap-1 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-1 sm:grid-cols-4"
+        data-testid="overlay-design-section-tabs"
+      >
+        {sections.map((s) => {
+          const active = s.id === openSection;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls={`overlay-design-pane-${s.id}`}
+              onClick={() => onToggle(s.id)}
+              data-testid={`overlay-design-section-toggle-${s.id}`}
+              className={`flex flex-col items-start rounded-sm border px-2.5 py-2 text-left transition-colors ${
+                active
+                  ? "border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--signal)]"
+                  : "border-transparent bg-transparent text-[var(--chalk-3)] hover:border-[var(--ink-4)] hover:text-[var(--chalk-1)]"
+              }`}
+            >
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em]">
+                {s.title}
+                <span
+                  className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-1 py-px font-mono text-[9px] text-[var(--chalk-2)]"
+                  data-testid={`overlay-design-section-count-${s.id}`}
+                >
+                  {s.count}
+                </span>
+              </span>
+              <span className="mt-0.5 line-clamp-1 text-[10px] text-[var(--chalk-3)]">
+                {s.hint}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Accordion content pane. Hides itself unless its `id` matches the
+ * accordion's `openSection`. Stays mounted so per-pane local state
+ * (filters, expanded rows, draft inputs) survives across switches.
+ */
+function SectionPane({
+  id,
+  openSection,
+  testid,
+  children,
+}: {
+  id: SectionId;
+  openSection: SectionId;
+  testid: string;
+  children: React.ReactNode;
+}) {
+  const isOpen = openSection === id;
+  return (
+    <div
+      id={`overlay-design-pane-${id}`}
+      role="tabpanel"
+      data-testid={testid}
+      data-pane-state={isOpen ? "open" : "closed"}
+      hidden={!isOpen}
+      className={isOpen ? "block" : "hidden"}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Reusable filter input rendered above row-heavy sections (Text,
+ * Animations). Strictly client-side: typing narrows the visible list
+ * via the parent's filter state. Empty value = show everything.
+ */
+function SectionFilter({
+  value,
+  onChange,
+  placeholder,
+  testid,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  testid: string;
+}) {
+  return (
+    <div className="relative" data-testid={`${testid}-wrapper`}>
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        data-testid={testid}
+        className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-3 py-1.5 pr-8 text-xs text-[var(--chalk-0)] placeholder:text-[var(--chalk-3)] focus:border-[var(--signal)] focus:outline-none"
+      />
+      {value ? (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)] hover:text-[var(--signal)]"
+          data-testid={`${testid}-clear`}
+          aria-label="Clear filter"
+        >
+          ×
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 const PHASE_DEFAULTS: Record<AnimPhase, Omit<AnimationRow, "elementId" | "animPhase">> = {
   entry: {
     enabled: false,
@@ -1033,142 +1234,360 @@ export default function OverlayDesignEditor({
     });
   }, [catalog, overlayKey]);
 
+  // 2026-04-28 UX overhaul — derive section open-state from a single
+  // controlled hook backed by localStorage. Only one section is open at
+  // a time so admins don't lose their visual orientation when scrolling
+  // between Tokens / Text / Partners / Animations.
+  const sectionKey = `overlayDesign:openSection:${overlayKey}`;
+  const initialSection: SectionId =
+    textRows.length > 0 ? "text" : "tokens";
+  const { openSection, setOpenSection } = useAccordion(
+    sectionKey,
+    initialSection,
+  );
+
+  // 2026-04-28 UX overhaul — text + animation row filters. Filter state
+  // is local (not persisted); typing narrows the visible row list while
+  // leaving editor + preview state untouched.
+  const [textFilter, setTextFilter] = useState<string>("");
+  const [animFilter, setAnimFilter] = useState<string>("");
+
+  const filteredTextRows = useMemo(() => {
+    const q = textFilter.trim().toLowerCase();
+    if (!q) return textRows;
+    return textRows.filter((r) => {
+      const label = (r.displayLabel ?? prettyId(r.elementId)).toLowerCase();
+      const id = r.elementId.toLowerCase();
+      const kind = r.kind.toLowerCase();
+      return label.includes(q) || id.includes(q) || kind.includes(q);
+    });
+  }, [textRows, textFilter]);
+
+  // Group text rows by kind so admins can scan quickly. Preserve original
+  // sort order within each group.
+  const groupedTextRows = useMemo(() => {
+    const groups = new Map<string, TextElementRow[]>();
+    for (const r of filteredTextRows) {
+      const key = r.kind || "text";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    }
+    return Array.from(groups.entries());
+  }, [filteredTextRows]);
+
+  const dirtyAnimCount = animationRows.filter(
+    (r) => r.enabled && r.animType !== "none",
+  ).length;
+  const partnerLogoCount = logos.length;
+  const tokenCount = filteredCatalog.length;
+  const textCount = textRows.length;
+
+  const sectionDefs: ReadonlyArray<SectionDef> = useMemo(
+    () => [
+      ...(textRows.length > 0
+        ? [
+            {
+              id: "text" as const,
+              title: "Text",
+              count: textCount,
+              hint: "Per-element copy, typography, position, opacity",
+            },
+          ]
+        : []),
+      {
+        id: "partners" as const,
+        title: "Partners",
+        count: partnerLogoCount,
+        hint: "Strip layout + global logo roster",
+      },
+      {
+        id: "animations" as const,
+        title: "Animations",
+        count: dirtyAnimCount,
+        hint: "Per-element entry / exit / continuous phases",
+      },
+      {
+        id: "tokens" as const,
+        title: "Tokens",
+        count: tokenCount,
+        hint: "Color, font, scale, pattern, background image",
+      },
+    ],
+    [
+      textRows.length,
+      textCount,
+      partnerLogoCount,
+      dirtyAnimCount,
+      tokenCount,
+    ],
+  );
+
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-      <div className="space-y-4">
-        {textRows.length > 0 ? (
-          <div
-            className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
-            data-testid="overlay-design-text-panel"
-          >
-            <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
-              Text — {textRows.length} element{textRows.length === 1 ? "" : "s"}
-            </h3>
-            <p className="mb-4 text-xs text-[var(--chalk-3)]">
-              Override the text content + per-element typography for any
-              labelled element on this overlay. Empty fields inherit the HTML
-              default. Save persists; Reset clears overrides for that row.
-            </p>
-            <div
-              className="space-y-3"
-              data-testid="overlay-design-text-rows"
+    <div
+      className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]"
+      data-testid="overlay-design-editor-root"
+    >
+      <div className="space-y-3" data-testid="overlay-design-section-list">
+        <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+            Editor sections
+          </p>
+          <p className="mt-1 text-xs text-[var(--chalk-2)]">
+            One section open at a time. Live preview stays pinned on the right
+            so every change is visible without scrolling. Selection persists
+            across navigations.
+          </p>
+        </div>
+
+        <SectionAccordion
+          sections={sectionDefs}
+          openSection={openSection}
+          onToggle={setOpenSection}
+        >
+          {textRows.length > 0 ? (
+            <SectionPane
+              id="text"
+              openSection={openSection}
+              testid="overlay-design-text-panel"
             >
-              {textRows.map((row) => (
-                <TextElementEditorRow
-                  key={row.elementId}
-                  row={row}
-                  fontOptions={fontOptions}
-                  pending={pending}
-                  onUpdate={(patch) => updateTextRow(row.elementId, patch)}
-                  onSave={() => saveTextRow(row.elementId)}
-                  onReset={() => resetTextRow(row.elementId)}
-                />
-              ))}
+              <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+                Text — {textRows.length} element
+                {textRows.length === 1 ? "" : "s"}
+                {filteredTextRows.length !== textRows.length ? (
+                  <span className="ml-2 text-[var(--signal)]">
+                    {filteredTextRows.length} match
+                    {filteredTextRows.length === 1 ? "" : "es"}
+                  </span>
+                ) : null}
+              </h3>
+              <p className="mb-3 text-xs text-[var(--chalk-3)]">
+                Override the text content + per-element typography for any
+                labelled element on this overlay. Empty fields inherit the
+                HTML default. Save persists; Reset clears overrides for that
+                row.
+              </p>
+              <SectionFilter
+                value={textFilter}
+                onChange={setTextFilter}
+                placeholder="Filter text rows by label, id, or kind…"
+                testid="overlay-design-text-filter"
+              />
+              {filteredTextRows.length === 0 ? (
+                <p className="mt-3 text-xs italic text-[var(--chalk-3)]">
+                  No rows match{" "}
+                  <span className="font-mono">{`"${textFilter}"`}</span>.
+                </p>
+              ) : (
+                <div
+                  className="mt-3 space-y-4"
+                  data-testid="overlay-design-text-rows"
+                >
+                  {groupedTextRows.map(([kind, rows]) => (
+                    <div
+                      key={kind}
+                      className="space-y-2"
+                      data-testid={`overlay-design-text-group-${kind}`}
+                    >
+                      <h4 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+                        {kindLabel(kind)} — {rows.length}
+                      </h4>
+                      <div className="space-y-2">
+                        {rows.map((row) => (
+                          <TextElementEditorRow
+                            key={row.elementId}
+                            row={row}
+                            fontOptions={fontOptions}
+                            pending={pending}
+                            onUpdate={(patch) =>
+                              updateTextRow(row.elementId, patch)
+                            }
+                            onSave={() => saveTextRow(row.elementId)}
+                            onReset={() => resetTextRow(row.elementId)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionPane>
+          ) : null}
+
+          <SectionPane
+            id="partners"
+            openSection={openSection}
+            testid="overlay-design-partners-pane"
+          >
+            <PartnersPanel
+              overlayKey={overlayKey}
+              variantId={variantId}
+              stripLayout={stripLayout}
+              logos={logos}
+              overrides={logoOverrides}
+              pending={pending}
+              onUpdateLayout={updateStripLayout}
+              onSaveLayout={saveStripLayout}
+              onUploaded={(newLogo) => {
+                setLogos((prev) => [...prev, newLogo]);
+              }}
+              onRemoveLogo={removeLogo}
+              onSetOverride={setOverride}
+            />
+          </SectionPane>
+
+          <SectionPane
+            id="animations"
+            openSection={openSection}
+            testid="overlay-design-animations-pane"
+          >
+            <AnimationsPanel
+              rows={animationRows}
+              registry={animatableElements ?? []}
+              pending={pending}
+              onUpdate={updateAnimationRow}
+              onSave={saveAnimationRow}
+              onReset={resetAnimationRow}
+              filter={animFilter}
+              onFilterChange={setAnimFilter}
+            />
+          </SectionPane>
+
+          <SectionPane
+            id="tokens"
+            openSection={openSection}
+            testid="overlay-design-tokens-pane"
+          >
+            <div
+              className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
+              data-testid="overlay-design-tokens-panel"
+            >
+              <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+                Tokens — {filteredCatalog.length}
+              </h3>
+              <p className="mb-4 text-xs text-[var(--chalk-3)]">
+                Brand-wide colors, fonts, and visual scaffold for this
+                overlay. Live preview updates on every change. Save persists
+                the whole map; Discard reverts to the last saved values.
+              </p>
+              <div className="space-y-4">
+                {filteredCatalog.map((entry) => (
+                  <TokenRow
+                    key={entry.tokenKey}
+                    entry={entry}
+                    value={tokens[entry.tokenKey] ?? ""}
+                    onChange={(v) => update(entry.tokenKey, v)}
+                    fontOptions={fontOptions}
+                    patternOptions={patternOptions}
+                    overlayKey={overlayKey}
+                    variantId={variantId}
+                  />
+                ))}
+              </div>
+              <div className="mt-5 flex items-center gap-2">
+                <PrimaryButton onClick={onSave} disabled={pending} size="sm">
+                  {pending ? "Saving…" : "Save"}
+                </PrimaryButton>
+                <SecondaryButton
+                  onClick={onDiscard}
+                  disabled={pending}
+                  size="sm"
+                >
+                  Discard
+                </SecondaryButton>
+                {success ? (
+                  <span className="text-xs text-[var(--signal)]">Saved</span>
+                ) : null}
+                {error ? (
+                  <span className="text-xs text-[var(--flare)]">{error}</span>
+                ) : null}
+              </div>
+            </div>
+          </SectionPane>
+        </SectionAccordion>
+      </div>
+
+      <aside
+        className="lg:sticky lg:top-4 lg:h-fit"
+        data-testid="overlay-design-preview-aside"
+      >
+        <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+              Live preview
+            </h3>
+            <span className="text-[10px] text-[var(--chalk-3)]">
+              {overlayKey} · {variantId}
+            </span>
+          </div>
+          {/*
+           * 2026-04-29 — preview iframe must show the full 1920×1080 overlay
+           * canvas scaled to fit the container width. Previously hard-coded
+           * `scale(0.4)` truncated wide containers and over-shrank narrow
+           * ones; now `100cqi / 1920` (CSS container-query inline-size unit)
+           * computes scale dynamically so the canvas always fills the
+           * container exactly. `aspectRatio: 16/9` keeps height in lockstep
+           * with the scaled width.
+           */}
+          <div
+            className="relative w-full overflow-hidden rounded-sm border border-[var(--ink-4)] bg-black"
+            style={{ aspectRatio: "16 / 9", containerType: "inline-size" }}
+          >
+            <iframe
+              src={previewSrc}
+              data-testid="overlay-design-preview-iframe"
+              className="absolute left-0 top-0"
+              style={{
+                width: "1920px",
+                height: "1080px",
+                transform: "scale(calc(100cqi / 1920px))",
+                transformOrigin: "top left",
+                border: "none",
+              }}
+              sandbox="allow-scripts allow-same-origin"
+            />
+          </div>
+          <p className="mt-2 text-[10px] text-[var(--chalk-3)]">
+            Iframe renders /overlay/v2/{overlayKey}?demo=1 with your pending
+            tokens applied via the previewTokens param. The 1920×1080 canvas
+            is scaled to fit at 16:9. Save to persist.
+          </p>
+          <div
+            className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-[var(--chalk-3)]"
+            data-testid="overlay-design-summary-stats"
+          >
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1.5">
+              <span className="block uppercase tracking-[0.18em]">Text</span>
+              <span className="font-mono text-sm text-[var(--chalk-1)]">
+                {textCount}
+              </span>
+            </div>
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1.5">
+              <span className="block uppercase tracking-[0.18em]">
+                Partners
+              </span>
+              <span className="font-mono text-sm text-[var(--chalk-1)]">
+                {partnerLogoCount}
+              </span>
+            </div>
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1.5">
+              <span className="block uppercase tracking-[0.18em]">
+                Anim. on
+              </span>
+              <span className="font-mono text-sm text-[var(--chalk-1)]">
+                {dirtyAnimCount}
+              </span>
+            </div>
+            <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1.5">
+              <span className="block uppercase tracking-[0.18em]">
+                Tokens
+              </span>
+              <span className="font-mono text-sm text-[var(--chalk-1)]">
+                {tokenCount}
+              </span>
             </div>
           </div>
-        ) : null}
-
-        <PartnersPanel
-          overlayKey={overlayKey}
-          variantId={variantId}
-          stripLayout={stripLayout}
-          logos={logos}
-          overrides={logoOverrides}
-          pending={pending}
-          onUpdateLayout={updateStripLayout}
-          onSaveLayout={saveStripLayout}
-          onUploaded={(newLogo) => {
-            setLogos((prev) => [...prev, newLogo]);
-          }}
-          onRemoveLogo={removeLogo}
-          onSetOverride={setOverride}
-        />
-
-        <AnimationsPanel
-          rows={animationRows}
-          registry={animatableElements ?? []}
-          pending={pending}
-          onUpdate={updateAnimationRow}
-          onSave={saveAnimationRow}
-          onReset={resetAnimationRow}
-        />
-
-        <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5">
-          <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
-            Tokens
-          </h3>
-          <div className="space-y-4">
-            {filteredCatalog.map((entry) => (
-              <TokenRow
-                key={entry.tokenKey}
-                entry={entry}
-                value={tokens[entry.tokenKey] ?? ""}
-                onChange={(v) => update(entry.tokenKey, v)}
-                fontOptions={fontOptions}
-                patternOptions={patternOptions}
-                overlayKey={overlayKey}
-                variantId={variantId}
-              />
-            ))}
-          </div>
-          <div className="mt-5 flex items-center gap-2">
-            <PrimaryButton onClick={onSave} disabled={pending} size="sm">
-              {pending ? "Saving…" : "Save"}
-            </PrimaryButton>
-            <SecondaryButton onClick={onDiscard} disabled={pending} size="sm">
-              Discard
-            </SecondaryButton>
-            {success ? (
-              <span className="text-xs text-[var(--signal)]">Saved</span>
-            ) : null}
-            {error ? (
-              <span className="text-xs text-[var(--flare)]">{error}</span>
-            ) : null}
-          </div>
         </div>
-      </div>
-
-      <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
-            Live preview
-          </h3>
-          <span className="text-[10px] text-[var(--chalk-3)]">
-            {overlayKey} · {variantId}
-          </span>
-        </div>
-        {/*
-         * 2026-04-29 — preview iframe must show the full 1920×1080 overlay
-         * canvas scaled to fit the container width. Previously hard-coded
-         * `scale(0.4)` truncated wide containers and over-shrank narrow ones;
-         * now `100cqi / 1920` (CSS container-query inline-size unit) computes
-         * scale dynamically so the canvas always fills the container exactly.
-         * `aspectRatio: 16/9` keeps height in lockstep with the scaled width.
-         */}
-        <div
-          className="relative w-full overflow-hidden rounded-sm border border-[var(--ink-4)] bg-black"
-          style={{ aspectRatio: "16 / 9", containerType: "inline-size" }}
-        >
-          <iframe
-            src={previewSrc}
-            data-testid="overlay-design-preview-iframe"
-            className="absolute left-0 top-0"
-            style={{
-              width: "1920px",
-              height: "1080px",
-              transform: "scale(calc(100cqi / 1920px))",
-              transformOrigin: "top left",
-              border: "none",
-            }}
-            sandbox="allow-scripts allow-same-origin"
-          />
-        </div>
-        <p className="mt-2 text-xs text-[var(--chalk-3)]">
-          Iframe renders /overlay/v2/{overlayKey}?demo=1 with your pending
-          tokens applied via the previewTokens param. The 1920×1080 canvas
-          is scaled to fit this preview container at 16:9. Save to persist.
-        </p>
-      </div>
+      </aside>
     </div>
   );
 }
@@ -2489,6 +2908,8 @@ function AnimationsPanel({
   onUpdate,
   onSave,
   onReset,
+  filter = "",
+  onFilterChange,
 }: {
   rows: ReadonlyArray<AnimationRow>;
   registry: ReadonlyArray<{
@@ -2504,6 +2925,12 @@ function AnimationsPanel({
   ) => void;
   onSave: (elementId: string, phase: AnimPhase) => void;
   onReset: (elementId: string, phase: AnimPhase) => void;
+  /**
+   * Optional filter string — narrows visible elements by displayLabel /
+   * elementId / kind. When undefined the panel renders every element.
+   */
+  filter?: string;
+  onFilterChange?: (next: string) => void;
 }) {
   const [activePhase, setActivePhase] = useState<
     Record<string, AnimPhase>
@@ -2534,6 +2961,23 @@ function AnimationsPanel({
     return Array.from(m.entries());
   }, [rows]);
 
+  // 2026-04-28 UX overhaul — filter visible elements by id / displayLabel /
+  // kind. Empty filter is no-op.
+  const filteredByElement = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return byElement;
+    return byElement.filter(([elementId]) => {
+      const meta = registryByKey.get(elementId);
+      const label = (meta?.displayLabel ?? prettyId(elementId)).toLowerCase();
+      const kind = (meta?.kind ?? "").toLowerCase();
+      return (
+        elementId.toLowerCase().includes(q) ||
+        label.includes(q) ||
+        kind.includes(q)
+      );
+    });
+  }, [byElement, filter, registryByKey]);
+
   if (byElement.length === 0) {
     return (
       <div
@@ -2555,17 +2999,39 @@ function AnimationsPanel({
       className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
       data-testid="overlay-design-animations-panel"
     >
-      <h3 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
+      <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--chalk-3)]">
         Animations — {byElement.length} element
         {byElement.length === 1 ? "" : "s"}
+        {filter.trim() && filteredByElement.length !== byElement.length ? (
+          <span className="ml-2 text-[var(--signal)]">
+            {filteredByElement.length} match
+            {filteredByElement.length === 1 ? "" : "es"}
+          </span>
+        ) : null}
       </h3>
-      <p className="mb-4 text-xs text-[var(--chalk-3)]">
+      <p className="mb-3 text-xs text-[var(--chalk-3)]">
         Add Entry, Continuous, and Exit animations per element. Live preview
         re-fires with each change. Save persists the selected phase; Reset
         clears that phase entirely.
       </p>
+      {onFilterChange ? (
+        <div className="mb-3">
+          <SectionFilter
+            value={filter}
+            onChange={onFilterChange}
+            placeholder="Filter animations by label, id, or kind…"
+            testid="overlay-design-anim-filter"
+          />
+        </div>
+      ) : null}
+      {filteredByElement.length === 0 ? (
+        <p className="text-xs italic text-[var(--chalk-3)]">
+          No rows match{" "}
+          <span className="font-mono">{`"${filter}"`}</span>.
+        </p>
+      ) : (
       <div className="space-y-3" data-testid="overlay-design-animation-rows">
-        {byElement.map(([elementId, elementRows]) => {
+        {filteredByElement.map(([elementId, elementRows]) => {
           const phase = activePhase[elementId] ?? "entry";
           const row =
             elementRows.find((r) => r.animPhase === phase) ?? {
@@ -2664,6 +3130,7 @@ function AnimationsPanel({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

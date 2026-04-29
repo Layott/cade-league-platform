@@ -75,10 +75,18 @@
       if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
       if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
       if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
-      if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
-      if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
+      // Y-position bug fix (2026-04-28): switch from `left/top + position:absolute`
+      // to the CSS individual `translate:` property. `absolute` resolved against
+      // the nearest positioned ancestor (often a transformed centering wrapper),
+      // so `top:Npx` did not move the element on the 1920x1080 canvas. `translate`
+      // is a pure visual displacement and composes with existing `transform: ...`
+      // animation keyframes via the Transforms 2 spec.
+      if (s.left || s.top) {
+        var tx = s.left ? sanitizeCss(s.left) : '0px';
+        var ty = s.top ? sanitizeCss(s.top) : '0px';
+        declarations.push('translate:' + tx + ' ' + ty + ' !important');
+      }
       if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
-      if (s.left || s.top) declarations.push('position:absolute');
       if (t.visible === false) declarations.push('display:none');
       if (declarations.length) {
         rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');

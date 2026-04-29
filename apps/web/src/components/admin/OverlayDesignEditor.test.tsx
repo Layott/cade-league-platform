@@ -916,3 +916,304 @@ describe("OverlayDesignEditor — Animations panel (Wave 2 Stage 4)", () => {
     expect(screen.getByTestId("anim-subtitle-entry-type")).toBeTruthy();
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * 2026-04-28 UX overhaul — accordion + filter + sticky preview       *
+ * ------------------------------------------------------------------ */
+
+describe("OverlayDesignEditor — UX overhaul (2026-04-28)", () => {
+  // jsdom 29 in vitest 4 ships a non-spec localStorage implementation
+  // (clear/key methods missing). Replace it with an in-memory shim
+  // before each accordion-persistence test so the hook can read +
+  // write without hitting "getItem is not a function".
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    const shim: Storage = {
+      get length() {
+        return store.size;
+      },
+      clear: () => store.clear(),
+      getItem: (k: string) => (store.has(k) ? store.get(k) ?? null : null),
+      key: (i: number) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+      setItem: (k: string, v: string) => {
+        store.set(k, String(v));
+      },
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      writable: true,
+      value: shim,
+    });
+  });
+
+  it("renders the accordion with section toggles + counts", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[mkRow({ elementId: "title" })]}
+        initialStripLayout={SAMPLE_LAYOUT}
+        initialPartnerLogos={[SAMPLE_LOGO]}
+        animatableElements={ELEMENTS_FIXTURE}
+        initialAnimations={[]}
+      />,
+    );
+    expect(screen.getByTestId("overlay-design-accordion")).toBeTruthy();
+    expect(
+      screen.getByTestId("overlay-design-section-toggle-text"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("overlay-design-section-toggle-partners"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("overlay-design-section-toggle-animations"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("overlay-design-section-toggle-tokens"),
+    ).toBeTruthy();
+  });
+
+  it("opens Text section first when text elements exist", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[mkRow({ elementId: "title" })]}
+      />,
+    );
+    const textPane = screen.getByTestId("overlay-design-text-panel");
+    expect(textPane.getAttribute("data-pane-state")).toBe("open");
+  });
+
+  it("opens Tokens section by default when no text elements supplied", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+      />,
+    );
+    const tokensPane = screen.getByTestId("overlay-design-tokens-pane");
+    expect(tokensPane.getAttribute("data-pane-state")).toBe("open");
+  });
+
+  it("clicking a section toggle switches the open pane", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[mkRow({ elementId: "title" })]}
+      />,
+    );
+    fireEvent.click(
+      screen.getByTestId("overlay-design-section-toggle-tokens"),
+    );
+    const tokensPane = screen.getByTestId("overlay-design-tokens-pane");
+    expect(tokensPane.getAttribute("data-pane-state")).toBe("open");
+    const textPane = screen.getByTestId("overlay-design-text-panel");
+    expect(textPane.getAttribute("data-pane-state")).toBe("closed");
+  });
+
+  it("persists the open section across re-renders via localStorage", () => {
+    const { unmount } = render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[mkRow({ elementId: "title" })]}
+      />,
+    );
+    fireEvent.click(
+      screen.getByTestId("overlay-design-section-toggle-partners"),
+    );
+    expect(
+      window.localStorage.getItem("overlayDesign:openSection:01-brb"),
+    ).toBe("partners");
+    unmount();
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[mkRow({ elementId: "title" })]}
+      />,
+    );
+    const partnersPane = screen.getByTestId("overlay-design-partners-pane");
+    expect(partnersPane.getAttribute("data-pane-state")).toBe("open");
+  });
+
+  it("renders the sticky preview aside on every layout", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+      />,
+    );
+    const aside = screen.getByTestId("overlay-design-preview-aside");
+    expect(aside.className).toMatch(/lg:sticky/);
+    expect(screen.getByTestId("overlay-design-preview-iframe")).toBeTruthy();
+  });
+
+  it("renders summary stat tiles next to the preview", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({ elementId: "title" }),
+          mkRow({ elementId: "subtitle", kind: "subtitle" }),
+        ]}
+        initialPartnerLogos={[SAMPLE_LOGO]}
+      />,
+    );
+    expect(screen.getByTestId("overlay-design-summary-stats")).toBeTruthy();
+  });
+
+  it("filters text rows by display label", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({
+            elementId: "title",
+            kind: "heading",
+            displayLabel: "BRB Title",
+          }),
+          mkRow({
+            elementId: "subtitle",
+            kind: "subheading",
+            displayLabel: "BRB Subtitle",
+          }),
+          mkRow({
+            elementId: "footer",
+            kind: "caption",
+            displayLabel: "Footer Note",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("text-row-title")).toBeTruthy();
+    expect(screen.getByTestId("text-row-subtitle")).toBeTruthy();
+    expect(screen.getByTestId("text-row-footer")).toBeTruthy();
+
+    const filter = screen.getByTestId(
+      "overlay-design-text-filter",
+    ) as HTMLInputElement;
+    fireEvent.change(filter, { target: { value: "BRB" } });
+    expect(screen.getByTestId("text-row-title")).toBeTruthy();
+    expect(screen.getByTestId("text-row-subtitle")).toBeTruthy();
+    expect(screen.queryByTestId("text-row-footer")).toBeNull();
+  });
+
+  it("groups text rows by kind in the rendered list", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({ elementId: "title-a", kind: "heading" }),
+          mkRow({ elementId: "title-b", kind: "heading" }),
+          mkRow({ elementId: "caption-a", kind: "caption" }),
+        ]}
+      />,
+    );
+    expect(
+      screen.getByTestId("overlay-design-text-group-heading"),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("overlay-design-text-group-caption"),
+    ).toBeTruthy();
+  });
+
+  it("clears the text filter via the × clear button", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        initialTextElements={[
+          mkRow({ elementId: "title", displayLabel: "BRB Title" }),
+        ]}
+      />,
+    );
+    const filter = screen.getByTestId(
+      "overlay-design-text-filter",
+    ) as HTMLInputElement;
+    fireEvent.change(filter, { target: { value: "Z" } });
+    expect(filter.value).toBe("Z");
+    const clearBtn = screen.getByTestId("overlay-design-text-filter-clear");
+    fireEvent.click(clearBtn);
+    expect(filter.value).toBe("");
+  });
+
+  it("filters animations by display label", () => {
+    render(
+      <OverlayDesignEditor
+        overlayKey="01-brb"
+        variantId="default"
+        initialTokens={{}}
+        catalog={CATALOG}
+        fontOptions={FONT_OPTS}
+        patternOptions={[]}
+        animatableElements={[
+          { elementId: "title", kind: "title", displayLabel: "BRB Title" },
+          { elementId: "footer", kind: "caption", displayLabel: "Footer" },
+        ]}
+        initialAnimations={[]}
+      />,
+    );
+    fireEvent.click(
+      screen.getByTestId("overlay-design-section-toggle-animations"),
+    );
+    const filter = screen.getByTestId(
+      "overlay-design-anim-filter",
+    ) as HTMLInputElement;
+    fireEvent.change(filter, { target: { value: "BRB" } });
+    expect(screen.getByTestId("anim-element-title")).toBeTruthy();
+    expect(screen.queryByTestId("anim-element-footer")).toBeNull();
+  });
+});
