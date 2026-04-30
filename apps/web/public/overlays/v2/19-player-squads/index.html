@@ -967,15 +967,16 @@
   }
   .fut-face {
     position: absolute;
-    /* Face slot — sits in the upper portion of the card, sized so it
-       never bleeds into the bottom name+stats band. Width via cqi (% of
-       card width); vertical bounds via % so they're relative to card
-       HEIGHT. */
-    top: 10%;
+    /* Face slot — wider + taller, fills the upper face area of the FUT
+       card frame (similar proportions to the user's reference image
+       cards). Width via cqi (% of card width); vertical bounds via %
+       so they're relative to card HEIGHT. Pinned to upper-half via top
+       + max-height so it stops well above the name/stats band. */
+    top: 8%;
     left: 50%;
     transform: translateX(-50%);
-    width: 48cqi;
-    max-height: 42%;
+    width: 64cqi;
+    max-height: 48%;
     height: auto;
     object-fit: contain;
     object-position: center top;
