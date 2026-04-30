@@ -986,12 +986,13 @@
         var nm = (only && (only.displayName || only.name)) || '';
         if (String(nm).trim().toUpperCase() === 'TBD') return;
       }
-      // Top-2 of each column (positions 1-2 in left, 7-8 in right).
-      var leftHtml  = standings.slice(0, 6).map(function (s, i) {
-        return buildRow(s, i, i < 2);
+      // Top-3 globally highlighted green (positions 1-3 only). Left
+      // column carries positions 1-7, right column carries 8-13.
+      var leftHtml  = standings.slice(0, 7).map(function (s, i) {
+        return buildRow(s, i, i < 3);
       }).join('');
-      var rightHtml = standings.slice(6, 13).map(function (s, i) {
-        return buildRow(s, i + 6, i < 2);
+      var rightHtml = standings.slice(7, 13).map(function (s, i) {
+        return buildRow(s, i + 7, false);
       }).join('');
       rowsLeft.innerHTML  = leftHtml;
       rowsRight.innerHTML = rightHtml;

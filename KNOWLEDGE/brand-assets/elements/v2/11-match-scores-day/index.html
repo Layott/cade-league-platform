@@ -788,12 +788,15 @@
       0 0 14px var(--pink-glow),
       0 0 28px rgba(254,3,109,0.30);
   }
+  /* Title stays centered + visible for the entire cycle. The earlier
+     slide-up keyframe at 85% caused the title to drift off-center
+     mid-trigger ("no longer centered after 5-10s"). The exit animation
+     is now driven by the body.cade-exiting class (cade-fade-out
+     keyframes above), not by this looping animation. */
   @keyframes title-loop {
     0%   { opacity: 0; transform: translate(-50%, -16px); }
     7%   { opacity: 1; transform: translate(-50%, 0); }
-    77%  { opacity: 1; transform: translate(-50%, 0); }
-    85%  { opacity: 0; transform: translate(-50%, -16px); }
-    100% { opacity: 0; transform: translate(-50%, -16px); }
+    100% { opacity: 1; transform: translate(-50%, 0); }
   }
 
   /* ── ROWS GRID ─────────────────────────────────────────────────
