@@ -114,16 +114,50 @@ export async function GET(
   const weekStartDate = requestedWeek || weekStartThursday(new Date());
 
   // Resolve playerId. Priority:
-  //   1. ?playerId= param (explicit pin from control panel postMessage
-  //      OR a deep link from the design-page preview).
-  //   2. First player (by display_name asc) with an approved/pending
+  //   1. ?playerId= param (explicit pin from postMessage or deep link).
+  //   2. Latest active overlay_events row for this session whose
+  //      template is `player_squads` — broadcast control panel writes
+  //      `{playerId}` into payload on Trigger, OBS browser sources
+  //      pick it up here for ambient-mode rendering.
+  //   3. First player (by display_name asc) with a non-rejected
   //      submission this week.
-  //
-  // The legacy `overlay_events.template_key` fallback used by the H2H
-  // family doesn't apply here: the control panel sends `playerId` in
-  // the postMessage `data` field on Trigger, and the static HTML's
-  // `update(data)` re-fetches this endpoint with the explicit param.
   let resolvedPlayerId = requestedPlayerId;
+
+  if (!resolvedPlayerId) {
+    try {
+      // overlay_events.template_id → overlay_templates.template_key.
+      // Pick the latest non-cleared row matching `player_squads`.
+      const { data: evRows } = await sb
+        .from("overlay_events")
+        .select(
+          "payload, triggered_at, overlay_templates:template_id ( template_key )",
+        )
+        .eq("stream_session_id", id)
+        .is("cleared_at", null)
+        .is("deleted_at", null)
+        .order("triggered_at", { ascending: false })
+        .limit(20);
+      type EvRow = {
+        payload: Record<string, unknown> | null;
+        overlay_templates:
+          | { template_key: string }
+          | { template_key: string }[]
+          | null;
+      };
+      const matched = ((evRows ?? []) as unknown as EvRow[]).find((r) => {
+        const tpl = r.overlay_templates;
+        if (!tpl) return false;
+        const flat = Array.isArray(tpl) ? tpl[0] : tpl;
+        return flat?.template_key === "player_squads";
+      });
+      const pinned = matched?.payload?.playerId;
+      if (typeof pinned === "string" && pinned.length > 0) {
+        resolvedPlayerId = pinned;
+      }
+    } catch {
+      // ignore — fall through to alphabetical default
+    }
+  }
 
   if (!resolvedPlayerId) {
     const { data: subsForWeek } = await sb

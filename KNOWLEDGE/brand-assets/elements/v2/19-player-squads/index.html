@@ -1500,9 +1500,41 @@
         return data;
       }
 
+      // When the broadcast control panel triggers with a different
+      // playerId (operator picks Mr Oga then Faruk etc), the postMessage
+      // payload only carries `{playerId}` — not the full draft. Re-fetch
+      // the player-squads endpoint with that id so name + photo +
+      // formation + chemistry + cards all repaint.
+      function fetchAndUpdate(playerId) {
+        try {
+          var qs = new URLSearchParams(window.location.search);
+          var sess = qs.get('session');
+          var tok  = qs.get('token');
+          if (!sess || !tok || !playerId) return;
+          var url = '/api/broadcast/v2/sessions/' + encodeURIComponent(sess) +
+                    '/player-squads?t=' + encodeURIComponent(tok) +
+                    '&playerId=' + encodeURIComponent(playerId);
+          fetch(url, { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d && d.payload) update(d.payload);
+            })
+            .catch(function (e) {
+              console.warn('[19-player-squads] fetchAndUpdate failed', e);
+            });
+        } catch (e) { /* ignore */ }
+      }
+
       function update(data) {
         var p = readPayload(data);
         if (!p) return;
+        // Broadcast Trigger path: only `{playerId}` arrived (no draftOwner /
+        // starting / subs). Re-fetch the full payload from the server, then
+        // recurse with the populated payload.
+        if (p.playerId && !p.draftOwner && !Array.isArray(p.starting)) {
+          fetchAndUpdate(p.playerId);
+          return;
+        }
         if (p.draftOwner) {
           var nameEl = document.querySelector('[data-element-id="draft-owner-name"]');
           if (nameEl && p.draftOwner.displayName) {
