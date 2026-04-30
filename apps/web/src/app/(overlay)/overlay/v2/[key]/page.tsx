@@ -182,9 +182,26 @@ type SearchParams = {
  */
 function buildCssVarRule(tokens: Record<string, string>): string {
   const entries: string[] = [];
+  const IMAGE_KEYS: Record<string, true> = { "bg-image": true };
   for (const [k, v] of Object.entries(tokens)) {
     if (typeof v !== "string") continue;
-    entries.push(`--overlay-${k}: ${escapeCssValue(v)};`);
+    const safe = escapeCssValue(v);
+    if (IMAGE_KEYS[k]) {
+      // Empty → drop (HTML default fallback wins).
+      if (!safe) continue;
+      // Sentinel "none" → emit the CSS keyword `none` so var(--bg-image,
+      // url(default)) resolves to none and DOES NOT fall through to the
+      // hardcoded HTML default. This is what enables the admin "Off"
+      // toggle to actually turn the background off (Bug #28 fix).
+      if (safe === "none") {
+        entries.push(`--overlay-${k}: none;`);
+      } else {
+        entries.push(`--overlay-${k}: url("${safe}");`);
+      }
+    } else {
+      if (!safe) continue;
+      entries.push(`--overlay-${k}: ${safe};`);
+    }
   }
   return `:root{${entries.join(" ")}}`;
 }

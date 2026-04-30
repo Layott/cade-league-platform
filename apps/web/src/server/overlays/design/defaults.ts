@@ -92,6 +92,13 @@ export const TOKEN_CATALOG: readonly TokenCatalogEntry[] = [
   { tokenKey: "pattern", tokenType: "enum", label: "Background pattern" },
   { tokenKey: "partner-strip-show", tokenType: "boolean", label: "Partner strip" },
   {
+    tokenKey: "partner-strip-scroll",
+    tokenType: "boolean",
+    label: "Partner strip scroll",
+    description:
+      "Continuous sideways marquee. Loops seamlessly via cloned children + 35s linear animation.",
+  },
+  {
     tokenKey: "bg-image",
     tokenType: "image",
     label: "Background image",
@@ -163,6 +170,7 @@ const BASE_DEFAULTS: Record<string, string> = {
   "row-highlight-count": "2",
   pattern: "none",
   "partner-strip-show": "true",
+  "partner-strip-scroll": "false",
 };
 
 /**

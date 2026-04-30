@@ -57,6 +57,8 @@ const KEYS = [
   "15-orgs",
   "16-coaches",
   "17-penalties",
+  "19-player-squads",
+  "20-highlight",
 ];
 
 /**
@@ -131,7 +133,14 @@ const BOOTSTRAP = `<script id="cade-token-bootstrap">
       var safe = v.replace(/[;{}<>"']/g, '');
       if (imageKeys[k]) {
         if (!safe) continue;
-        parts.push('--overlay-' + k + ': url("' + safe + '")');
+        // Sentinel "none" → CSS keyword (turn off background image entirely
+        // so var(--overlay-bg-image, url(default)) resolves to none and
+        // does NOT fall through to the HTML hard-coded default).
+        if (safe === 'none') {
+          parts.push('--overlay-' + k + ': none');
+        } else {
+          parts.push('--overlay-' + k + ': url("' + safe + '")');
+        }
       } else {
         if (!safe) continue;
         parts.push('--overlay-' + k + ': ' + safe);
@@ -438,6 +447,35 @@ const BOOTSTRAP = `<script id="cade-token-bootstrap">
       }
       if (previewPartnerTokens && Array.isArray(previewPartnerTokens.logos)) {
         applyPartnerLogos(previewPartnerTokens.logos, previewPartnerTokens.layout);
+      }
+      // Phase D — partner-strip scroll. Token \`partner-strip-scroll\`
+      // controls whether logos scroll continuously sideways. When "true",
+      // wrap the strip's children in a flex track + clone them once for
+      // a seamless 50% translateX loop. Inject @keyframes + animation
+      // rule via a dedicated <style> block so OBS sees the motion.
+      var scrollOn = false;
+      if (design && design['partner-strip-scroll'] === 'true') scrollOn = true;
+      if (preview && preview['partner-strip-scroll'] === 'true') scrollOn = true;
+      if (preview && preview['partner-strip-scroll'] === 'false') scrollOn = false;
+      if (scrollOn) {
+        var stripScroll = document.querySelector('[data-element-id="partners-strip"]');
+        if (stripScroll && !stripScroll.querySelector('.cade-partner-track')) {
+          var kids = Array.from(stripScroll.children);
+          if (kids.length > 0) {
+            var track = document.createElement('div');
+            track.className = 'cade-partner-track';
+            kids.forEach(function(c) { track.appendChild(c); });
+            kids.forEach(function(c) { track.appendChild(c.cloneNode(true)); });
+            stripScroll.appendChild(track);
+            var s6 = document.createElement('style');
+            s6.id = 'cade-injected-partner-scroll';
+            s6.textContent =
+              '[data-element-id="partners-strip"]{overflow:hidden !important;}' +
+              '.cade-partner-track{display:flex;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
+              '@keyframes cade-partner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}';
+            document.head.appendChild(s6);
+          }
+        }
       }
     };
     if (document.readyState === 'loading') {

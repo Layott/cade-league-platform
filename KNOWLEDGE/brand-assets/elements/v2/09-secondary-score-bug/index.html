@@ -45,7 +45,14 @@
       var safe = v.replace(/[;{}<>"']/g, '');
       if (imageKeys[k]) {
         if (!safe) continue;
-        parts.push('--overlay-' + k + ': url("' + safe + '")');
+        // Sentinel "none" → CSS keyword (turn off background image entirely
+        // so var(--overlay-bg-image, url(default)) resolves to none and
+        // does NOT fall through to the HTML hard-coded default).
+        if (safe === 'none') {
+          parts.push('--overlay-' + k + ': none');
+        } else {
+          parts.push('--overlay-' + k + ': url("' + safe + '")');
+        }
       } else {
         if (!safe) continue;
         parts.push('--overlay-' + k + ': ' + safe);
@@ -74,18 +81,10 @@
       if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
       if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
       if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
-      // Y-position bug fix (2026-04-28): switch from `left/top + position:absolute`
-      // to the CSS individual `translate:` property. `absolute` resolved against
-      // the nearest positioned ancestor (often a transformed centering wrapper),
-      // so `top:Npx` did not move the element on the 1920x1080 canvas. `translate`
-      // is a pure visual displacement and composes with existing `transform: ...`
-      // animation keyframes via the Transforms 2 spec.
-      if (s.left || s.top) {
-        var tx = s.left ? sanitizeCss(s.left) : '0px';
-        var ty = s.top ? sanitizeCss(s.top) : '0px';
-        declarations.push('translate:' + tx + ' ' + ty + ' !important');
-      }
+      if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
+      if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
       if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
+      if (s.left || s.top) declarations.push('position:absolute');
       if (t.visible === false) declarations.push('display:none');
       if (declarations.length) {
         rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');
@@ -113,43 +112,43 @@
       return '[data-element-id="partners-strip"]{display:none !important;}';
     }
     var declarations = [];
-    declarations.push('display:flex !important');
-    declarations.push('flex-direction:' + (layout.orientation === 'vertical' ? 'column' : 'row') + ' !important');
-    declarations.push('justify-content:' + sanitizeCss(layout.justification || 'center') + ' !important');
-    declarations.push('align-items:center !important');
-    declarations.push('gap:' + ((+layout.itemSpacingPx) || 0) + 'px !important');
-    declarations.push('z-index:' + ((+layout.zIndex) || 12) + ' !important');
-    declarations.push('position:absolute !important');
+    declarations.push('display:flex');
+    declarations.push('flex-direction:' + (layout.orientation === 'vertical' ? 'column' : 'row'));
+    declarations.push('justify-content:' + sanitizeCss(layout.justification || 'center'));
+    declarations.push('align-items:center');
+    declarations.push('gap:' + ((+layout.itemSpacingPx) || 0) + 'px');
+    declarations.push('z-index:' + ((+layout.zIndex) || 12));
+    declarations.push('position:absolute');
     var anchor = layout.anchor || 'bottom-center';
     var px = (+layout.positionXPx) || 0;
     var py = (+layout.positionYPx) || 0;
     var sx = ((+layout.scalePct) || 100) / 100;
     var transformOps = [];
     if (anchor.indexOf('top') === 0) {
-      declarations.push('top:' + py + 'px !important');
-      declarations.push('bottom:auto !important');
+      declarations.push('top:' + py + 'px');
+      declarations.push('bottom:auto');
     } else if (anchor.indexOf('bottom') === 0) {
-      declarations.push('bottom:' + py + 'px !important');
-      declarations.push('top:auto !important');
+      declarations.push('bottom:' + (1080 - py) + 'px');
+      declarations.push('top:auto');
     } else {
-      declarations.push('top:' + py + 'px !important');
-      declarations.push('bottom:auto !important');
+      declarations.push('top:' + py + 'px');
+      declarations.push('bottom:auto');
       transformOps.push('translateY(-50%)');
     }
     if (anchor.indexOf('left') !== -1) {
-      declarations.push('left:' + px + 'px !important');
-      declarations.push('right:auto !important');
+      declarations.push('left:' + px + 'px');
+      declarations.push('right:auto');
     } else if (anchor.indexOf('right') !== -1) {
-      declarations.push('right:' + px + 'px !important');
+      declarations.push('right:' + (1920 - px) + 'px');
       declarations.push('left:auto');
     } else {
-      declarations.push('left:50% !important');
-      declarations.push('right:auto !important');
+      declarations.push('left:50%');
+      declarations.push('right:auto');
       transformOps.push('translateX(-50%)');
     }
-    if (sx !== 1) declarations.push('scale:' + sx + ' !important');
+    if (sx !== 1) transformOps.push('scale(' + sx + ')');
     if (transformOps.length) {
-      declarations.push('transform:' + transformOps.join(' ') + ' !important');
+      declarations.push('transform:' + transformOps.join(' '));
       declarations.push('transform-origin:center center');
     }
     return '[data-element-id="partners-strip"]{' + declarations.join(';') + ';}';
@@ -360,6 +359,35 @@
       }
       if (previewPartnerTokens && Array.isArray(previewPartnerTokens.logos)) {
         applyPartnerLogos(previewPartnerTokens.logos, previewPartnerTokens.layout);
+      }
+      // Phase D — partner-strip scroll. Token `partner-strip-scroll`
+      // controls whether logos scroll continuously sideways. When "true",
+      // wrap the strip's children in a flex track + clone them once for
+      // a seamless 50% translateX loop. Inject @keyframes + animation
+      // rule via a dedicated <style> block so OBS sees the motion.
+      var scrollOn = false;
+      if (design && design['partner-strip-scroll'] === 'true') scrollOn = true;
+      if (preview && preview['partner-strip-scroll'] === 'true') scrollOn = true;
+      if (preview && preview['partner-strip-scroll'] === 'false') scrollOn = false;
+      if (scrollOn) {
+        var stripScroll = document.querySelector('[data-element-id="partners-strip"]');
+        if (stripScroll && !stripScroll.querySelector('.cade-partner-track')) {
+          var kids = Array.from(stripScroll.children);
+          if (kids.length > 0) {
+            var track = document.createElement('div');
+            track.className = 'cade-partner-track';
+            kids.forEach(function(c) { track.appendChild(c); });
+            kids.forEach(function(c) { track.appendChild(c.cloneNode(true)); });
+            stripScroll.appendChild(track);
+            var s6 = document.createElement('style');
+            s6.id = 'cade-injected-partner-scroll';
+            s6.textContent =
+              '[data-element-id="partners-strip"]{overflow:hidden !important;}' +
+              '.cade-partner-track{display:flex;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
+              '@keyframes cade-partner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}';
+            document.head.appendChild(s6);
+          }
+        }
       }
     };
     if (document.readyState === 'loading') {

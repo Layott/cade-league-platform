@@ -38,7 +38,24 @@
 
 <script id="cade-token-bootstrap">
 (function() {
-  // Wave 2 Stage 4 — cross-document design + text + partner + animation propagation.
+  // Wave 2 Stage 3 — cross-document design + text + partner propagation.
+  //
+  // Read base64-encoded JSON token maps from the iframe URL query
+  // string and emit <style> blocks that win the CSS source-order
+  // cascade (appended LATER in <head> than the author defaults).
+  //
+  // Token shapes:
+  //   tokens / previewTokens     — { 'bg-color': '#000', ... }
+  //   textTokens / previewTextTokens — { '<elementId>': { visible?,
+  //     content?, styles?: { color, fontFamily, fontSize, ... } } }
+  //   partnerTokens / previewPartnerTokens — {
+  //     layout?: { anchor, positionXPx, positionYPx, scalePct,
+  //                itemSpacingPx, orientation, justification,
+  //                zIndex, visible },
+  //     logos?: [ { partnerKey, label, alt, fileUrl, visible?, sort? } ]
+  //   }
+  //
+  // Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §6.2
   function decodeTokens(param) {
     if (!param) return null;
     try {
@@ -59,7 +76,14 @@
       var safe = v.replace(/[;{}<>"']/g, '');
       if (imageKeys[k]) {
         if (!safe) continue;
-        parts.push('--overlay-' + k + ': url("' + safe + '")');
+        // Sentinel "none" → CSS keyword (turn off background image entirely
+        // so var(--overlay-bg-image, url(default)) resolves to none and
+        // does NOT fall through to the HTML hard-coded default).
+        if (safe === 'none') {
+          parts.push('--overlay-' + k + ': none');
+        } else {
+          parts.push('--overlay-' + k + ': url("' + safe + '")');
+        }
       } else {
         if (!safe) continue;
         parts.push('--overlay-' + k + ': ' + safe);
@@ -88,12 +112,10 @@
       if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
       if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
       if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
-      if (s.left || s.top) {
-        var tx = s.left ? sanitizeCss(s.left) : '0px';
-        var ty = s.top ? sanitizeCss(s.top) : '0px';
-        declarations.push('translate:' + tx + ' ' + ty + ' !important');
-      }
+      if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
+      if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
       if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
+      if (s.left || s.top) declarations.push('position:absolute');
       if (t.visible === false) declarations.push('display:none');
       if (declarations.length) {
         rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');
@@ -121,43 +143,43 @@
       return '[data-element-id="partners-strip"]{display:none !important;}';
     }
     var declarations = [];
-    declarations.push('display:flex !important');
-    declarations.push('flex-direction:' + (layout.orientation === 'vertical' ? 'column' : 'row') + ' !important');
-    declarations.push('justify-content:' + sanitizeCss(layout.justification || 'center') + ' !important');
-    declarations.push('align-items:center !important');
-    declarations.push('gap:' + ((+layout.itemSpacingPx) || 0) + 'px !important');
-    declarations.push('z-index:' + ((+layout.zIndex) || 12) + ' !important');
-    declarations.push('position:absolute !important');
+    declarations.push('display:flex');
+    declarations.push('flex-direction:' + (layout.orientation === 'vertical' ? 'column' : 'row'));
+    declarations.push('justify-content:' + sanitizeCss(layout.justification || 'center'));
+    declarations.push('align-items:center');
+    declarations.push('gap:' + ((+layout.itemSpacingPx) || 0) + 'px');
+    declarations.push('z-index:' + ((+layout.zIndex) || 12));
+    declarations.push('position:absolute');
     var anchor = layout.anchor || 'bottom-center';
     var px = (+layout.positionXPx) || 0;
     var py = (+layout.positionYPx) || 0;
     var sx = ((+layout.scalePct) || 100) / 100;
     var transformOps = [];
     if (anchor.indexOf('top') === 0) {
-      declarations.push('top:' + py + 'px !important');
-      declarations.push('bottom:auto !important');
+      declarations.push('top:' + py + 'px');
+      declarations.push('bottom:auto');
     } else if (anchor.indexOf('bottom') === 0) {
-      declarations.push('bottom:' + py + 'px !important');
-      declarations.push('top:auto !important');
+      declarations.push('bottom:' + (1080 - py) + 'px');
+      declarations.push('top:auto');
     } else {
-      declarations.push('top:' + py + 'px !important');
-      declarations.push('bottom:auto !important');
+      declarations.push('top:' + py + 'px');
+      declarations.push('bottom:auto');
       transformOps.push('translateY(-50%)');
     }
     if (anchor.indexOf('left') !== -1) {
-      declarations.push('left:' + px + 'px !important');
-      declarations.push('right:auto !important');
+      declarations.push('left:' + px + 'px');
+      declarations.push('right:auto');
     } else if (anchor.indexOf('right') !== -1) {
-      declarations.push('right:' + px + 'px !important');
+      declarations.push('right:' + (1920 - px) + 'px');
       declarations.push('left:auto');
     } else {
-      declarations.push('left:50% !important');
-      declarations.push('right:auto !important');
+      declarations.push('left:50%');
+      declarations.push('right:auto');
       transformOps.push('translateX(-50%)');
     }
-    if (sx !== 1) declarations.push('scale:' + sx + ' !important');
+    if (sx !== 1) transformOps.push('scale(' + sx + ')');
     if (transformOps.length) {
-      declarations.push('transform:' + transformOps.join(' ') + ' !important');
+      declarations.push('transform:' + transformOps.join(' '));
       declarations.push('transform-origin:center center');
     }
     return '[data-element-id="partners-strip"]{' + declarations.join(';') + ';}';
@@ -166,6 +188,7 @@
     if (!Array.isArray(logos)) return false;
     var strip = document.querySelector('[data-element-id="partners-strip"]');
     if (!strip) return false;
+    // Filter visible + sort.
     var sorted = logos
       .filter(function(l) { return l && l.visible !== false && typeof l.fileUrl === 'string'; })
       .slice()
@@ -175,9 +198,13 @@
         return sa - sb;
       });
     if (sorted.length === 0 && (!layout || layout.visible !== false)) {
+      // No logos but layout present — leave existing children alone.
       return false;
     }
+    // Wipe existing children.
     while (strip.firstChild) strip.removeChild(strip.firstChild);
+    // Mark as flex container so the layout CSS takes effect even without
+    // browser quirks.
     sorted.forEach(function(l) {
       var img = document.createElement('img');
       var safeKey = sanitizeCss(l.partnerKey || 'x');
@@ -189,6 +216,12 @@
     });
     return true;
   }
+  // ────────── Stage 4 — element animations ──────────
+  //
+  // Build @keyframes BODY for a given preset anim type. Mirrors
+  // server/overlays/animations/elements.ts::buildKeyframesBody — same
+  // values across server-side resolver + client-side bootstrap so
+  // SSR-emitted styles + URL-borne overrides yield identical motion.
   function buildPresetKeyframes(animType, name, customBody) {
     switch (animType) {
       case 'slide-left':
@@ -216,6 +249,8 @@
       case 'flip':
         return '@keyframes ' + name + '{from{opacity:0;transform:perspective(800px) rotateY(-90deg)}to{opacity:1;transform:perspective(800px) rotateY(0)}}';
       case 'custom-css':
+        // Defence-in-depth: strip url(), at-rules, and angle/backtick
+        // characters even if server sanitizer was bypassed (URL-borne).
         if (typeof customBody !== 'string') return '';
         if (/\burl\s*\(/i.test(customBody)) return '';
         if (/@(import|font-face|charset|media|supports|keyframes)\b/i.test(customBody)) return '';
@@ -254,6 +289,8 @@
         var delay = (+p.delayMs) || 0;
         var easing = sanitizeCss(p.easing || 'ease-out');
         var iterations = sanitizeCss(p.iterationCount || '1');
+        // Phase-gated selector. Continuous animations only run while
+        // the overlay is visible (cade-visible class on body).
         var sel =
           phase === 'exit'
             ? 'body.cade-exiting [data-element-id="' + elId + '"]'
@@ -283,8 +320,11 @@
     var previewPartnerTokens = decodeTokens(qs.get('previewPartnerTokens'));
     var animTokens = decodeTokens(qs.get('animTokens'));
     var previewAnimTokens = decodeTokens(qs.get('previewAnimTokens'));
+    // Source order: design first, preview second so preview wins.
     var cssVarRule = buildCssVars(design) + buildCssVars(preview);
     var textRule = buildTextRules(textTokens) + (buildTextRules(textTokens).length && buildTextRules(previewTextTokens).length ? '\n' : '') + buildTextRules(previewTextTokens);
+    // Partner layout: preview wins by being applied second (later
+    // <style> block wins on identical selector via source-order).
     var partnerRules = [];
     if (partnerTokens && partnerTokens.layout) {
       var r1 = buildPartnerLayoutRule(partnerTokens.layout);
@@ -294,6 +334,10 @@
       var r2 = buildPartnerLayoutRule(previewPartnerTokens.layout);
       if (r2) partnerRules.push(r2);
     }
+    // Stage 4 — element animations. Build keyframes + rules from both
+    // design + preview maps. Source-order wins on identical names: the
+    // preview block emits second, so its keyframes & rules overwrite
+    // design's via CSS cascade (same selector + same animation-name).
     var animDesign = buildAnimRulesAndKeyframes(animTokens);
     var animPreview = buildAnimRulesAndKeyframes(previewAnimTokens);
     var animKeyframesCss = animDesign.keyframes +
@@ -322,6 +366,8 @@
         s3.textContent = partnerRules.join('\n');
         document.head.appendChild(s3);
       }
+      // Stage 4 — animation keyframes block FIRST (must precede rules
+      // so the named animations resolve).
       if (animKeyframesCss) {
         var s4 = document.createElement('style');
         s4.id = 'cade-injected-anim-keyframes';
@@ -334,13 +380,45 @@
         s5.textContent = animRulesCss;
         document.head.appendChild(s5);
       }
+      // Apply textContent edits AFTER DOM is parsed.
       applyTextContent(textTokens);
       applyTextContent(previewTextTokens);
+      // Rebuild partner strip children — preview wins by being applied
+      // second (overwrites design's children).
       if (partnerTokens && Array.isArray(partnerTokens.logos)) {
         applyPartnerLogos(partnerTokens.logos, partnerTokens.layout);
       }
       if (previewPartnerTokens && Array.isArray(previewPartnerTokens.logos)) {
         applyPartnerLogos(previewPartnerTokens.logos, previewPartnerTokens.layout);
+      }
+      // Phase D — partner-strip scroll. Token `partner-strip-scroll`
+      // controls whether logos scroll continuously sideways. When "true",
+      // wrap the strip's children in a flex track + clone them once for
+      // a seamless 50% translateX loop. Inject @keyframes + animation
+      // rule via a dedicated <style> block so OBS sees the motion.
+      var scrollOn = false;
+      if (design && design['partner-strip-scroll'] === 'true') scrollOn = true;
+      if (preview && preview['partner-strip-scroll'] === 'true') scrollOn = true;
+      if (preview && preview['partner-strip-scroll'] === 'false') scrollOn = false;
+      if (scrollOn) {
+        var stripScroll = document.querySelector('[data-element-id="partners-strip"]');
+        if (stripScroll && !stripScroll.querySelector('.cade-partner-track')) {
+          var kids = Array.from(stripScroll.children);
+          if (kids.length > 0) {
+            var track = document.createElement('div');
+            track.className = 'cade-partner-track';
+            kids.forEach(function(c) { track.appendChild(c); });
+            kids.forEach(function(c) { track.appendChild(c.cloneNode(true)); });
+            stripScroll.appendChild(track);
+            var s6 = document.createElement('style');
+            s6.id = 'cade-injected-partner-scroll';
+            s6.textContent =
+              '[data-element-id="partners-strip"]{overflow:hidden !important;}' +
+              '.cade-partner-track{display:flex;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
+              '@keyframes cade-partner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}';
+            document.head.appendChild(s6);
+          }
+        }
       }
     };
     if (document.readyState === 'loading') {

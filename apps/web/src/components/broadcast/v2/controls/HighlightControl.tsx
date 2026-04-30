@@ -46,7 +46,11 @@ export function HighlightControl({
           active={active}
           onOptimisticToggle={optimisticToggle}
           payloadFields={
-            <input type="hidden" name="payload" value="{}" />
+            <input
+              type="hidden"
+              name="payload"
+              value='{"matchDayLabel":"HIGHLIGHT"}'
+            />
           }
         />
       }

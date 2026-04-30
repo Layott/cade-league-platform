@@ -1947,9 +1947,14 @@ function ImageRow({
 
   const handleClear = useCallback(() => {
     setUploadError(null);
-    onChange("");
+    // Sentinel "none" tells the bootstrap to emit
+    // `--overlay-bg-image: none` so var() resolves to none and the
+    // hardcoded HTML default does NOT show through (Bug #28 fix).
+    onChange("none");
   }, [onChange]);
 
+  const isOff = value === "none";
+  const isUploaded = value && value !== "none";
   return (
     <div className="space-y-1.5">
       <label className={labelStyle}>{entry.label}</label>
@@ -1959,7 +1964,7 @@ function ImageRow({
           className="flex h-[45px] w-[80px] flex-none items-center justify-center overflow-hidden rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)]"
           data-testid={`token-${entry.tokenKey}-thumb`}
         >
-          {value ? (
+          {isUploaded ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={value}
@@ -1969,9 +1974,13 @@ function ImageRow({
                 (e.currentTarget as HTMLImageElement).style.display = "none";
               }}
             />
+          ) : isOff ? (
+            <span className="px-1 text-center text-[8px] uppercase tracking-[0.18em] text-[var(--flare)]">
+              Off
+            </span>
           ) : (
             <span className="px-1 text-center text-[8px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-              No image
+              Default
             </span>
           )}
         </div>
@@ -1990,10 +1999,20 @@ function ImageRow({
             <SecondaryButton
               size="sm"
               onClick={handleClear}
+              disabled={uploading || isOff}
+              type="button"
+              title="Turn the background image off (admin set OFF, not just clear-to-default)"
+            >
+              Off
+            </SecondaryButton>
+            <SecondaryButton
+              size="sm"
+              onClick={() => onChange("")}
               disabled={uploading || !value}
               type="button"
+              title="Revert to overlay HTML default"
             >
-              Clear
+              Default
             </SecondaryButton>
           </div>
           {uploading ? (
@@ -2007,7 +2026,7 @@ function ImageRow({
               {uploadError}
             </span>
           ) : null}
-          {value && !uploadError ? (
+          {isUploaded && !uploadError ? (
             <span
               className="break-all font-mono text-[10px] text-[var(--chalk-3)]"
               data-testid={`token-${entry.tokenKey}-url`}
