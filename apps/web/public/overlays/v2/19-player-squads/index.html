@@ -967,18 +967,19 @@
   }
   .fut-face {
     position: absolute;
-    /* Face slot — wider + taller, fills the upper face area of the FUT
-       card frame (similar proportions to the user's reference image
-       cards). Width via cqi (% of card width); vertical bounds via %
-       so they're relative to card HEIGHT. Pinned to upper-half via top
-       + max-height so it stops well above the name/stats band. */
+    /* Face slot — sized so the visible PLAYER FACE inside the PNG
+       (FUTBIN's `card_image_url` has the actual face occupying only
+       the upper ~55% of its 64×89 frame, with empty/transparent space
+       below) reads clearly. Use `cover` with `object-position: center
+       top` to crop the bottom whitespace; the resulting visible face
+       fills ~55% of card width × ~50% of card height — close to the
+       user's reference image proportions. */
     top: 8%;
     left: 50%;
     transform: translateX(-50%);
-    width: 64cqi;
-    max-height: 48%;
-    height: auto;
-    object-fit: contain;
+    width: 78cqi;
+    height: 52%;
+    object-fit: cover;
     object-position: center top;
     image-rendering: auto;
     pointer-events: none;
