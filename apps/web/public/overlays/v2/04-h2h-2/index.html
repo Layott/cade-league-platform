@@ -749,7 +749,7 @@
      pill itself is inline-block so margin auto + content-fit width work. */
   .h2h-kicker-wrap {
     position: absolute;
-    top: 200px;
+    top: 130px;
     left: 0;
     right: 0;
     width: 100%;
@@ -1006,7 +1006,7 @@
      HEAD TO HEAD. */
   .draw-prob-pill {
     position: absolute;
-    top: 894px;
+    top: 860px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 30;
@@ -1034,14 +1034,16 @@
     text-shadow: 0 0 22px rgba(255,255,255,0.40);
   }
 
-  /* ── CENTER STATS HUD CARD — repositioned to leave ≥80px gap to partner strip ── */
+  /* ── CENTER STATS HUD CARD — pulled up so DRAW pill + partner strip both
+     have breathing room. height bumped to 640 so 9 rows + header fit
+     without TOTAL PTS clipping the bottom clip-path corner. ── */
   .stats-card {
     position: absolute;
-    top: 270px;
+    top: 200px;
     left: 50%;
     transform: translateX(-50%);
     width: 660px;
-    height: 600px;
+    height: 640px;
     z-index: 15;
     background: linear-gradient(180deg,
       rgba(8, 12, 6, 0.94) 0%,
@@ -1140,7 +1142,7 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 6px 0 32px;
+    padding: 4px 0 18px;
   }
 
   .stat-row {
