@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<!--
+  CADE ELITE LEAGUE — OVERLAY #19-PLAYER-SQUADS — "DRAFT / TEAM SHEET"
+  Full-screen 1920×1080 transparent FUT-style draft view for one player.
+  Top-left: draft owner name + "DRAFT" big condensed Agharti title with
+  optional headshot. Below: CHEMISTRY 30/33 + FORMATION 4-3-3(2) labels.
+  Center pitch: 11 starting cards arranged in 4-3-3 formation with green
+  pitch outline. Right column: 7 sub cards in a SUBS panel. Top-right:
+  CADE Esports + Pro League logos.
+
+  Aesthetics: ELITE S2 GREEN BG (same source as 07-leaderboard), locked
+  brand palette #6bcd06 / #fe036d / #050505 / #ffffff, Agharti display +
+  Quedora secondary.
+
+  DATA WIRES:
+    draftOwner   = { displayName, headshotUrl }
+    formation    = '4-3-3(2)'
+    chemistry    = '30/33'
+    starting[11] = { slot_index, name, rating, position, item_type, nationality_flag }
+    subs[N]      = { slot_index, name, rating, position, item_type, nationality_flag }
+                   N is variable (0..12). Players spend the leftover 10M-coin budget
+                   on as many subs as fit. Schema CHECK on slot_index 0..22 caps subs
+                   at 12. CSS grid is `repeat(3, 1fr)` so 1..12 subs flow naturally.
+
+  Slot mapping (4-3-3):
+    0  -> GK
+    1  -> LB     2  -> CB-L    3  -> CB-R    4  -> RB
+    5  -> CM-L   6  -> CM-C    7  -> CM-R
+    8  -> LW     9  -> ST     10  -> RW
+    11..22 -> SUBS (variable count)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="viewport" content="width=1920, initial-scale=1" />
+  <title>CADE — DRAFT / TEAM SHEET</title>
+
+<script id="cade-token-bootstrap">
+(function() {
+  // Wave 2 Stage 4 — cross-document design + text + partner + animation propagation.
+  function decodeTokens(param) {
+    if (!param) return null;
+    try {
+      var json = decodeURIComponent(escape(atob(param)));
+      var obj = JSON.parse(json);
+      if (typeof obj !== 'object' || !obj) return null;
+      return obj;
+    } catch (e) { return null; }
+  }
+  function buildCssVars(tokens) {
+    if (!tokens) return '';
+    var parts = [];
+    var imageKeys = { 'bg-image': 1 };
+    for (var k in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, k)) continue;
+      var v = tokens[k];
+      if (typeof v !== 'string') continue;
+      var safe = v.replace(/[;{}<>"']/g, '');
+      if (imageKeys[k]) {
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': url("' + safe + '")');
+      } else {
+        if (!safe) continue;
+        parts.push('--overlay-' + k + ': ' + safe);
+      }
+    }
+    return parts.length ? ':root{' + parts.join(';') + ';}' : '';
+  }
+  function sanitizeCss(v) {
+    return String(v == null ? '' : v).replace(/[;{}<>"\\`]/g, '');
+  }
+  function buildTextRules(tokens) {
+    if (!tokens || typeof tokens !== 'object') return '';
+    var rules = [];
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var t = tokens[elId];
+      if (!t || typeof t !== 'object') continue;
+      var s = t.styles || {};
+      var declarations = [];
+      if (s.color)         declarations.push('color:' + sanitizeCss(s.color));
+      if (s.fontFamily)    declarations.push("font-family:'" + sanitizeCss(s.fontFamily) + "'");
+      if (s.fontWeight)    declarations.push('font-weight:' + (+s.fontWeight || 400));
+      if (s.fontSize)      declarations.push('font-size:' + sanitizeCss(s.fontSize));
+      if (s.letterSpacing) declarations.push('letter-spacing:' + sanitizeCss(s.letterSpacing));
+      if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
+      if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
+      if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
+      if (s.left || s.top) {
+        var tx = s.left ? sanitizeCss(s.left) : '0px';
+        var ty = s.top ? sanitizeCss(s.top) : '0px';
+        declarations.push('translate:' + tx + ' ' + ty + ' !important');
+      }
+      if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
+      if (t.visible === false) declarations.push('display:none');
+      if (declarations.length) {
+        rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');
+      }
+    }
+    return rules.join('\n');
+  }
+  function applyTextContent(tokens) {
+    if (!tokens || typeof tokens !== 'object') return;
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var t = tokens[elId];
+      if (!t || typeof t !== 'object') continue;
+      if (typeof t.content !== 'string') continue;
+      if (t.content === '' || t.content == null) continue;
+      var node = document.querySelector('[data-element-id="' + elId + '"]');
+      if (!node) continue;
+      try { node.textContent = t.content; } catch (e) { /* read-only */ }
+    }
+  }
+  function buildPartnerLayoutRule(layout) {
+    if (!layout || typeof layout !== 'object') return '';
+    if (layout.visible === false) {
+      return '[data-element-id="partners-strip"]{display:none !important;}';
+    }
+    var declarations = [];
+    declarations.push('display:flex !important');
+    declarations.push('flex-direction:' + (layout.orientation === 'vertical' ? 'column' : 'row') + ' !important');
+    declarations.push('justify-content:' + sanitizeCss(layout.justification || 'center') + ' !important');
+    declarations.push('align-items:center !important');
+    declarations.push('gap:' + ((+layout.itemSpacingPx) || 0) + 'px !important');
+    declarations.push('z-index:' + ((+layout.zIndex) || 12) + ' !important');
+    declarations.push('position:absolute !important');
+    var anchor = layout.anchor || 'bottom-center';
+    var px = (+layout.positionXPx) || 0;
+    var py = (+layout.positionYPx) || 0;
+    var sx = ((+layout.scalePct) || 100) / 100;
+    var transformOps = [];
+    if (anchor.indexOf('top') === 0) {
+      declarations.push('top:' + py + 'px !important');
+      declarations.push('bottom:auto !important');
+    } else if (anchor.indexOf('bottom') === 0) {
+      declarations.push('bottom:' + py + 'px !important');
+      declarations.push('top:auto !important');
+    } else {
+      declarations.push('top:' + py + 'px !important');
+      declarations.push('bottom:auto !important');
+      transformOps.push('translateY(-50%)');
+    }
+    if (anchor.indexOf('left') !== -1) {
+      declarations.push('left:' + px + 'px !important');
+      declarations.push('right:auto !important');
+    } else if (anchor.indexOf('right') !== -1) {
+      declarations.push('right:' + px + 'px !important');
+      declarations.push('left:auto');
+    } else {
+      declarations.push('left:50% !important');
+      declarations.push('right:auto !important');
+      transformOps.push('translateX(-50%)');
+    }
+    if (sx !== 1) declarations.push('scale:' + sx + ' !important');
+    if (transformOps.length) {
+      declarations.push('transform:' + transformOps.join(' ') + ' !important');
+      declarations.push('transform-origin:center center');
+    }
+    return '[data-element-id="partners-strip"]{' + declarations.join(';') + ';}';
+  }
+  function applyPartnerLogos(logos, layout) {
+    if (!Array.isArray(logos)) return false;
+    var strip = document.querySelector('[data-element-id="partners-strip"]');
+    if (!strip) return false;
+    var sorted = logos
+      .filter(function(l) { return l && l.visible !== false && typeof l.fileUrl === 'string'; })
+      .slice()
+      .sort(function(a, b) {
+        var sa = typeof a.sort === 'number' ? a.sort : 999;
+        var sb = typeof b.sort === 'number' ? b.sort : 999;
+        return sa - sb;
+      });
+    if (sorted.length === 0 && (!layout || layout.visible !== false)) {
+      return false;
+    }
+    while (strip.firstChild) strip.removeChild(strip.firstChild);
+    sorted.forEach(function(l) {
+      var img = document.createElement('img');
+      var safeKey = sanitizeCss(l.partnerKey || 'x');
+      img.className = 'partner partner--' + safeKey;
+      img.src = sanitizeCss(l.fileUrl);
+      img.alt = sanitizeCss(l.alt || l.label || '');
+      img.setAttribute('data-partner-key', safeKey);
+      strip.appendChild(img);
+    });
+    return true;
+  }
+  function buildPresetKeyframes(animType, name, customBody) {
+    switch (animType) {
+      case 'slide-left':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateX(-32px)}to{opacity:1;transform:translateX(0)}}';
+      case 'slide-right':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateX(32px)}to{opacity:1;transform:translateX(0)}}';
+      case 'slide-up':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}';
+      case 'slide-down':
+        return '@keyframes ' + name + '{from{opacity:0;transform:translateY(-32px)}to{opacity:1;transform:translateY(0)}}';
+      case 'fade':
+        return '@keyframes ' + name + '{from{opacity:0}to{opacity:1}}';
+      case 'scale':
+        return '@keyframes ' + name + '{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}';
+      case 'rotate':
+        return '@keyframes ' + name + '{from{opacity:0;transform:rotate(-12deg)}to{opacity:1;transform:rotate(0)}}';
+      case 'bounce':
+        return '@keyframes ' + name + '{0%{opacity:0;transform:translateY(20px)}60%{transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}';
+      case 'pulse':
+        return '@keyframes ' + name + '{0%{transform:scale(1)}50%{transform:scale(1.04)}100%{transform:scale(1)}}';
+      case 'glow':
+        return '@keyframes ' + name + '{0%{filter:drop-shadow(0 0 0 rgba(107,205,6,0))}50%{filter:drop-shadow(0 0 24px rgba(107,205,6,0.55))}100%{filter:drop-shadow(0 0 0 rgba(107,205,6,0))}}';
+      case 'shake':
+        return '@keyframes ' + name + '{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}';
+      case 'flip':
+        return '@keyframes ' + name + '{from{opacity:0;transform:perspective(800px) rotateY(-90deg)}to{opacity:1;transform:perspective(800px) rotateY(0)}}';
+      case 'custom-css':
+        if (typeof customBody !== 'string') return '';
+        if (/\burl\s*\(/i.test(customBody)) return '';
+        if (/@(import|font-face|charset|media|supports|keyframes)\b/i.test(customBody)) return '';
+        if (/[<>\`]/.test(customBody)) return '';
+        return '@keyframes ' + name + '{' + customBody + '}';
+      case 'none':
+      default:
+        return '';
+    }
+  }
+  function buildAnimRulesAndKeyframes(tokens) {
+    if (!tokens || typeof tokens !== 'object') return { keyframes: '', rules: '' };
+    var keyframesParts = [];
+    var rulesParts = [];
+    for (var elId in tokens) {
+      if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
+      if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
+      var phases = tokens[elId];
+      if (!phases || typeof phases !== 'object') continue;
+      for (var phase in phases) {
+        if (!Object.prototype.hasOwnProperty.call(phases, phase)) continue;
+        if (phase !== 'entry' && phase !== 'exit' && phase !== 'continuous') continue;
+        var p = phases[phase];
+        if (!p || typeof p !== 'object') continue;
+        if (p.enabled === false) continue;
+        if (!p.animType || p.animType === 'none') continue;
+        var animName = 'cade-' + elId + '-' + phase;
+        var kf = buildPresetKeyframes(
+          p.animType,
+          animName,
+          p.customCssKeyframes || ''
+        );
+        if (!kf) continue;
+        keyframesParts.push(kf);
+        var duration = (+p.durationMs) || 360;
+        var delay = (+p.delayMs) || 0;
+        var easing = sanitizeCss(p.easing || 'ease-out');
+        var iterations = sanitizeCss(p.iterationCount || '1');
+        var sel =
+          phase === 'exit'
+            ? 'body.cade-exiting [data-element-id="' + elId + '"]'
+            : 'body.cade-visible [data-element-id="' + elId + '"]';
+        var rule =
+          'animation:' + animName +
+          ' ' + duration + 'ms' +
+          ' ' + easing +
+          ' ' + delay + 'ms' +
+          ' ' + iterations +
+          ' both;';
+        rulesParts.push(sel + '{' + rule + '}');
+      }
+    }
+    return {
+      keyframes: keyframesParts.join('\n'),
+      rules: rulesParts.join('\n'),
+    };
+  }
+  try {
+    var qs = new URLSearchParams(location.search);
+    var design = decodeTokens(qs.get('tokens'));
+    var preview = decodeTokens(qs.get('previewTokens'));
+    var textTokens = decodeTokens(qs.get('textTokens'));
+    var previewTextTokens = decodeTokens(qs.get('previewTextTokens'));
+    var partnerTokens = decodeTokens(qs.get('partnerTokens'));
+    var previewPartnerTokens = decodeTokens(qs.get('previewPartnerTokens'));
+    var animTokens = decodeTokens(qs.get('animTokens'));
+    var previewAnimTokens = decodeTokens(qs.get('previewAnimTokens'));
+    var cssVarRule = buildCssVars(design) + buildCssVars(preview);
+    var textRule = buildTextRules(textTokens) + (buildTextRules(textTokens).length && buildTextRules(previewTextTokens).length ? '\n' : '') + buildTextRules(previewTextTokens);
+    var partnerRules = [];
+    if (partnerTokens && partnerTokens.layout) {
+      var r1 = buildPartnerLayoutRule(partnerTokens.layout);
+      if (r1) partnerRules.push(r1);
+    }
+    if (previewPartnerTokens && previewPartnerTokens.layout) {
+      var r2 = buildPartnerLayoutRule(previewPartnerTokens.layout);
+      if (r2) partnerRules.push(r2);
+    }
+    var animDesign = buildAnimRulesAndKeyframes(animTokens);
+    var animPreview = buildAnimRulesAndKeyframes(previewAnimTokens);
+    var animKeyframesCss = animDesign.keyframes +
+      (animDesign.keyframes && animPreview.keyframes ? '\n' : '') +
+      animPreview.keyframes;
+    var animRulesCss = animDesign.rules +
+      (animDesign.rules && animPreview.rules ? '\n' : '') +
+      animPreview.rules;
+    var emit = function() {
+      if (!document.head) return;
+      if (cssVarRule) {
+        var s1 = document.createElement('style');
+        s1.id = 'cade-injected-tokens';
+        s1.textContent = cssVarRule;
+        document.head.appendChild(s1);
+      }
+      if (textRule) {
+        var s2 = document.createElement('style');
+        s2.id = 'cade-injected-text';
+        s2.textContent = textRule;
+        document.head.appendChild(s2);
+      }
+      if (partnerRules.length) {
+        var s3 = document.createElement('style');
+        s3.id = 'cade-injected-partners-layout';
+        s3.textContent = partnerRules.join('\n');
+        document.head.appendChild(s3);
+      }
+      if (animKeyframesCss) {
+        var s4 = document.createElement('style');
+        s4.id = 'cade-injected-anim-keyframes';
+        s4.textContent = animKeyframesCss;
+        document.head.appendChild(s4);
+      }
+      if (animRulesCss) {
+        var s5 = document.createElement('style');
+        s5.id = 'cade-injected-anim-rules';
+        s5.textContent = animRulesCss;
+        document.head.appendChild(s5);
+      }
+      applyTextContent(textTokens);
+      applyTextContent(previewTextTokens);
+      if (partnerTokens && Array.isArray(partnerTokens.logos)) {
+        applyPartnerLogos(partnerTokens.logos, partnerTokens.layout);
+      }
+      if (previewPartnerTokens && Array.isArray(previewPartnerTokens.logos)) {
+        applyPartnerLogos(previewPartnerTokens.logos, previewPartnerTokens.layout);
+      }
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', emit);
+    } else {
+      emit();
+    }
+  } catch (e) {
+    // Bootstrap MUST never throw — fall back to HTML defaults.
+  }
+})();
+</script>
+
+
+<style>
+  /* ── REAL BRAND FONTS ─ */
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Agharti';
+    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    font-weight: 500; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    font-weight: 700; font-style: normal; font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900; font-style: normal; font-display: block;
+  }
+
+  /* ── DESIGN TOKENS (locked brand palette) ───────────────────── */
+  :root {
+    --overlay-bg-color: #050505;
+    --overlay-accent-color: #6bcd06;
+    --overlay-secondary-color: #fe036d;
+    --overlay-text-color: #ffffff;
+    --overlay-font-display: 'Agharti';
+    --overlay-font-body: 'Quedora';
+    --overlay-pattern: halftone;
+    --overlay-partner-strip-show: flex;
+
+    --green:        var(--overlay-accent-color, #6bcd06);
+    --green-glow:   rgba(107, 205, 6, 0.55);
+    --green-faint:  rgba(107, 205, 6, 0.18);
+    --pink:         var(--overlay-secondary-color, #fe036d);
+    --pink-glow:    rgba(254, 3, 109, 0.55);
+    --black:        var(--overlay-bg-color, #050505);
+    --ink:          var(--overlay-text-color, #ffffff);
+    --display:      var(--overlay-font-display, 'Agharti'), 'Impact', sans-serif;
+    --accent:       var(--overlay-font-body, 'Quedora'), 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 1920px; height: 1080px; overflow: hidden;
+    background: transparent !important;
+    color-scheme: dark; color: var(--ink);
+    font-family: var(--accent);
+    -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  }
+  /* Body always opacity 1 — bg-image stays visible while content gates. */
+  body { opacity: 1 !important; }
+  body:not(.cade-visible):not(.cade-exiting) .bg-image,
+  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
+  body:not(.cade-visible):not(.cade-exiting) .header-row,
+  body:not(.cade-visible):not(.cade-exiting) .title-block,
+  body:not(.cade-visible):not(.cade-exiting) .stat-block,
+  body:not(.cade-visible):not(.cade-exiting) .pitch-wrap,
+  body:not(.cade-visible):not(.cade-exiting) .subs-panel,
+  body:not(.cade-visible):not(.cade-exiting) .partners,
+  body:not(.cade-visible):not(.cade-exiting) .pitch-card,
+  body:not(.cade-visible):not(.cade-exiting) .sub-card {
+    opacity: 0 !important;
+  }
+  body.cade-visible .bg-image,
+  body.cade-visible .bg-vignette,
+  body.cade-visible .bg-grain {
+    opacity: 1;
+    transition: opacity 0.4s ease-out;
+  }
+  body.cade-exiting .bg-image,
+  body.cade-exiting .bg-vignette,
+  body.cade-exiting .bg-grain,
+  body.cade-exiting .header-row,
+  body.cade-exiting .title-block,
+  body.cade-exiting .stat-block,
+  body.cade-exiting .pitch-wrap,
+  body.cade-exiting .subs-panel,
+  body.cade-exiting .partners,
+  body.cade-exiting .pitch-card,
+  body.cade-exiting .sub-card {
+    animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
+  }
+  @keyframes cade-fade-out {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-8px); }
+  }
+
+  /* ── STAGE ─────────────────────────────────── */
+  .stage {
+    position: relative;
+    width: 1920px; height: 1080px;
+    overflow: hidden;
+    background: transparent !important;
+    isolation: isolate;
+  }
+
+  /* ── BG: ELITE S2 GREEN BG (matches 07-leaderboard) ────────── */
+  .bg-image {
+    position: absolute;
+    inset: -3% -3%;
+    background-image: var(--overlay-bg-image, url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png'));
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform-origin: 50% 50%;
+    animation: bg-drift 22s ease-in-out infinite alternate,
+               bg-breathe 6s ease-in-out infinite;
+    z-index: 0;
+  }
+  @keyframes bg-drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    100% { transform: scale(1.04) translate(-1.0%, -0.5%); }
+  }
+  @keyframes bg-breathe {
+    0%, 100% { filter: brightness(1.00) saturate(1.00); }
+    50%      { filter: brightness(1.04) saturate(1.06); }
+  }
+
+  /* dark gradient overlay so card chrome reads cleanly */
+  .bg-vignette {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.18) 55%, rgba(5,5,5,0.55) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.05) 50%, rgba(5,5,5,0.40) 90%, rgba(5,5,5,0.78) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .bg-grain {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.012) 0 1px,
+        transparent 1px 3px
+      );
+    z-index: 2;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── TOP-RIGHT HEADER (CADE | Pro League) ───── */
+  .header-row {
+    position: absolute;
+    top: 50px;
+    right: 60px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    z-index: 10;
+    animation: top-fade 0.9s 0.15s ease both;
+  }
+  .header-row .logo {
+    height: 110px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
+  }
+  .header-row .logo--cade { height: 100px; }
+  .header-row .logo--pro  { height: 110px; }
+  .header-row .divider {
+    width: 2px;
+    height: 92px;
+    background: linear-gradient(
+      to bottom,
+      rgba(107,205,6,0) 0%,
+      rgba(107,205,6,0.65) 20%,
+      rgba(107,205,6,0.95) 50%,
+      rgba(107,205,6,0.65) 80%,
+      rgba(107,205,6,0) 100%
+    );
+    border-radius: 1px;
+    box-shadow: 0 0 12px rgba(107,205,6,0.45);
+  }
+  @keyframes top-fade {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── TITLE BLOCK (top-left): "MR OGA / DRAFT" ──────────── */
+  .title-block {
+    position: absolute;
+    top: 60px;
+    left: 80px;
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    z-index: 12;
+    animation: title-fade 0.9s 0.25s ease both;
+  }
+  .title-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 0.88;
+  }
+  .title-line {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 110px;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    text-transform: uppercase;
+    margin: 0;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 6px 22px rgba(0,0,0,0.65),
+      0 0 38px rgba(107,205,6,0.18);
+  }
+  .title-line.line-1 {
+    color: var(--ink);
+  }
+  .title-line.line-2 {
+    color: var(--green);
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 6px 22px rgba(0,0,0,0.65),
+      0 0 38px var(--green-glow);
+  }
+  .draft-photo {
+    width: 160px;
+    height: 200px;
+    object-fit: cover;
+    object-position: center 22%;
+    border-radius: 6px;
+    border: 2px solid rgba(107,205,6,0.55);
+    box-shadow:
+      0 8px 24px rgba(0,0,0,0.65),
+      0 0 18px rgba(107,205,6,0.30);
+  }
+  .draft-photo[src=""] { display: none; }
+  @keyframes title-fade {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── STAT BLOCK (Chemistry / Formation under title) ─────── */
+  .stat-block {
+    position: absolute;
+    top: 320px;
+    left: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    z-index: 11;
+    animation: stat-fade 0.9s 0.4s ease both;
+  }
+  .stat-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat-label {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.40em;
+    color: var(--green);
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(107,205,6,0.55);
+  }
+  .stat-value {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 64px;
+    line-height: 1;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 14px rgba(0,0,0,0.65);
+  }
+  .stat-row.formation .stat-value { font-size: 56px; }
+  @keyframes stat-fade {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── PITCH (center) ─────────────────────────── */
+  .pitch-wrap {
+    position: absolute;
+    top: 100px;
+    left: 460px;
+    width: 860px;
+    height: 880px;
+    z-index: 8;
+    animation: pitch-fade 1.0s 0.45s ease both;
+  }
+  .pitch-bg {
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(107,205,6,0.55);
+    border-radius: 16px;
+    background:
+      linear-gradient(180deg, rgba(8,16,4,0.32) 0%, rgba(4,8,2,0.46) 100%);
+    box-shadow:
+      inset 0 0 60px rgba(107,205,6,0.10),
+      inset 0 0 120px rgba(0,0,0,0.55),
+      0 12px 40px rgba(0,0,0,0.55);
+    overflow: hidden;
+  }
+  /* center halfway line */
+  .pitch-bg::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 12px;
+    bottom: 12px;
+    width: 1.5px;
+    background: rgba(107,205,6,0.22);
+    transform: translateX(-50%);
+  }
+  /* center circle */
+  .pitch-bg::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 130px;
+    height: 130px;
+    border: 1.5px solid rgba(107,205,6,0.22);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .pitch {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: 1fr 1fr 1fr 1fr;
+    grid-template-areas:
+      ".  lw .  st .  rw ."
+      ".  cml .  cmc .  cmr ."
+      "lb .  cbl .  cbr .  rb"
+      ".  .  .  gk .  .  .";
+    gap: 8px;
+    padding: 18px 14px 28px;
+  }
+  .slot { display: flex; align-items: center; justify-content: center; }
+  .slot-gk  { grid-area: gk; }
+  .slot-lb  { grid-area: lb; }
+  .slot-cbl { grid-area: cbl; }
+  .slot-cbr { grid-area: cbr; }
+  .slot-rb  { grid-area: rb; }
+  .slot-cml { grid-area: cml; }
+  .slot-cmc { grid-area: cmc; }
+  .slot-cmr { grid-area: cmr; }
+  .slot-lw  { grid-area: lw; }
+  .slot-st  { grid-area: st; }
+  .slot-rw  { grid-area: rw; }
+  @keyframes pitch-fade {
+    from { opacity: 0; transform: scale(0.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── CARD (FUT-style vertical) ───────────────── */
+  .pitch-card,
+  .sub-card {
+    position: relative;
+    width: 116px;
+    height: 168px;
+    border-radius: 8px;
+    padding: 8px 6px 6px;
+    color: #131106;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    box-shadow:
+      0 6px 16px rgba(0,0,0,0.55),
+      inset 0 0 12px rgba(0,0,0,0.18);
+    overflow: hidden;
+    font-family: var(--accent);
+  }
+  .sub-card { width: 100px; height: 144px; }
+
+  /* item_type tints */
+  .pitch-card.t-gold,    .sub-card.t-gold {
+    background: linear-gradient(180deg, #FBE48E 0%, #E5BD55 50%, #C8A33A 100%);
+    border: 1px solid rgba(255,235,150,0.85);
+  }
+  .pitch-card.t-silver,  .sub-card.t-silver {
+    background: linear-gradient(180deg, #ECECEC 0%, #B8B8B8 50%, #888 100%);
+    border: 1px solid rgba(255,255,255,0.55);
+    color: #1a1a1a;
+  }
+  .pitch-card.t-bronze,  .sub-card.t-bronze {
+    background: linear-gradient(180deg, #E0AE82 0%, #B97D52 50%, #6B3F1A 100%);
+    border: 1px solid rgba(255,200,150,0.55);
+    color: #1a0e05;
+  }
+  .pitch-card.t-hero,    .sub-card.t-hero {
+    background: linear-gradient(180deg, #3F2A86 0%, #6B2C82 50%, #B83A1A 100%);
+    border: 1px solid rgba(255,180,100,0.65);
+    color: #fff5d6;
+  }
+  .pitch-card.t-icon,    .sub-card.t-icon {
+    background: linear-gradient(180deg, #FFEAA0 0%, #DCC77A 50%, #B7A85F 100%);
+    border: 1px solid rgba(255,235,180,0.85);
+    color: #2a200a;
+  }
+  .pitch-card.t-special, .sub-card.t-special {
+    background: linear-gradient(180deg, #0a0a0a 0%, #181818 50%, #303030 100%);
+    border: 1px solid var(--green);
+    color: var(--ink);
+    box-shadow:
+      0 6px 16px rgba(0,0,0,0.65),
+      inset 0 0 14px rgba(107,205,6,0.18),
+      0 0 14px rgba(107,205,6,0.30);
+  }
+  .pitch-card.t-tots, .sub-card.t-tots {
+    background: linear-gradient(180deg, #06121f 0%, #0c2740 50%, #00477a 100%);
+    border: 1px solid #6bb6ff;
+    color: #ffffff;
+    box-shadow:
+      0 6px 16px rgba(0,0,0,0.65),
+      inset 0 0 14px rgba(60,140,255,0.20),
+      0 0 14px rgba(60,140,255,0.30);
+  }
+  .pitch-card.t-toty, .sub-card.t-toty {
+    background: linear-gradient(180deg, #08070a 0%, #1a1530 50%, #2a1c4f 100%);
+    border: 1px solid #c8a3ff;
+    color: #ffffff;
+    box-shadow:
+      0 6px 16px rgba(0,0,0,0.65),
+      inset 0 0 14px rgba(180,120,255,0.20),
+      0 0 14px rgba(180,120,255,0.30);
+  }
+  .pitch-card.t-rttf, .sub-card.t-rttf {
+    background: linear-gradient(180deg, #050505 0%, #1a1a1a 50%, #2a2a2a 100%);
+    border: 1px solid var(--pink);
+    color: var(--ink);
+    box-shadow:
+      0 6px 16px rgba(0,0,0,0.65),
+      inset 0 0 14px rgba(254,3,109,0.20),
+      0 0 14px rgba(254,3,109,0.30);
+  }
+  .pitch-card.t-other, .sub-card.t-other {
+    background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 50%, #0a0a0a 100%);
+    border: 1px solid rgba(255,255,255,0.30);
+    color: var(--ink);
+  }
+
+  /* card head (rating + position + flag) */
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    line-height: 1;
+  }
+  .card-rating {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 36px;
+    color: inherit;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+  }
+  .sub-card .card-rating { font-size: 30px; }
+  .card-pos {
+    font-family: var(--accent);
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 0.05em;
+    color: inherit;
+    opacity: 0.92;
+  }
+  .sub-card .card-pos { font-size: 15px; }
+
+  /* card body — portrait area gradient placeholder */
+  .card-body {
+    flex: 1;
+    margin: 4px 2px 4px;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0.10) 65%, rgba(0,0,0,0.30) 100%);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .card-body::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 30%;
+    width: 32px;
+    height: 32px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .card-body::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 56%;
+    height: 50%;
+    background: rgba(0,0,0,0.18);
+    border-top-left-radius: 50% 22px;
+    border-top-right-radius: 50% 22px;
+    transform: translateX(-50%);
+  }
+
+  /* card foot (name + flag) */
+  .card-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding-top: 2px;
+    border-top: 1px solid rgba(0,0,0,0.18);
+  }
+  .card-name {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: inherit;
+    line-height: 1;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .sub-card .card-name { font-size: 10px; }
+  .card-flag {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .sub-card .card-flag { font-size: 14px; }
+
+  /* slot label under each card (e.g. "GK ++") */
+  .slot {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .slot-label {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.10em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+    line-height: 1;
+  }
+  .slot-label .chem {
+    color: var(--green);
+    margin-left: 2px;
+  }
+
+  /* ── SUBS PANEL (right) ─────────────────────── */
+  .subs-panel {
+    position: absolute;
+    top: 240px;
+    left: 1340px;
+    width: 520px;
+    height: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    z-index: 9;
+    animation: subs-fade 0.9s 0.55s ease both;
+  }
+  .subs-label {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 80px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    text-transform: uppercase;
+    text-shadow:
+      0 0 1px rgba(255,255,255,0.85),
+      0 4px 14px rgba(0,0,0,0.65),
+      0 0 24px rgba(107,205,6,0.18);
+    margin-bottom: 2px;
+  }
+  .subs-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px 14px;
+    width: 100%;
+    justify-items: center;
+  }
+  @keyframes subs-fade {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── BOTTOM PARTNER STRIP ─────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 24px;
+    display: var(--overlay-partner-strip-show, flex);
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 12;
+    animation: partners-fade 1.1s 0.7s ease both;
+  }
+  .partners-label {
+    font-family: var(--accent);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.42em;
+    color: rgba(255,255,255,0.70);
+    text-transform: uppercase;
+  }
+  [data-element-id="partners-strip"] img.partner {
+    height: 50px; width: auto; object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .partners-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 64px;
+    padding: 8px 32px;
+    background: rgba(8,8,8,0.55);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+  }
+  @keyframes partners-fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SEASON WATERMARK (bottom-left corner, subtle) ────── */
+  .season-mark {
+    position: absolute;
+    bottom: 110px;
+    left: 80px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.40em;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    z-index: 12;
+  }
+  .season-mark::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 9px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px var(--green-glow);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
+    50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+
+    <!-- BG -->
+    <div class="bg-image" aria-hidden="true"></div>
+    <div class="bg-vignette" aria-hidden="true"></div>
+    <div class="bg-grain" aria-hidden="true"></div>
+
+    <!-- TOP-LEFT: title + draft-owner photo -->
+    <section class="title-block">
+      <div class="title-text">
+        <h1 class="title-line line-1" data-element-id="draft-owner-name">MR OGA</h1>
+        <h1 class="title-line line-2" data-element-id="draft-label">DRAFT</h1>
+      </div>
+      <img class="draft-photo"
+           data-element-id="draft-owner-photo"
+           src="/overlays/v2/_assets/players/processed/mr_oga/headshot_01_nobg.png"
+           alt="Draft owner" />
+    </section>
+
+    <!-- STATS (Chemistry / Formation) -->
+    <section class="stat-block">
+      <div class="stat-row chemistry">
+        <span class="stat-label" data-element-id="chemistry-label">CHEMISTRY</span>
+        <span class="stat-value" data-element-id="chemistry-value">30/33</span>
+      </div>
+      <div class="stat-row formation">
+        <span class="stat-label" data-element-id="formation-label">FORMATION</span>
+        <span class="stat-value" data-element-id="formation-value">4-3-3(2)</span>
+      </div>
+    </section>
+
+    <!-- TOP-RIGHT: CADE + PRO LEAGUE -->
+    <header class="header-row" data-element-id="header-row">
+      <img class="logo logo--cade"
+           src="/overlays/v2/_assets/logos/processed/1cade%20esport_strip.png"
+           alt="CADE Esports" />
+      <span class="divider" aria-hidden="true"></span>
+      <img class="logo logo--pro"
+           src="/overlays/v2/_assets/logos/processed/pro%20league%20_strip.png"
+           alt="National E-Soccer Pro League" />
+    </header>
+
+    <!-- PITCH (4-3-3 formation) -->
+    <section class="pitch-wrap" data-element-id="pitch-wrap">
+      <div class="pitch-bg" aria-hidden="true"></div>
+      <div class="pitch" data-element-id="pitch">
+        <!-- Cards rendered by JS into these slots -->
+        <div class="slot slot-lw"  data-slot-index="8"></div>
+        <div class="slot slot-st"  data-slot-index="9"></div>
+        <div class="slot slot-rw"  data-slot-index="10"></div>
+        <div class="slot slot-cml" data-slot-index="5"></div>
+        <div class="slot slot-cmc" data-slot-index="6"></div>
+        <div class="slot slot-cmr" data-slot-index="7"></div>
+        <div class="slot slot-lb"  data-slot-index="1"></div>
+        <div class="slot slot-cbl" data-slot-index="2"></div>
+        <div class="slot slot-cbr" data-slot-index="3"></div>
+        <div class="slot slot-rb"  data-slot-index="4"></div>
+        <div class="slot slot-gk"  data-slot-index="0"></div>
+      </div>
+    </section>
+
+    <!-- SUBS PANEL (right) -->
+    <aside class="subs-panel" data-element-id="subs-panel">
+      <h2 class="subs-label" data-element-id="subs-label">SUBS</h2>
+      <div class="subs-grid" data-element-id="subs-grid">
+        <!-- Sub cards rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- SEASON WATERMARK -->
+    <div class="season-mark">ELITE LEAGUE · SEASON 2</div>
+
+    <!-- Bottom partner strip -->
+    <footer data-element-id="partners-strip" class="partners">
+      <span class="partners-label">Official Partners</span>
+      <div class="partners-row">
+        <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports" />
+        <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
+        <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
+        <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
+        <img class="partner partner--oas"     src="/overlays/v2/_assets/logos/processed/OAS%20esport_strip.png" alt="OAS esport" />
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+    /* LIVE DATA — postMessage listener (data-feed driven).
+       Accepts:
+         { type:'show'|'hide', data?: {...} }
+         { type:'update', data: { draftOwner:{displayName, headshotUrl},
+                                  formation: '4-3-3(2)',
+                                  chemistry: '30/33' | 30,
+                                  starting: [{slot_index, name, rating, position, item_type, nationality_flag}],
+                                  subs:     [{slot_index, name, rating, position, item_type, nationality_flag}] } }
+       Also accepts the server-shaped payload: { payload: { ... } }. */
+    (function () {
+      var POSITION_LABEL = {
+        0: 'GK',
+        1: 'LB',  2: 'CB',  3: 'CB',  4: 'RB',
+        5: 'CM',  6: 'CM',  7: 'CM',
+        8: 'LW',  9: 'ST', 10: 'RW'
+      };
+
+      function escHtml(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+      function tintClass(itemType) {
+        var t = (itemType || '').toLowerCase();
+        if (t === 'gold')    return 't-gold';
+        if (t === 'silver')  return 't-silver';
+        if (t === 'bronze')  return 't-bronze';
+        if (t === 'hero')    return 't-hero';
+        if (t === 'icon')    return 't-icon';
+        if (t === 'special') return 't-special';
+        if (t === 'tots')    return 't-tots';
+        if (t === 'toty')    return 't-toty';
+        if (t === 'rttf')    return 't-rttf';
+        return 't-other';
+      }
+      function cardHtml(item, isSub) {
+        var cls = isSub ? 'sub-card ' : 'pitch-card ';
+        cls += tintClass(item.item_type);
+        var rating = (item.rating != null) ? String(item.rating) : '--';
+        var pos    = item.position || POSITION_LABEL[item.slot_index] || '';
+        var name   = item.name || '';
+        var flag   = item.nationality_flag || '';
+        return '<div class="' + cls + '">' +
+          '<div class="card-head">' +
+            '<span class="card-rating">' + escHtml(rating) + '</span>' +
+            '<span class="card-pos">' + escHtml(pos) + '</span>' +
+          '</div>' +
+          '<div class="card-body" aria-hidden="true"></div>' +
+          '<div class="card-foot">' +
+            '<span class="card-name">' + escHtml(name).toUpperCase() + '</span>' +
+            (flag ? '<span class="card-flag">' + escHtml(flag) + '</span>' : '') +
+          '</div>' +
+        '</div>';
+      }
+
+      function renderPitch(items) {
+        if (!Array.isArray(items)) return;
+        var slots = document.querySelectorAll('.pitch .slot');
+        // Wipe each slot, then place item by slot_index.
+        var bySlot = {};
+        items.forEach(function (it) {
+          if (!it || it.slot_index == null) return;
+          bySlot[it.slot_index] = it;
+        });
+        slots.forEach(function (slot) {
+          var idx = parseInt(slot.getAttribute('data-slot-index'), 10);
+          var posLabel = POSITION_LABEL[idx] || '';
+          var item = bySlot[idx];
+          if (item) {
+            slot.innerHTML = cardHtml(item, false) +
+              '<span class="slot-label">' + escHtml(posLabel) +
+                (item.chemistry ? ' <span class="chem">' + escHtml(item.chemistry) + '</span>' : '') +
+              '</span>';
+          } else {
+            slot.innerHTML = '';
+          }
+        });
+      }
+
+      function renderSubs(items) {
+        var grid = document.querySelector('[data-element-id="subs-grid"]');
+        if (!grid || !Array.isArray(items)) return;
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+          var it = items[i] || {};
+          html += cardHtml(it, true);
+        }
+        grid.innerHTML = html;
+      }
+
+      function readPayload(data) {
+        if (!data) return null;
+        if (data.payload && typeof data.payload === 'object') return data.payload;
+        return data;
+      }
+
+      function update(data) {
+        var p = readPayload(data);
+        if (!p) return;
+        if (p.draftOwner) {
+          var nameEl = document.querySelector('[data-element-id="draft-owner-name"]');
+          if (nameEl && p.draftOwner.displayName) {
+            nameEl.textContent = String(p.draftOwner.displayName).toUpperCase();
+          }
+          var photoEl = document.querySelector('[data-element-id="draft-owner-photo"]');
+          if (photoEl && p.draftOwner.headshotUrl) {
+            photoEl.setAttribute('src', p.draftOwner.headshotUrl);
+          }
+        }
+        if (p.formation) {
+          var formEl = document.querySelector('[data-element-id="formation-value"]');
+          if (formEl) formEl.textContent = String(p.formation);
+        }
+        if (p.chemistry != null) {
+          var chemEl = document.querySelector('[data-element-id="chemistry-value"]');
+          if (chemEl) chemEl.textContent = String(p.chemistry);
+        }
+        if (Array.isArray(p.starting)) renderPitch(p.starting);
+        if (Array.isArray(p.subs))     renderSubs(p.subs);
+      }
+
+      function show() {
+        document.body.classList.remove('cade-exiting');
+        document.body.classList.add('cade-visible');
+      }
+      function hide() {
+        document.body.classList.remove('cade-visible');
+        document.body.classList.add('cade-exiting');
+      }
+
+      window.addEventListener('message', function (ev) {
+        var msg = ev && ev.data;
+        if (!msg || typeof msg !== 'object') return;
+        console.info('[overlay/19-player-squads] message', msg.type || msg.event || '?', msg.payload || msg.data);
+        if (msg.type === 'show') {
+          update(msg.data || msg.payload || {});
+          show();
+        } else if (msg.type === 'update') {
+          update(msg.data || msg.payload || {});
+        } else if (msg.type === 'hide') {
+          hide();
+        }
+      }, false);
+
+      // Expose for diagnostics + initial-fetch wiring.
+      window.__cadeOverlay19 = { update: update, show: show, hide: hide };
+    })();
+  </script>
+
+  <script data-tag="cade-visible-gate-observer-v2">
+  (function(){
+    var SEL = '.bg-image,.bg-vignette,.bg-grain,.header-row,.title-block,.stat-block,.pitch-wrap,.subs-panel,.partners,.season-mark,.pitch-card,.sub-card';
+    var INNER_SEL = '.title-line,.draft-photo,.stat-label,.stat-value,.subs-label,.slot-label,.card-rating,.card-pos,.card-name,.card-flag,.card-body,.card-head,.card-foot,.pitch,.subs-grid,.partners-row,.partners-label';
+    function apply() {
+      var b = document.body;
+      if (!b) return;
+      var vis = b.classList.contains('cade-visible');
+      var exit = b.classList.contains('cade-exiting');
+      document.querySelectorAll(SEL).forEach(function(el){
+        if (!el.dataset.cadeTransition) {
+          el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+          el.dataset.cadeTransition = '1';
+        }
+        if (vis) {
+          el.style.setProperty('opacity', '1', 'important');
+          el.style.removeProperty('transform');
+          el.style.setProperty('visibility', 'visible', 'important');
+        } else if (exit) {
+          el.style.setProperty('opacity', '0', 'important');
+        } else {
+          el.style.setProperty('opacity', '0', 'important');
+        }
+      });
+      document.querySelectorAll(INNER_SEL).forEach(function(el){
+        if (!el.dataset.cadeTransition) {
+          el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+          el.dataset.cadeTransition = '1';
+        }
+        if (vis) {
+          el.style.setProperty('opacity', '1', 'important');
+        } else if (!exit) {
+          el.style.removeProperty('opacity');
+        }
+      });
+    }
+    apply();
+    new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+  })();
+  </script>
+
+  <script data-tag="cade-demo-mode">
+  (function(){
+    if (new URLSearchParams(location.search).get('demo') !== '1') return;
+
+    var demoStarting = [
+      { slot_index: 0,  name: 'EDERSON',         rating: 88, position: 'GK', item_type: 'gold',    nationality_flag: '🇧🇷' },
+      { slot_index: 1,  name: 'THEO H.',         rating: 87, position: 'LB', item_type: 'gold',    nationality_flag: '🇫🇷' },
+      { slot_index: 2,  name: 'VAN DIJK',        rating: 89, position: 'CB', item_type: 'special', nationality_flag: '🇳🇱' },
+      { slot_index: 3,  name: 'RUDIGER',         rating: 86, position: 'CB', item_type: 'gold',    nationality_flag: '🇩🇪' },
+      { slot_index: 4,  name: 'HAKIMI',          rating: 87, position: 'RB', item_type: 'gold',    nationality_flag: '🇲🇦' },
+      { slot_index: 5,  name: 'BELLINGHAM',      rating: 90, position: 'CM', item_type: 'hero',    nationality_flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+      { slot_index: 6,  name: 'RODRI',           rating: 89, position: 'CM', item_type: 'special', nationality_flag: '🇪🇸' },
+      { slot_index: 7,  name: 'DE BRUYNE',       rating: 91, position: 'CM', item_type: 'icon',    nationality_flag: '🇧🇪' },
+      { slot_index: 8,  name: 'VINI JR.',        rating: 90, position: 'LW', item_type: 'hero',    nationality_flag: '🇧🇷' },
+      { slot_index: 9,  name: 'HAALAND',         rating: 91, position: 'ST', item_type: 'special', nationality_flag: '🇳🇴' },
+      { slot_index: 10, name: 'SALAH',           rating: 89, position: 'RW', item_type: 'gold',    nationality_flag: '🇪🇬' }
+    ];
+    var demoSubs = [
+      { slot_index: 11, name: 'ALISSON',  rating: 87, position: 'GK',  item_type: 'gold',   nationality_flag: '🇧🇷' },
+      { slot_index: 12, name: 'WALKER',   rating: 84, position: 'RB',  item_type: 'gold',   nationality_flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+      { slot_index: 13, name: 'KIMMICH',  rating: 86, position: 'CDM', item_type: 'gold',   nationality_flag: '🇩🇪' },
+      { slot_index: 14, name: 'MODRIC',   rating: 88, position: 'CM',  item_type: 'icon',   nationality_flag: '🇭🇷' },
+      { slot_index: 15, name: 'MUSIALA',  rating: 86, position: 'CAM', item_type: 'special',nationality_flag: '🇩🇪' },
+      { slot_index: 16, name: 'OSIMHEN',  rating: 87, position: 'ST',  item_type: 'gold',   nationality_flag: '🇳🇬' },
+      { slot_index: 17, name: 'LEAO',     rating: 85, position: 'LW',  item_type: 'silver', nationality_flag: '🇵🇹' }
+    ];
+    var demoPayload = {
+      draftOwner: {
+        displayName: 'MR OGA',
+        headshotUrl: '/overlays/v2/_assets/players/processed/mr_oga/headshot_01_nobg.png'
+      },
+      formation: '4-3-3(2)',
+      chemistry: '30/33',
+      starting: demoStarting,
+      subs: demoSubs
+    };
+
+    function fire(type, data){
+      window.dispatchEvent(new MessageEvent('message', { data: { type: type, data: data } }));
+    }
+    setTimeout(function(){ fire('update', demoPayload); }, 80);
+    setTimeout(function(){ fire('show'); }, 200);
+    setInterval(function(){ fire('hide'); }, 9000);
+    setTimeout(function(){
+      setInterval(function(){
+        fire('update', demoPayload);
+        fire('show');
+      }, 9000);
+    }, 9000 - 5500);
+  })();
+  </script>
+</body>
+</html>

@@ -124,6 +124,7 @@ describe("supportsBgImage", () => {
     "12-starting-soon",
     "13-stream-ended",
     "14-top-scorers",
+    "19-player-squads",
   ] as const;
   const FLOATING_UI = [
     "02-timer",

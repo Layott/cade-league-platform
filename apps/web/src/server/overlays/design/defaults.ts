@@ -140,6 +140,7 @@ export const OVERLAY_KEYS = [
   "15-orgs",
   "16-coaches",
   "17-penalties",
+  "19-player-squads",
 ] as const;
 export type OverlayKey = (typeof OVERLAY_KEYS)[number];
 
@@ -228,6 +229,11 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
   "17-penalties": {
     "partner-strip-show": "false",
   },
+  "19-player-squads": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+  },
 };
 
 /**
@@ -256,6 +262,7 @@ export const BG_IMAGE_SUPPORTED_KEYS: readonly OverlayKey[] = [
   "12-starting-soon",
   "13-stream-ended",
   "14-top-scorers",
+  "19-player-squads",
 ] as const;
 
 /**

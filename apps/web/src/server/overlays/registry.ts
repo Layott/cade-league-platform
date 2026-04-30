@@ -41,6 +41,7 @@ import {
   orgsRosterSchema,
   coachIntrosSchema,
   playerPenaltiesSchema,
+  playerSquadsSchema,
   // Plan 44 — comments
   featuredCommentSchema,
 } from "./schemas";
@@ -96,6 +97,7 @@ export const TEMPLATE_KEYS = [
   "orgs_roster",
   "coach_intros",
   "player_penalties",
+  "player_squads",
   // Plan 44 comments (1)
   "featured_comment",
 ] as const;
@@ -371,6 +373,13 @@ export const TEMPLATE_REGISTRY: Record<TemplateKey, TemplateEntry> = {
     group: "stats",
     label: "Player Penalties",
     defaultSoundSlot: null,
+  },
+  player_squads: {
+    schema: playerSquadsSchema,
+    route: "/overlay/v2/19-player-squads",
+    group: "stats",
+    label: "Player Squads",
+    defaultSoundSlot: "whoosh-short",
   },
   // Plan 44 — comments (YouTube live-chat featuring)
   featured_comment: {

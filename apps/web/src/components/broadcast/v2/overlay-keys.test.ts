@@ -8,8 +8,8 @@ import {
 } from "./overlay-keys";
 
 describe("V2_OVERLAY_KEYS", () => {
-  it("exposes 16 keys (per Plan 51 §8.2 — animated-bg + partners-strip excluded)", () => {
-    expect(V2_OVERLAY_KEYS.length).toBe(16);
+  it("exposes 17 keys (16 from Plan 51 + 19-player-squads added 2026-04-30)", () => {
+    expect(V2_OVERLAY_KEYS.length).toBe(17);
   });
 
   it("every key has a human label", () => {

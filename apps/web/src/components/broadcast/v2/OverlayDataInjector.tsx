@@ -75,6 +75,11 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   ],
   "14-top-scorers": ["match.ended", "standings.changed"],
   "17-penalties": ["standings.changed"],
+  // 19-player-squads — repaint when standings recompute (proxy for
+  // disciplinary edits affecting the displayed player) and when a new
+  // match-day boundary lands. Squad-submission edits don't hit the
+  // overlay mid-stream — submissions land outside live-broadcast windows.
+  "19-player-squads": ["standings.changed", "match.ended"],
 };
 
 /**
@@ -105,6 +110,7 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   "15-orgs": (s) => `/api/broadcast/v2/sessions/${s}/orgs`,
   "16-coaches": (s) => `/api/broadcast/v2/sessions/${s}/coaches`,
   "17-penalties": (s) => `/api/broadcast/v2/sessions/${s}/penalties`,
+  "19-player-squads": (s) => `/api/broadcast/v2/sessions/${s}/player-squads`,
 };
 
 /**

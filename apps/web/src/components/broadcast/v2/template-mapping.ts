@@ -33,6 +33,7 @@ export const V2_TO_LEGACY_TEMPLATE: Record<V2OverlayKey, TemplateKey> = {
   "15-orgs": "orgs_roster",
   "16-coaches": "coach_intros",
   "17-penalties": "player_penalties",
+  "19-player-squads": "player_squads",
 };
 
 export function v2ToLegacy(key: V2OverlayKey): TemplateKey {

@@ -51,6 +51,7 @@ const DB_TEMPLATE_TYPES = [
   "orgs_roster",
   "coach_intros",
   "player_penalties",
+  "player_squads",
   // Plan 44
   "featured_comment",
 ] as const;
@@ -106,7 +107,7 @@ describe("overlay registry", () => {
     expect(groups).toHaveLength(8);
     const total = groups.reduce((acc, g) => acc + g.templates.length, 0);
     expect(total).toBe(TEMPLATE_KEYS.length);
-    expect(TEMPLATE_KEYS.length).toBe(35);
+    expect(TEMPLATE_KEYS.length).toBe(36);
   });
 
   it("every stinger template defaults to its dedicated sound slot", () => {

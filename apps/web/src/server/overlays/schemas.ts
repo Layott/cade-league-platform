@@ -475,6 +475,25 @@ export const playerPenaltiesSchema = z.object({
 });
 export type PlayerPenaltiesPayload = z.infer<typeof playerPenaltiesSchema>;
 
+// -- Player Squads (broadcast 19-player-squads) -----------------------
+//
+// Trigger payload sent by the broadcast control panel. The overlay
+// then re-fetches the full squad via the
+// `/api/broadcast/v2/sessions/[id]/player-squads?playerId=` endpoint;
+// the trigger payload only needs to identify which player's draft to
+// pin. `weekStartDate` is optional — server defaults to the current
+// Thursday-anchored week.
+export const playerSquadsSchema = z.object({
+  playerId: z.string().uuid().optional(),
+  weekStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "weekStartDate must be YYYY-MM-DD")
+    .optional(),
+  soundSlot: soundSlotSchema,
+  slot: matchSlotSchema,
+});
+export type PlayerSquadsPayload = z.infer<typeof playerSquadsSchema>;
+
 // -- Plan 44 — Featured Comment ---------------------------------------
 
 /**

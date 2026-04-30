@@ -206,6 +206,35 @@ export default async function BroadcastV2SessionPage({
   // resolves to one indexed lookup on overlay_events / overlay_active_instances.
   const activeState = await probeAllActiveStates(sb, session.id);
 
+  // 13 Elite players for the player-squads dropdown. We list players that
+  // (a) have a non-null user link (so we can read display_name) and
+  // (b) aren't soft-deleted. Sorted alphabetically by display name.
+  const { data: rosterRaw } = await sb
+    .from("players")
+    .select(
+      "id, gamer_tag, users:users!players_user_id_fkey(display_name)",
+    )
+    .is("deleted_at", null);
+  type RosterRow = {
+    id: string;
+    gamer_tag: string | null;
+    users:
+      | { display_name: string | null }
+      | { display_name: string | null }[]
+      | null;
+  };
+  const playerOptions = ((rosterRaw ?? []) as unknown as RosterRow[])
+    .map((p) => {
+      const u = Array.isArray(p.users) ? p.users[0] : p.users;
+      const displayName = u?.display_name ?? p.gamer_tag ?? "Player";
+      return {
+        playerId: p.id,
+        displayName,
+        gamerTag: p.gamer_tag,
+      };
+    })
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
   const isLive = session.ended_at === null;
   const titleText = matchDay
     ? `${formatWat(`${matchDay.match_date}T00:00:00Z`, "EEE MMM d yyyy")} · ${matchDay.venue_name}`
@@ -286,6 +315,7 @@ export default async function BroadcastV2SessionPage({
         lowerThirdSlots={
           activeState.multi["08-lower-third"] ?? [false, false, false]
         }
+        playerOptions={playerOptions}
       />
     </div>
   );

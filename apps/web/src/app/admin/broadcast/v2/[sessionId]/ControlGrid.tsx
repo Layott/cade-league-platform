@@ -22,6 +22,10 @@ import { TopScorersControl } from "@/components/broadcast/v2/controls/TopScorers
 import { OrgsControl } from "@/components/broadcast/v2/controls/OrgsControl";
 import { CoachesControl } from "@/components/broadcast/v2/controls/CoachesControl";
 import { PenaltiesControl } from "@/components/broadcast/v2/controls/PenaltiesControl";
+import {
+  PlayerSquadsControl,
+  type PlayerOption,
+} from "@/components/broadcast/v2/controls/PlayerSquadsControl";
 
 /**
  * Plan 51 — control card grid layout.
@@ -47,6 +51,8 @@ export type ControlGridProps = {
   active: Record<string, boolean>;
   /** Per-slot active flags for the multi-instance lower-third overlay. */
   lowerThirdSlots: [boolean, boolean, boolean];
+  /** 13 Elite players for the player-squads dropdown picker. */
+  playerOptions?: PlayerOption[];
 };
 
 export function ControlGrid({
@@ -56,6 +62,7 @@ export function ControlGrid({
   canTrigger,
   active,
   lowerThirdSlots,
+  playerOptions = [],
 }: ControlGridProps) {
   const router = useRouter();
 
@@ -193,6 +200,12 @@ export function ControlGrid({
         sessionId={sessionId}
         viewToken={viewToken}
         active={active["17-penalties"] ?? false}
+      />
+      <PlayerSquadsControl
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["19-player-squads"] ?? false}
+        players={playerOptions}
       />
     </fieldset>
   );

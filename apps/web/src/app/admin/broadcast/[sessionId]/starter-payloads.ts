@@ -203,6 +203,12 @@ export const STARTER_PAYLOADS: Record<string, Record<string, unknown>> = {
     ],
     slot: "primary",
   },
+  // 2026-04-30 — broadcast-v2 19-player-squads. Trigger payload pins
+  // which player's draft to render; HTML re-fetches the full squad via
+  // `/api/broadcast/v2/sessions/[id]/player-squads?playerId=...`.
+  player_squads: {
+    slot: "primary",
+  },
   // Plan 44 — featured YouTube chat comment. The YouTubeChatPanel posts a
   // real payload from the picked message; this starter exists so the
   // legacy textarea form + starter-payloads.test.ts both cover the key.
