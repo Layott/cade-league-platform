@@ -3,6 +3,7 @@ import { login } from "./actions";
 import { FormField, inputClass } from "@/components/admin/FormField";
 import { PrimaryButton } from "@/components/admin/buttons";
 import { PRIMARY_LOGOS } from "@/lib/brand";
+import { PasswordInput } from "./PasswordInput";
 
 export default async function LoginPage({
   searchParams,
@@ -136,14 +137,7 @@ export default async function LoginPage({
             </FormField>
 
             <FormField label="Password">
-              <input
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="••••••••••"
-                className={inputClass}
-              />
+              <PasswordInput />
             </FormField>
 
             {/*
