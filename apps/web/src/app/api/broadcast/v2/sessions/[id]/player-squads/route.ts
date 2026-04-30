@@ -57,7 +57,8 @@ type SquadItem = {
   value: number;
   // Enriched via fc26_players JOIN by (LOWER(name), rating).
   // Null when no match found (rare — Faruk's submission has 100% match rate).
-  cardImageUrl: string | null;
+  cardImageUrl: string | null;   // player face (futbin /img/players/<id>.png)
+  cardBgUrl: string | null;      // FUT card frame (futbin /img/cards/tiny/<variant>.png)
   mains: {
     pac: number | null;
     sho: number | null;
@@ -332,6 +333,10 @@ export async function GET(
       cardImageUrl:
         typeof attrs["card_image_url"] === "string"
           ? (attrs["card_image_url"] as string)
+          : null,
+      cardBgUrl:
+        typeof attrs["card_bg_url"] === "string"
+          ? (attrs["card_bg_url"] as string)
           : null,
       mains: mainsRaw
         ? {
