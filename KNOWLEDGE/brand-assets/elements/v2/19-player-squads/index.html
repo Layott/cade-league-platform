@@ -967,15 +967,18 @@
   }
   .fut-face {
     position: absolute;
-    /* Face slot sits in the upper-middle of the FUT card frame.
-       Centered horizontally; spans ~58% of card width; top-anchored
-       at ~16% so the rating + position chrome above remains visible. */
-    top: 16%;
+    /* Face slot — centred under the rating/position chrome, sized so it
+       does NOT collide with the bottom name + stats overlay. Width via
+       cqi (% of card width); vertical bounds via % so they're relative
+       to card HEIGHT, not width. */
+    top: 14%;
     left: 50%;
     transform: translateX(-50%);
-    width: 58%;
+    width: 50cqi;            /* 50% of card width */
+    max-height: 44%;         /* never bleeds into the name+stats zone */
     height: auto;
     object-fit: contain;
+    object-position: center top;
     image-rendering: auto;
     pointer-events: none;
     z-index: 1;
@@ -1000,30 +1003,35 @@
     color: #fefefe;
     text-shadow: 0 1px 1px rgba(0,0,0,0.55);
   }
-  /* Rating + position stack — top-left, FUT-classic placement */
+  /* Rating + position stack — top-left corner of the card. cqi for font
+     size keeps text proportional to card width; % for top/left so the
+     anchor is relative to card HEIGHT (not width). */
   .fut-rating {
     position: absolute;
-    top: 7cqi;
-    left: 12cqi;
+    top: 4%;
+    left: 8%;
     font-weight: 800;
-    font-size: 26cqi;       /* % of card width */
+    font-size: 26cqi;
     letter-spacing: 0.01em;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+    z-index: 3;
   }
   .fut-pos {
     position: absolute;
-    top: 32cqi;
-    left: 14cqi;
+    top: 21%;
+    left: 11%;
     font-family: 'Quedora', 'Inter', sans-serif;
     font-weight: 700;
     font-size: 11cqi;
     letter-spacing: 0.04em;
+    z-index: 3;
   }
-  /* Name across the card under the face */
+  /* Name across the card BELOW the face slot */
   .fut-name {
     position: absolute;
-    top: 70cqi;
-    left: 6cqi;
-    right: 6cqi;
+    top: 60%;
+    left: 6%;
+    right: 6%;
     text-align: center;
     font-weight: 700;
     font-size: 11cqi;
@@ -1032,28 +1040,32 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    padding-bottom: 1%;
     border-bottom: 1px solid currentColor;
-    padding-bottom: 2cqi;
-    opacity: 0.95;
+    opacity: 0.96;
+    z-index: 3;
   }
-  /* 6 main stats — 2-col × 3-row grid below name (FUT-classic) */
+  /* 6 main stats — 2-col × 3-row grid in bottom 30% of card. */
   .fut-stats {
     position: absolute;
-    top: 84cqi;
-    left: 12cqi;
-    right: 12cqi;
+    bottom: 4%;
+    left: 8%;
+    right: 8%;
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-auto-rows: min-content;
-    gap: 0.5cqi 6cqi;
+    gap: 1% 8%;
     font-family: 'Quedora', 'Inter', sans-serif;
-    font-size: 8.5cqi;
-    line-height: 1.05;
+    font-size: 9cqi;
+    line-height: 1.1;
+    z-index: 3;
   }
   .fut-stats > div {
     display: flex;
     align-items: baseline;
-    gap: 0.3em;
+    justify-content: flex-start;
+    gap: 0.35em;
+    white-space: nowrap;
   }
   .fut-stats b {
     font-weight: 800;
@@ -1062,9 +1074,9 @@
   }
   .fut-stats span {
     font-weight: 600;
-    font-size: 0.78em;
+    font-size: 0.74em;
     opacity: 0.78;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
   }
 
   /* card foot (name + flag) */
