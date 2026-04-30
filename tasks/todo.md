@@ -1046,3 +1046,60 @@ Latest commit on `main` is already `a8fb24aa`, the Vercel production alias point
 ### Lessons (already in `tasks/lessons.md`)
 
 The portal-mismatch lesson (line 298-299) covers the "always gate post-hydration DOM mutations behind a `mounted` flag" pattern. The countdown clock-skew issue is a closely-related variant: any **lazy state initializer** that reads a non-deterministic source (`Date.now()`, `Math.random()`, `crypto.randomUUID()`, `navigator.language`, `window.innerWidth`, etc.) is a hydration hazard in a Client Component rendered inside an SSR tree. Pre-flight check: `grep -rn "useState.*=>.*Date.now()" apps/web/src` and `grep -rn "useState(Date.now())" apps/web/src` — both should be empty for any state used in render output. (`Date.now()` is fine inside `useEffect`, just never in the initial render path.)
+
+---
+
+## 2026-04-30 — Text-element save bug (eyebrow + all text fields, all 16 overlays)
+
+User report (caveman quote): "made a change to leaderboard eyebrow and it did not save when i clicked save, anytime i refresh it changes [reverts] and it also did not reflect on the leaderboard over on the broadcast sessions page when i trigger the overlay. Please check and confirm it is not the same across all the session overlays."
+
+### Bug status: RESOLVED. `7dac90a0` shipped + verified end-to-end on prod.
+
+### Root cause
+
+`apps/web/src/server/overlays/text/elements.ts::upsertTextElement` used `.upsert(row, { onConflict: "overlay_key,variant_id,element_id" })` against `overlay_text_elements`. That table has a PARTIAL unique index `WHERE deleted_at IS NULL` (migration `20260620000001_overlay_text_elements.sql`). Postgres rejects ON CONFLICT against partial indexes with PG 42P10. Every text-element save (content, font, color, position, alignment, opacity, z-index, visibility) silently 500'd in the Server Action — `setError(...)` was set in the React state but the optimistic UI didn't refetch from server, and on hard refresh the editor re-fetched the unchanged DB row. Broadcast session overlays kept rendering HTML defaults because no text-token row existed to flow through `resolveTextElements` → `cade-injected-text` style block → `?textTokens=` URL param.
+
+### Why it slipped past verification
+
+Same bug class as Wave 2 Stage 3 (`setStripLayoutAction`, fixed `b7b3deff`) and Stage 4 (`upsertAnimation`, fixed `b2dd661d`). Open-session-state file (2026-04-29) explicitly FLAGGED this exact code path as latent: "Stage 1 `upsertTextElement` + Stage 2 setLogoOverride upsert paths have SAME latent bug — recommend live-write smoke per stage." But no live-write smoke ran for Stage 1, and the latent flag never converted into a hot-fix.
+
+### Fix
+
+Replaced `.upsert(...)` with explicit SELECT-then-INSERT-or-UPDATE keyed on the partial unique tuple, mirroring the `upsertAnimation` (b2dd661d) and `setStripLayoutAction` (b7b3deff) patterns.
+
+### Files changed
+
+- `apps/web/src/server/overlays/text/elements.ts` — `upsertTextElement` rewrite (no signature change, semantics identical, partial-unique-index workaround inline).
+- `apps/web/src/server/overlays/text/elements.test.ts` — `rowsTable` mock rewired (dropped upsert chain, added insert + update-by-id chains, differentiated update payloads). Added INSERT-branch regression test alongside existing UPDATE-branch test.
+- `tasks/lessons.md` — entry with repo-wide partial-unique-index audit list.
+
+### Verification (post-deploy, this slice)
+
+Build `dpl_Hk6z5LbtQVtHdGjbUGQLUn5PHmrC` (commit `7dac90a0`) READY. Aliased to `cade-league.vercel.app`.
+
+| Step | Pre-fix | Post-fix |
+|---|---|---|
+| 1. Login admin → `/admin/broadcast/v2/design?overlay=07-leaderboard` | ✓ | ✓ |
+| 2. Open Eyebrow row, type content "Elite Test 30Apr", click Save | save click → no error toast → no DB write | save click → DB row INSERT with content="Elite Test 30Apr" |
+| 3. DB query `overlay_text_elements WHERE element_id='eyebrow' AND deleted_at IS NULL` | content="" + updated_at=2026-04-29 (yesterday seed) | content="Elite Test 30Apr" + updated_at=2026-04-30 12:29:28 |
+| 4. Hard reload page | edit gone | edit persists in input |
+| 5. SSR `/overlay/v2/07-leaderboard?demo=1` payload | `designTextTokens.eyebrow` absent OR `content=""` | `designTextTokens.eyebrow.content="Elite Test 30Apr"` + `?textTokens=<b64>` URL param decodes to same |
+| 6. Revert: edit content back to "" + click Save | n/a | DB UPDATE row content="" + updated_at=12:30:09 |
+
+Both INSERT-when-no-row and UPDATE-when-existing-row paths verified on real Postgres + real Vercel runtime + real iframe SSR injection.
+
+### Bug scope (per user's confirmation request)
+
+Confirmed: bug was platform-wide for ALL text edits (content, color, font, weight, size, alignment, position, opacity, z-index, visibility) across ALL 16 v2 overlays. Color/font/scale/pos *tokens* (the design-system tokens, not text elements) were unaffected — those write to `overlay_design_tokens` which uses a FULL unique constraint, not partial.
+
+### Repo-wide partial-unique-index audit (added to lessons.md)
+
+Tables in repo with `WHERE deleted_at IS NULL` partial unique indexes — never call `.upsert(..., {onConflict})` against these:
+- `overlay_text_elements` ← was broken, fixed `7dac90a0`
+- `overlay_partner_strip_layout` ← fixed `b7b3deff`
+- `overlay_partner_logo_overrides` ← fixed `b7b3deff`
+- `overlay_element_animations` ← fixed `b2dd661d`
+- `overlay_partner_logos` (partial unique on `partner_key` only)
+
+Tables with full unique constraints (safe for `.upsert`):
+- `overlay_design_tokens` (full UNIQUE on `(overlay_key, variant_id, token_key)`)
