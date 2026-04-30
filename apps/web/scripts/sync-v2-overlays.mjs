@@ -68,6 +68,8 @@ export const KEYS = Object.freeze([
   "15-orgs",
   "16-coaches",
   "17-penalties",
+  "19-player-squads",
+  "20-highlight",
 ]);
 
 // Buckets the v2 HTMLs reference via `../../../<bucket>/...`. Keep this list

@@ -8,8 +8,8 @@ import {
 } from "./overlay-keys";
 
 describe("V2_OVERLAY_KEYS", () => {
-  it("exposes 17 keys (16 from Plan 51 + 19-player-squads added 2026-04-30)", () => {
-    expect(V2_OVERLAY_KEYS.length).toBe(17);
+  it("exposes 18 keys (16 Plan 51 + 19-player-squads + 20-highlight)", () => {
+    expect(V2_OVERLAY_KEYS.length).toBe(18);
   });
 
   it("every key has a human label", () => {

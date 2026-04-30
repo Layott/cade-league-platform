@@ -52,6 +52,20 @@ const SEED_AUGMENTS = [
     "migrations",
     "20260620000009_overlay_text_elements_partners_strip_extra.sql",
   ),
+  // 19-player-squads (added 2026-04-30).
+  resolve(
+    REPO_ROOT,
+    "supabase",
+    "migrations",
+    "20260620000014_overlay_template_variants_player_squads.sql",
+  ),
+  // 20-highlight + 11-match-scores-day redesign (added 2026-04-30).
+  resolve(
+    REPO_ROOT,
+    "supabase",
+    "migrations",
+    "20260620000017_overlay_template_variants_highlight.sql",
+  ),
 ];
 
 /** Extract every (overlay_key, element_id) tuple from the seed migration. */

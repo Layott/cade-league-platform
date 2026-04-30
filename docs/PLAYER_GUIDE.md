@@ -120,20 +120,15 @@ If a match result is disputed (wrong score entered, server crash, opponent no-sh
 
 ---
 
-## 8. File an Appeal — `/player/appeals/new`
+## 8. File an Appeal
 
-If you receive a sanction you think is unfair:
+If you receive a sanction you think is unfair you can file an appeal. The web flow for appeals is currently being finalized — for now, **message the admin directly** with:
 
-**Steps:**
-1. Click **Appeals** → **New appeal**.
-2. Pick the **case** you're appealing.
-3. Write your **statement** — why the sanction should be reversed or reduced.
-4. Attach **evidence** if you have it.
-5. Submit.
+- The case you're appealing.
+- Your statement (why the sanction should be reversed or reduced).
+- Any evidence (screenshots / video).
 
-The admin reviews + decides: UPHELD (sanction stands), OVERTURNED (sanction removed), or REDUCED.
-
-You'll see the outcome on your `/player/appeals` page + receive a notification.
+The admin reviews + decides: UPHELD (sanction stands), OVERTURNED (sanction removed), or REDUCED. You'll receive a notification with the outcome.
 
 ---
 

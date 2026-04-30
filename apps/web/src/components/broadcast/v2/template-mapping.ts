@@ -34,6 +34,10 @@ export const V2_TO_LEGACY_TEMPLATE: Record<V2OverlayKey, TemplateKey> = {
   "16-coaches": "coach_intros",
   "17-penalties": "player_penalties",
   "19-player-squads": "player_squads",
+  // 20-highlight: reuse `match_scores_day` template_key — both render
+  // recent fixture results, just in different visual layouts. Cleanest
+  // option until we add a dedicated `highlight` enum value.
+  "20-highlight": "match_scores_day",
 };
 
 export function v2ToLegacy(key: V2OverlayKey): TemplateKey {

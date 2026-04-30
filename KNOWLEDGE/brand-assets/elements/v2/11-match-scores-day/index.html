@@ -1,49 +1,34 @@
 <!DOCTYPE html>
 <!--
-  CADE ELITE LEAGUE — OVERLAY #11 — MATCH SCORES OF THE DAY
-  Adaptive 2-column grid (6 left, 6 right) — fits 1 to 12 matches without overlap.
-  Reuses v2 pilot template: halftone bg, top CADE+Pro League header, side chevrons,
-  bottom partner marquee. Transparent 1920×1080 stage. Silent.
-  Demo loop: entry (rows cascade in, 50ms stagger) → 10s hold
-             → exit cascade → 1s gap → repeat.
+  CADE ELITE LEAGUE — OVERLAY #11-MATCH-SCORES-DAY — "FIXTURES BOARD"
+  Full-screen 1920×1080 transparent registry of the matchday's 10
+  fixtures, two columns × five rows, with the giant gradient FIXTURES
+  headline and a WEEK pill above. Designed to match
+  KNOWLEDGE/brand-assets/designsample/FIXTURES.jpg verbatim.
 
-  TBD pill = pulsing breathe (subtle).
-  Title = "MATCH DAY N RESULTS" only — no decorative subtitle.
+  Aesthetics inherit the v2 pilot template (../15-orgs/index.html):
+  halftone-green stadium BG, top league shield (left) + CADE Esports
+  logo (right), bottom partner strip, Agharti display + Quedora
+  secondary, locked palette #6bcd06 / #fe036d / #050505 / #ffffff.
 
-  Top logos enlarged ~40% per shared-rule #1.
-  ≥80px gap maintained between rows-grid and partner strip per shared-rule #2.
+  DATA WIRES:
+    weekNumber: number
+    fixtures: Array<{playerA:{displayName}, playerB:{displayName},
+                     scoreA:number, scoreB:number}>
 
-  DATA WIRES: matchDay (number), matches[] = {p1Slug, p1Name, p2Slug, p2Name,
-              status ('finished'|'tbd'|'walkover'), score1, score2, walkoverWinnerSide}
+  Demo loop: enter cards cascade, dwell ~5s, exit, loop. Guarded by
+  ?demo=1 (no auto-show on default load).
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="color-scheme" content="dark" />
   <meta name="viewport" content="width=1920, initial-scale=1" />
-  <title>CADE — Match Day Results</title>
-
+  <title>CADE — MATCH SCORES OF THE DAY</title>
 
 <script id="cade-token-bootstrap">
 (function() {
   // Wave 2 Stage 3 — cross-document design + text + partner propagation.
-  //
-  // Read base64-encoded JSON token maps from the iframe URL query
-  // string and emit <style> blocks that win the CSS source-order
-  // cascade (appended LATER in <head> than the author defaults).
-  //
-  // Token shapes:
-  //   tokens / previewTokens     — { 'bg-color': '#000', ... }
-  //   textTokens / previewTextTokens — { '<elementId>': { visible?,
-  //     content?, styles?: { color, fontFamily, fontSize, ... } } }
-  //   partnerTokens / previewPartnerTokens — {
-  //     layout?: { anchor, positionXPx, positionYPx, scalePct,
-  //                itemSpacingPx, orientation, justification,
-  //                zIndex, visible },
-  //     logos?: [ { partnerKey, label, alt, fileUrl, visible?, sort? } ]
-  //   }
-  //
-  // Spec: docs/superpowers/specs/2026-04-29-overlay-design-page-v2.md §6.2
   function decodeTokens(param) {
     if (!param) return null;
     try {
@@ -93,12 +78,6 @@
       if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
       if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
       if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
-      // Y-position bug fix (2026-04-28): switch from `left/top + position:absolute`
-      // to the CSS individual `translate:` property. `absolute` resolved against
-      // the nearest positioned ancestor (often a transformed centering wrapper),
-      // so `top:Npx` did not move the element on the 1920x1080 canvas. `translate`
-      // is a pure visual displacement and composes with existing `transform: ...`
-      // animation keyframes via the Transforms 2 spec.
       if (s.left || s.top) {
         var tx = s.left ? sanitizeCss(s.left) : '0px';
         var ty = s.top ? sanitizeCss(s.top) : '0px';
@@ -177,7 +156,6 @@
     if (!Array.isArray(logos)) return false;
     var strip = document.querySelector('[data-element-id="partners-strip"]');
     if (!strip) return false;
-    // Filter visible + sort.
     var sorted = logos
       .filter(function(l) { return l && l.visible !== false && typeof l.fileUrl === 'string'; })
       .slice()
@@ -187,13 +165,9 @@
         return sa - sb;
       });
     if (sorted.length === 0 && (!layout || layout.visible !== false)) {
-      // No logos but layout present — leave existing children alone.
       return false;
     }
-    // Wipe existing children.
     while (strip.firstChild) strip.removeChild(strip.firstChild);
-    // Mark as flex container so the layout CSS takes effect even without
-    // browser quirks.
     sorted.forEach(function(l) {
       var img = document.createElement('img');
       var safeKey = sanitizeCss(l.partnerKey || 'x');
@@ -205,12 +179,6 @@
     });
     return true;
   }
-  // ────────── Stage 4 — element animations ──────────
-  //
-  // Build @keyframes BODY for a given preset anim type. Mirrors
-  // server/overlays/animations/elements.ts::buildKeyframesBody — same
-  // values across server-side resolver + client-side bootstrap so
-  // SSR-emitted styles + URL-borne overrides yield identical motion.
   function buildPresetKeyframes(animType, name, customBody) {
     switch (animType) {
       case 'slide-left':
@@ -238,8 +206,6 @@
       case 'flip':
         return '@keyframes ' + name + '{from{opacity:0;transform:perspective(800px) rotateY(-90deg)}to{opacity:1;transform:perspective(800px) rotateY(0)}}';
       case 'custom-css':
-        // Defence-in-depth: strip url(), at-rules, and angle/backtick
-        // characters even if server sanitizer was bypassed (URL-borne).
         if (typeof customBody !== 'string') return '';
         if (/\burl\s*\(/i.test(customBody)) return '';
         if (/@(import|font-face|charset|media|supports|keyframes)\b/i.test(customBody)) return '';
@@ -278,8 +244,6 @@
         var delay = (+p.delayMs) || 0;
         var easing = sanitizeCss(p.easing || 'ease-out');
         var iterations = sanitizeCss(p.iterationCount || '1');
-        // Phase-gated selector. Continuous animations only run while
-        // the overlay is visible (cade-visible class on body).
         var sel =
           phase === 'exit'
             ? 'body.cade-exiting [data-element-id="' + elId + '"]'
@@ -309,11 +273,8 @@
     var previewPartnerTokens = decodeTokens(qs.get('previewPartnerTokens'));
     var animTokens = decodeTokens(qs.get('animTokens'));
     var previewAnimTokens = decodeTokens(qs.get('previewAnimTokens'));
-    // Source order: design first, preview second so preview wins.
     var cssVarRule = buildCssVars(design) + buildCssVars(preview);
     var textRule = buildTextRules(textTokens) + (buildTextRules(textTokens).length && buildTextRules(previewTextTokens).length ? '\n' : '') + buildTextRules(previewTextTokens);
-    // Partner layout: preview wins by being applied second (later
-    // <style> block wins on identical selector via source-order).
     var partnerRules = [];
     if (partnerTokens && partnerTokens.layout) {
       var r1 = buildPartnerLayoutRule(partnerTokens.layout);
@@ -323,10 +284,6 @@
       var r2 = buildPartnerLayoutRule(previewPartnerTokens.layout);
       if (r2) partnerRules.push(r2);
     }
-    // Stage 4 — element animations. Build keyframes + rules from both
-    // design + preview maps. Source-order wins on identical names: the
-    // preview block emits second, so its keyframes & rules overwrite
-    // design's via CSS cascade (same selector + same animation-name).
     var animDesign = buildAnimRulesAndKeyframes(animTokens);
     var animPreview = buildAnimRulesAndKeyframes(previewAnimTokens);
     var animKeyframesCss = animDesign.keyframes +
@@ -355,8 +312,6 @@
         s3.textContent = partnerRules.join('\n');
         document.head.appendChild(s3);
       }
-      // Stage 4 — animation keyframes block FIRST (must precede rules
-      // so the named animations resolve).
       if (animKeyframesCss) {
         var s4 = document.createElement('style');
         s4.id = 'cade-injected-anim-keyframes';
@@ -369,11 +324,8 @@
         s5.textContent = animRulesCss;
         document.head.appendChild(s5);
       }
-      // Apply textContent edits AFTER DOM is parsed.
       applyTextContent(textTokens);
       applyTextContent(previewTextTokens);
-      // Rebuild partner strip children — preview wins by being applied
-      // second (overwrites design's children).
       if (partnerTokens && Array.isArray(partnerTokens.logos)) {
         applyPartnerLogos(partnerTokens.logos, partnerTokens.layout);
       }
@@ -392,52 +344,80 @@
 })();
 </script>
 
+
 <style>
-  /* ── REAL BRAND FONTS (carried from pilot) ──────────────────── */
+  /* ── REAL BRAND FONTS ────────────────────────────────────── */
   @font-face {
     font-family: 'Agharti';
     src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
-    font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
   }
   @font-face {
     font-family: 'Agharti';
     src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
-    font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+    font-weight: 700;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
   }
   @font-face {
     font-family: 'Agharti';
     src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
-    font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
   }
   @font-face {
     font-family: 'Agharti';
     src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
-    font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+    font-weight: 900;
+    font-style: normal;
+    font-stretch: 75%;
+    font-display: block;
   }
   @font-face {
     font-family: 'Agharti';
     src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
-    font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+    font-weight: 400;
+    font-style: normal;
+    font-stretch: 100%;
+    font-display: block;
   }
   @font-face {
     font-family: 'Quedora';
     src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
-    font-weight: 400; font-style: normal; font-display: block;
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
   }
   @font-face {
     font-family: 'Quedora';
     src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
-    font-weight: 500; font-style: normal; font-display: block;
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
   }
   @font-face {
     font-family: 'Quedora';
     src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
-    font-weight: 700; font-style: normal; font-display: block;
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: 'Quedora';
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-style: normal;
+    font-display: block;
   }
 
-  /* ── DESIGN TOKENS ──────────────────────────────────────────── */
+  /* ── DESIGN TOKENS ─────────────────────────────────────── */
   :root {
-    /* Phase 2 admin-tunable tokens (CSS-variable contract) */
     --overlay-bg-color: #050505;
     --overlay-accent-color: #6bcd06;
     --overlay-text-color: #ffffff;
@@ -449,22 +429,15 @@
     --overlay-pattern: halftone;
     --overlay-partner-strip-show: flex;
 
-    /* Brand vars derived from tokens (legacy-compatible) */
     --green:        var(--overlay-accent-color, #6bcd06);
     --green-glow:   rgba(107, 205, 6, 0.55);
     --green-faint:  rgba(107, 205, 6, 0.18);
     --pink:         #fe036d;
     --pink-glow:    rgba(254, 3, 109, 0.55);
-    --pink-faint:   rgba(254, 3, 109, 0.18);
-    --gold:         #e6c832;
-    --gold-glow:    rgba(230, 200, 50, 0.55);
-    --gold-faint:   rgba(230, 200, 50, 0.18);
     --black:        var(--overlay-bg-color, #050505);
     --ink:          var(--overlay-text-color, #ffffff);
     --display:      var(--overlay-font-display, 'Agharti', 'Impact', sans-serif);
     --accent:       var(--overlay-font-body, 'Quedora', 'Inter', sans-serif);
-
-    --cycle:        13s;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -480,56 +453,28 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
   }
+
   /* === SPLIT GATE (Category B full-canvas):
      Body always opacity 1 — bg-image stays visible.
-     Inner content shells: hidden until cade-visible. On cade-visible, infinite
-     loop animations replaced with single-play fade-in. On cade-exiting,
-     replaced with single-play fade-out. === */
+     Inner content shells hidden until cade-visible. === */
   body { opacity: 1 !important; }
-
-  /* HIDE bg + inner content until trigger ON.
-     IMPORTANT: selectors must match the ACTUAL rendered class names.
-     The `title-loop` / `header-loop` / `footer-loop` infinite animations
-     would otherwise flash opacity 0→1 on default load and leak the title /
-     partners through the canvas. */
   body:not(.cade-visible):not(.cade-exiting) .bg-image,
   body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
   body:not(.cade-visible):not(.cade-exiting) .bg-grain,
   body:not(.cade-visible):not(.cade-exiting) .top-band,
-  body:not(.cade-visible):not(.cade-exiting) .top-band .divider,
-  body:not(.cade-visible):not(.cade-exiting) .title-bar,
-  body:not(.cade-visible):not(.cade-exiting) .title-bar__main,
-  body:not(.cade-visible):not(.cade-exiting) .title-bar__rule,
-  body:not(.cade-visible):not(.cade-exiting) .matchday-title,
-  body:not(.cade-visible):not(.cade-exiting) .match-row,
-  body:not(.cade-visible):not(.cade-exiting) .rows-wrap,
-  body:not(.cade-visible):not(.cade-exiting) .row,
+  body:not(.cade-visible):not(.cade-exiting) .title-block,
+  body:not(.cade-visible):not(.cade-exiting) .week-pill,
+  body:not(.cade-visible):not(.cade-exiting) .fixtures-grid,
   body:not(.cade-visible):not(.cade-exiting) .partners,
-  body:not(.cade-visible):not(.cade-exiting) .partners-label,
-  body:not(.cade-visible):not(.cade-exiting) .marquee,
-  body:not(.cade-visible):not(.cade-exiting) .row-card,
-  body:not(.cade-visible):not(.cade-exiting) .chevrons,
-  body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
   }
   body:not(.cade-visible):not(.cade-exiting) .top-band,
-  body:not(.cade-visible):not(.cade-exiting) .top-band .divider,
-  body:not(.cade-visible):not(.cade-exiting) .title-bar,
-  body:not(.cade-visible):not(.cade-exiting) .title-bar__main,
-  body:not(.cade-visible):not(.cade-exiting) .title-bar__rule,
-  body:not(.cade-visible):not(.cade-exiting) .matchday-title,
-  body:not(.cade-visible):not(.cade-exiting) .match-row,
-  body:not(.cade-visible):not(.cade-exiting) .rows-wrap,
-  body:not(.cade-visible):not(.cade-exiting) .row,
+  body:not(.cade-visible):not(.cade-exiting) .title-block,
+  body:not(.cade-visible):not(.cade-exiting) .week-pill,
+  body:not(.cade-visible):not(.cade-exiting) .fixtures-grid,
   body:not(.cade-visible):not(.cade-exiting) .partners,
-  body:not(.cade-visible):not(.cade-exiting) .partners-label,
-  body:not(.cade-visible):not(.cade-exiting) .marquee,
-  body:not(.cade-visible):not(.cade-exiting) .row-card,
-  body:not(.cade-visible):not(.cade-exiting) .chevrons,
-  body:not(.cade-visible):not(.cade-exiting) .matchday-mark,
-  body:not(.cade-visible):not(.cade-exiting) .season-mark,
-  body:not(.cade-visible):not(.cade-exiting) .season-mark::before {
+  body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
   }
   body.cade-visible .bg-image,
@@ -544,32 +489,11 @@
     opacity: 0 !important;
     transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
-
-  /* On cade-visible: replace infinite loops with single-play fade-in */
-  body.cade-visible .top-band,
-  body.cade-visible .matchday-title,
-  body.cade-visible .match-row,
-  body.cade-visible .partners,
-  body.cade-visible .row-card {
-    animation-name: cade-fade-in !important;
-    animation-duration: 0.6s !important;
-    animation-iteration-count: 1 !important;
-    animation-fill-mode: forwards !important;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
-  }
-  @keyframes cade-fade-in {
-    0%   { opacity: 0; transform: translateY(-12px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
-
-  /* On cade-exiting: smooth fade-out */
   body.cade-exiting .top-band,
-  body.cade-exiting .matchday-title,
-  body.cade-exiting .match-row,
+  body.cade-exiting .title-block,
+  body.cade-exiting .week-pill,
+  body.cade-exiting .fixtures-grid,
   body.cade-exiting .partners,
-  body.cade-exiting .row-card,
-  body.cade-exiting .chevrons,
-  body.cade-exiting .matchday-mark,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
   }
@@ -578,6 +502,7 @@
     100% { opacity: 0; transform: translateY(-8px); }
   }
 
+  /* ── STAGE ─────────────────────────────────────────────── */
   .stage {
     position: relative;
     width: 1920px;
@@ -589,7 +514,7 @@
     transform-origin: 50% 50%;
   }
 
-  /* ── BG ─────────────────────────────────────────────────────── */
+  /* ── BG: halftone-green stadium texture ─────────────────── */
   .bg-image {
     position: absolute;
     inset: -3% -3%;
@@ -610,12 +535,13 @@
     0%, 100% { filter: brightness(1.00) saturate(1.00); }
     50%      { filter: brightness(1.02) saturate(1.05); }
   }
+
   .bg-vignette {
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.78) 100%),
-      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.55) 75%, rgba(5,5,5,0.85) 100%);
+      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.70) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.40) 75%, rgba(5,5,5,0.65) 100%);
     z-index: 1;
     pointer-events: none;
   }
@@ -633,110 +559,281 @@
     mix-blend-mode: overlay;
   }
 
-  /* ── TOP HEADER BAND (CADE | PRO LEAGUE) — enlarged ~40% ────── */
+  /* ── TOP HEADER ─────────────────────────────────────────── */
   .top-band {
     position: absolute;
-    top: 28px;
+    top: 60px;
     left: 0;
     right: 0;
-    height: 132px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 38px;
+    height: 220px;
     z-index: 10;
-    /* Phase B2 — single-play (default iteration-count: 1).
-       Was previously `infinite` paired with --cycle: 13s. Marquee
-       below stays infinite; loop-shells should only run once. */
-    animation: header-loop var(--cycle) cubic-bezier(0.22, 1, 0.36, 1);
+    animation: top-fade 1.2s 0.1s ease both;
   }
   .top-band .logo {
-    height: 116px;
-    width: auto;
+    position: absolute;
+    height: auto;
     display: block;
     filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
   }
-  .top-band .logo--cade { height: 104px; }
-  .top-band .logo--pro  { height: 124px; }
-  .top-band .divider {
-    width: 2px;
-    height: 92px;
+  .top-band .logo--shield {
+    left: 80px;
+    top: 0;
+    width: 280px;
+    height: 220px;
+    object-fit: contain;
+  }
+  .top-band .logo--cade {
+    right: 80px;
+    top: 20px;
+    width: 200px;
+    height: 140px;
+    object-fit: contain;
+  }
+  @keyframes top-fade {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── TITLE: massive FIXTURES gradient text ─────────────── */
+  .title-block {
+    position: absolute;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 12;
+    width: 1100px;
+    animation: title-fade 1.2s 0.35s ease both;
+  }
+  .title {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 320px;
+    line-height: 0.88;
+    letter-spacing: -0.025em;
+    text-transform: uppercase;
+    margin: 0;
     background: linear-gradient(
-      to bottom,
-      rgba(255,255,255,0) 0%,
-      rgba(255,255,255,0.55) 20%,
-      rgba(255,255,255,0.85) 50%,
-      rgba(255,255,255,0.55) 80%,
-      rgba(255,255,255,0) 100%
+      180deg,
+      #a1f7d8 0%,
+      #ffffff 38%,
+      #fe036d 100%
     );
-    border-radius: 1px;
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+            color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 8px 28px rgba(0,0,0,0.65))
+            drop-shadow(0 0 38px rgba(254,3,109,0.18));
+    animation: title-pulse 4.6s ease-in-out infinite;
   }
-  @keyframes header-loop {
-    0%   { opacity: 0; transform: translateY(-30px); }
-    5%   { opacity: 1; transform: translateY(0); }
-    77%  { opacity: 1; transform: translateY(0); }
-    85%  { opacity: 0; transform: translateY(-30px); }
-    100% { opacity: 0; transform: translateY(-30px); }
+  @keyframes title-fade {
+    from { opacity: 0; transform: translate(-50%, -10px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
   }
-
-  /* ── SIDE CHEVRONS ─────────────────────────────────────────── */
-  .chevrons {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-    z-index: 5;
-    pointer-events: none;
-  }
-  .chevrons--left  { left: 32px; }
-  .chevrons--right { right: 32px; }
-  .chevron {
-    width: 56px;
-    height: 42px;
-    color: var(--green);
-    opacity: 0.35;
-    animation: chev-pulse 4.2s ease-in-out infinite;
-  }
-  .chevron svg { width: 100%; height: 100%; display: block; }
-  .chevrons--left  .chevron:nth-child(1) { animation-delay: 0s;    }
-  .chevrons--left  .chevron:nth-child(2) { animation-delay: 0.4s;  }
-  .chevrons--left  .chevron:nth-child(3) { animation-delay: 0.8s;  }
-  .chevrons--right .chevron:nth-child(1) { animation-delay: 0.6s;  }
-  .chevrons--right .chevron:nth-child(2) { animation-delay: 1.0s;  }
-  .chevrons--right .chevron:nth-child(3) { animation-delay: 1.4s;  }
-  @keyframes chev-pulse {
-    0%, 100% { opacity: 0.20; transform: translateX(0); }
-    50%      { opacity: 0.65; transform: translateX(6px); }
-  }
-  .chevrons--right .chevron { animation-name: chev-pulse-right; }
-  @keyframes chev-pulse-right {
-    0%, 100% { opacity: 0.20; transform: translateX(0); }
-    50%      { opacity: 0.65; transform: translateX(-6px); }
+  @keyframes title-pulse {
+    0%, 100% { filter: drop-shadow(0 8px 28px rgba(0,0,0,0.65)) drop-shadow(0 0 24px rgba(254,3,109,0.18)); }
+    50%      { filter: drop-shadow(0 8px 28px rgba(0,0,0,0.7))  drop-shadow(0 0 56px rgba(254,3,109,0.34)); }
   }
 
-  /* ── SEASON WATERMARK ───────────────────────────────────────── */
-  .season-mark {
+  /* ── WEEK PILL ──────────────────────────────────────────── */
+  .week-pill {
     position: absolute;
-    top: 26px;
-    right: 38px;
+    top: 360px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 14;
+    background: var(--pink);
+    color: var(--ink);
     font-family: var(--accent);
     font-weight: 700;
-    font-size: 12px;
+    font-size: 28px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    padding: 14px 40px;
+    border-radius: 6px;
+    box-shadow:
+      0 6px 22px rgba(254,3,109,0.45),
+      0 0 38px rgba(254,3,109,0.30),
+      inset 0 0 0 1.5px rgba(255,255,255,0.20);
+    animation: week-fade 1.0s 0.55s ease both, week-breathe 3.4s ease-in-out infinite 1.2s;
+  }
+  @keyframes week-fade {
+    from { opacity: 0; transform: translate(-50%, -8px) scale(0.92); }
+    to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  }
+  @keyframes week-breathe {
+    0%, 100% { box-shadow: 0 6px 22px rgba(254,3,109,0.45), 0 0 24px rgba(254,3,109,0.20), inset 0 0 0 1.5px rgba(255,255,255,0.20); }
+    50%      { box-shadow: 0 8px 28px rgba(254,3,109,0.62), 0 0 56px rgba(254,3,109,0.42), inset 0 0 0 1.5px rgba(255,255,255,0.24); }
+  }
+
+  /* ── FIXTURES GRID (2 columns, dynamic 4-7 rows per column) ─
+     User spec: support 8-13 fixtures per match-day. JS splits the
+     incoming array via Math.ceil(n/2) → left col gets 4-7 rows,
+     right col gets 4-6 rows. Each column flex-distributes the
+     available 540px so rows shrink as count grows. */
+  .fixtures-grid {
+    position: absolute;
+    top: 440px;
+    left: 80px;
+    right: 80px;
+    width: auto;
+    height: 540px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 60px;
+    row-gap: 0;
+    z-index: 8;
+  }
+  .fixtures-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 0;
+  }
+  .fixture-row {
+    display: grid;
+    grid-template-columns: 1fr 60px 80px 60px 1fr;
+    align-items: center;
+    column-gap: 10px;
+    flex: 1;
+    min-height: 56px;
+    max-height: 88px;
+    opacity: 0;
+    animation: row-in 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  /* Cascade entry — left col first, right col second; cover up to 7
+     rows per column (max for 13 fixtures = 7 left + 6 right). */
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(1) { animation-delay: 0.65s; }
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(2) { animation-delay: 0.72s; }
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(3) { animation-delay: 0.79s; }
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(4) { animation-delay: 0.86s; }
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(5) { animation-delay: 0.93s; }
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(6) { animation-delay: 1.00s; }
+  .fixtures-col:nth-child(1) .fixture-row:nth-child(7) { animation-delay: 1.07s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(1) { animation-delay: 0.85s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(2) { animation-delay: 0.92s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(3) { animation-delay: 0.99s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(4) { animation-delay: 1.06s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(5) { animation-delay: 1.13s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(6) { animation-delay: 1.20s; }
+  .fixtures-col:nth-child(2) .fixture-row:nth-child(7) { animation-delay: 1.27s; }
+
+  @keyframes row-in {
+    0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+    65%  { opacity: 1; transform: translateY(-2px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .name-pill {
+    background: var(--pink);
+    color: var(--ink);
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 14px 26px;
+    border-radius: 6px;
+    text-align: center;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 4px 14px rgba(0,0,0,0.5),
+      inset 0 0 0 1.5px rgba(255,255,255,0.10);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .name-pill--left  { justify-self: stretch; }
+  .name-pill--right { justify-self: stretch; }
+
+  .score-pill {
+    background: var(--ink);
+    color: var(--pink);
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 100%;
+    font-size: 36px;
+    line-height: 1;
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 4px 14px rgba(0,0,0,0.55),
+      inset 0 0 0 1.5px rgba(0,0,0,0.10);
+  }
+
+  .vs-label {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 36px;
+    line-height: 1;
+    color: var(--green);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    text-shadow:
+      0 0 18px rgba(107,205,6,0.55),
+      0 2px 6px rgba(0,0,0,0.65);
+  }
+
+  /* ── BOTTOM PARTNER STRIP ──────────────────────────────── */
+  .partners {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 24px;
+    display: var(--overlay-partner-strip-show, flex);
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+    z-index: 12;
+    animation: partners-fade 1.2s 0.95s ease both;
+  }
+  .partners img.partner {
+    height: 50px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  @keyframes partners-fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SEASON WATERMARK ──────────────────────────────────── */
+  .season-mark {
+    position: absolute;
+    bottom: 100px;
+    right: 32px;
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 11px;
     letter-spacing: 0.40em;
     color: rgba(255,255,255,0.55);
     text-transform: uppercase;
     z-index: 12;
+    animation: top-fade 1.2s 0.1s ease both;
   }
   .season-mark::before {
     content: '';
     display: inline-block;
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     background: var(--green);
     border-radius: 50%;
-    margin-right: 10px;
+    margin-right: 9px;
     transform: translateY(-1px);
     box-shadow: 0 0 10px var(--green-glow);
     animation: dot-pulse 1.6s ease-in-out infinite;
@@ -745,1017 +842,201 @@
     0%, 100% { opacity: 0.55; transform: translateY(-1px) scale(1); }
     50%      { opacity: 1;    transform: translateY(-1px) scale(1.2); }
   }
-
-  /* ── TITLE — ONLY "MATCH DAY N RESULTS" ─────────────────────── */
-  .title-bar {
-    position: absolute;
-    top: 188px;
-    left: 50%;
-    text-align: center;
-    z-index: 11;
-    /* Phase B2 — single-play (see header-loop note above). */
-    animation: title-loop var(--cycle) cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .title-bar__main {
-    font-family: var(--display);
-    font-weight: 900;
-    font-stretch: 75%;
-    font-size: 78px;
-    line-height: 0.92;
-    letter-spacing: 0.005em;
-    color: var(--ink);
-    text-transform: uppercase;
-    text-shadow:
-      0 0 1px rgba(255,255,255,0.85),
-      0 4px 18px rgba(0,0,0,0.65),
-      0 0 28px rgba(107,205,6,0.18);
-    white-space: nowrap;
-  }
-  .title-bar__main .accent {
-    color: var(--green);
-    text-shadow:
-      0 0 1px rgba(255,255,255,0.6),
-      0 0 18px var(--green-glow),
-      0 0 36px rgba(107,205,6,0.30);
-  }
-  .title-bar__rule {
-    width: 220px;
-    height: 4px;
-    margin: 14px auto 0;
-    background: var(--pink);
-    border-radius: 2px;
-    box-shadow:
-      0 0 14px var(--pink-glow),
-      0 0 28px rgba(254,3,109,0.30);
-  }
-  /* Title stays centered + visible for the entire cycle. The earlier
-     slide-up keyframe at 85% caused the title to drift off-center
-     mid-trigger ("no longer centered after 5-10s"). The exit animation
-     is now driven by the body.cade-exiting class (cade-fade-out
-     keyframes above), not by this looping animation. */
-  @keyframes title-loop {
-    0%   { opacity: 0; transform: translate(-50%, -16px); }
-    7%   { opacity: 1; transform: translate(-50%, 0); }
-    100% { opacity: 1; transform: translate(-50%, 0); }
-  }
-
-  /* ── ROWS GRID ─────────────────────────────────────────────────
-     2-column adaptive grid. Up to 12 matches (6 left + 6 right).
-     Top of grid = 320px. Bottom budget = 1080 - partner strip 184px
-     ≈ 896px. Available height ≈ 576px / 6 rows = 96px per row + 6px gap.
-     Rows are compact 76px each so 6×76 + 5×16gap = 536px (cleared).
-     ─────────────────────────────────────────────────────────────── */
-  .rows-wrap {
-    position: absolute;
-    top: 320px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 1820px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 28px;
-    row-gap: 12px;
-    z-index: 8;
-  }
-
-  .row {
-    position: relative;
-    height: 80px;
-    padding: 0;
-    background: transparent;
-    /* Phase B2 — single-play (see header-loop note above). */
-    animation: row-enter var(--cycle) cubic-bezier(0.22, 1, 0.36, 1);
-    opacity: 0;
-  }
-
-  .row__panel {
-    position: absolute;
-    inset: 0;
-    background: rgba(8, 12, 8, 0.62);
-    -webkit-backdrop-filter: blur(3px);
-            backdrop-filter: blur(3px);
-    clip-path: polygon(
-      14px 0,
-      calc(100% - 14px) 0,
-      100% 14px,
-      100% calc(100% - 14px),
-      calc(100% - 14px) 100%,
-      14px 100%,
-      0 calc(100% - 14px),
-      0 14px
-    );
-    z-index: 1;
-  }
-  .row__border {
-    position: absolute;
-    inset: 0;
-    background: var(--row-border, var(--green));
-    clip-path: polygon(
-      14px 0,
-      calc(100% - 14px) 0,
-      100% 14px,
-      100% calc(100% - 14px),
-      calc(100% - 14px) 100%,
-      14px 100%,
-      0 calc(100% - 14px),
-      0 14px
-    );
-    filter: drop-shadow(0 0 14px var(--row-glow, var(--green-glow)));
-    z-index: 0;
-  }
-  .row__panel::before {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    background: inherit;
-    clip-path: inherit;
-    z-index: -1;
-  }
-  .row__body {
-    position: relative;
-    z-index: 2;
-    height: 100%;
-    padding: 0 18px;
-    display: grid;
-    grid-template-columns: 1fr 200px 1fr;
-    align-items: center;
-    column-gap: 10px;
-  }
-
-  .row--finished { --row-border: var(--green); --row-glow: var(--green-glow); }
-  .row--tbd      { --row-border: var(--pink);  --row-glow: var(--pink-glow);  }
-  .row--tbd      .row__panel { background: rgba(20, 8, 14, 0.62); }
-  .row--walkover { --row-border: var(--gold);  --row-glow: var(--gold-glow); }
-  .row--walkover .row__panel { background: rgba(20, 16, 6, 0.62); }
-
-  /* Per-row entry stagger — 50ms between rows for a fast top-down cascade.
-     Layout fills column-major-ish so we stagger by DOM order. */
-  .row:nth-child(1)  { animation-delay: 0.00s; }
-  .row:nth-child(2)  { animation-delay: 0.05s; }
-  .row:nth-child(3)  { animation-delay: 0.10s; }
-  .row:nth-child(4)  { animation-delay: 0.15s; }
-  .row:nth-child(5)  { animation-delay: 0.20s; }
-  .row:nth-child(6)  { animation-delay: 0.25s; }
-  .row:nth-child(7)  { animation-delay: 0.30s; }
-  .row:nth-child(8)  { animation-delay: 0.35s; }
-  .row:nth-child(9)  { animation-delay: 0.40s; }
-  .row:nth-child(10) { animation-delay: 0.45s; }
-  .row:nth-child(11) { animation-delay: 0.50s; }
-  .row:nth-child(12) { animation-delay: 0.55s; }
-
-  @keyframes row-enter {
-    0%   { opacity: 0; transform: translateX(-30px); }
-    7%   { opacity: 1; transform: translateX(0); }
-    77%  { opacity: 1; transform: translateX(0); }
-    85%  { opacity: 0; transform: translateX(-30px); }
-    100% { opacity: 0; transform: translateX(-30px); }
-  }
-
-  /* ── ROW SIDE: PLAYER A / B ────────────────────────────────── */
-  .row-side {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-  }
-  .row-side--right {
-    flex-direction: row-reverse;
-    justify-content: flex-start;
-  }
-
-  .player-photo {
-    position: relative;
-    width: 60px;
-    height: 60px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at 50% 35%, rgba(107,205,6,0.32) 0%, rgba(107,205,6,0) 60%),
-      rgba(0,0,0,0.55);
-    border: 2px solid rgba(255,255,255,0.18);
-    overflow: hidden;
-    box-shadow:
-      0 4px 12px rgba(0,0,0,0.55),
-      inset 0 0 0 1px rgba(255,255,255,0.06);
-  }
-  .row--tbd      .player-photo { border-color: rgba(254,3,109,0.55); }
-  .row--walkover .player-photo { border-color: rgba(230,200,50,0.55); }
-  .player-photo img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: 50% 18%;
-  }
-
-  .player-name {
-    font-family: var(--display);
-    font-weight: 900;
-    font-stretch: 75%;
-    font-size: 28px;
-    line-height: 0.95;
-    letter-spacing: 0.012em;
-    color: var(--ink);
-    text-transform: uppercase;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.6);
-    min-width: 0;
-  }
-  .row-side--right .player-name { text-align: right; }
-
-  /* ── ROW CENTER ────────────────────────────────────────────── */
-  .row-center {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-  }
-
-  .score-final {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    font-family: var(--display);
-    font-weight: 900;
-    font-stretch: 100%;
-    font-size: 56px;
-    line-height: 1;
-    letter-spacing: 0.005em;
-    color: var(--ink);
-    text-shadow:
-      0 0 1px rgba(255,255,255,0.7),
-      0 4px 14px rgba(0,0,0,0.65),
-      0 0 18px rgba(107,205,6,0.25);
-  }
-  .score-final__digit {
-    display: inline-block;
-    min-width: 48px;
-    text-align: center;
-  }
-  .score-final__sep {
-    width: 22px;
-    height: 4px;
-    background: var(--green);
-    border-radius: 2px;
-    box-shadow: 0 0 14px var(--green-glow);
-    transform: translateY(2px);
-  }
-
-  /* TBD pill: pink, with subtle PULSING BREATHE (no shimmer sweep — softer) */
-  .pill-tbd {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 26px;
-    font-family: var(--display);
-    font-weight: 900;
-    font-stretch: 75%;
-    font-size: 32px;
-    letter-spacing: 0.18em;
-    color: var(--ink);
-    text-transform: uppercase;
-    background: rgba(254, 3, 109, 0.18);
-    border: 2px solid var(--pink);
-    border-radius: 6px;
-    box-shadow:
-      0 0 22px rgba(254,3,109,0.35),
-      inset 0 0 18px rgba(254,3,109,0.18);
-    animation: tbd-breathe 2.8s ease-in-out infinite;
-  }
-  @keyframes tbd-breathe {
-    0%, 100% {
-      transform: scale(1.00);
-      box-shadow:
-        0 0 14px rgba(254,3,109,0.28),
-        inset 0 0 12px rgba(254,3,109,0.16);
-      opacity: 0.88;
-    }
-    50% {
-      transform: scale(1.04);
-      box-shadow:
-        0 0 30px rgba(254,3,109,0.55),
-        inset 0 0 22px rgba(254,3,109,0.30);
-      opacity: 1;
-    }
-  }
-
-  /* Walkover pill: gold */
-  .pill-walkover {
-    position: relative;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 6px 22px;
-    font-family: var(--display);
-    font-weight: 900;
-    font-stretch: 75%;
-    color: var(--gold);
-    text-transform: uppercase;
-    background: rgba(230, 200, 50, 0.14);
-    border: 2px solid var(--gold);
-    border-radius: 6px;
-    overflow: hidden;
-    box-shadow:
-      0 0 22px rgba(230,200,50,0.35),
-      inset 0 0 18px rgba(230,200,50,0.18);
-    animation: wo-breathe 3s ease-in-out infinite;
-  }
-  .pill-walkover__label {
-    font-size: 16px;
-    letter-spacing: 0.30em;
-    line-height: 1;
-  }
-  .pill-walkover__score {
-    font-size: 32px;
-    letter-spacing: 0.05em;
-    line-height: 1;
-    margin-top: 2px;
-    color: var(--ink);
-    text-shadow:
-      0 0 1px rgba(255,255,255,0.7),
-      0 0 14px rgba(230,200,50,0.55);
-  }
-  @keyframes wo-breathe {
-    0%, 100% { box-shadow: 0 0 16px rgba(230,200,50,0.30), inset 0 0 12px rgba(230,200,50,0.18); }
-    50%      { box-shadow: 0 0 30px rgba(230,200,50,0.55), inset 0 0 22px rgba(230,200,50,0.28); }
-  }
-
-  /* ── BOTTOM PARTNER STRIP (≥80px gap from rows enforced via top:320 + max grid 536px = ends at 856px; partners begin near 944px) ── */
-  .partners {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 22px;
-    display: var(--overlay-partner-strip-show, flex);
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    z-index: 12;
-    /* Phase B2 — single-play (see header-loop note above).
-       Marquee inside still scrolls infinitely (next rule). */
-    animation: footer-loop var(--cycle) cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .partners-label {
-    font-family: var(--accent);
-    font-weight: 500;
-    font-size: 11px;
-    letter-spacing: 0.42em;
-    color: rgba(255,255,255,0.65);
-    text-transform: uppercase;
-  }
-  .marquee {
-    position: relative;
-    width: 980px;
-    max-width: 90%;
-    overflow: hidden;
-    padding: 10px 0;
-    background: rgba(8,8,8,0.55);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 60px,
-      #000 calc(100% - 60px),
-      transparent 100%
-    );
-            mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 60px,
-      #000 calc(100% - 60px),
-      transparent 100%
-    );
-  }
-  .marquee-track {
-    display: flex;
-    width: max-content;
-    animation: marquee-scroll 40s linear infinite;
-    will-change: transform;
-  }
-  @keyframes marquee-scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-33.3333%); }
-  }
-  .marquee-group {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 56px;
-    padding: 0 28px;
-    flex-shrink: 0;
-  }
-  
-  /* Fallback for dynamically-rebuilt partner imgs (admin save wipes marquee wrapper). */
-  [data-element-id="partners-strip"] img.partner { height: 50px; width: auto; object-fit: contain; }
-.marquee-group .partner {
-    height: 50px;
-    width: auto;
-    display: block;
-    object-fit: contain;
-    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
-  }
-  .marquee-group .partner--gameevo  { height: 50px; }
-  .marquee-group .partner--pride    { height: 50px; }
-  .marquee-group .partner--africa   { height: 50px; }
-  .marquee-group .partner--trace    { height: 50px; }
-  .marquee-group .partner--oas      { height: 50px; }
-  @keyframes footer-loop {
-    0%   { opacity: 0; transform: translateY(20px); }
-    7%   { opacity: 1; transform: translateY(0); }
-    77%  { opacity: 1; transform: translateY(0); }
-    85%  { opacity: 0; transform: translateY(20px); }
-    100% { opacity: 0; transform: translateY(20px); }
-  }
 </style>
 </head>
 <body>
   <main class="stage">
 
-    <!-- BG halftone + vignette + grain (loops continuously) -->
+    <!-- BG halftone + vignette + grain -->
     <div class="bg-image" aria-hidden="true"></div>
     <div class="bg-vignette" aria-hidden="true"></div>
     <div class="bg-grain" aria-hidden="true"></div>
 
-    <!-- Side chevrons -->
-    <div class="chevrons chevrons--left" aria-hidden="true">
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 6 L42 32 L14 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M48 6 L76 32 L48 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    </div>
-    <div class="chevrons chevrons--right" aria-hidden="true">
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <div class="chevron"><svg viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M74 6 L46 32 L74 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 6 L12 32 L40 58" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    </div>
-
     <!-- Season watermark -->
-    <div data-element-id="season-mark" class="season-mark">ELITE LEAGUE · SEASON 2</div>
+    <div class="season-mark" data-element-id="season-mark">ELITE LEAGUE · SEASON 2</div>
 
-    <!-- Top header -->
+    <!-- Top header: shield (left) + CADE Esports (right) -->
     <header class="top-band">
-      <img class="logo logo--cade" src="../../../logos/1cade%20esport.png" alt="CADE Esports" />
-      <span class="divider" aria-hidden="true"></span>
-      <img class="logo logo--pro" src="../../../logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+      <img class="logo logo--shield" src="../../../logos/processed/pro%20league%20_strip.png" alt="National E-Soccer League" />
+      <img class="logo logo--cade"   src="../../../logos/processed/1cade%20esport_strip.png" alt="CADE Esports" />
     </header>
 
-    <!-- Title (ONLY "MATCH DAY N RESULTS") -->
-    <div class="title-bar">
-      <div class="title-bar__main">
-        <span class="accent">MATCH DAY 5</span> RESULTS
-      </div>
-      <div class="title-bar__rule" aria-hidden="true"></div>
-    </div>
+    <!-- Title block: massive gradient FIXTURES -->
+    <section class="title-block">
+      <h1 data-element-id="title" class="title">FIXTURES</h1>
+    </section>
 
-    <!-- Up to 12 match rows in a 2-column grid (6 left + 6 right) -->
-    <!-- data-static-sample="1" marks the inline FARUK/ANIFE/etc rows below
-         as the unedited static sample. The first non-empty `update`
-         flips this to "0" so subsequent empty Trigger payloads do not
-         wipe the live data. See rebuildRows() guard. -->
-    <section class="rows-wrap" data-static-sample="1" aria-label="Match scores of the day">
+    <!-- Week pill -->
+    <div data-element-id="week-pill" class="week-pill">WEEK 1</div>
 
-      <!-- 1. FARUK 4-2 ANIFE -->
-      <div class="row row--finished">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/faruk/headshot_01_nobg.png" alt="FARUK" /></div>
-            <div class="player-name">FARUK</div>
-          </div>
-          <div class="row-center">
-            <div class="score-final">
-              <span class="score-final__digit">4</span>
-              <span class="score-final__sep" aria-hidden="true"></span>
-              <span class="score-final__digit">2</span>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/anife/headshot_02_nobg.png" alt="ANIFE" /></div>
-            <div class="player-name">ANIFE</div>
-          </div>
+    <!-- 2-col fixtures grid (10 fixtures total, 5 per col) -->
+    <section data-element-id="fixtures-grid" class="fixtures-grid" aria-label="Match-day fixtures">
+      <div class="fixtures-col">
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">GURU</div>
+          <div class="score-pill">5</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">2</div>
+          <div class="name-pill name-pill--right">KAYKAY</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">KILLERFREAK</div>
+          <div class="score-pill">0</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">3</div>
+          <div class="name-pill name-pill--right">WOLEVATION</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">ADEFOLA</div>
+          <div class="score-pill">1</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">2</div>
+          <div class="name-pill name-pill--right">TACTICAL</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">ANIFE</div>
+          <div class="score-pill">0</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">7</div>
+          <div class="name-pill name-pill--right">MITCH</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">BAJI JNR</div>
+          <div class="score-pill">6</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">4</div>
+          <div class="name-pill name-pill--right">KILLERFREAK</div>
         </div>
       </div>
-
-      <!-- 2. KAYKAY 3-3 MR OGA -->
-      <div class="row row--finished">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/kaykay/headshot_01_nobg.png" alt="KAYKAY" /></div>
-            <div class="player-name">KAYKAY</div>
-          </div>
-          <div class="row-center">
-            <div class="score-final">
-              <span class="score-final__digit">3</span>
-              <span class="score-final__sep" aria-hidden="true"></span>
-              <span class="score-final__digit">3</span>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/mr_oga/headshot_01_nobg.png" alt="MR OGA" /></div>
-            <div class="player-name">MR OGA</div>
-          </div>
+      <div class="fixtures-col">
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">DADABOI</div>
+          <div class="score-pill">1</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">13</div>
+          <div class="name-pill name-pill--right">KAYKAY</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">BAJI JNR</div>
+          <div class="score-pill">5</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">2</div>
+          <div class="name-pill name-pill--right">MR OGA</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">KING NONEX</div>
+          <div class="score-pill">5</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">3</div>
+          <div class="name-pill name-pill--right">MITCH</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">TACTICAL</div>
+          <div class="score-pill">4</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">2</div>
+          <div class="name-pill name-pill--right">WOLEVATION</div>
+        </div>
+        <div class="fixture-row">
+          <div class="name-pill name-pill--left">ADEFOLA</div>
+          <div class="score-pill">5</div>
+          <div class="vs-label">VS</div>
+          <div class="score-pill">3</div>
+          <div class="name-pill name-pill--right">GURU</div>
         </div>
       </div>
-
-      <!-- 3. KILLER FREAK 1-0 DADABOI -->
-      <div class="row row--finished">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/killer_freak/headshot_01_nobg.png" alt="KILLER FREAK" /></div>
-            <div class="player-name">KILLER FREAK</div>
-          </div>
-          <div class="row-center">
-            <div class="score-final">
-              <span class="score-final__digit">1</span>
-              <span class="score-final__sep" aria-hidden="true"></span>
-              <span class="score-final__digit">0</span>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI" /></div>
-            <div class="player-name">DADABOI</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. ADEFOLA 2-1 GURU -->
-      <div class="row row--finished">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/adefola/headshot_01_nobg.png" alt="ADEFOLA" /></div>
-            <div class="player-name">ADEFOLA</div>
-          </div>
-          <div class="row-center">
-            <div class="score-final">
-              <span class="score-final__digit">2</span>
-              <span class="score-final__sep" aria-hidden="true"></span>
-              <span class="score-final__digit">1</span>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/guru/headshot_01_nobg.png" alt="GURU" /></div>
-            <div class="player-name">GURU</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 5. MITCH 5-2 TACTICAL -->
-      <div class="row row--finished">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/mitch/headshot_01_nobg.png" alt="MITCH" /></div>
-            <div class="player-name">MITCH</div>
-          </div>
-          <div class="row-center">
-            <div class="score-final">
-              <span class="score-final__digit">5</span>
-              <span class="score-final__sep" aria-hidden="true"></span>
-              <span class="score-final__digit">2</span>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/tactical/headshot_01_nobg.png" alt="TACTICAL" /></div>
-            <div class="player-name">TACTICAL</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 6. WOLEVATION 0-2 KING NONEX -->
-      <div class="row row--finished">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/wolevation/headshot_01_nobg.png" alt="WOLEVATION" /></div>
-            <div class="player-name">WOLEVATION</div>
-          </div>
-          <div class="row-center">
-            <div class="score-final">
-              <span class="score-final__digit">0</span>
-              <span class="score-final__sep" aria-hidden="true"></span>
-              <span class="score-final__digit">2</span>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/kingnonex/headshot_03_nobg.png" alt="KING NONEX" /></div>
-            <div class="player-name">KING NONEX</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 7. BAJI JNR vs KING NONEX — TBD -->
-      <div class="row row--tbd">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/baji_jnr/headshot_01_nobg.png" alt="BAJI JNR" /></div>
-            <div class="player-name">BAJI JNR</div>
-          </div>
-          <div class="row-center">
-            <div class="pill-tbd">TBD</div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/kingnonex/headshot_03_nobg.png" alt="KING NONEX" /></div>
-            <div class="player-name">KING NONEX</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 8. GURU vs MITCH — TBD -->
-      <div class="row row--tbd">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/guru/headshot_01_nobg.png" alt="GURU" /></div>
-            <div class="player-name">GURU</div>
-          </div>
-          <div class="row-center">
-            <div class="pill-tbd">TBD</div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/mitch/headshot_01_nobg.png" alt="MITCH" /></div>
-            <div class="player-name">MITCH</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 9. TACTICAL vs WOLEVATION — TBD -->
-      <div class="row row--tbd">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/tactical/headshot_01_nobg.png" alt="TACTICAL" /></div>
-            <div class="player-name">TACTICAL</div>
-          </div>
-          <div class="row-center">
-            <div class="pill-tbd">TBD</div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/wolevation/headshot_01_nobg.png" alt="WOLEVATION" /></div>
-            <div class="player-name">WOLEVATION</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 10. ADEFOLA W/O 3-0 ANIFE — walkover -->
-      <div class="row row--walkover">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/adefola/headshot_01_nobg.png" alt="ADEFOLA" /></div>
-            <div class="player-name">ADEFOLA</div>
-          </div>
-          <div class="row-center">
-            <div class="pill-walkover">
-              <div class="pill-walkover__label">W / O</div>
-              <div class="pill-walkover__score">3 — 0</div>
-            </div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/anife/headshot_02_nobg.png" alt="ANIFE" /></div>
-            <div class="player-name">ANIFE</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 11. FARUK vs DADABOI — TBD -->
-      <div class="row row--tbd">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/faruk/headshot_01_nobg.png" alt="FARUK" /></div>
-            <div class="player-name">FARUK</div>
-          </div>
-          <div class="row-center">
-            <div class="pill-tbd">TBD</div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/dadaboi/headshot_01_nobg.png" alt="DADABOI" /></div>
-            <div class="player-name">DADABOI</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 12. KAYKAY vs KILLER FREAK — TBD -->
-      <div class="row row--tbd">
-        <div class="row__border" aria-hidden="true"></div>
-        <div class="row__panel"  aria-hidden="true"></div>
-        <div class="row__body">
-          <div class="row-side row-side--left">
-            <div class="player-photo"><img src="../../../players/processed/kaykay/headshot_01_nobg.png" alt="KAYKAY" /></div>
-            <div class="player-name">KAYKAY</div>
-          </div>
-          <div class="row-center">
-            <div class="pill-tbd">TBD</div>
-          </div>
-          <div class="row-side row-side--right">
-            <div class="player-photo"><img src="../../../players/processed/killer_freak/headshot_01_nobg.png" alt="KILLER FREAK" /></div>
-            <div class="player-name">KILLER FREAK</div>
-          </div>
-        </div>
-      </div>
-
     </section>
 
     <!-- Bottom partner strip -->
     <footer data-element-id="partners-strip" class="partners">
-      <span class="partners-label">Official Partners</span>
-      <div class="marquee" aria-label="Official partners ticker">
-        <div class="marquee-track">
-          <div class="marquee-group" aria-hidden="false">
-            <img class="partner partner--gameevo" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports" />
-            <img class="partner partner--pride"   src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
-            <img class="partner partner--africa"  src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
-            <img class="partner partner--trace"   src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
-            <img class="partner partner--oas"     src="../../../logos/processed/OAS%20esport_strip.png" alt="OAS esport" />
-          </div>
-          <div class="marquee-group" aria-hidden="true">
-            <img class="partner partner--gameevo" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="" />
-            <img class="partner partner--pride"   src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="" />
-            <img class="partner partner--africa"  src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="" />
-            <img class="partner partner--trace"   src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="" />
-            <img class="partner partner--oas"     src="../../../logos/processed/OAS%20esport_strip.png" alt="" />
-          </div>
-          <div class="marquee-group" aria-hidden="true">
-            <img class="partner partner--gameevo" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="" />
-            <img class="partner partner--pride"   src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="" />
-            <img class="partner partner--africa"  src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="" />
-            <img class="partner partner--trace"   src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="" />
-            <img class="partner partner--oas"     src="../../../logos/processed/OAS%20esport_strip.png" alt="" />
-          </div>
-        </div>
-      </div>
+      <img class="partner partner--gameevo" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports" />
+      <img class="partner partner--pride"   src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
+      <img class="partner partner--africa"  src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
+      <img class="partner partner--trace"   src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
     </footer>
 
   </main>
 
   <script>
-    /* ------------------------------------------------------------
-       LIVE DATA — postMessage handler (data-feed driven)
-       ------------------------------------------------------------
-       Accepts:
-         { type:'update', data: { matches:[...], partRange?:'1-4'|'5-8'|'9-12'|'all', matchDay?:N } }
-         { type:'update', event: 'standings.changed'|'score.changed'|'match.ended', payload }
-         { type:'show' } / { type:'hide' }
-       For now: filters visible rows by partRange and logs payloads. Full
-       row re-render from arbitrary `matches[]` is a follow-up slice. */
+    /* LIVE DATA — postMessage listener (data-feed driven).
+       Accepts BOTH shapes:
+         1. postMessage relay: { type:'update', data:{ weekNumber, fixtures:[...] } }
+         2. server endpoint:   { type:'update', data:{ payload:{ weekNumber, fixtures:[...] } } }
+       Falls back to placeholder when fields missing. */
     (function () {
       var stage = document.querySelector('.stage') || document.body;
+      var grid  = document.querySelector('[data-element-id="fixtures-grid"]');
+      var weekPill = document.querySelector('[data-element-id="week-pill"]');
 
-      function applyPartRange(range) {
-        var rows = document.querySelectorAll('.row');
-        if (!rows.length) return;
-        var keep = null;
-        if (range === '1-4')  keep = [0, 4];
-        else if (range === '5-8')  keep = [4, 8];
-        else if (range === '9-12') keep = [8, 12];
-        for (var i = 0; i < rows.length; i++) {
-          if (keep && (i < keep[0] || i >= keep[1])) {
-            rows[i].style.display = 'none';
-          } else {
-            rows[i].style.display = '';
-          }
-        }
-      }
-
-      function buildRow(m) {
-        m = m || {};
-        var status = m.status || 'tbd';
-        var klass = 'row row--' + (status === 'finished' || status === 'completed' ? 'finished' : (status === 'walkover' ? 'walkover' : 'tbd'));
-        var p1Img = m.p1PhotoUrl
-          ? '<img src="' + m.p1PhotoUrl + '" alt="' + (m.p1Name || '') + '" />'
-          : '';
-        var p2Img = m.p2PhotoUrl
-          ? '<img src="' + m.p2PhotoUrl + '" alt="' + (m.p2Name || '') + '" />'
-          : '';
-        var center;
-        if (status === 'finished' || status === 'completed' || status === 'walkover') {
-          center = '<div class="score-final">' +
-            '<span class="score-final__digit">' + (m.score1 != null ? m.score1 : '0') + '</span>' +
-            '<span class="score-final__sep" aria-hidden="true"></span>' +
-            '<span class="score-final__digit">' + (m.score2 != null ? m.score2 : '0') + '</span>' +
-            '</div>';
-        } else {
-          center = '<div class="score-tbd"><span>TBD</span></div>';
-        }
-        return '<div class="' + klass + '">' +
-          '<div class="row__border" aria-hidden="true"></div>' +
-          '<div class="row__panel"  aria-hidden="true"></div>' +
-          '<div class="row__body">' +
-            '<div class="row-side row-side--left">' +
-              '<div class="player-photo">' + p1Img + '</div>' +
-              '<div class="player-name">' + (m.p1Name || 'TBD') + '</div>' +
-            '</div>' +
-            '<div class="row-center">' + center + '</div>' +
-            '<div class="row-side row-side--right">' +
-              '<div class="player-photo">' + p2Img + '</div>' +
-              '<div class="player-name">' + (m.p2Name || 'TBD') + '</div>' +
-            '</div>' +
-          '</div>' +
+      function rowHtml(f) {
+        if (!f) return '';
+        var nameA = (f.playerA && (f.playerA.displayName || f.playerA.gamerTag || f.playerA.name)) || '—';
+        var nameB = (f.playerB && (f.playerB.displayName || f.playerB.gamerTag || f.playerB.name)) || '—';
+        var sA = (f.scoreA == null ? '–' : f.scoreA);
+        var sB = (f.scoreB == null ? '–' : f.scoreB);
+        return '<div class="fixture-row">' +
+          '<div class="name-pill name-pill--left">' + nameA + '</div>' +
+          '<div class="score-pill">' + sA + '</div>' +
+          '<div class="vs-label">VS</div>' +
+          '<div class="score-pill">' + sB + '</div>' +
+          '<div class="name-pill name-pill--right">' + nameB + '</div>' +
         '</div>';
       }
 
-      function rebuildRows(matches) {
-        var wrap = document.querySelector('.rows-wrap');
-        if (!wrap || !Array.isArray(matches)) return;
-        if (matches.length === 0) {
-          // 2026-04-26 — Bug 2 fix: an empty `rows[]` from a Trigger
-          // payload (the broadcast control card sends `{matchDayLabel,
-          // rows: []}` to fire the entry animation) MUST NOT clear the
-          // existing rendered rows. Without this guard, triggering the
-          // overlay AFTER the initial-fetch populated the grid would
-          // wipe the live data. We only clear when the static sample
-          // is still in the DOM — after the first non-empty rebuild
-          // we flip data-static-sample="0" and subsequent empty
-          // payloads no-op.
-          if (wrap.dataset.staticSample === '1') {
-            wrap.innerHTML = '';
-            wrap.dataset.staticSample = '0';
-          }
+      function rerender(fixtures) {
+        if (!grid || !Array.isArray(fixtures)) return;
+        if (fixtures.length === 0) {
+          grid.innerHTML = '';
           return;
         }
-        wrap.innerHTML = matches.map(buildRow).join('');
-        wrap.dataset.staticSample = '0';
+        // Split into halves: first half left col, second half right col.
+        var half = Math.ceil(fixtures.length / 2);
+        var left  = fixtures.slice(0, half);
+        var right = fixtures.slice(half);
+        var leftHtml  = '<div class="fixtures-col">'  + left.map(rowHtml).join('')  + '</div>';
+        var rightHtml = '<div class="fixtures-col">' + right.map(rowHtml).join('') + '</div>';
+        grid.innerHTML = leftHtml + rightHtml;
       }
 
-      /**
-       * Pull matches list out of the message payload, regardless of which
-       * shape arrived:
-       *   - `{matches: [...]}` (legacy postMessage relay)
-       *   - `{rows: [...]}` (Realtime direct shape)
-       *   - `{payload: {rows: [{home, away, homeScore, awayScore, status}]}}`
-       *     (initial-fetch from /api/broadcast/sessions/<id>/match-scores-day
-       *     — server returns `{payload: MatchScoresDayPayload, seasonId,
-       *     channels}` per route.ts).
-       */
-      function readMatches(data) {
-        if (!data) return null;
-        if (Array.isArray(data.matches)) return data.matches;
-        if (Array.isArray(data.rows)) return data.rows;
-        if (data.payload && typeof data.payload === 'object') {
-          if (Array.isArray(data.payload.matches)) return data.payload.matches;
-          if (Array.isArray(data.payload.rows)) return data.payload.rows;
-        }
+      function readPayload(data) {
+        if (!data || typeof data !== 'object') return null;
+        if (Array.isArray(data.fixtures) || data.weekNumber != null) return data;
+        if (data.payload && typeof data.payload === 'object') return data.payload;
         return null;
       }
 
-      // 2026-04-26 — slug normalization so server-supplied gamer_tag
-      // (e.g. `king_nonex`) resolves to the canonical asset folder
-      // (`kingnonex`). Mirrors the maps in 09-secondary-score-bug + 10-up-next-bug.
-      var SLUG_ALIAS = { 'kingnonex': 'kingnonex', 'king_nonex': 'kingnonex' };
-      var NAME_TO_SLUG = {
-        'ADEFOLA': 'adefola', 'ANIFE': 'anife', 'BAJI JNR': 'baji_jnr',
-        'DADABOI': 'dadaboi', 'FARUK': 'faruk', 'GURU': 'guru',
-        'KAYKAY': 'kaykay', 'KILLER FREAK': 'killer_freak',
-        'KING NONEX': 'kingnonex', 'KINGNONEX': 'kingnonex',
-        'MITCH': 'mitch', 'MR OGA': 'mr_oga', 'MR. OGA': 'mr_oga',
-        'TACTICAL': 'tactical', 'WOLEVATION': 'wolevation'
-      };
-      // Pose override per slug — kingnonex pose 01 is back-facing.
-      var POSE_FOR_SLUG = { 'kingnonex': '03' };
-      function canonSlug(rawSlug, rawName) {
-        if (rawSlug) {
-          var s = String(rawSlug).toLowerCase();
-          if (SLUG_ALIAS[s]) return SLUG_ALIAS[s];
-          var compact = s.replace(/[^a-z0-9]/g, '');
-          if (SLUG_ALIAS[compact]) return SLUG_ALIAS[compact];
-          return s.replace(/[^a-z0-9]+/g, '_');
-        }
-        if (rawName) {
-          var upper = String(rawName).trim().toUpperCase();
-          if (NAME_TO_SLUG[upper]) return NAME_TO_SLUG[upper];
-        }
-        return '';
-      }
-      function resolvePhotoUrl(rawSlug, rawName, override) {
-        if (override) return override;
-        var c = canonSlug(rawSlug, rawName);
-        if (!c) return '';
-        var pose = POSE_FOR_SLUG[c] || '01';
-        return '../../../players/processed/' + c + '/headshot_' + pose + '_nobg.png';
-      }
-
       function update(data) {
-        if (!data) return;
-        var matches = readMatches(data);
-        if (matches) {
-          console.info('[overlay/11-match-scores-day] matches[]', matches.length);
-          // Normalize server shape (home/away/homeScore/awayScore/homeSlug/awaySlug)
-          // into the overlay's expected shape (p1Name/p2Name/score1/score2/p*PhotoUrl).
-          var normalized = matches.map(function(m){
-            // Server shape: {home, away, homeSlug, awaySlug, homeScore, awayScore, status}
-            // where home/away can be a string name OR a legacy object {name, slug, photoUrl}.
-            var homeName = typeof m.home === 'string' ? m.home : (m.home && m.home.name) || m.p1Name || '';
-            var awayName = typeof m.away === 'string' ? m.away : (m.away && m.away.name) || m.p2Name || '';
-            var homeRawSlug = m.homeSlug || (typeof m.home === 'object' && m.home ? m.home.slug : '') || '';
-            var awayRawSlug = m.awaySlug || (typeof m.away === 'object' && m.away ? m.away.slug : '') || '';
-            var homePhotoOverride = (typeof m.home === 'object' && m.home ? m.home.photoUrl : '') || m.p1PhotoUrl || '';
-            var awayPhotoOverride = (typeof m.away === 'object' && m.away ? m.away.photoUrl : '') || m.p2PhotoUrl || '';
-            return {
-              p1Name: homeName,
-              p2Name: awayName,
-              p1PhotoUrl: resolvePhotoUrl(homeRawSlug, homeName, homePhotoOverride),
-              p2PhotoUrl: resolvePhotoUrl(awayRawSlug, awayName, awayPhotoOverride),
-              score1: m.homeScore != null ? m.homeScore : (m.score1 != null ? m.score1 : 0),
-              score2: m.awayScore != null ? m.awayScore : (m.score2 != null ? m.score2 : 0),
-              status: m.status || 'tbd'
-            };
-          });
-          rebuildRows(normalized);
+        var p = readPayload(data);
+        if (!p) return;
+        if (p.weekNumber != null && weekPill) {
+          try { weekPill.textContent = 'WEEK ' + p.weekNumber; } catch (e) {}
         }
-        // 2026-04-26 — partRange filter retired per user brief: always show
-        // ALL matches on one page. The control panel may still send a
-        // partRange field but we ignore it (no-op).
-        // if (typeof data.partRange === 'string') applyPartRange(data.partRange);
-        // Match-day label can come as `matchDay` (legacy number) OR
-        // `matchDayLabel` (server payload shape) OR
-        // `payload.matchDayLabel`. Bug 1 fix (2026-04-26) — server now
-        // sets `matchDayLabel = "MATCH DAY N RESULTS"` derived from the
-        // session's match_day_id sequence within the season, so the title
-        // tracks live match-day instead of static "MATCH DAY 5".
-        var label = data.matchDayLabel ||
-          (data.payload && data.payload.matchDayLabel) ||
-          (typeof data.matchDay === 'number' ? 'MATCH DAY ' + data.matchDay + ' RESULTS' : null);
-        if (label) {
-          var titleEl = document.querySelector('.title-bar__main') ||
-                        document.querySelector('.title, .matchday-title, h1');
-          if (titleEl) {
-            // Preserve the .accent span structure: split "MATCH DAY N"
-            // (everything before the trailing " RESULTS") into the
-            // accent span + a literal " RESULTS" sibling. Plain
-            // textContent assignment would strip the green-glow accent.
-            var match = String(label).match(/^(.*?)(\s+RESULTS)\s*$/i);
-            if (match) {
-              titleEl.innerHTML =
-                '<span class="accent">' + match[1] + '</span>' + match[2];
-            } else {
-              titleEl.textContent = label;
-            }
-          }
-        }
+        if (Array.isArray(p.fixtures)) rerender(p.fixtures);
       }
 
-      // Phase B2 — single-play animation guard. The animation-restart
-      // dance below was firing on EVERY `show` postMessage which made
-      // the entry animations replay each cycle. Per user brief: entry
-      // anims run ONCE, subsequent show() calls just flip classes +
-      // update data without re-firing. The gate observer + cade-fade-in
-      // CSS rule still handle visibility, so subsequent shows simply
-      // re-display the rendered grid.
-      var hasRenderedOnce = false;
       function show() {
         document.body.classList.remove('cade-exiting');
         document.body.classList.add('cade-visible');
-        if (!hasRenderedOnce) {
-          document.body.classList.add('cade-rendered');
-          if (stage) {
-            var animated = stage.querySelectorAll(
-              '.top-band, .header-row, .match-row, .matches-grid, .partners, .matchday-title, .row-card'
-            );
-            animated.forEach(function (el) {
-              var orig = el.style.animation;
-              el.style.animation = 'none';
-              void el.offsetHeight;
-              el.style.animation = orig || '';
-            });
-          }
-          hasRenderedOnce = true;
+        if (stage) {
+          var animated = stage.querySelectorAll(
+            '.top-band, .title-block, .week-pill, .fixtures-grid, .fixture-row, .partners, .season-mark'
+          );
+          animated.forEach(function (el) {
+            var orig = el.style.animation;
+            el.style.animation = 'none';
+            void el.offsetHeight;
+            el.style.animation = orig || '';
+          });
         }
       }
       function hide() {
         document.body.classList.remove('cade-visible');
         document.body.classList.add('cade-exiting');
-        // Intentional: do NOT reset hasRenderedOnce. Animations are
-        // single-play across the lifetime of the page — only a hard
-        // reload re-fires them.
       }
-
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
-        console.info('[overlay/11-match-scores-day] message', msg.type || msg.event || '?');
+        console.info('[overlay/11-match-scores-day] message', msg.type || msg.event || '?', msg.payload || msg.data);
         // CONTRACT (per CLAUDE.md §14):
         //   show   → render data + add cade-visible
         //   hide   → swap cade-visible → cade-exiting
@@ -1773,14 +1054,8 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  // Top-level gated containers — class names listed here MUST exist in the
-  // DOM. The 2026-04-26 audit added .title-bar, .title-bar__main,
-  // .title-bar__rule, .partners-label, .marquee, .top-band .divider — without
-  // these, the title-loop / footer-loop / header-loop infinite animations
-  // flash through the canvas at load time even with no cade-visible class.
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.matchday-mark,.matchday-title,.partners,.partners-label,.marquee,.row,.rows-wrap,.season-mark,.title-bar,.title-bar__main,.title-bar__rule,.top-band';
-  // Inner descendants that the row-builder injects + that have animations.
-  var INNER_SEL = '.row__panel,.row__border,.row__body,.row-side,.row-center,.player-photo,.player-name,.score-block,.match-status,.kickoff-time,.divider';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.top-band,.title-block,.week-pill,.fixtures-grid,.fixture-row,.partners,.season-mark';
+  var INNER_SEL = '.title,.name-pill,.score-pill,.vs-label,.fixtures-col';
   function apply() {
     var b = document.body;
     if (!b) return;
@@ -1815,13 +1090,11 @@
 (function(){
   if (new URLSearchParams(location.search).get('demo') !== '1') return;
   function fire(type){ window.dispatchEvent(new MessageEvent('message', { data: { type: type } })); }
-  // Initial show after a tiny tick so the gate observer is wired.
   setTimeout(function(){ fire('show'); }, 200);
-  // Loop: show 5s, hide 3s, repeat.
   setInterval(function(){ fire('hide'); }, 8000);
   setTimeout(function(){
     setInterval(function(){ fire('show'); }, 8000);
-  }, 8000 - 5000); // offset so show fires 5s after each hide
+  }, 8000 - 5000);
 })();
 </script>
 </body>

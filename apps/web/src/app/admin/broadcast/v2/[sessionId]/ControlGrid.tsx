@@ -26,6 +26,7 @@ import {
   PlayerSquadsControl,
   type PlayerOption,
 } from "@/components/broadcast/v2/controls/PlayerSquadsControl";
+import { HighlightControl } from "@/components/broadcast/v2/controls/HighlightControl";
 
 /**
  * Plan 51 — control card grid layout.
@@ -206,6 +207,11 @@ export function ControlGrid({
         viewToken={viewToken}
         active={active["19-player-squads"] ?? false}
         players={playerOptions}
+      />
+      <HighlightControl
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["20-highlight"] ?? false}
       />
     </fieldset>
   );

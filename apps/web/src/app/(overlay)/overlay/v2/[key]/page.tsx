@@ -93,6 +93,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "16-coaches",
   "17-penalties",
   "19-player-squads",
+  "20-highlight",
 ]);
 
 /**
@@ -134,6 +135,8 @@ const KEY_ALIASES: Record<string, string> = {
   squads: "19-player-squads",
   draft: "19-player-squads",
   drafts: "19-player-squads",
+  highlight: "20-highlight",
+  highlights: "20-highlight",
 };
 
 type SearchParams = {

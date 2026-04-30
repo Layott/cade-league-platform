@@ -80,6 +80,9 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   // match-day boundary lands. Squad-submission edits don't hit the
   // overlay mid-stream — submissions land outside live-broadcast windows.
   "19-player-squads": ["standings.changed", "match.ended"],
+  // 20-highlight — same as match-scores-day; bottom strip shows recent
+  // fixtures so we resubscribe to score + match-end events.
+  "20-highlight": ["score.changed", "match.ended", "standings.changed"],
 };
 
 /**
@@ -111,6 +114,9 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   "16-coaches": (s) => `/api/broadcast/v2/sessions/${s}/coaches`,
   "17-penalties": (s) => `/api/broadcast/v2/sessions/${s}/penalties`,
   "19-player-squads": (s) => `/api/broadcast/v2/sessions/${s}/player-squads`,
+  // 20-highlight reuses the existing match-scores-day endpoint — same
+  // shape (week + fixtures), different overlay layout.
+  "20-highlight": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
 };
 
 /**

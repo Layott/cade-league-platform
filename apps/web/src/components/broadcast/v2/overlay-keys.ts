@@ -30,6 +30,7 @@ export const V2_OVERLAY_KEYS = [
   "16-coaches",
   "17-penalties",
   "19-player-squads",
+  "20-highlight",
 ] as const;
 
 export type V2OverlayKey = (typeof V2_OVERLAY_KEYS)[number];
@@ -60,6 +61,7 @@ export const V2_OVERLAY_LABELS: Record<V2OverlayKey, string> = {
   "16-coaches": "Coach Introductions",
   "17-penalties": "Player Penalties",
   "19-player-squads": "Player Squads",
+  "20-highlight": "Highlight",
 };
 
 /**

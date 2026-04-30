@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <!--
-  CADE ELITE LEAGUE — OVERLAY #11-MATCH-SCORES-DAY — "FIXTURES BOARD"
-  Full-screen 1920×1080 transparent registry of the matchday's 10
-  fixtures, two columns × five rows, with the giant gradient FIXTURES
-  headline and a WEEK pill above. Designed to match
-  KNOWLEDGE/brand-assets/designsample/FIXTURES.jpg verbatim.
+  CADE ELITE LEAGUE — OVERLAY #20-HIGHLIGHT — "L-SHAPE HIGHLIGHT BUG"
+  Full-screen 1920×1080 transparent L-shape composition: HIGHLIGHT
+  block on the top-left, big green-bordered video stage on the
+  right, and a thin row of 6 fixture cards along the bottom.
+  Designed to match KNOWLEDGE/brand-assets/designsample/L_SHAPE FIXTURES.jpg.
 
   Aesthetics inherit the v2 pilot template (../15-orgs/index.html):
-  halftone-green stadium BG, top league shield (left) + CADE Esports
-  logo (right), bottom partner strip, Agharti display + Quedora
-  secondary, locked palette #6bcd06 / #fe036d / #050505 / #ffffff.
+  halftone-green stadium BG, league shield + CADE Esports logos,
+  bottom partner strip optional, Agharti display + Quedora secondary,
+  locked palette #6bcd06 / #fe036d / #050505 / #ffffff.
 
   DATA WIRES:
-    weekNumber: number
-    fixtures: Array<{playerA:{displayName}, playerB:{displayName},
-                     scoreA:number, scoreB:number}>
+    recentFixtures: Array<{playerA:{displayName}, playerB:{displayName},
+                           scoreA:number, scoreB:number}>
+    Top-right [data-element-id="highlight-stage"] is left transparent
+    in production so OBS can composite a video clip behind it.
 
   Demo loop: enter cards cascade, dwell ~5s, exit, loop. Guarded by
   ?demo=1 (no auto-show on default load).
@@ -24,7 +25,7 @@
   <meta charset="UTF-8" />
   <meta name="color-scheme" content="dark" />
   <meta name="viewport" content="width=1920, initial-scale=1" />
-  <title>CADE — MATCH SCORES OF THE DAY</title>
+  <title>CADE — HIGHLIGHT (L-SHAPE)</title>
 
 <script id="cade-token-bootstrap">
 (function() {
@@ -349,7 +350,7 @@
   /* ── REAL BRAND FONTS ────────────────────────────────────── */
   @font-face {
     font-family: 'Agharti';
-    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-stretch: 100%;
@@ -357,7 +358,7 @@
   }
   @font-face {
     font-family: 'Agharti';
-    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-stretch: 75%;
@@ -365,7 +366,7 @@
   }
   @font-face {
     font-family: 'Agharti';
-    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
     font-weight: 900;
     font-style: normal;
     font-stretch: 100%;
@@ -373,7 +374,7 @@
   }
   @font-face {
     font-family: 'Agharti';
-    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
     font-weight: 900;
     font-style: normal;
     font-stretch: 75%;
@@ -381,7 +382,7 @@
   }
   @font-face {
     font-family: 'Agharti';
-    src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+    src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
     font-stretch: 100%;
@@ -389,28 +390,28 @@
   }
   @font-face {
     font-family: 'Quedora';
-    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
     font-display: block;
   }
   @font-face {
     font-family: 'Quedora';
-    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: block;
   }
   @font-face {
     font-family: 'Quedora';
-    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
     font-display: block;
   }
   @font-face {
     font-family: 'Quedora';
-    src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+    src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
     font-weight: 900;
     font-style: normal;
     font-display: block;
@@ -461,18 +462,20 @@
   body:not(.cade-visible):not(.cade-exiting) .bg-image,
   body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
   body:not(.cade-visible):not(.cade-exiting) .bg-grain,
-  body:not(.cade-visible):not(.cade-exiting) .top-band,
-  body:not(.cade-visible):not(.cade-exiting) .title-block,
-  body:not(.cade-visible):not(.cade-exiting) .week-pill,
-  body:not(.cade-visible):not(.cade-exiting) .fixtures-grid,
+  body:not(.cade-visible):not(.cade-exiting) .corner-stack,
+  body:not(.cade-visible):not(.cade-exiting) .highlight-text,
+  body:not(.cade-visible):not(.cade-exiting) .corner-cade,
+  body:not(.cade-visible):not(.cade-exiting) .highlight-stage,
+  body:not(.cade-visible):not(.cade-exiting) .recent-strip,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
   }
-  body:not(.cade-visible):not(.cade-exiting) .top-band,
-  body:not(.cade-visible):not(.cade-exiting) .title-block,
-  body:not(.cade-visible):not(.cade-exiting) .week-pill,
-  body:not(.cade-visible):not(.cade-exiting) .fixtures-grid,
+  body:not(.cade-visible):not(.cade-exiting) .corner-stack,
+  body:not(.cade-visible):not(.cade-exiting) .highlight-text,
+  body:not(.cade-visible):not(.cade-exiting) .corner-cade,
+  body:not(.cade-visible):not(.cade-exiting) .highlight-stage,
+  body:not(.cade-visible):not(.cade-exiting) .recent-strip,
   body:not(.cade-visible):not(.cade-exiting) .partners,
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     animation-name: none !important;
@@ -489,10 +492,11 @@
     opacity: 0 !important;
     transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
-  body.cade-exiting .top-band,
-  body.cade-exiting .title-block,
-  body.cade-exiting .week-pill,
-  body.cade-exiting .fixtures-grid,
+  body.cade-exiting .corner-stack,
+  body.cade-exiting .highlight-text,
+  body.cade-exiting .corner-cade,
+  body.cade-exiting .highlight-stage,
+  body.cade-exiting .recent-strip,
   body.cade-exiting .partners,
   body.cade-exiting .season-mark {
     animation: cade-fade-out 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards !important;
@@ -518,7 +522,7 @@
   .bg-image {
     position: absolute;
     inset: -3% -3%;
-    background-image: var(--overlay-bg-image, url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png'));
+    background-image: var(--overlay-bg-image, url('../../../designsample/ELITE%20S2%20BG.png'));
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -540,8 +544,9 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse at 50% 40%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.70) 100%),
-      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.40) 75%, rgba(5,5,5,0.65) 100%);
+      radial-gradient(ellipse at 70% 45%, rgba(5,5,5,0) 0%, rgba(5,5,5,0.30) 55%, rgba(5,5,5,0.65) 100%),
+      linear-gradient(to right, rgba(5,5,5,0.55) 0%, rgba(5,5,5,0.18) 24%, rgba(5,5,5,0.10) 50%, rgba(5,5,5,0.18) 100%),
+      linear-gradient(to bottom, rgba(5,5,5,0.10) 0%, rgba(5,5,5,0.10) 60%, rgba(5,5,5,0.40) 80%, rgba(5,5,5,0.65) 100%);
     z-index: 1;
     pointer-events: none;
   }
@@ -559,253 +564,283 @@
     mix-blend-mode: overlay;
   }
 
-  /* ── TOP HEADER ─────────────────────────────────────────── */
-  .top-band {
+  /* ── TOP-LEFT CORNER STACK (shield + HIGHLIGHT + CADE) ── */
+  .corner-stack {
     position: absolute;
     top: 60px;
-    left: 0;
-    right: 0;
-    height: 220px;
-    z-index: 10;
-    animation: top-fade 1.2s 0.1s ease both;
-  }
-  .top-band .logo {
-    position: absolute;
-    height: auto;
-    display: block;
-    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
-  }
-  .top-band .logo--shield {
     left: 80px;
-    top: 0;
+    width: 360px;
+    z-index: 12;
+    animation: corner-fade 1.2s 0.1s ease both;
+  }
+  .corner-shield {
     width: 280px;
     height: 220px;
     object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,0.55));
   }
-  .top-band .logo--cade {
-    right: 80px;
-    top: 20px;
-    width: 200px;
-    height: 140px;
-    object-fit: contain;
-  }
-  @keyframes top-fade {
+  @keyframes corner-fade {
     from { opacity: 0; transform: translateY(-12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── TITLE: massive FIXTURES gradient text ─────────────── */
-  .title-block {
+  /* ── HIGHLIGHT block (massive Agharti) ─────────────────── */
+  .highlight-text {
     position: absolute;
-    top: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    text-align: center;
-    z-index: 12;
-    width: 1100px;
-    animation: title-fade 1.2s 0.35s ease both;
+    top: 320px;
+    left: 80px;
+    width: 480px;
+    z-index: 13;
+    animation: title-fade 1.0s 0.35s ease both;
   }
-  .title {
+  .highlight-text .label {
     font-family: var(--display);
     font-weight: 900;
     font-stretch: 75%;
-    font-size: 320px;
+    font-size: 200px;
     line-height: 0.88;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.03em;
+    color: var(--ink);
     text-transform: uppercase;
     margin: 0;
-    background: linear-gradient(
-      180deg,
-      #a1f7d8 0%,
-      #ffffff 38%,
-      #fe036d 100%
-    );
-    -webkit-background-clip: text;
-            background-clip: text;
-    -webkit-text-fill-color: transparent;
-            color: transparent;
-    text-shadow: none;
-    filter: drop-shadow(0 8px 28px rgba(0,0,0,0.65))
-            drop-shadow(0 0 38px rgba(254,3,109,0.18));
-    animation: title-pulse 4.6s ease-in-out infinite;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.65))
+            drop-shadow(0 0 28px rgba(107,205,6,0.20));
+    animation: highlight-pulse 4.6s ease-in-out infinite;
   }
   @keyframes title-fade {
-    from { opacity: 0; transform: translate(-50%, -10px); }
-    to   { opacity: 1; transform: translate(-50%, 0); }
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes title-pulse {
-    0%, 100% { filter: drop-shadow(0 8px 28px rgba(0,0,0,0.65)) drop-shadow(0 0 24px rgba(254,3,109,0.18)); }
-    50%      { filter: drop-shadow(0 8px 28px rgba(0,0,0,0.7))  drop-shadow(0 0 56px rgba(254,3,109,0.34)); }
-  }
-
-  /* ── WEEK PILL ──────────────────────────────────────────── */
-  .week-pill {
-    position: absolute;
-    top: 360px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 14;
-    background: var(--pink);
-    color: var(--ink);
-    font-family: var(--accent);
-    font-weight: 700;
-    font-size: 28px;
-    letter-spacing: 0.20em;
-    text-transform: uppercase;
-    padding: 14px 40px;
-    border-radius: 6px;
-    box-shadow:
-      0 6px 22px rgba(254,3,109,0.45),
-      0 0 38px rgba(254,3,109,0.30),
-      inset 0 0 0 1.5px rgba(255,255,255,0.20);
-    animation: week-fade 1.0s 0.55s ease both, week-breathe 3.4s ease-in-out infinite 1.2s;
-  }
-  @keyframes week-fade {
-    from { opacity: 0; transform: translate(-50%, -8px) scale(0.92); }
-    to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  }
-  @keyframes week-breathe {
-    0%, 100% { box-shadow: 0 6px 22px rgba(254,3,109,0.45), 0 0 24px rgba(254,3,109,0.20), inset 0 0 0 1.5px rgba(255,255,255,0.20); }
-    50%      { box-shadow: 0 8px 28px rgba(254,3,109,0.62), 0 0 56px rgba(254,3,109,0.42), inset 0 0 0 1.5px rgba(255,255,255,0.24); }
+  @keyframes highlight-pulse {
+    0%, 100% { filter: drop-shadow(0 8px 24px rgba(0,0,0,0.65)) drop-shadow(0 0 18px rgba(107,205,6,0.10)); }
+    50%      { filter: drop-shadow(0 8px 24px rgba(0,0,0,0.7))  drop-shadow(0 0 48px rgba(107,205,6,0.34)); }
   }
 
-  /* ── FIXTURES GRID (2 columns, dynamic 4-7 rows per column) ─
-     User spec: support 8-13 fixtures per match-day. JS splits the
-     incoming array via Math.ceil(n/2) → left col gets 4-7 rows,
-     right col gets 4-6 rows. Each column flex-distributes the
-     available 540px so rows shrink as count grows. */
-  .fixtures-grid {
+  /* ── corner cade lockup (small CADE logo + caption) ─── */
+  .corner-cade {
     position: absolute;
-    top: 440px;
+    top: 600px;
     left: 80px;
-    right: 80px;
-    width: auto;
-    height: 540px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 60px;
-    row-gap: 0;
-    z-index: 8;
-  }
-  .fixtures-col {
+    width: 280px;
+    z-index: 12;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 0;
+    align-items: flex-start;
+    gap: 6px;
+    animation: corner-fade 1.2s 0.5s ease both;
   }
-  .fixture-row {
-    display: grid;
-    grid-template-columns: 1fr 60px 80px 60px 1fr;
+  .corner-cade img {
+    width: 200px;
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+  }
+  .corner-cade .caption {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.32em;
+    color: rgba(255,255,255,0.85);
+    text-transform: uppercase;
+  }
+  .corner-cade .caption em {
+    font-style: normal;
+    color: var(--green);
+    text-shadow: 0 0 10px rgba(107,205,6,0.55);
+  }
+
+  /* ── HIGHLIGHT STAGE (big green-bordered video stage) ─── */
+  .highlight-stage {
+    position: absolute;
+    top: 60px;
+    left: 480px;
+    width: 1360px;
+    height: 800px;
+    border: 3px solid var(--green);
+    border-radius: 4px;
+    background:
+      linear-gradient(180deg, rgba(8,16,4,0.55) 0%, rgba(4,8,2,0.65) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(107,205,6,0.45),
+      inset 0 0 60px rgba(107,205,6,0.12),
+      0 12px 38px rgba(0,0,0,0.55),
+      0 0 28px rgba(107,205,6,0.20);
+    z-index: 9;
+    overflow: hidden;
+    animation: stage-fade 1.0s 0.7s ease both, stage-glow 5.4s ease-in-out infinite 1.6s;
+  }
+  .highlight-stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        135deg,
+        rgba(107,205,6,0.04) 0 1px,
+        transparent 1px 14px
+      );
+    pointer-events: none;
+  }
+  .highlight-stage .placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    column-gap: 10px;
-    flex: 1;
-    min-height: 56px;
-    max-height: 88px;
+    justify-content: center;
+    gap: 16px;
+    color: rgba(255,255,255,0.30);
+    text-align: center;
+  }
+  .highlight-stage .placeholder .marker {
+    font-family: var(--display);
+    font-weight: 900;
+    font-stretch: 75%;
+    font-size: 64px;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.20);
+  }
+  .highlight-stage .placeholder .sub {
+    font-family: var(--accent);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.40em;
+    text-transform: uppercase;
+    color: rgba(107,205,6,0.45);
+  }
+  /* corner notches */
+  .highlight-stage::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    width: 28px;
+    height: 28px;
+    border-top: 3px solid var(--pink);
+    border-left: 3px solid var(--pink);
+    pointer-events: none;
+  }
+  @keyframes stage-fade {
+    from { opacity: 0; transform: translateX(8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes stage-glow {
+    0%, 100% { box-shadow: inset 0 0 0 1px rgba(107,205,6,0.45), inset 0 0 60px rgba(107,205,6,0.10), 0 12px 38px rgba(0,0,0,0.55), 0 0 18px rgba(107,205,6,0.18); }
+    50%      { box-shadow: inset 0 0 0 1px rgba(107,205,6,0.62), inset 0 0 80px rgba(107,205,6,0.20), 0 12px 38px rgba(0,0,0,0.55), 0 0 38px rgba(107,205,6,0.34); }
+  }
+
+  /* ── BOTTOM RECENT-FIXTURES STRIP (3 cols × 2 rows) ──── */
+  .recent-strip {
+    position: absolute;
+    top: 920px;
+    left: 80px;
+    right: 80px;
+    height: 140px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: 60px 60px;
+    column-gap: 18px;
+    row-gap: 16px;
+    z-index: 11;
+  }
+  .recent-row {
+    display: grid;
+    grid-template-columns: 1fr 36px 56px 36px 1fr;
+    align-items: center;
+    column-gap: 6px;
+    height: 54px;
     opacity: 0;
     animation: row-in 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
   }
-  /* Cascade entry — left col first, right col second; cover up to 7
-     rows per column (max for 13 fixtures = 7 left + 6 right). */
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(1) { animation-delay: 0.65s; }
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(2) { animation-delay: 0.72s; }
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(3) { animation-delay: 0.79s; }
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(4) { animation-delay: 0.86s; }
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(5) { animation-delay: 0.93s; }
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(6) { animation-delay: 1.00s; }
-  .fixtures-col:nth-child(1) .fixture-row:nth-child(7) { animation-delay: 1.07s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(1) { animation-delay: 0.85s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(2) { animation-delay: 0.92s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(3) { animation-delay: 0.99s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(4) { animation-delay: 1.06s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(5) { animation-delay: 1.13s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(6) { animation-delay: 1.20s; }
-  .fixtures-col:nth-child(2) .fixture-row:nth-child(7) { animation-delay: 1.27s; }
-
+  .recent-strip .recent-row:nth-child(1) { animation-delay: 0.85s; }
+  .recent-strip .recent-row:nth-child(2) { animation-delay: 0.93s; }
+  .recent-strip .recent-row:nth-child(3) { animation-delay: 1.01s; }
+  .recent-strip .recent-row:nth-child(4) { animation-delay: 1.09s; }
+  .recent-strip .recent-row:nth-child(5) { animation-delay: 1.17s; }
+  .recent-strip .recent-row:nth-child(6) { animation-delay: 1.25s; }
   @keyframes row-in {
-    0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+    0%   { opacity: 0; transform: translateY(10px) scale(0.96); }
     65%  { opacity: 1; transform: translateY(-2px) scale(1.02); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
 
-  .name-pill {
+  .recent-row .name-pill {
     background: var(--pink);
     color: var(--ink);
     font-family: var(--accent);
     font-weight: 700;
-    font-size: 26px;
-    letter-spacing: 0.05em;
+    font-size: 18px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    padding: 14px 26px;
-    border-radius: 6px;
+    padding: 8px 14px;
+    border-radius: 5px;
     text-align: center;
-    height: 60px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     box-shadow:
-      0 4px 14px rgba(0,0,0,0.5),
-      inset 0 0 0 1.5px rgba(255,255,255,0.10);
+      0 3px 10px rgba(0,0,0,0.5),
+      inset 0 0 0 1px rgba(255,255,255,0.10);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .name-pill--left  { justify-self: stretch; }
-  .name-pill--right { justify-self: stretch; }
-
-  .score-pill {
+  .recent-row .score-pill {
     background: var(--ink);
     color: var(--pink);
     font-family: var(--display);
     font-weight: 900;
     font-stretch: 100%;
-    font-size: 36px;
+    font-size: 24px;
     line-height: 1;
-    width: 60px;
-    height: 60px;
-    border-radius: 6px;
+    width: 36px;
+    height: 40px;
+    border-radius: 5px;
     display: flex;
     align-items: center;
     justify-content: center;
     box-shadow:
-      0 4px 14px rgba(0,0,0,0.55),
-      inset 0 0 0 1.5px rgba(0,0,0,0.10);
+      0 3px 10px rgba(0,0,0,0.55),
+      inset 0 0 0 1px rgba(0,0,0,0.10);
   }
-
-  .vs-label {
+  .recent-row .vs-label {
     font-family: var(--display);
     font-weight: 900;
     font-stretch: 75%;
-    font-size: 36px;
+    font-size: 24px;
     line-height: 1;
     color: var(--green);
     text-align: center;
     text-transform: uppercase;
     letter-spacing: -0.01em;
     text-shadow:
-      0 0 18px rgba(107,205,6,0.55),
-      0 2px 6px rgba(0,0,0,0.65);
+      0 0 14px rgba(107,205,6,0.55),
+      0 2px 4px rgba(0,0,0,0.65);
   }
 
-  /* ── BOTTOM PARTNER STRIP ──────────────────────────────── */
+  /* ── BOTTOM PARTNER STRIP (subtle, fits below recent-strip) ─── */
   .partners {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 24px;
-    display: var(--overlay-partner-strip-show, flex);
+    bottom: 4px;
+    display: var(--overlay-partner-strip-show, none);
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 56px;
+    gap: 36px;
     z-index: 12;
-    animation: partners-fade 1.2s 0.95s ease both;
+    animation: partners-fade 1.2s 1.4s ease both;
   }
   .partners img.partner {
-    height: 50px;
+    height: 28px;
     width: auto;
     object-fit: contain;
     filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+    opacity: 0.78;
   }
   @keyframes partners-fade {
     from { opacity: 0; transform: translateY(8px); }
@@ -815,7 +850,7 @@
   /* ── SEASON WATERMARK ──────────────────────────────────── */
   .season-mark {
     position: absolute;
-    bottom: 100px;
+    top: 22px;
     right: 32px;
     font-family: var(--accent);
     font-weight: 700;
@@ -823,8 +858,8 @@
     letter-spacing: 0.40em;
     color: rgba(255,255,255,0.55);
     text-transform: uppercase;
-    z-index: 12;
-    animation: top-fade 1.2s 0.1s ease both;
+    z-index: 13;
+    animation: corner-fade 1.2s 0.1s ease both;
   }
   .season-mark::before {
     content: '';
@@ -855,104 +890,82 @@
     <!-- Season watermark -->
     <div class="season-mark" data-element-id="season-mark">ELITE LEAGUE · SEASON 2</div>
 
-    <!-- Top header: shield (left) + CADE Esports (right) -->
-    <header class="top-band">
-      <img class="logo logo--shield" src="/overlays/v2/_assets/logos/processed/pro%20league%20_strip.png" alt="National E-Soccer League" />
-      <img class="logo logo--cade"   src="/overlays/v2/_assets/logos/processed/1cade%20esport_strip.png" alt="CADE Esports" />
-    </header>
+    <!-- Top-left league shield -->
+    <div class="corner-stack">
+      <img class="corner-shield" src="../../../logos/processed/pro%20league%20_strip.png" alt="National E-Soccer League" />
+    </div>
 
-    <!-- Title block: massive gradient FIXTURES -->
-    <section class="title-block">
-      <h1 data-element-id="title" class="title">FIXTURES</h1>
+    <!-- HIGHLIGHT massive label -->
+    <section class="highlight-text" data-element-id="highlight-label">
+      <h1 class="label">HIGHLIGHT</h1>
     </section>
 
-    <!-- Week pill -->
-    <div data-element-id="week-pill" class="week-pill">WEEK 1</div>
+    <!-- Bottom-left CADE Esports lockup -->
+    <div class="corner-cade">
+      <img src="../../../logos/processed/1cade%20esport_strip.png" alt="CADE Esports" />
+      <div class="caption">CADE <em>/</em> ESPORTS</div>
+    </div>
 
-    <!-- 2-col fixtures grid (10 fixtures total, 5 per col) -->
-    <section data-element-id="fixtures-grid" class="fixtures-grid" aria-label="Match-day fixtures">
-      <div class="fixtures-col">
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">GURU</div>
-          <div class="score-pill">5</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">2</div>
-          <div class="name-pill name-pill--right">KAYKAY</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">KILLERFREAK</div>
-          <div class="score-pill">0</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">3</div>
-          <div class="name-pill name-pill--right">WOLEVATION</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">ADEFOLA</div>
-          <div class="score-pill">1</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">2</div>
-          <div class="name-pill name-pill--right">TACTICAL</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">ANIFE</div>
-          <div class="score-pill">0</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">7</div>
-          <div class="name-pill name-pill--right">MITCH</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">BAJI JNR</div>
-          <div class="score-pill">6</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">4</div>
-          <div class="name-pill name-pill--right">KILLERFREAK</div>
-        </div>
-      </div>
-      <div class="fixtures-col">
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">DADABOI</div>
-          <div class="score-pill">1</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">13</div>
-          <div class="name-pill name-pill--right">KAYKAY</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">BAJI JNR</div>
-          <div class="score-pill">5</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">2</div>
-          <div class="name-pill name-pill--right">MR OGA</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">KING NONEX</div>
-          <div class="score-pill">5</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">3</div>
-          <div class="name-pill name-pill--right">MITCH</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">TACTICAL</div>
-          <div class="score-pill">4</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">2</div>
-          <div class="name-pill name-pill--right">WOLEVATION</div>
-        </div>
-        <div class="fixture-row">
-          <div class="name-pill name-pill--left">ADEFOLA</div>
-          <div class="score-pill">5</div>
-          <div class="vs-label">VS</div>
-          <div class="score-pill">3</div>
-          <div class="name-pill name-pill--right">GURU</div>
-        </div>
+    <!-- Right-side green-bordered highlight stage (placeholder for OBS video) -->
+    <section data-element-id="highlight-stage" class="highlight-stage" aria-label="Highlight video stage">
+      <div class="placeholder">
+        <div class="marker">▶ HIGHLIGHT</div>
+        <div class="sub">Video plays here</div>
       </div>
     </section>
 
-    <!-- Bottom partner strip -->
+    <!-- Bottom-recent strip: 6 mini fixture rows in 3 cols × 2 rows -->
+    <section data-element-id="recent-fixtures" class="recent-strip" aria-label="Recent fixtures">
+      <div class="recent-row">
+        <div class="name-pill">GURU</div>
+        <div class="score-pill">5</div>
+        <div class="vs-label">VS</div>
+        <div class="score-pill">2</div>
+        <div class="name-pill">KAYKAY</div>
+      </div>
+      <div class="recent-row">
+        <div class="name-pill">ADEFOLA</div>
+        <div class="score-pill">0</div>
+        <div class="vs-label">VS</div>
+        <div class="score-pill">0</div>
+        <div class="name-pill">KAYKAY</div>
+      </div>
+      <div class="recent-row">
+        <div class="name-pill">ADEFOLA</div>
+        <div class="score-pill">0</div>
+        <div class="vs-label">VS</div>
+        <div class="score-pill">0</div>
+        <div class="name-pill">KAYKAY</div>
+      </div>
+      <div class="recent-row">
+        <div class="name-pill">KILLERFREAK</div>
+        <div class="score-pill">0</div>
+        <div class="vs-label">VS</div>
+        <div class="score-pill">3</div>
+        <div class="name-pill">WOLEVATION</div>
+      </div>
+      <div class="recent-row">
+        <div class="name-pill">ANIFE</div>
+        <div class="score-pill">0</div>
+        <div class="vs-label">VS</div>
+        <div class="score-pill">0</div>
+        <div class="name-pill">MITCH</div>
+      </div>
+      <div class="recent-row">
+        <div class="name-pill">ANIFE</div>
+        <div class="score-pill">0</div>
+        <div class="vs-label">VS</div>
+        <div class="score-pill">0</div>
+        <div class="name-pill">MITCH</div>
+      </div>
+    </section>
+
+    <!-- Bottom partner strip (subtle, hidden by default) -->
     <footer data-element-id="partners-strip" class="partners">
-      <img class="partner partner--gameevo" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports" />
-      <img class="partner partner--pride"   src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
-      <img class="partner partner--africa"  src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
-      <img class="partner partner--trace"   src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
+      <img class="partner partner--gameevo" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports" />
+      <img class="partner partner--pride"   src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride" />
+      <img class="partner partner--africa"  src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News" />
+      <img class="partner partner--trace"   src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace" />
     </footer>
 
   </main>
@@ -960,13 +973,13 @@
   <script>
     /* LIVE DATA — postMessage listener (data-feed driven).
        Accepts BOTH shapes:
-         1. postMessage relay: { type:'update', data:{ weekNumber, fixtures:[...] } }
-         2. server endpoint:   { type:'update', data:{ payload:{ weekNumber, fixtures:[...] } } }
-       Falls back to placeholder when fields missing. */
+         1. postMessage relay: { type:'update', data:{ recentFixtures:[...] } }
+         2. server endpoint:   { type:'update', data:{ payload:{ recentFixtures:[...] } } }
+       Top-right [data-element-id="highlight-stage"] stays as a
+       transparent border in production (OBS composites video behind). */
     (function () {
       var stage = document.querySelector('.stage') || document.body;
-      var grid  = document.querySelector('[data-element-id="fixtures-grid"]');
-      var weekPill = document.querySelector('[data-element-id="week-pill"]');
+      var strip = document.querySelector('[data-element-id="recent-fixtures"]');
 
       function rowHtml(f) {
         if (!f) return '';
@@ -974,33 +987,29 @@
         var nameB = (f.playerB && (f.playerB.displayName || f.playerB.gamerTag || f.playerB.name)) || '—';
         var sA = (f.scoreA == null ? '–' : f.scoreA);
         var sB = (f.scoreB == null ? '–' : f.scoreB);
-        return '<div class="fixture-row">' +
-          '<div class="name-pill name-pill--left">' + nameA + '</div>' +
+        return '<div class="recent-row">' +
+          '<div class="name-pill">' + nameA + '</div>' +
           '<div class="score-pill">' + sA + '</div>' +
           '<div class="vs-label">VS</div>' +
           '<div class="score-pill">' + sB + '</div>' +
-          '<div class="name-pill name-pill--right">' + nameB + '</div>' +
+          '<div class="name-pill">' + nameB + '</div>' +
         '</div>';
       }
 
       function rerender(fixtures) {
-        if (!grid || !Array.isArray(fixtures)) return;
+        if (!strip || !Array.isArray(fixtures)) return;
         if (fixtures.length === 0) {
-          grid.innerHTML = '';
+          strip.innerHTML = '';
           return;
         }
-        // Split into halves: first half left col, second half right col.
-        var half = Math.ceil(fixtures.length / 2);
-        var left  = fixtures.slice(0, half);
-        var right = fixtures.slice(half);
-        var leftHtml  = '<div class="fixtures-col">'  + left.map(rowHtml).join('')  + '</div>';
-        var rightHtml = '<div class="fixtures-col">' + right.map(rowHtml).join('') + '</div>';
-        grid.innerHTML = leftHtml + rightHtml;
+        // Cap to 6 rows (3 cols × 2 rows = grid is fixed).
+        var rows = fixtures.slice(0, 6);
+        strip.innerHTML = rows.map(rowHtml).join('');
       }
 
       function readPayload(data) {
         if (!data || typeof data !== 'object') return null;
-        if (Array.isArray(data.fixtures) || data.weekNumber != null) return data;
+        if (Array.isArray(data.recentFixtures) || Array.isArray(data.fixtures)) return data;
         if (data.payload && typeof data.payload === 'object') return data.payload;
         return null;
       }
@@ -1008,10 +1017,8 @@
       function update(data) {
         var p = readPayload(data);
         if (!p) return;
-        if (p.weekNumber != null && weekPill) {
-          try { weekPill.textContent = 'WEEK ' + p.weekNumber; } catch (e) {}
-        }
-        if (Array.isArray(p.fixtures)) rerender(p.fixtures);
+        var f = Array.isArray(p.recentFixtures) ? p.recentFixtures : (Array.isArray(p.fixtures) ? p.fixtures : null);
+        if (f) rerender(f);
       }
 
       function show() {
@@ -1019,7 +1026,7 @@
         document.body.classList.add('cade-visible');
         if (stage) {
           var animated = stage.querySelectorAll(
-            '.top-band, .title-block, .week-pill, .fixtures-grid, .fixture-row, .partners, .season-mark'
+            '.corner-stack, .highlight-text, .corner-cade, .highlight-stage, .recent-strip, .recent-row, .partners, .season-mark'
           );
           animated.forEach(function (el) {
             var orig = el.style.animation;
@@ -1036,7 +1043,7 @@
       window.addEventListener('message', function (ev) {
         var msg = ev && ev.data;
         if (!msg || typeof msg !== 'object') return;
-        console.info('[overlay/11-match-scores-day] message', msg.type || msg.event || '?', msg.payload || msg.data);
+        console.info('[overlay/20-highlight] message', msg.type || msg.event || '?', msg.payload || msg.data);
         // CONTRACT (per CLAUDE.md §14):
         //   show   → render data + add cade-visible
         //   hide   → swap cade-visible → cade-exiting
@@ -1054,8 +1061,8 @@
   </script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.top-band,.title-block,.week-pill,.fixtures-grid,.fixture-row,.partners,.season-mark';
-  var INNER_SEL = '.title,.name-pill,.score-pill,.vs-label,.fixtures-col';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.corner-stack,.highlight-text,.corner-cade,.highlight-stage,.recent-strip,.recent-row,.partners,.season-mark';
+  var INNER_SEL = '.corner-shield,.label,.caption,.placeholder,.marker,.sub,.name-pill,.score-pill,.vs-label';
   function apply() {
     var b = document.body;
     if (!b) return;
