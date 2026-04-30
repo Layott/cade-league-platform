@@ -999,13 +999,21 @@
     text-shadow: 0 0 22px var(--pink-glow);
   }
 
-  /* DRAW % pill in the kicker wrap (centered between player names) */
+  /* DRAW % pill — absolute-positioned in the negative space BELOW the
+     stats card and ABOVE the partner strip (i.e. ~880-1020px row). Sits
+     centered on the canvas X-axis so it reads as the shared probability
+     between both players. Pulled out of the kicker so it never crowds
+     HEAD TO HEAD. */
   .draw-prob-pill {
+    position: absolute;
+    top: 894px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
     display: inline-flex;
     align-items: baseline;
     gap: 10px;
-    margin-top: 12px;
-    padding: 8px 18px;
+    padding: 10px 22px;
     border: 1px solid rgba(255,255,255,0.20);
     border-radius: 4px;
     background: rgba(0,0,0,0.55);
@@ -1454,10 +1462,14 @@
     <!-- Kicker pill: HEAD TO HEAD (wrapped for guaranteed centering) -->
     <div class="h2h-kicker-wrap">
       <div class="h2h-kicker">HEAD <span class="vs">TO</span> HEAD</div>
-      <div class="draw-prob-pill">
-        <span class="draw-prob-label">Draw</span>
-        <span class="draw-prob-value" data-stat="draw-prob">25%</span>
-      </div>
+    </div>
+
+    <!-- DRAW % pill — sits under the stats card, centered between card
+         bottom (870px) and partner strip top (~1020px). Pulled out of the
+         kicker-wrap so it doesn't crowd the HEAD-TO-HEAD title row. -->
+    <div class="draw-prob-pill">
+      <span class="draw-prob-label">Draw</span>
+      <span class="draw-prob-value" data-stat="draw-prob">25%</span>
     </div>
 
     <!-- LEFT player column: FARUK -->
