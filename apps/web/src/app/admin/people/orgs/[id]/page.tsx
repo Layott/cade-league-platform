@@ -32,6 +32,7 @@ import {
   linkCoachAction,
   linkTeamManagerAction,
 } from "./actions";
+import { OrgLogoUploader } from "./OrgLogoUploader";
 
 export const dynamic = "force-dynamic";
 
@@ -452,6 +453,18 @@ export default async function OrgDetailPage({
                 </dd>
               </div>
             </dl>
+          </div>
+          <div className="mt-5 border-t border-[var(--ink-4)] pt-5">
+            <OrgLogoUploader
+              orgId={org.id}
+              currentLogoUrl={org.logo_url}
+              orgName={org.name}
+            />
+            <p className="mt-2 text-[11px] text-[var(--chalk-3)]">
+              Uploaded logos render on the broadcast 15-orgs overlay + the
+              orgs list page. PNG/JPG/WebP, max 50MB. White-on-dark variants
+              read best on the overlay&apos;s pitch-black canvas.
+            </p>
           </div>
         </div>
       </section>

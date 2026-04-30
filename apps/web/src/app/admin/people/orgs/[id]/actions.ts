@@ -14,6 +14,7 @@ import {
 } from "@/server/orgs";
 import { createSignedUpload } from "@/server/storage/signed";
 import { ORG_LOGOS_BUCKET, buildOrgLogoPath } from "@/server/storage/paths";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import {
   parseLinkPlayerForm,
   parseLinkCoachForm,
@@ -46,15 +47,29 @@ export async function requestOrgLogoUploadAction(input: {
 export async function updateOrgAction(formData: FormData): Promise<void> {
   const { sb } = await gate("orgs.edit");
   const input = parseUpdateOrgForm(formData);
+
+  // SignedFileInput emits the storage PATH (e.g. `orgs/<uuid>/logo.png`).
+  // The DB column `organizations.logo_url` is rendered directly as
+  // `<img src>` on /admin/people/orgs and the 15-orgs broadcast overlay,
+  // so we must resolve the path to a fully-qualified PUBLIC URL here.
+  // Bucket is public so getPublicUrl is sufficient (no signed-read).
+  let resolvedLogoUrl = input.logoPath;
+  if (input.logoPath && !/^https?:\/\//i.test(input.logoPath) && !input.logoPath.startsWith("/")) {
+    const svc = getServiceRoleSupabase();
+    const { data } = svc.storage.from(ORG_LOGOS_BUCKET).getPublicUrl(input.logoPath);
+    resolvedLogoUrl = data?.publicUrl || input.logoPath;
+  }
+
   await updateOrg(sb, {
     id: input.id,
     name: input.name,
-    logoUrl: input.logoPath,
+    logoUrl: resolvedLogoUrl,
     contactRepUserId: input.contactRepUserId,
     status: input.status,
   });
   revalidatePath(`/admin/people/orgs/${input.id}`);
   revalidatePath("/admin/people/orgs");
+  revalidatePath("/overlay/v2/15-orgs", "page");
 }
 
 export async function linkPlayerAction(formData: FormData): Promise<void> {

@@ -7,6 +7,7 @@ import { gate } from "@/lib/server-actor";
 import { createOrg } from "@/server/orgs";
 import { createSignedUpload } from "@/server/storage/signed";
 import { ORG_LOGOS_BUCKET, buildOrgLogoPath } from "@/server/storage/paths";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { parseCreateOrgForm } from "./schemas";
 
 /**
@@ -28,9 +29,22 @@ export async function requestOrgLogoUploadAction(input: {
 export async function createOrgAction(formData: FormData): Promise<void> {
   const { sb } = await gate("orgs.edit");
   const input = parseCreateOrgForm(formData);
+
+  // Resolve storage path → public URL (see updateOrgAction for rationale).
+  let resolvedLogoUrl: string | null = input.logoPath ?? null;
+  if (
+    resolvedLogoUrl &&
+    !/^https?:\/\//i.test(resolvedLogoUrl) &&
+    !resolvedLogoUrl.startsWith("/")
+  ) {
+    const svc = getServiceRoleSupabase();
+    const { data } = svc.storage.from(ORG_LOGOS_BUCKET).getPublicUrl(resolvedLogoUrl);
+    resolvedLogoUrl = data?.publicUrl || resolvedLogoUrl;
+  }
+
   const row = await createOrg(sb, {
     name: input.name,
-    logoUrl: input.logoPath ?? null,
+    logoUrl: resolvedLogoUrl,
     contactRepUserId: input.contactRepUserId ?? null,
     status: "active",
   });
