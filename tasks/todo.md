@@ -1103,3 +1103,68 @@ Tables in repo with `WHERE deleted_at IS NULL` partial unique indexes — never 
 
 Tables with full unique constraints (safe for `.upsert`):
 - `overlay_design_tokens` (full UNIQUE on `(overlay_key, variant_id, token_key)`)
+
+---
+
+## 2026-04-30 — 19-player-squads overlay shipped
+
+User brief: "create new overlay for player squads to be used in broadcast sessions. Shows squad each player should be using each week, based off what they submitted. Like image #1 [pitch + subs panel layout] but background should be the green one we currently use, and text should show player name and image of who owns the draft."
+
+Clarification: "not a fixed 19 squad — 11 players plus subs. Provided player don't pass budget, can have as much total players as they want."
+
+### Bug status: SHIPPED + verified end-to-end on prod.
+
+### Files added (commit `5a3350d1`)
+
+- `KNOWLEDGE/brand-assets/elements/v2/19-player-squads/index.html` (1387 lines, all §14 contract checks pass; 27 data-element-id attrs; demo loop guarded by ?demo=1; bootstrap script verbatim from 15-orgs)
+- `apps/web/public/overlays/v2/19-player-squads/index.html` (mirror)
+- `apps/web/src/app/api/broadcast/v2/sessions/[id]/player-squads/route.ts` (view-token gated; resolves playerId via `?playerId=` or alphabetical fallback; falls back to current Thursday-anchored week if `?week=` omitted)
+- `apps/web/src/components/broadcast/v2/controls/PlayerSquadsControl.tsx` (client widget with 13-player dropdown picker)
+- `supabase/migrations/20260620000014_overlay_template_variants_player_squads.sql` (variant seed + 4 text-element rows for design-page tunable copy: draft-label "DRAFT", chemistry-label "CHEMISTRY", formation-label "FORMATION", subs-label "SUBS")
+- `supabase/migrations/20260620000015_overlay_templates_player_squads.sql` (extends `overlay_templates.template_type` CHECK to include `player_squads`, seeds the template row at template_key='player_squads')
+
+### Files updated (`5a3350d1`)
+
+- `overlay-keys.ts` + `page.tsx` ALLOWED_KEYS + KEY_ALIASES (squads/draft/drafts/player-squads → 19-player-squads)
+- `OverlayDataInjector.tsx` INITIAL_FETCH_PATH + REALTIME_KEY_EVENTS (standings.changed, match.ended)
+- `defaults.ts` OVERLAY_KEYS + BG_IMAGE_SUPPORTED_KEYS + OVERLAY_OVERRIDES
+- `registry.ts` TEMPLATE_KEYS + TEMPLATE_REGISTRY entry (player_squads legacy template_key, group=stats)
+- `schemas.ts` new playerSquadsSchema (just playerId + weekStartDate; full squad fetched from endpoint)
+- `template-mapping.ts` V2_TO_LEGACY_TEMPLATE
+- `ControlGrid.tsx` + `page.tsx` mount PlayerSquadsControl with the 13 Elite roster as picker options
+- `registry.test.ts` + `overlay-keys.test.ts` + `defaults.test.ts` + `overlay_active_state.test.ts` count assertions bumped (16→17, 35→36)
+- `starter-payloads.ts` new player_squads entry
+
+### Hot-fix `7a268dca`
+
+When endpoint default-week request hits a player with no submission for the current Thursday-anchored week, fall back to their MOST RECENT submission instead of returning empty. Symptom pre-fix: prod call against Faruk's playerId returned 0/0 because his only submission is for 2026-04-23 but current week is 2026-04-30.
+
+### Hot-fix `44369ff3`
+
+ELITE S2 BG.png + LAEAGUE_ANNONCEMENT.png committed to git so Vercel sync script can deploy them. File existed locally but was untracked → all full-canvas v2 overlays (leaderboard, h2h, 19-player-squads, match-scores-day) rendered with black BG instead of green halftone wallpaper. Same root cause + fix pattern as `6ea4d4c2` (org logos).
+
+### Post-deploy verification (this slice)
+
+| Step | Result |
+|---|---|
+| Vercel deploy `dpl_CASxkDdu` (commit 7a268dca) state | READY ✓ |
+| `GET /api/broadcast/v2/sessions/<id>/player-squads?playerId=Faruk` (no week) | `{owner: Faruk, formation: 4-4-2, starting: 11, subs: 2, weekUsed: 2026-04-23}` (fallback path resolved) ✓ |
+| `GET /overlays/v2/19-player-squads/index.html?demo=1` static HTML | 200 OK ✓ |
+| postMessage `{type:'show'}` to overlay → DOM renders | `bgOpacity:1, titleBlockOpacity:1, pitchOpacity:1` after 2s ✓ |
+| Title block | "MR OGA" / "DRAFT" big Agharti white ✓ |
+| Player photo (mr_oga headshot) | rendered to right of title ✓ |
+| Chemistry value | "30/33" ✓ |
+| Formation value | "4-3-3(2)" ✓ |
+| Pitch cards (.pitch-card) | 11 ✓ (Vini Jr LW 98 special, Bellingham CM 98 special, Haaland 91, Rodri 89, Carreras LB 87 gold, Eder Militão CB 89, etc.) |
+| Sub cards (.sub-card) | 7 (demo data uses 7; real Faruk submission is 2 — variable subs working) ✓ |
+| Partner-strip logos | 5 ✓ |
+| BG image after `44369ff3` deploy | pending — black fallback before commit; green ELITE S2 BG after Vercel rebuild |
+
+### Bug scope (per user's "11 + variable subs" clarification)
+
+Confirmed: HTML's `renderSubs()` iterates `items.length` not hardcoded 7. CSS grid `repeat(3, 1fr)` flows 0..12 subs naturally (DB schema CHECK on `slot_index between 0 and 22` caps subs at 12 max). Endpoint returns ALL `slot_index >= 11` rows; no truncation. Demo data uses 7 for visual demo; real submissions render whatever count was submitted.
+
+### Memory updates
+
+- `project_overlay_19_player_squads.md` (new) — full spec + scope + key gotchas.
+- `MEMORY.md` index — link entry under archive line.
