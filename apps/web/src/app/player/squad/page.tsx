@@ -12,7 +12,7 @@ import {
   type PlayerSubmissionSummary,
 } from "@/server/squads";
 import { listMatchDays } from "@/server/matches/match-days";
-import { formatWat } from "@/lib/time";
+import { formatWat, weekendStartSaturday, weekendLabel } from "@/lib/time";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import { StatusPill } from "@/components/admin/StatusPill";
 import { SquadPickerBuilder } from "@/components/squads/SquadPickerBuilder";
@@ -282,7 +282,7 @@ export default async function PlayerSquadPage({
 
   // List view — bucket every match day into past / this_week / upcoming so
   // the player's "next squad to file" sits in the most prominent group.
-  const items: SquadMatchDayPickerItem[] = resolved.map((r) => {
+  const matchDayItems: SquadMatchDayPickerItem[] = resolved.map((r) => {
     const weekAnchor = weekStartThursday(r.matchDate);
     const bucket: SquadMatchDayPickerItem["bucket"] =
       weekAnchor === todayWeekStart
@@ -314,6 +314,49 @@ export default async function PlayerSquadPage({
       bucket,
     };
   });
+
+  // 2026-04-30 — Aggregate Sat+Sun match days into ONE picker entry per
+  // weekend. Players submit ONE squad per weekend (per spec), and Sat+Sun
+  // match days in the same Thursday-anchor week share one
+  // squad_submissions row by definition. Keep the FIRST match day's id
+  // as the click target so existing per-match-day routing still works.
+  const byWeekend = new Map<string, SquadMatchDayPickerItem[]>();
+  for (const item of matchDayItems) {
+    const wkKey = weekendStartSaturday(item.matchDate);
+    const arr = byWeekend.get(wkKey) ?? [];
+    arr.push(item);
+    byWeekend.set(wkKey, arr);
+  }
+  const items: SquadMatchDayPickerItem[] = [];
+  for (const [satYmd, group] of byWeekend) {
+    const sorted = [...group].sort((a, b) =>
+      a.matchDate < b.matchDate ? -1 : a.matchDate > b.matchDate ? 1 : 0,
+    );
+    const head = sorted[0];
+    if (sorted.length === 1) {
+      // Single match in this weekend — render as-is (no displayLabel).
+      items.push(head);
+      continue;
+    }
+    // Two or more (Sat+Sun) — collapse. Status precedence: any open row
+    // wins, then any submitted row, then any upcoming, fallback to head.
+    const pickStatus = (): SquadMatchDayPickerItem["status"] => {
+      if (sorted.some((s) => s.status === "open")) return "open";
+      if (sorted.some((s) => s.status === "submitted")) return "submitted";
+      if (sorted.some((s) => s.status === "upcoming")) return "upcoming";
+      return head.status;
+    };
+    const subRow =
+      sorted.find((s) => s.status === "submitted") ?? head;
+    items.push({
+      ...head,
+      status: pickStatus(),
+      submittedAt: subRow.submittedAt ?? null,
+      validationStatus: subRow.validationStatus ?? null,
+      displayLabel: weekendLabel(satYmd, sorted.map((s) => s.matchDate)),
+      secondaryMatchDate: sorted[1]?.matchDate ?? null,
+    });
+  }
 
   // Find the "this week" match day id for the live-refresh ping.
   const thisWeekItem = items.find((i) => i.bucket === "this_week");

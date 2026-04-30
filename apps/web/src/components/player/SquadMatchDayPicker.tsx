@@ -35,13 +35,22 @@ export type SquadMatchDayPickerStatus =
 
 export type SquadMatchDayPickerItem = {
   matchDayId: string;
-  matchDate: string; // YYYY-MM-DD
+  matchDate: string; // YYYY-MM-DD (the primary / first match day in the group)
   venueName: string;
   status: SquadMatchDayPickerStatus;
   submittedAt?: string | null;
   validationStatus?: "pending" | "approved" | "rejected" | null;
   windowOpensAt?: string | null;
   bucket: "past" | "this_week" | "upcoming";
+  // 2026-04-30 — weekend grouping. When a weekend has BOTH Sat + Sun match
+  // days, the page aggregates them into ONE row pointing at the Sat
+  // matchDayId (which carries the same squad submission since the two
+  // share a Thursday-anchor week). `displayLabel` is "May 2-3" for the
+  // pair or "May 23" when only one date falls in the weekend; replaces
+  // the raw matchDate as the visible header. `secondaryMatchDate` is the
+  // Sun (or absent) match-date string used for the smaller sublabel.
+  displayLabel?: string;
+  secondaryMatchDate?: string | null;
 };
 
 export type SquadMatchDayPickerProps = {
@@ -139,11 +148,16 @@ function Row({
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-3">
           <span className="font-display text-sm font-semibold text-[var(--chalk-0)]">
-            {item.matchDate}
+            {item.displayLabel
+              ? `Weekend · ${item.displayLabel}`
+              : item.matchDate}
           </span>
           {pillFor(item)}
         </div>
         <div className="text-[11px] text-[var(--chalk-2)]">
+          {item.displayLabel
+            ? `${item.matchDate}${item.secondaryMatchDate ? ` + ${item.secondaryMatchDate}` : ""} · `
+            : null}
           {item.venueName}
           {item.status === "submitted" && item.submittedAt
             ? ` · Submitted ${formatWat(item.submittedAt, "yyyy-MM-dd HH:mm")} WAT`
