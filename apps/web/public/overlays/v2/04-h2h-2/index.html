@@ -968,6 +968,64 @@
   }
   .player-col--b .player-org { margin-left: auto; }
 
+  /* WIN % chip under each player name (replaces inside-the-box winprob block) */
+  .winprob-under-name {
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: var(--accent);
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .winprob-under-label {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.30em;
+    color: rgba(255,255,255,0.55);
+  }
+  .winprob-under-value {
+    font-size: 38px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 24px rgba(0,0,0,0.65);
+  }
+  .winprob-under-name--a .winprob-under-value {
+    color: var(--green);
+    text-shadow: 0 0 22px var(--green-glow);
+  }
+  .winprob-under-name--b .winprob-under-value {
+    color: var(--pink);
+    text-shadow: 0 0 22px var(--pink-glow);
+  }
+
+  /* DRAW % pill in the kicker wrap (centered between player names) */
+  .draw-prob-pill {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 8px 18px;
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 4px;
+    background: rgba(0,0,0,0.55);
+    font-family: var(--accent);
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .draw-prob-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.32em;
+    color: rgba(255,255,255,0.55);
+  }
+  .draw-prob-value {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--ink);
+    text-shadow: 0 0 22px rgba(255,255,255,0.40);
+  }
+
   /* ── CENTER STATS HUD CARD — repositioned to leave ≥80px gap to partner strip ── */
   .stats-card {
     position: absolute;
@@ -1396,6 +1454,10 @@
     <!-- Kicker pill: HEAD TO HEAD (wrapped for guaranteed centering) -->
     <div class="h2h-kicker-wrap">
       <div class="h2h-kicker">HEAD <span class="vs">TO</span> HEAD</div>
+      <div class="draw-prob-pill">
+        <span class="draw-prob-label">Draw</span>
+        <span class="draw-prob-value" data-stat="draw-prob">25%</span>
+      </div>
     </div>
 
     <!-- LEFT player column: FARUK -->
@@ -1404,6 +1466,10 @@
 
       <div class="player-nameplate">
         <h2 class="player-name">FARUK</h2>
+        <div class="winprob-under-name winprob-under-name--a">
+          <span class="winprob-under-label">Win</span>
+          <span class="winprob-under-value" data-stat="win-prob-under">50%</span>
+        </div>
         <img class="player-org"
              src="/overlays/v2/_assets/Orgs/OAS%20ESPORTS%20COLORED%20-%20FARUK.png"
              alt="OAS Esports"
@@ -1425,6 +1491,10 @@
 
       <div class="player-nameplate">
         <h2 class="player-name">ANIFE</h2>
+        <div class="winprob-under-name winprob-under-name--b">
+          <span class="winprob-under-label">Win</span>
+          <span class="winprob-under-value" data-stat="win-prob-under">50%</span>
+        </div>
         <img class="player-org"
              src="/overlays/v2/_assets/Orgs/AFROPANDA%20ESPORTS%20-%20ANIFE.jpeg"
              alt="Afropanda Esports"
@@ -1505,19 +1575,6 @@
             <span class="stat-val stat-val--a tie" data-stat="points">0</span>
             <span class="stat-label">Total Pts</span>
             <span class="stat-val stat-val--b tie" data-stat="points">0</span>
-          </div>
-        </div>
-
-        <!-- Win Probability emphasis block -->
-        <div class="winprob">
-          <div class="winprob-label">Win Probability</div>
-          <div class="winprob-values">
-            <span class="winprob-val winprob-val--a" data-stat="win-prob">50%</span>
-            <span class="winprob-val winprob-val--b" data-stat="win-prob">50%</span>
-          </div>
-          <div class="winprob-bar" aria-hidden="true">
-            <span class="winprob-bar-a"></span>
-            <span class="winprob-bar-b"></span>
           </div>
         </div>
       </div>
@@ -1649,7 +1706,8 @@
             ga:          pickStat(stats, 'ga',       p.ga),
             gd:          pickStat(stats, 'gd',       p.gd),
             points:      pickStat(stats, 'points',   p.pts != null ? p.pts : p.points),
-            winProbPct:  pickStat(stats, 'winProbPct', p.winProbPct)
+            winProbPct:  pickStat(stats, 'winProbPct', p.winProbPct),
+            drawProbPct: pickStat(stats, 'drawProbPct', p.drawProbPct)
           }
         };
       }
@@ -1704,39 +1762,55 @@
         var s = info.stats;
         nodes.forEach(function (el) {
           var key = el.getAttribute('data-stat');
-          var val = (key === 'win-prob') ? s.winProbPct : s[key];
+          var val = s[key];
           if (val === null || val === undefined) {
             el.textContent = '—';
-          } else if (key === 'win-prob') {
-            // Round to nearest int + suffix.
-            var n = Number(val);
-            if (!isFinite(n)) { el.textContent = '—'; return; }
-            el.textContent = String(Math.round(n)) + '%';
           } else {
             el.textContent = String(val);
           }
         });
-        // Also paint the win-probability bar widths if both sides are
-        // resolved by the time this fires.
-        var aPct = readWinProb('a');
-        var bPct = readWinProb('b');
-        if (aPct != null && bPct != null) {
-          var stage = document.querySelector('.stage');
-          if (stage) {
-            stage.style.setProperty('--winA-pct', aPct + '%');
-            stage.style.setProperty('--winB-pct', bPct + '%');
-          }
-        }
       }
-      function readWinProb(side) {
+
+      /**
+       * Paint the WIN % chip under the player's name (replaces the inside-
+       * the-box winprob block). winProbPct already lives on info.stats —
+       * it's the integer percent in [0..100] that the endpoint computes.
+       */
+      function applyWinProbToCol(info, side) {
+        if (!info || !info.stats) return;
         var el = document.querySelector(
-          '.stats-card .winprob-val--' + side + '[data-stat="win-prob"]'
+          '.player-col--' + side + ' .winprob-under-value[data-stat="win-prob-under"]'
         );
-        if (!el) return null;
-        var t = (el.textContent || '').trim();
-        if (!t || t === '—') return null;
-        var n = parseFloat(t);
-        return isFinite(n) ? n : null;
+        if (!el) return;
+        var val = info.stats.winProbPct;
+        if (val === null || val === undefined) {
+          el.textContent = '—';
+          return;
+        }
+        var n = Number(val);
+        if (!isFinite(n)) { el.textContent = '—'; return; }
+        el.textContent = String(Math.round(n)) + '%';
+      }
+
+      /**
+       * Paint the central DRAW % pill. drawProbPct is symmetric across
+       * cards in a 2-player matchup — average defensively in case the
+       * server ever drifts. Falls back to '—' when neither card carries
+       * the field (e.g. legacy postMessage with no stats).
+       */
+      function applyDrawProb(a, b) {
+        var el = document.querySelector(
+          '.draw-prob-value[data-stat="draw-prob"]'
+        );
+        if (!el) return;
+        var aVal = a && a.stats ? a.stats.drawProbPct : null;
+        var bVal = b && b.stats ? b.stats.drawProbPct : null;
+        var values = [];
+        if (aVal !== null && aVal !== undefined && isFinite(Number(aVal))) values.push(Number(aVal));
+        if (bVal !== null && bVal !== undefined && isFinite(Number(bVal))) values.push(Number(bVal));
+        if (values.length === 0) { el.textContent = '—'; return; }
+        var avg = values.reduce(function (s, v) { return s + v; }, 0) / values.length;
+        el.textContent = String(Math.round(avg)) + '%';
       }
 
       function applyHeader(info, side) {
@@ -1763,11 +1837,16 @@
           applyToCol(colA, a);
           applyHeader(a, 'a');
           applyStatsToSide(a, 'a');
+          applyWinProbToCol(a, 'a');
         }
         if (b) {
           applyToCol(colB, b);
           applyHeader(b, 'b');
           applyStatsToSide(b, 'b');
+          applyWinProbToCol(b, 'b');
+        }
+        if (a || b) {
+          applyDrawProb(a, b);
         }
       }
 
@@ -1777,7 +1856,7 @@
         document.body.classList.add('cade-visible');
         // restart entry animations on every show by reflowing animated nodes
         var animated = stage.querySelectorAll(
-          '.top-band, .chevrons, .h2h-kicker-wrap, .player-col, .stats-card, .stat-row, .winprob, .winprob-bar-a, .winprob-bar-b, .partners'
+          '.top-band, .chevrons, .h2h-kicker-wrap, .player-col, .stats-card, .stat-row, .winprob-under-name, .draw-prob-pill, .partners'
         );
         animated.forEach(function (el) {
           var orig = el.style.animation;
@@ -1823,7 +1902,7 @@
   // and left the entry feeling muted. Visibility is still gated via the
   // `body.cade-visible` CSS rule on `.player-col` itself + the keyframe
   // animation handles the from-state.
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.season-mark,.stat-row,.stats-card,.top-band,.winprob-bar-block';
+  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.season-mark,.stat-row,.stats-card,.top-band,.winprob-under-name,.draw-prob-pill';
   function apply() {
     var b = document.body;
     if (!b) return;

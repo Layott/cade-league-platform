@@ -222,6 +222,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         gd: 9,
         pts: 13,
         winProbPct: 0.65,
+        drawProbPct: 0.18,
       },
     ]);
 
@@ -236,6 +237,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
     expect(body.cards[0].name).toBe("FARUK");
     // Wire-shape contract: integer percent in [0..100] (NOT a fraction).
     expect(body.cards[0].winProbPct).toBe(65);
+    expect(body.cards[0].drawProbPct).toBe(18);
     expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
       PLAYER_A,
       PLAYER_B,
@@ -350,6 +352,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         gd: 9,
         pts: 13,
         winProbPct: 0.65,
+        drawProbPct: 0.18,
       },
       {
         playerId: PLAYER_B,
@@ -365,6 +368,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         gd: 3,
         pts: 9,
         winProbPct: 0.35,
+        drawProbPct: 0.18,
       },
     ]);
 
@@ -456,6 +460,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         gd: -1,
         pts: 0,
         winProbPct: 0.456, // fraction → must arrive at the wire as 46.
+        drawProbPct: 0.20,
       },
       {
         playerId: PLAYER_B,
@@ -471,6 +476,7 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
         gd: 1,
         pts: 3,
         winProbPct: 0.875, // fraction → must arrive at the wire as 88.
+        drawProbPct: 0.20,
       },
     ]);
 

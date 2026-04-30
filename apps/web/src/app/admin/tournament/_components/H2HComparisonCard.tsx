@@ -32,6 +32,12 @@ export type H2HCard = {
    * fraction in [0..1]; multiplied by 100 at the endpoint layer.
    */
   winProbPct: number;
+  /**
+   * Draw probability against the AVERAGE of the other selected players.
+   * Integer percent in [0..100]. Optional for backwards-compat with
+   * older callers that don't supply it.
+   */
+  drawProbPct?: number;
 };
 
 export function H2HComparisonCard({ card }: { card: H2HCard }) {

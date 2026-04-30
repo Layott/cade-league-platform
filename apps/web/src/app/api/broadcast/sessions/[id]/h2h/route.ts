@@ -140,6 +140,7 @@ export async function GET(
     const cards = rawCards.map((c) => ({
       ...c,
       winProbPct: Math.round(c.winProbPct * 100),
+      drawProbPct: Math.round(c.drawProbPct * 100),
     }));
     return NextResponse.json(
       {

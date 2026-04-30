@@ -33,6 +33,7 @@ export type H2HCard = {
   gd: number;
   pts: number;
   winProbPct: number;
+  drawProbPct: number;
 };
 
 export async function buildH2HCards(
@@ -73,9 +74,10 @@ export async function buildH2HCards(
   for (const pid of playerIds) {
     const row = byPlayer.get(pid);
     if (!row) continue;
-    // Win prob = average against every OTHER selected player.
+    // Win prob + draw prob = average against every OTHER selected player.
     const others = playerIds.filter((o) => o !== pid);
     let pSum = 0;
+    let dSum = 0;
     let pCount = 0;
     for (const oid of others) {
       const aStats = stats[pid];
@@ -100,9 +102,11 @@ export async function buildH2HCards(
             : undefined;
       const wp = computeWinProbability(aStats, bStats, aFlipped);
       pSum += wp.pA;
+      dSum += wp.pDraw;
       pCount += 1;
     }
     const winProbPct = pCount > 0 ? pSum / pCount : 0;
+    const drawProbPct = pCount > 0 ? dSum / pCount : 0;
     out.push({
       playerId: pid,
       name: row.name,
@@ -117,6 +121,7 @@ export async function buildH2HCards(
       gd: row.gd,
       pts: row.pts,
       winProbPct,
+      drawProbPct,
     });
   }
   return out;

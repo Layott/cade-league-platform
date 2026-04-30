@@ -163,6 +163,7 @@ describe("GET /api/tournament/h2h", () => {
         gd: 9,
         pts: 13,
         winProbPct: 0.624, // fraction
+        drawProbPct: 0.20,
       },
       {
         playerId: PLAYER_B,
@@ -178,6 +179,7 @@ describe("GET /api/tournament/h2h", () => {
         gd: 3,
         pts: 9,
         winProbPct: 0.376, // fraction
+        drawProbPct: 0.20,
       },
     ]);
 
