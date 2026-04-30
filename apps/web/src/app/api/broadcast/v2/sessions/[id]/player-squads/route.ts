@@ -318,6 +318,24 @@ export async function GET(
     return Number.isFinite(n) ? n : null;
   }
 
+  // FUTBIN signs every image URL (`s=<HMAC>`) at the table-thumbnail
+  // size of `w=64`; bumping the `w=` param invalidates the signature.
+  // Wrap the URL in our `/api/img/upscale` proxy which fetches the 64px
+  // source, runs Sharp Lanczos3 at 4x, and serves a 256-wide PNG.
+  // Cards in the broadcast overlay then display crisply at 116-200px
+  // without browser CSS-scaling blur. Skip when the URL isn't on the
+  // FUTBIN host (allowlist mismatch → proxy would 400 anyway).
+  function upscale(rawUrl: string | null, w = 256): string | null {
+    if (!rawUrl) return null;
+    try {
+      const u = new URL(rawUrl);
+      if (u.hostname !== "cdn3.futbin.com") return rawUrl;
+      return `/api/img/upscale?url=${encodeURIComponent(rawUrl)}&w=${w}`;
+    } catch {
+      return rawUrl;
+    }
+  }
+
   const allItems: SquadItem[] = itemRows.map((r) => {
     const fc = lookup(r.name, r.rating);
     const attrs = (fc?.attributes ?? {}) as Record<string, unknown>;
@@ -330,14 +348,18 @@ export async function GET(
       itemType: r.item_type,
       nationalityFlag: r.nationality_flag,
       value: Number(r.value ?? 0),
-      cardImageUrl:
+      cardImageUrl: upscale(
         typeof attrs["card_image_url"] === "string"
           ? (attrs["card_image_url"] as string)
           : null,
-      cardBgUrl:
+        256,
+      ),
+      cardBgUrl: upscale(
         typeof attrs["card_bg_url"] === "string"
           ? (attrs["card_bg_url"] as string)
           : null,
+        320,
+      ),
       mains: mainsRaw
         ? {
             pac: intOrNull(mainsRaw["pac"]),

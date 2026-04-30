@@ -749,8 +749,8 @@
   .pitch-card,
   .sub-card {
     position: relative;
-    width: 116px;
-    height: 168px;
+    width: 150px;
+    height: 212px;
     border-radius: 8px;
     padding: 8px 6px 6px;
     color: #131106;
@@ -763,7 +763,7 @@
     overflow: hidden;
     font-family: var(--accent);
   }
-  .sub-card { width: 100px; height: 144px; }
+  .sub-card { width: 120px; height: 170px; }
 
   /* item_type tints */
   .pitch-card.t-gold,    .sub-card.t-gold {
@@ -950,7 +950,11 @@
     height: 100%;
     object-fit: contain;
     object-position: center top;
-    image-rendering: -webkit-optimize-contrast;
+    /* Source is 256/320-wide PNG (Lanczos3 upscale of FUTBIN's signed
+       64×89 thumb via /api/img/upscale). Browser then DOWN-scales to
+       ~150px display — that path is sharp by default; no rendering hint
+       needed. `auto` is the right fallback for photographic content. */
+    image-rendering: auto;
     pointer-events: none;
     filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55));
   }
