@@ -1254,11 +1254,15 @@
       function renderPitch(items) {
         if (!Array.isArray(items)) return;
         var slots = document.querySelectorAll('.pitch .slot');
-        // Wipe each slot, then place item by slot_index.
+        // Wipe each slot, then place item by slot index. Accept both
+        // camelCase (server feed) and snake_case (postMessage demo / control
+        // panel) shapes via the `pick()` helper.
         var bySlot = {};
         items.forEach(function (it) {
-          if (!it || it.slot_index == null) return;
-          bySlot[it.slot_index] = it;
+          if (!it) return;
+          var idx = pick(it, 'slotIndex', 'slot_index');
+          if (idx == null) return;
+          bySlot[idx] = it;
         });
         slots.forEach(function (slot) {
           var idx = parseInt(slot.getAttribute('data-slot-index'), 10);
