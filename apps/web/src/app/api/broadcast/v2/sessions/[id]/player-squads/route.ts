@@ -197,17 +197,35 @@ export async function GET(
   const headshotUrl =
     getPlayerHeadshotUrl(player.gamer_tag, "transparent", 1) ?? null;
 
-  // Live submission for this week.
-  const { data: subRaw } = await sb
+  // Live submission for this week. If the operator didn't pin a specific
+  // `?week=`, fall back to the player's MOST RECENT submission so the
+  // overlay always has something to render between submission windows.
+  // The exact-week match still wins when present.
+  const { data: exactRaw } = await sb
     .from("squad_submissions")
     .select("id, week_start_date, validation_status, submitted_at")
     .eq("player_id", resolvedPlayerId)
     .eq("week_start_date", weekStartDate)
     .is("deleted_at", null)
     .maybeSingle();
-  const submission = subRaw as
-    | { id: string; week_start_date: string; validation_status: string; submitted_at: string }
-    | null;
+  type SubmissionRow = {
+    id: string;
+    week_start_date: string;
+    validation_status: string;
+    submitted_at: string;
+  };
+  let submission = exactRaw as SubmissionRow | null;
+  if (!submission && !requestedWeek) {
+    const { data: latestRaw } = await sb
+      .from("squad_submissions")
+      .select("id, week_start_date, validation_status, submitted_at")
+      .eq("player_id", resolvedPlayerId)
+      .is("deleted_at", null)
+      .order("week_start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    submission = latestRaw as SubmissionRow | null;
+  }
 
   if (!submission) {
     return NextResponse.json(
