@@ -670,10 +670,10 @@
   /* ── PITCH (center) ─────────────────────────── */
   .pitch-wrap {
     position: absolute;
-    top: 100px;
-    left: 460px;
-    width: 860px;
-    height: 880px;
+    top: 80px;
+    left: 360px;
+    width: 920px;
+    height: 920px;
     z-index: 8;
     animation: pitch-fade 1.0s 0.45s ease both;
   }
@@ -718,15 +718,20 @@
     width: 100%;
     height: 100%;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    /* 5 columns wide × 4 rows. Each card sits in its own ~170px column
+       (920 inner - 32 padding - 4×12 gap = 840 / 5 = 168px) so 150-wide
+       cards have ~18px breathing room and never overlap an adjacent
+       slot. The DEF row spans cols 1-5 with col 3 empty for the centre
+       channel; the GK row centres in col 3. */
+    grid-template-columns: repeat(5, 1fr);
     grid-template-rows: 1fr 1fr 1fr 1fr;
     grid-template-areas:
-      ".  lw .  st .  rw ."
-      ".  cml .  cmc .  cmr ."
-      "lb .  cbl .  cbr .  rb"
-      ".  .  .  gk .  .  .";
-    gap: 8px;
-    padding: 18px 14px 28px;
+      ".  lw  st  rw ."
+      ".  cml cmc cmr ."
+      "lb cbl .   cbr rb"
+      ".  .   gk  .   .";
+    gap: 12px;
+    padding: 20px 16px 32px;
   }
   .slot { display: flex; align-items: center; justify-content: center; }
   .slot-gk  { grid-area: gk; }
@@ -1013,8 +1018,8 @@
   .subs-panel {
     position: absolute;
     top: 240px;
-    left: 1340px;
-    width: 520px;
+    left: 1320px;
+    width: 540px;
     height: 720px;
     display: flex;
     flex-direction: column;
@@ -1040,9 +1045,10 @@
   }
   .subs-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px 14px;
-    width: 100%;
+    grid-template-columns: repeat(3, 120px);
+    gap: 18px 16px;
+    width: max-content;
+    justify-content: center;
     justify-items: center;
   }
   @keyframes subs-fade {
