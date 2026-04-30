@@ -673,7 +673,7 @@
     top: 80px;
     left: 360px;
     width: 920px;
-    height: 920px;
+    height: 820px;
     z-index: 8;
     animation: pitch-fade 1.0s 0.45s ease both;
   }
@@ -754,8 +754,8 @@
   .pitch-card,
   .sub-card {
     position: relative;
-    width: 150px;
-    height: 212px;
+    width: 140px;
+    height: 196px;
     border-radius: 8px;
     padding: 8px 6px 6px;
     color: #131106;
@@ -768,7 +768,7 @@
     overflow: hidden;
     font-family: var(--accent);
   }
-  .sub-card { width: 120px; height: 170px; }
+  .sub-card { width: 110px; height: 154px; }
 
   /* item_type tints */
   .pitch-card.t-gold,    .sub-card.t-gold {
@@ -967,15 +967,15 @@
   }
   .fut-face {
     position: absolute;
-    /* Face slot — centred under the rating/position chrome, sized so it
-       does NOT collide with the bottom name + stats overlay. Width via
-       cqi (% of card width); vertical bounds via % so they're relative
-       to card HEIGHT, not width. */
-    top: 14%;
+    /* Face slot — sits in the upper portion of the card, sized so it
+       never bleeds into the bottom name+stats band. Width via cqi (% of
+       card width); vertical bounds via % so they're relative to card
+       HEIGHT. */
+    top: 10%;
     left: 50%;
     transform: translateX(-50%);
-    width: 50cqi;            /* 50% of card width */
-    max-height: 44%;         /* never bleeds into the name+stats zone */
+    width: 48cqi;
+    max-height: 42%;
     height: auto;
     object-fit: contain;
     object-position: center top;
@@ -988,20 +988,15 @@
     inset: 0;
     z-index: 2;
     pointer-events: none;
-    color: #1a1407;          /* dark text on gold/silver/bronze */
-    text-shadow: 0 1px 0 rgba(255,255,255,0.18);
+    /* Always white text — strong drop-shadow keeps legibility on every
+       variant frame (gold/silver/bronze/icon/hero/special). User
+       feedback 2026-04-30: dark text on bronze/silver was unreadable. */
+    color: #ffffff;
+    text-shadow:
+      0 1px 2px rgba(0,0,0,0.85),
+      0 0 4px rgba(0,0,0,0.55);
     font-family: 'Agharti', 'Inter', sans-serif;
     line-height: 1;
-  }
-  /* Light text for variants with dark frames (icons / promos / specials) */
-  .has-fut-card.t-icon .fut-overlay,
-  .has-fut-card.t-hero .fut-overlay,
-  .has-fut-card.t-toty .fut-overlay,
-  .has-fut-card.t-tots .fut-overlay,
-  .has-fut-card.t-rttf .fut-overlay,
-  .has-fut-card.t-special .fut-overlay {
-    color: #fefefe;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.55);
   }
   /* Rating + position stack — top-left corner of the card. cqi for font
      size keeps text proportional to card width; % for top/left so the
@@ -1029,40 +1024,46 @@
   /* Name across the card BELOW the face slot */
   .fut-name {
     position: absolute;
-    top: 60%;
+    top: 56%;
     left: 6%;
     right: 6%;
     text-align: center;
     font-weight: 700;
-    font-size: 11cqi;
+    font-size: 10.5cqi;
     letter-spacing: 0.03em;
     text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-bottom: 1%;
-    border-bottom: 1px solid currentColor;
-    opacity: 0.96;
+    padding-bottom: 2%;
+    border-bottom: 1px solid rgba(255,255,255,0.45);
+    opacity: 0.97;
     z-index: 3;
   }
-  /* 6 main stats — 2-col × 3-row grid in bottom 30% of card. */
+  /* 6 main stats — 2-col × 3-row grid in bottom of card.
+     Anchored to a fixed bottom position so all three rows stay INSIDE
+     the card frame, never bleeding past the bottom edge into the
+     partner-strip area. Tight font + tight gap → 3 rows fit in ~30% of
+     card height. */
   .fut-stats {
     position: absolute;
-    bottom: 4%;
-    left: 8%;
-    right: 8%;
+    top: 70%;
+    bottom: 6%;
+    left: 10%;
+    right: 10%;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-auto-rows: min-content;
-    gap: 1% 8%;
+    grid-template-rows: 1fr 1fr 1fr;
+    align-content: space-between;
+    gap: 0 6%;
     font-family: 'Quedora', 'Inter', sans-serif;
-    font-size: 9cqi;
-    line-height: 1.1;
+    font-size: 8.5cqi;
+    line-height: 1;
     z-index: 3;
   }
   .fut-stats > div {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: flex-start;
     gap: 0.35em;
     white-space: nowrap;
@@ -1074,8 +1075,8 @@
   }
   .fut-stats span {
     font-weight: 600;
-    font-size: 0.74em;
-    opacity: 0.78;
+    font-size: 0.72em;
+    opacity: 0.82;
     letter-spacing: 0.05em;
   }
 
@@ -1160,7 +1161,7 @@
   }
   .subs-grid {
     display: grid;
-    grid-template-columns: repeat(3, 120px);
+    grid-template-columns: repeat(3, 110px);
     gap: 18px 16px;
     width: max-content;
     justify-content: center;
