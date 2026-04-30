@@ -55,6 +55,19 @@ type SquadItem = {
   itemType: string;
   nationalityFlag: string | null;
   value: number;
+  // Enriched via fc26_players JOIN by (LOWER(name), rating).
+  // Null when no match found (rare — Faruk's submission has 100% match rate).
+  cardImageUrl: string | null;
+  mains: {
+    pac: number | null;
+    sho: number | null;
+    pas: number | null;
+    dri: number | null;
+    def: number | null;
+    phy: number | null;
+  } | null;
+  weakFoot: number | null;
+  skillMoves: number | null;
 };
 
 export async function GET(
@@ -260,7 +273,7 @@ export async function GET(
     .is("deleted_at", null)
     .order("slot_index", { ascending: true });
 
-  const allItems = ((itemsRaw ?? []) as Array<{
+  type SquadRow = {
     slot_index: number;
     name: string;
     rating: number;
@@ -268,15 +281,72 @@ export async function GET(
     value: number;
     item_type: string;
     nationality_flag: string | null;
-  }>).map<SquadItem>((r) => ({
-    slotIndex: r.slot_index,
-    name: r.name,
-    rating: r.rating,
-    position: r.position,
-    itemType: r.item_type,
-    nationalityFlag: r.nationality_flag,
-    value: Number(r.value ?? 0),
-  }));
+  };
+  const itemRows = (itemsRaw ?? []) as SquadRow[];
+
+  // Enrich every item via fc26_players. Match by (LOWER(name), rating)
+  // against `source_dataset='futbin.com'` rows — those are the only
+  // cards with `attributes.card_image_url` populated (Kaggle / fut.gg
+  // rows are kept for provenance but lack the image). 100% hit rate
+  // confirmed against existing Faruk submission (2026-04-30).
+  type FcRow = {
+    name: string;
+    rating: number;
+    attributes: Record<string, unknown> | null;
+  };
+  let enrichByKey = new Map<string, FcRow>();
+  if (itemRows.length > 0) {
+    const namesUnique = Array.from(new Set(itemRows.map((r) => r.name)));
+    const { data: fcRaw } = await sb
+      .from("fc26_players")
+      .select("name, rating, attributes")
+      .eq("source_dataset", "futbin.com")
+      .is("deleted_at", null)
+      .in("name", namesUnique);
+    const fcRows = (fcRaw ?? []) as FcRow[];
+    enrichByKey = new Map(
+      fcRows.map((r) => [`${r.name.toLowerCase()}|${r.rating}`, r]),
+    );
+  }
+  function lookup(name: string, rating: number): FcRow | undefined {
+    return enrichByKey.get(`${name.toLowerCase()}|${rating}`);
+  }
+  function intOrNull(v: unknown): number | null {
+    if (v === null || v === undefined) return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  const allItems: SquadItem[] = itemRows.map((r) => {
+    const fc = lookup(r.name, r.rating);
+    const attrs = (fc?.attributes ?? {}) as Record<string, unknown>;
+    const mainsRaw = (attrs["mains"] ?? null) as Record<string, unknown> | null;
+    return {
+      slotIndex: r.slot_index,
+      name: r.name,
+      rating: r.rating,
+      position: r.position,
+      itemType: r.item_type,
+      nationalityFlag: r.nationality_flag,
+      value: Number(r.value ?? 0),
+      cardImageUrl:
+        typeof attrs["card_image_url"] === "string"
+          ? (attrs["card_image_url"] as string)
+          : null,
+      mains: mainsRaw
+        ? {
+            pac: intOrNull(mainsRaw["pac"]),
+            sho: intOrNull(mainsRaw["sho"]),
+            pas: intOrNull(mainsRaw["pas"]),
+            dri: intOrNull(mainsRaw["dri"]),
+            def: intOrNull(mainsRaw["def"]),
+            phy: intOrNull(mainsRaw["phy"]),
+          }
+        : null,
+      weakFoot: intOrNull(attrs["weak_foot"]),
+      skillMoves: intOrNull(attrs["skill_moves"]),
+    };
+  });
 
   const starting = allItems.filter((i) => i.slotIndex >= 0 && i.slotIndex <= 10);
   const subs = allItems.filter((i) => i.slotIndex >= 11 && i.slotIndex <= 22);

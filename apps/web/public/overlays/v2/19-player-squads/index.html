@@ -891,6 +891,34 @@
     border-top-right-radius: 50% 22px;
     transform: translateX(-50%);
   }
+  /* FUTBIN card image — replaces the gradient placeholder when the
+     server-feed endpoint enriches the squad item with a fc26_players
+     match (post-2026-04-30 enrichment, ~100% hit rate against current
+     submissions). The img is absolutely-positioned so it overlays the
+     entire card frame, hiding the head/foot rating + position chrome
+     while the FUTBIN PNG carries its own design. */
+  .pitch-card.has-img,
+  .sub-card.has-img {
+    background: transparent !important;
+    border-color: transparent !important;
+    overflow: visible;
+  }
+  .pitch-card.has-img .card-head,
+  .pitch-card.has-img .card-foot,
+  .sub-card.has-img .card-head,
+  .sub-card.has-img .card-foot {
+    display: none;
+  }
+  .card-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center top;
+    image-rendering: -webkit-optimize-contrast;
+    /* Slight glow to match the green-line pitch aesthetic on the dark BG */
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
+  }
 
   /* card foot (name + flag) */
   .card-foot {
@@ -1180,19 +1208,42 @@
         if (t === 'rttf')    return 't-rttf';
         return 't-other';
       }
+      // Normalize camelCase ↔ snake_case so the same renderer handles BOTH
+      // postMessage payloads (typically snake_case from the broadcast control
+      // panel) AND server-feed payloads from
+      // `/api/broadcast/v2/sessions/<id>/player-squads` (camelCase).
+      function pick(item, camel, snake) {
+        if (!item) return undefined;
+        if (item[camel] != null) return item[camel];
+        if (item[snake] != null) return item[snake];
+        return undefined;
+      }
       function cardHtml(item, isSub) {
+        var itemType = pick(item, 'itemType', 'item_type');
+        var slotIdx  = pick(item, 'slotIndex', 'slot_index');
+        var nationalityFlag = pick(item, 'nationalityFlag', 'nationality_flag');
+        var cardImg  = pick(item, 'cardImageUrl', 'card_image_url');
         var cls = isSub ? 'sub-card ' : 'pitch-card ';
-        cls += tintClass(item.item_type);
-        var rating = (item.rating != null) ? String(item.rating) : '--';
-        var pos    = item.position || POSITION_LABEL[item.slot_index] || '';
-        var name   = item.name || '';
-        var flag   = item.nationality_flag || '';
+        cls += tintClass(itemType);
+        if (cardImg) cls += ' has-img';
+        var rating = (item && item.rating != null) ? String(item.rating) : '--';
+        var pos    = (item && item.position) || POSITION_LABEL[slotIdx] || '';
+        var name   = (item && item.name) || '';
+        var flag   = nationalityFlag || '';
+        // FUTBIN card image (post-2026-04-30 enrichment via fc26_players JOIN).
+        // When present we render the FUTBIN PNG inline; the tinted gradient
+        // becomes a thin border behind it. When absent (rare — should only
+        // happen on hand-typed names that don't match an fc26 row) we fall
+        // back to the original gradient placeholder.
+        var bodyHtml = cardImg
+          ? '<img class="card-img" src="' + escHtml(cardImg) + '" alt="' + escHtml(name) + '" loading="lazy" referrerpolicy="no-referrer" />'
+          : '<div class="card-body" aria-hidden="true"></div>';
         return '<div class="' + cls + '">' +
           '<div class="card-head">' +
             '<span class="card-rating">' + escHtml(rating) + '</span>' +
             '<span class="card-pos">' + escHtml(pos) + '</span>' +
           '</div>' +
-          '<div class="card-body" aria-hidden="true"></div>' +
+          bodyHtml +
           '<div class="card-foot">' +
             '<span class="card-name">' + escHtml(name).toUpperCase() + '</span>' +
             (flag ? '<span class="card-flag">' + escHtml(flag) + '</span>' : '') +
@@ -1254,16 +1305,23 @@
             photoEl.setAttribute('src', p.draftOwner.headshotUrl);
           }
         }
-        if (p.formation) {
-          var formEl = document.querySelector('[data-element-id="formation-value"]');
-          if (formEl) formEl.textContent = String(p.formation);
+        // Empty-state: no submission for the requested week. Show "—" for
+        // formation + chemistry, wipe pitch + subs. This is the user's
+        // explicit spec — "if they have not submitted it should come up
+        // as a -".
+        var hasSubmission = p.submission != null;
+        var formEl = document.querySelector('[data-element-id="formation-value"]');
+        if (formEl) {
+          formEl.textContent = (hasSubmission && p.formation) ? String(p.formation) : '—';
         }
-        if (p.chemistry != null) {
-          var chemEl = document.querySelector('[data-element-id="chemistry-value"]');
-          if (chemEl) chemEl.textContent = String(p.chemistry);
+        var chemEl = document.querySelector('[data-element-id="chemistry-value"]');
+        if (chemEl) {
+          chemEl.textContent = (hasSubmission && p.chemistry != null) ? String(p.chemistry) : '—';
         }
         if (Array.isArray(p.starting)) renderPitch(p.starting);
+        else if (!hasSubmission) renderPitch([]);
         if (Array.isArray(p.subs))     renderSubs(p.subs);
+        else if (!hasSubmission) renderSubs([]);
       }
 
       function show() {
