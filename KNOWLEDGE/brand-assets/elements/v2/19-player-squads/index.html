@@ -921,14 +921,11 @@
   }
 
   /* ==================================================================
-     FUT card composite (`.has-fut-card`) — frame + face + overlay text.
-     The futbin scraper provides:
-       - card_bg_url  → the FUT card template (gold/icon/special art),
-                        sized 64x89 from /img/cards/tiny/<variant>.png
-       - card_image_url → the player face PNG, sized 64x89.
-     Both are stretched 2-3x via CSS; image-rendering hints keep them
-     reasonably sharp. Rating / position / name / 6 mains stats overlay
-     on top via CSS-rendered text (always sharp at any scale).
+     `.has-fut-card` — render the FULL FUTBIN composite card as a single
+     `<img>`. FUTBIN's `card_bg_url` (`/img/cards/tiny/<variant>.png`)
+     bakes frame + face + rating + position + stats + name into one
+     PNG, so we just stretch it to fill the card slot. No CSS overlay
+     text needed; image-rendering hints keep the 64×89 source sharp.
      ================================================================== */
   .pitch-card.has-fut-card,
   .sub-card.has-fut-card {
@@ -936,7 +933,8 @@
     border: none !important;
     overflow: visible;
     aspect-ratio: 64 / 89;
-    /* widen vs the tinted gradient cards so the FUT artwork has room */
+    box-shadow: none !important;
+    padding: 0 !important;
   }
   .pitch-card.has-fut-card .card-head,
   .pitch-card.has-fut-card .card-foot,
@@ -946,110 +944,15 @@
   .sub-card.has-fut-card .card-body {
     display: none;
   }
-  .card-frame-img {
-    position: absolute;
-    inset: 0;
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    background-position: center;
-    image-rendering: -webkit-optimize-contrast;
-    pointer-events: none;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
-  }
-  .card-face-img {
-    position: absolute;
-    /* face slot ~= top 14-46% of card, horizontally centered */
-    top: 14%;
-    left: 50%;
-    width: 62%;
-    height: auto;
-    transform: translateX(-50%);
+  .fut-card-full {
+    display: block;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
+    object-position: center top;
     image-rendering: -webkit-optimize-contrast;
     pointer-events: none;
-    z-index: 1;
-  }
-  .card-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-    color: rgba(20, 14, 0, 0.95);
-    text-shadow: 0 1px 0 rgba(255,255,255,0.18);
-  }
-  /* Special / hero / icon variants use light text on dark frames */
-  .has-fut-card.t-icon .card-overlay,
-  .has-fut-card.t-hero .card-overlay,
-  .has-fut-card.t-toty .card-overlay,
-  .has-fut-card.t-tots .card-overlay,
-  .has-fut-card.t-special .card-overlay {
-    color: rgba(255,255,255,0.96);
-    text-shadow: 0 1px 1px rgba(0,0,0,0.55);
-  }
-  .fut-rating {
-    position: absolute;
-    top: 7%;
-    left: 14%;
-    font-family: 'Agharti', 'Inter', sans-serif;
-    font-weight: 800;
-    font-size: 26%;       /* % of width — scales with card */
-    letter-spacing: 0.02em;
-    line-height: 1;
-  }
-  .fut-pos {
-    position: absolute;
-    top: 21%;
-    left: 14%;
-    font-family: 'Quedora', 'Inter', sans-serif;
-    font-weight: 700;
-    font-size: 11%;
-    letter-spacing: 0.05em;
-    line-height: 1;
-  }
-  .fut-name {
-    position: absolute;
-    bottom: 28%;
-    left: 8%;
-    right: 8%;
-    text-align: center;
-    font-family: 'Agharti', 'Inter', sans-serif;
-    font-weight: 700;
-    font-size: 12%;
-    letter-spacing: 0.04em;
-    line-height: 1.05;
-    text-transform: uppercase;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .fut-stats {
-    position: absolute;
-    bottom: 8%;
-    left: 8%;
-    right: 8%;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1% 4%;
-    font-family: 'Quedora', 'Inter', sans-serif;
-    font-size: 8.5%;
-    line-height: 1;
-    text-align: center;
-  }
-  .fut-stats > div {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.25em;
-  }
-  .fut-stats b { font-weight: 800; }
-  .fut-stats span { opacity: 0.78; font-weight: 500; font-size: 0.85em; }
-  .fut-flag {
-    position: absolute;
-    bottom: 22%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 9%;
-    opacity: 0.85;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55));
   }
 
   /* card foot (name + flag) */
@@ -1374,34 +1277,16 @@
         var flag   = nationalityFlag || '';
 
         if (hasFutbinComposite) {
-          // Full FUT card composite. The `card-frame-img` is the FUTBIN card
-          // template (gold/icon/special variant artwork) stretched to fill
-          // the card. The `card-face-img` is the player's face PNG layered
-          // on top, positioned in the conventional FUT face slot. Rating /
-          // position / name / 6 mains stats overlay on top via CSS-rendered
-          // text so the text stays sharp at any scale.
-          var statsHtml = '';
-          if (mains) {
-            statsHtml =
-              '<div class="fut-stats">' +
-                '<div><b>' + escHtml(mains.pac == null ? '--' : mains.pac) + '</b><span>PAC</span></div>' +
-                '<div><b>' + escHtml(mains.sho == null ? '--' : mains.sho) + '</b><span>SHO</span></div>' +
-                '<div><b>' + escHtml(mains.pas == null ? '--' : mains.pas) + '</b><span>PAS</span></div>' +
-                '<div><b>' + escHtml(mains.dri == null ? '--' : mains.dri) + '</b><span>DRI</span></div>' +
-                '<div><b>' + escHtml(mains.def == null ? '--' : mains.def) + '</b><span>DEF</span></div>' +
-                '<div><b>' + escHtml(mains.phy == null ? '--' : mains.phy) + '</b><span>PHY</span></div>' +
-              '</div>';
-          }
+          // FUTBIN's `card_bg_url` is the FULL composite FUT card — frame
+          // + face + rating + position + stats + name all baked into the
+          // PNG by FUTBIN at /img/cards/tiny/<variant>.png. We render it
+          // as a single `<img>` filling the card slot. No CSS overlay
+          // needed — the FUTBIN art carries every visual the player sees
+          // on the futbin.com row. Confirmed against Faruk's submission
+          // (13/13 items have card_bg_url populated, including bronze /
+          // silver / icon / special variants).
           return '<div class="' + cls + '">' +
-            '<div class="card-frame-img" style="background-image:url(\'' + escHtml(cardBg) + '\')"></div>' +
-            '<img class="card-face-img" src="' + escHtml(cardImg) + '" alt="' + escHtml(name) + '" loading="lazy" referrerpolicy="no-referrer" />' +
-            '<div class="card-overlay">' +
-              '<div class="fut-rating">' + escHtml(rating) + '</div>' +
-              '<div class="fut-pos">' + escHtml(pos) + '</div>' +
-              '<div class="fut-name">' + escHtml(name).toUpperCase() + '</div>' +
-              statsHtml +
-              (flag ? '<div class="fut-flag">' + escHtml(flag) + '</div>' : '') +
-            '</div>' +
+            '<img class="fut-card-full" src="' + escHtml(cardBg) + '" alt="' + escHtml(name) + ' ' + escHtml(rating) + ' ' + escHtml(pos) + '" loading="lazy" referrerpolicy="no-referrer" />' +
           '</div>';
         }
 
