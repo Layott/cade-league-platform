@@ -89,20 +89,24 @@ function mkSeedRow(overrides: Partial<Row> = {}): Row {
 function rowsTable(rows: Row[]) {
   const orderResult = vi.fn().mockResolvedValue({ data: rows, error: null });
   const isSelectThenOrder = vi.fn(() => ({ order: orderResult }));
-  const selectChain = vi.fn(() => ({
-    eq: vi.fn(() => ({
-      eq: vi.fn(() => ({ is: isSelectThenOrder })),
-    })),
-  }));
   const maybeSingle = vi.fn().mockResolvedValue({
     data: rows[0] ?? null,
     error: null,
   });
-  const upsertSingle = vi
+  // SELECT-then-INSERT-or-UPDATE workaround chains (post partial-unique-index fix).
+  // Synthesize a returnable row when the input rows[] is empty (INSERT path),
+  // so toElement() doesn't NPE before the test gets to assert call shape.
+  const writeRow: Row = rows[0] ?? mkSeedRow({ element_id: "title" });
+  const writeSingle = vi
     .fn()
-    .mockResolvedValue({ data: rows[0] ?? null, error: null });
-  const upsertChain = vi.fn(() => ({
-    select: vi.fn(() => ({ single: upsertSingle })),
+    .mockResolvedValue({ data: writeRow, error: null });
+  const updateById = vi.fn(() => ({
+    eq: vi.fn(() => ({
+      select: vi.fn(() => ({ single: writeSingle })),
+    })),
+  }));
+  const insertChain = vi.fn(() => ({
+    select: vi.fn(() => ({ single: writeSingle })),
   }));
   const updateNot = vi
     .fn()
@@ -128,45 +132,45 @@ function rowsTable(rows: Row[]) {
   }));
 
   const update = vi.fn((..._args: unknown[]) => {
-    // First update call in deleteTextElement / restoreTextElement uses
-    // separate chains. Detect by inspecting the payload (deleted_at).
+    // Three update shapes:
+    //   1. .update({deleted_at:null,...}).eq().eq().eq().not()... — restore.
+    //   2. .update({deleted_at:<iso>,...}).eq().eq().eq().is()    — soft-delete.
+    //   3. .update(row).eq("id", X).select().single()             — upsert update branch.
+    // Detect by inspecting the payload.
     const payload = _args[0] as { deleted_at: string | null };
-    if (payload && payload.deleted_at === null) {
+    if (payload && payload.deleted_at === null && !("element_id" in payload)) {
       return updateRestore();
     }
-    return updateSoftDeleteChain();
+    if (payload && typeof payload.deleted_at === "string") {
+      return updateSoftDeleteChain();
+    }
+    // upsert UPDATE branch — payload includes element_id, set_by, etc.
+    return updateById();
   });
 
-  // Two select shapes — the list one (4-deep w/ order) and the
-  // single-row one (4-deep w/ maybeSingle, used by getTextElement).
-  // Resolve by checking the chain depth.
-  const select = vi.fn((cols: string) => {
-    const isList = cols.length > 50;
-    if (isList) {
-      // Returns chain that supports both list (eq->eq->is->order) and
-      // single (eq->eq->eq->is->maybeSingle). Provide both.
-      return {
+  // Three select shapes:
+  //   - list:   .select(SELECT_COLS).eq().eq().is().order()
+  //   - single: .select(SELECT_COLS).eq().eq().eq().is().maybeSingle()
+  //   - id:     .select("id").eq().eq().eq().is().maybeSingle() (upsert SELECT)
+  const select = vi.fn(() => ({
+    eq: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        is: isSelectThenOrder,
         eq: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            is: isSelectThenOrder,
-            eq: vi.fn(() => ({
-              is: vi.fn(() => ({ maybeSingle })),
-            })),
-          })),
+          is: vi.fn(() => ({ maybeSingle })),
         })),
-      };
-    }
-    return selectChain();
-  });
+      })),
+    })),
+  }));
 
   return {
     select,
-    upsert: upsertChain,
     update,
+    insert: insertChain,
     _spies: {
       updateSoftDelete,
       updateNot,
-      upsertSingle,
+      writeSingle,
       orderResult,
       maybeSingle,
     },
@@ -488,7 +492,8 @@ describe("upsertTextElement — perm + validation", () => {
     );
   });
 
-  it("upserts a valid seed override", async () => {
+  it("UPDATEs an existing seed override (partial-unique-index workaround)", async () => {
+    // Existing row in mock → SELECT-first finds it → UPDATE branch.
     const r = mkSeedRow({
       element_id: "title",
       content: "GAME ON",
@@ -519,7 +524,39 @@ describe("upsertTextElement — perm + validation", () => {
     const out = await upsertTextElement(sb as never, ACTOR, input);
     expect(out.elementId).toBe("title");
     expect(out.content).toBe("GAME ON");
-    expect(sb._table.upsert).toHaveBeenCalled();
+    // Confirm UPDATE branch (NOT .upsert, which Supabase JS rejects with PG 42P10
+    // against the partial unique index on this table).
+    expect(sb._table.update).toHaveBeenCalled();
+    expect(sb._table.insert).not.toHaveBeenCalled();
+  });
+
+  it("INSERTs when no existing row (partial-unique-index workaround)", async () => {
+    // Empty rows → SELECT-first returns null → INSERT branch.
+    const sb = mkSb([]);
+    const input: TextElementInput = {
+      overlayKey: KEY,
+      variantId: VARIANT,
+      elementId: "title",
+      origin: "runtime",
+      kind: "title",
+      visible: true,
+      content: "BRAND NEW",
+      fontFamily: null,
+      fontWeight: null,
+      fontSizePx: null,
+      letterSpacing: null,
+      lineHeight: null,
+      color: null,
+      alignment: null,
+      opacityPct: null,
+      positionXPx: 100,
+      positionYPx: 100,
+      zIndex: null,
+      sortOrder: 0,
+    };
+    await upsertTextElement(sb as never, ACTOR, input);
+    expect(sb._table.insert).toHaveBeenCalled();
+    expect(sb._table.update).not.toHaveBeenCalled();
   });
 });
 

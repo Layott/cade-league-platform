@@ -319,41 +319,64 @@ export async function upsertTextElement(
   validateInput(input);
 
   const nowIso = new Date().toISOString();
+  const row = {
+    overlay_key: input.overlayKey,
+    variant_id: input.variantId,
+    element_id: input.elementId,
+    origin: input.origin,
+    kind: input.kind,
+    display_label: input.displayLabel,
+    visible: input.visible,
+    content: input.content,
+    font_family: input.fontFamily,
+    font_weight: input.fontWeight,
+    font_size_px: input.fontSizePx,
+    letter_spacing: input.letterSpacing,
+    line_height: input.lineHeight,
+    color: input.color,
+    alignment: input.alignment,
+    opacity_pct: input.opacityPct,
+    position_x_px: input.positionXPx,
+    position_y_px: input.positionYPx,
+    z_index: input.zIndex,
+    sort_order: input.sortOrder,
+    set_by: actor.userId,
+    updated_at: nowIso,
+    deleted_at: null,
+  };
 
-  const { data, error } = await sb
+  // SELECT-then-INSERT-or-UPDATE workaround for partial unique index
+  // `overlay_text_elements_unique_active (overlay_key, variant_id,
+  // element_id) WHERE deleted_at IS NULL` — Supabase JS .upsert() throws
+  // PG 42P10 against partial constraints. Same pattern as upsertAnimation
+  // (b2dd661d) + setStripLayoutAction (b7b3deff).
+  const { data: existing } = await sb
     .from("overlay_text_elements")
-    .upsert(
-      {
-        overlay_key: input.overlayKey,
-        variant_id: input.variantId,
-        element_id: input.elementId,
-        origin: input.origin,
-        kind: input.kind,
-        display_label: input.displayLabel,
-        visible: input.visible,
-        content: input.content,
-        font_family: input.fontFamily,
-        font_weight: input.fontWeight,
-        font_size_px: input.fontSizePx,
-        letter_spacing: input.letterSpacing,
-        line_height: input.lineHeight,
-        color: input.color,
-        alignment: input.alignment,
-        opacity_pct: input.opacityPct,
-        position_x_px: input.positionXPx,
-        position_y_px: input.positionYPx,
-        z_index: input.zIndex,
-        sort_order: input.sortOrder,
-        set_by: actor.userId,
-        updated_at: nowIso,
-        deleted_at: null,
-      },
-      { onConflict: "overlay_key,variant_id,element_id" },
-    )
-    .select(SELECT_COLS)
-    .single();
-  if (error) throw new Error(`upsertTextElement: ${error.message}`);
-  return toElement(data as Row);
+    .select("id")
+    .eq("overlay_key", input.overlayKey)
+    .eq("variant_id", input.variantId)
+    .eq("element_id", input.elementId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await sb
+      .from("overlay_text_elements")
+      .update(row)
+      .eq("id", (existing as { id: string }).id)
+      .select(SELECT_COLS)
+      .single();
+    if (error) throw new Error(`upsertTextElement (update): ${error.message}`);
+    return toElement(data as Row);
+  } else {
+    const { data, error } = await sb
+      .from("overlay_text_elements")
+      .insert(row)
+      .select(SELECT_COLS)
+      .single();
+    if (error) throw new Error(`upsertTextElement (insert): ${error.message}`);
+    return toElement(data as Row);
+  }
 }
 
 /**
