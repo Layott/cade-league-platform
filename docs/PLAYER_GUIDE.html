@@ -18,6 +18,8 @@
   hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
   ul, ol { padding-left: 22px; }
   a { color: #1a7000; }
+  blockquote { border-left: 3px solid #6bcd06; margin: 12px 0; padding: 6px 14px;
+               background: #f5fbf0; color: #234014; }
   @media print {
     body { max-width: none; }
     h2 { page-break-before: auto; break-before: auto; }
@@ -65,9 +67,7 @@
 <ol>
 <li>Click <strong>Squad</strong> in the top nav (or go to <code>/player/squad</code>).</li>
 <li>You'll see your weekend pickers grouped by date (e.g. <em>Weekend · May 2-3</em>). Click the open one.</li>
-<li>Two ways to submit:</li>
-<li><strong>Picker mode</strong> — search for players in the league's price database (FCDB), pick 11 starters + however many subs your <strong>10M coin</strong> budget allows, place them on the pitch.</li>
-<li><strong>Screenshot mode</strong> — upload a clean Futbin screenshot of your full squad (rating, position, club, nation visible). The admin transcribes it.</li>
+<li>Use <strong>Picker mode</strong>: search for players in the league's price database (FCDB), pick 11 starters + however many subs your <strong>10M coin</strong> budget allows, place them on the pitch.</li>
 <li>Click <strong>Submit squad</strong>. You'll see a confirmation + the page refreshes to show <em>Submitted · Pending validation</em>.</li>
 <li>The admin validates your squad within 24h. You'll see one of:</li>
 <li><strong>Approved</strong> — your squad is locked in for the weekend.</li>
@@ -86,19 +86,18 @@
 <li><strong>Before deadline</strong>: you can resubmit; the new submission overwrites the old.</li>
 <li><strong>After deadline</strong>: you cannot edit unless the admin grants a Friday change window or manually re-opens.</li>
 </ul>
+<blockquote>
+<p><strong>Tip:</strong> if the picker mode gives you trouble or your card isn't found in the FCDB, message the admin — they can add the missing card or input the squad on your behalf.</p>
+</blockquote>
 <hr />
 <h2 id="4-view-edit-during-the-friday-change-window-playersquadchange">4. View / Edit During the Friday Change Window — <code>/player/squad/change</code></h2>
 <p>If the admin opens the Friday 21:00-22:00 WAT change window, you'll see a banner on <code>/player/squad</code> linking to <code>/player/squad/change</code>. You may swap <strong>at most 1 player</strong> in this window. Use it sparingly — abuse can be flagged.</p>
 <hr />
 <h2 id="5-profile-profile">5. Profile — <code>/profile</code></h2>
-<p>Manage your own profile:</p>
-<ul>
-<li><strong>Display name + gamer tag</strong> — visible on broadcasts + standings.</li>
-<li><strong>Avatar</strong> — your headshot. Used on the broadcast overlay.</li>
-<li><strong>Email + password</strong> — change password any time.</li>
-<li><strong>Bank details</strong> (optional) — used for prize payouts. Visible only to admin.</li>
-</ul>
-<p>If you change your gamer tag, please notify the admin so the broadcast overlay's photo lookup stays in sync.</p>
+<p>Your profile page shows your league info: display name, gamer tag, headshot, season standings position, and discipline summary.</p>
+<blockquote>
+<p><strong>Note:</strong> profile fields are admin-managed. You <strong>cannot edit your own profile from the website.</strong> If you need to update your display name, gamer tag, headshot, email, or password, message the admin and they will make the change for you.</p>
+</blockquote>
 <hr />
 <h2 id="6-view-cases-playercases">6. View Cases — <code>/player/cases</code></h2>
 <p>If you receive a disciplinary action (warning, point deduction, fine, suspension), it appears on this page. Each case shows:</p>
@@ -158,10 +157,10 @@
 <h2 id="11-tips-best-practices">11. Tips + Best Practices</h2>
 <ul>
 <li><strong>Submit early.</strong> The admin has more time to flag rule violations + you can resubmit before the deadline. Don't wait until Thursday 09:55.</li>
-<li><strong>Use the picker mode if you can</strong> — the system pre-validates your budget + bans live as you build. Screenshot mode requires manual transcription which delays validation.</li>
+<li><strong>Picker mode pre-validates</strong> — the system flags budget + ban-list violations as you build, so use it to catch rule issues before submitting.</li>
 <li><strong>Keep evidence.</strong> For disputes, screenshots + match recordings are decisive. Video is best.</li>
 <li><strong>Check notifications daily</strong> during weekends. Admin pings + sanction notices land here first.</li>
-<li><strong>Profile + photo</strong> — keep your headshot up to date. It's used on the broadcast overlay during your matches.</li>
+<li><strong>Profile changes go through the admin.</strong> Need to update your headshot, gamer tag, or password? Message the admin.</li>
 </ul>
 <hr />
 <h2 id="12-need-help">12. Need Help?</h2>

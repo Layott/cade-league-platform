@@ -53,9 +53,7 @@ This is the most important page each week.
 
 1. Click **Squad** in the top nav (or go to `/player/squad`).
 2. You'll see your weekend pickers grouped by date (e.g. *Weekend · May 2-3*). Click the open one.
-3. Two ways to submit:
-   - **Picker mode** — search for players in the league's price database (FCDB), pick 11 starters + however many subs your **10M coin** budget allows, place them on the pitch.
-   - **Screenshot mode** — upload a clean Futbin screenshot of your full squad (rating, position, club, nation visible). The admin transcribes it.
+3. Use **Picker mode**: search for players in the league's price database (FCDB), pick 11 starters + however many subs your **10M coin** budget allows, place them on the pitch.
 4. Click **Submit squad**. You'll see a confirmation + the page refreshes to show *Submitted · Pending validation*.
 5. The admin validates your squad within 24h. You'll see one of:
    - **Approved** — your squad is locked in for the weekend.
@@ -74,6 +72,8 @@ This is the most important page each week.
 - **Before deadline**: you can resubmit; the new submission overwrites the old.
 - **After deadline**: you cannot edit unless the admin grants a Friday change window or manually re-opens.
 
+> **Tip:** if the picker mode gives you trouble or your card isn't found in the FCDB, message the admin — they can add the missing card or input the squad on your behalf.
+
 ---
 
 ## 4. View / Edit During the Friday Change Window — `/player/squad/change`
@@ -84,14 +84,9 @@ If the admin opens the Friday 21:00-22:00 WAT change window, you'll see a banner
 
 ## 5. Profile — `/profile`
 
-Manage your own profile:
+Your profile page shows your league info: display name, gamer tag, headshot, season standings position, and discipline summary.
 
-- **Display name + gamer tag** — visible on broadcasts + standings.
-- **Avatar** — your headshot. Used on the broadcast overlay.
-- **Email + password** — change password any time.
-- **Bank details** (optional) — used for prize payouts. Visible only to admin.
-
-If you change your gamer tag, please notify the admin so the broadcast overlay's photo lookup stays in sync.
+> **Note:** profile fields are admin-managed. You **cannot edit your own profile from the website.** If you need to update your display name, gamer tag, headshot, email, or password, message the admin and they will make the change for you.
 
 ---
 
@@ -170,10 +165,10 @@ Click any notification to jump to the related page.
 ## 11. Tips + Best Practices
 
 - **Submit early.** The admin has more time to flag rule violations + you can resubmit before the deadline. Don't wait until Thursday 09:55.
-- **Use the picker mode if you can** — the system pre-validates your budget + bans live as you build. Screenshot mode requires manual transcription which delays validation.
+- **Picker mode pre-validates** — the system flags budget + ban-list violations as you build, so use it to catch rule issues before submitting.
 - **Keep evidence.** For disputes, screenshots + match recordings are decisive. Video is best.
 - **Check notifications daily** during weekends. Admin pings + sanction notices land here first.
-- **Profile + photo** — keep your headshot up to date. It's used on the broadcast overlay during your matches.
+- **Profile changes go through the admin.** Need to update your headshot, gamer tag, or password? Message the admin.
 
 ---
 
