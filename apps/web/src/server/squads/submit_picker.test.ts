@@ -139,6 +139,33 @@ function mkSb(opts: {
           }),
         };
       }
+      if (table === "players") {
+        // Used by clearDraft path (post-insert): look up users.id via
+        // players.user_id so we can soft-delete the autosave draft row.
+        return {
+          select: () => ({
+            eq: () => ({
+              is: () => ({
+                maybeSingle: vi
+                  .fn()
+                  .mockResolvedValue({ data: { user_id: PLAYER }, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "squad_drafts") {
+        // clearDraft soft-delete chain: .update().eq().eq().is()
+        return {
+          update: () => ({
+            eq: () => ({
+              eq: () => ({
+                is: vi.fn().mockResolvedValue({ error: null }),
+              }),
+            }),
+          }),
+        };
+      }
       throw new Error(`unexpected table ${table}`);
     }),
   };

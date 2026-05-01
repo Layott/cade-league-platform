@@ -9,6 +9,7 @@ import {
   resolveSquadWindowForMatchDay,
   listSubmissionsForPlayerInSeason,
   getSubmissionForPlayerAndMatchDay,
+  getDraft,
   type PlayerSubmissionSummary,
 } from "@/server/squads";
 import { listMatchDays } from "@/server/matches/match-days";
@@ -26,6 +27,7 @@ import {
   requestUploadUrlAction,
   submitPickerAction,
 } from "./actions";
+import { saveSquadDraftAction } from "./draft-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -183,6 +185,24 @@ export default async function PlayerSquadPage({
 
     const matchDayWeekStart = weekStartThursday(selected.matchDate);
 
+    // Picker autosave hydration — only relevant when we'll mount the
+    // picker (open match day, no live submission). Fetch via the service
+    // role client because squad_drafts.player_id points at users.id and
+    // the draft row may be queried before any RLS policy is added.
+    let initialDraft = null;
+    if (!subWithItems && selected.isOpen) {
+      try {
+        initialDraft = await getDraft(
+          svc,
+          pub.id,
+          matchDayWeekStart,
+          selected.matchDayId,
+        );
+      } catch {
+        initialDraft = null;
+      }
+    }
+
     return (
       <div className="space-y-6">
         <PlayerSquadLiveRefresh
@@ -244,6 +264,8 @@ export default async function PlayerSquadPage({
               matchDayId={selected.matchDayId}
               submitAction={submitPickerAction}
               requestUploadUrlAction={requestUploadUrlAction}
+              initialDraft={initialDraft}
+              saveDraftAction={saveSquadDraftAction}
             />
           </section>
         ) : selected.matchDate > todayWeekStart ? (

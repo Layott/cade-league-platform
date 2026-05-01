@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FutCard } from "./FutCard";
 import {
   PitchLayout,
@@ -14,6 +14,7 @@ import { CardSearchDialog } from "./CardSearchDialog";
 import { LiveTotalsBar, type LiveTotalsRule } from "./LiveTotalsBar";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import type { CardSearchResult } from "@/server/fcdb/search";
+import type { DraftRow } from "@/server/squads/draft";
 
 /**
  * Plan 30 — top-level picker UI component.
@@ -62,6 +63,32 @@ export type SquadPickerBuilderProps = {
     token?: string;
     weekStartDate: string;
   }>;
+  /**
+   * Hydrated picker state from a previously-autosaved draft. NULL on first
+   * visit (no draft yet). The picker seeds its formation / slots / subs /
+   * screenshot state from this on mount via lazy `useState` initializers
+   * — subsequent edits debounce a `saveDraftAction` call to repersist.
+   */
+  initialDraft?: DraftRow | null;
+  /**
+   * Server Action — autosave the in-flight pick state. Called after every
+   * change with an 800ms debounce. The action returns a structured `{ok}`
+   * envelope; the picker logs failures to console.warn but never blocks
+   * UI interactions on a failed save (matches Plan 30 + 47 patterns).
+   */
+  saveDraftAction?: (input: {
+    weekStartDate: string;
+    matchDayId?: string | null;
+    formation: string;
+    slots: Array<{
+      slotIndex: number;
+      fcdbPlayerId: string;
+      positionInLineup: string;
+      cardSnapshot: CardSearchResult;
+    }>;
+    subs: Array<CardSearchResult | null>;
+    screenshotPath: string | null;
+  }) => Promise<{ ok: boolean; error?: string; updatedAt?: string }>;
 };
 
 export function SquadPickerBuilder({
@@ -70,13 +97,22 @@ export function SquadPickerBuilder({
   matchDayId,
   submitAction,
   requestUploadUrlAction,
+  initialDraft,
+  saveDraftAction,
 }: SquadPickerBuilderProps) {
-  const [formation, setFormation] = useState<FormationKey>("433");
+  // Lazy initializers seed from `initialDraft` so a returning player sees
+  // their previous picks immediately, with NO flash of empty state. Missing
+  // / malformed fields fall back to empty defaults — the JSON columns are
+  // intentionally schemaless (see server/squads/draft.ts).
+  const [formation, setFormation] = useState<FormationKey>(() => {
+    const f = initialDraft?.formation;
+    return isFormationKey(f) ? f : "433";
+  });
   const [slots, setSlots] = useState<Record<number, CardSearchResult | null>>(
-    () => emptySlots(),
+    () => seedSlotsFromDraft(initialDraft),
   );
   const [subs, setSubs] = useState<Array<CardSearchResult | null>>(
-    () => Array.from({ length: MAX_SUBS }, () => null),
+    () => seedSubsFromDraft(initialDraft),
   );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTarget, setDialogTarget] = useState<
@@ -84,7 +120,9 @@ export function SquadPickerBuilder({
     | { kind: "sub"; index: number }
     | null
   >(null);
-  const [screenshotPath, setScreenshotPath] = useState<string | null>(null);
+  const [screenshotPath, setScreenshotPath] = useState<string | null>(
+    () => initialDraft?.screenshotPath ?? null,
+  );
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -95,6 +133,67 @@ export function SquadPickerBuilder({
     | { kind: "sub"; index: number }
     | null
   >(null);
+
+  // Debounced autosave (~800ms). Fires whenever any field the player can
+  // change moves: formation, slots, subs, or the screenshot upload pointer.
+  // Skipped on the very first effect run (which would re-save the hydrated
+  // initialDraft for no reason) via `firstAutosaveRunRef`. A failed save is
+  // logged but never blocks UI — autosave is best-effort.
+  const firstAutosaveRunRef = useRef(true);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!saveDraftAction) return;
+    if (firstAutosaveRunRef.current) {
+      firstAutosaveRunRef.current = false;
+      return;
+    }
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      const defs = getFormationSlots(formation);
+      const slotPayload = defs
+        .map((s) => {
+          const card = slots[s.slotIndex];
+          if (!card) return null;
+          return {
+            slotIndex: s.slotIndex,
+            fcdbPlayerId: card.id,
+            positionInLineup: s.label,
+            cardSnapshot: card,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      saveDraftAction({
+        weekStartDate,
+        matchDayId: matchDayId ?? null,
+        formation,
+        slots: slotPayload,
+        subs,
+        screenshotPath,
+      })
+        .then((res) => {
+          if (!res.ok) {
+            console.warn("squad draft autosave failed:", res.error);
+          }
+        })
+        .catch((err) => {
+          console.warn("squad draft autosave threw:", err);
+        });
+    }, 800);
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [
+    formation,
+    slots,
+    subs,
+    screenshotPath,
+    weekStartDate,
+    matchDayId,
+    saveDraftAction,
+  ]);
 
   const filledCount = useMemo(
     () => Object.values(slots).filter((c) => !!c).length,
@@ -606,4 +705,49 @@ function emptySlots(): Record<number, CardSearchResult | null> {
   const out: Record<number, CardSearchResult | null> = {};
   for (let i = 0; i < 11; i++) out[i] = null;
   return out;
+}
+
+const FORMATION_KEYS: ReadonlyArray<FormationKey> = FORMATION_GROUPS.flatMap(
+  (g) => g.keys,
+);
+function isFormationKey(v: unknown): v is FormationKey {
+  return (
+    typeof v === "string" && (FORMATION_KEYS as readonly string[]).includes(v)
+  );
+}
+
+function seedSlotsFromDraft(
+  draft: DraftRow | null | undefined,
+): Record<number, CardSearchResult | null> {
+  const out = emptySlots();
+  if (!draft || !Array.isArray(draft.slots)) return out;
+  for (const s of draft.slots) {
+    if (
+      s &&
+      typeof s.slotIndex === "number" &&
+      s.slotIndex >= 0 &&
+      s.slotIndex < 11 &&
+      s.card
+    ) {
+      out[s.slotIndex] = s.card as CardSearchResult;
+    }
+  }
+  return out;
+}
+
+function seedSubsFromDraft(
+  draft: DraftRow | null | undefined,
+): Array<CardSearchResult | null> {
+  const base: Array<CardSearchResult | null> = Array.from(
+    { length: MAX_SUBS },
+    () => null,
+  );
+  if (!draft || !Array.isArray(draft.subs)) return base;
+  for (let i = 0; i < MAX_SUBS; i++) {
+    const c = draft.subs[i];
+    if (c && typeof c === "object" && typeof (c as CardSearchResult).id === "string") {
+      base[i] = c as CardSearchResult;
+    }
+  }
+  return base;
 }

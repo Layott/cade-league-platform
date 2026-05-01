@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createSubmission } from "./submit";
+import { clearDraft } from "./draft";
 import { ConflictError, ValidationError } from "./errors";
 
 /**
@@ -255,6 +256,27 @@ export async function submitPickerSquad(
         .update({ resolved_fc_player_id: slot.fcdbPlayerId })
         .eq("id", itemId);
     }
+  }
+
+  // 5. Clear the autosave draft for this player + week. Squad drafts are
+  //    keyed on `users.id` (set_by + player_id columns both point at users)
+  //    so we resolve the owning user via `players.user_id`. Best-effort —
+  //    a failure here doesn't unwind the submission; the partial unique
+  //    index allows multiple soft-deleted drafts so a stale row only
+  //    causes harmless rehydration noise on the next visit.
+  try {
+    const { data: playerRow } = await sb
+      .from("players")
+      .select("user_id")
+      .eq("id", v.playerId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    const ownerUserId = (playerRow as { user_id: string } | null)?.user_id;
+    if (ownerUserId) {
+      await clearDraft(sb, ownerUserId, v.weekStartDate);
+    }
+  } catch {
+    // best-effort; submission is the durable record
   }
 
   return result;

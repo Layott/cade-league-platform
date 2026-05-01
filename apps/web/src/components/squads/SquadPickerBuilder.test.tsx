@@ -162,6 +162,80 @@ describe("SquadPickerBuilder", () => {
     expect(cbFilled).toBeGreaterThanOrEqual(2);
   });
 
+  it("hydrates state from initialDraft on mount (formation + slot 0 visible)", () => {
+    const card = mkCard({ name: "Hydrated" });
+    render(
+      <SquadPickerBuilder
+        weekStartDate="2026-04-16"
+        rule={null}
+        submitAction={vi.fn()}
+        requestUploadUrlAction={vi.fn()}
+        initialDraft={{
+          formation: "442",
+          slots: [{ slotIndex: 0, card }],
+          subs: [card, null, null, null, null, null, null],
+          screenshotPath: "seasons/s/players/p/weeks/w/x.png",
+          updatedAt: "2026-04-30T10:00:00Z",
+        }}
+      />,
+    );
+    // Slot 0 carries data-card-id from the hydrated card.
+    expect(
+      screen.getByTestId("pitch-slot-0").getAttribute("data-card-id"),
+    ).toBeTruthy();
+    // Sub slot 0 also hydrated.
+    expect(
+      screen.getByTestId("sub-slot-0").getAttribute("data-card-id"),
+    ).toBeTruthy();
+    // Screenshot pre-populated → upload-ok pip is rendered.
+    expect(screen.queryByTestId("picker-upload-ok")).toBeTruthy();
+  });
+
+  it("fires saveDraftAction (debounced) after a pick", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (String(url).startsWith("/api/fcdb/search")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ results: [mkCard()] }),
+        });
+      }
+      return Promise.resolve({ ok: true });
+    });
+    const saveDraftAction = vi
+      .fn()
+      .mockResolvedValue({ ok: true, updatedAt: "2026-04-30T10:00:00Z" });
+
+    render(
+      <SquadPickerBuilder
+        weekStartDate="2026-04-16"
+        rule={null}
+        submitAction={vi.fn()}
+        requestUploadUrlAction={vi.fn()}
+        saveDraftAction={saveDraftAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("pitch-slot-0"));
+    fireEvent.change(screen.getByTestId("card-search-input"), {
+      target: { value: "Mbappe" },
+    });
+    const row = await screen.findByTestId("card-search-result-0");
+    fireEvent.click(row.querySelector("button[type='button']")!);
+
+    // 800ms debounce → wait until autosave fires.
+    await waitFor(
+      () => {
+        expect(saveDraftAction).toHaveBeenCalled();
+      },
+      { timeout: 2000 },
+    );
+    const payload = saveDraftAction.mock.calls[0][0];
+    expect(payload.weekStartDate).toBe("2026-04-16");
+    expect(Array.isArray(payload.slots)).toBe(true);
+    expect(payload.slots.length).toBe(1);
+    expect(payload.slots[0].slotIndex).toBe(0);
+  });
+
   it("enables submit button once 11 slots + screenshot landed", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (String(url).startsWith("/api/fcdb/search")) {
