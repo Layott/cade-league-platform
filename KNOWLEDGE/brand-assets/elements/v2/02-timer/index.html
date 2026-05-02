@@ -125,6 +125,14 @@
     var py = (+layout.positionYPx) || 0;
     var sx = ((+layout.scalePct) || 100) / 100;
     var transformOps = [];
+    // Bug 12 (2026-05-01) — *-center anchors must honour positionXPx /
+    // positionYPx as a NUDGE from canvas center. Earlier impl hard-set
+    // left:50% / top:50% and only emitted translateX(-50%) /
+    // translateY(-50%), causing the input field to be visually inert
+    // on bottom-center / middle-center / top-center anchors. Fix: keep
+    // left:50% / top:50% as the centre reference, but bake positionXPx
+    // / positionYPx into the translate via calc() so the strip nudges
+    // off centre by the user-entered px count (positive = right/down).
     if (anchor.indexOf('top') === 0) {
       declarations.push('top:' + py + 'px');
       declarations.push('bottom:auto');
@@ -132,9 +140,10 @@
       declarations.push('bottom:' + (1080 - py) + 'px');
       declarations.push('top:auto');
     } else {
-      declarations.push('top:' + py + 'px');
+      // middle-* — anchor at 50% Y, NUDGE by positionYPx.
+      declarations.push('top:50%');
       declarations.push('bottom:auto');
-      transformOps.push('translateY(-50%)');
+      transformOps.push(py === 0 ? 'translateY(-50%)' : 'translateY(calc(-50% + ' + py + 'px))');
     }
     if (anchor.indexOf('left') !== -1) {
       declarations.push('left:' + px + 'px');
@@ -143,9 +152,10 @@
       declarations.push('right:' + (1920 - px) + 'px');
       declarations.push('left:auto');
     } else {
+      // *-center — anchor at 50% X, NUDGE by positionXPx.
       declarations.push('left:50%');
       declarations.push('right:auto');
-      transformOps.push('translateX(-50%)');
+      transformOps.push(px === 0 ? 'translateX(-50%)' : 'translateX(calc(-50% + ' + px + 'px))');
     }
     if (sx !== 1) transformOps.push('scale(' + sx + ')');
     if (transformOps.length) {
@@ -395,19 +405,51 @@
             stripScroll.appendChild(track);
             var s6 = document.createElement('style');
             s6.id = 'cade-injected-partner-scroll';
-            // The strip becomes a fixed-width window:
-            //  - keeps its anchor/position/transform from layout tokens
-            //  - overflow:hidden clips the moving track
-            //  - justify-content reset to flex-start so the track always
-            //    begins flush with the strip's left edge (anchor side)
-            //  - flex-wrap forced nowrap so the track is single-row
+            // Bug 12 (2026-05-01) — when scroll is ON, the strip must
+            // span the full canvas width so the marquee runway has a
+            // bounded horizontal window. Earlier impl kept the design-
+            // token anchor + transform on the strip (e.g. translateX
+            // (-50%) on bottom-center), but with width:auto the strip
+            // sized to the track's max-content and visually drifted
+            // (right-bunched) because translateX shifted a content-
+            // sized box off-axis. Fix: when scroll is on, force the
+            // strip to left:0; right:0; width:auto so it spans the
+            // canvas; reset the X-axis transform piece so any
+            // translateX(-50%) anchor offset stops shifting the
+            // window. The vertical anchor (top/bottom positioning
+            // from layout tokens) is preserved by emitting these
+            // overrides as side-effects on the strip's existing
+            // transform — we replace the whole transform with the
+            // vertical-only piece (translateY for middle-* anchor) +
+            // any scale.
+            //
+            // Authoritative override for HORIZONTAL placement when
+            // scroll is on:
+            //  - left:0; right:0 -> strip spans canvas
+            //  - transform:none -> drop translateX(-50%) which would
+            //    shift the now full-width strip off-canvas to the left
+            //    (vertical positioning is handled by top/bottom px in
+            //    the design-tokens block which still applies)
+            //  - overflow:hidden clips the track
+            //  - justify-content:flex-start so the track aligns flush
+            //    to the strip's left edge (the marquee animation
+            //    handles the rest)
+            //  - flex-wrap:nowrap so children stay single-row
+            //
             // The track itself:
-            //  - width:max-content so it can hold all kids + clones
+            //  - width:max-content so it holds all kids + clones
             //  - gap inherited so brand spacing stays consistent
             //  - flex-direction matches the strip (vertical/horizontal)
             //  - animation translateX -50% creates the seamless loop
+            //
+            // NOTE: positionXPx is intentionally ignored when scroll
+            // is on. The marquee loops through every logo on every
+            // pass — so X-offset within the canvas is meaningless;
+            // each logo passes through every horizontal coordinate.
+            // Y-anchor + scale still apply via the design-token
+            // block; only the X-anchor + X-translate get neutralised.
             s6.textContent =
-              '[data-element-id="partners-strip"]{overflow:hidden !important;justify-content:flex-start !important;flex-wrap:nowrap !important;}' +
+              '[data-element-id="partners-strip"]{left:0 !important;right:0 !important;width:auto !important;transform:none !important;overflow:hidden !important;justify-content:flex-start !important;flex-wrap:nowrap !important;}' +
               '[data-element-id="partners-strip"] > .cade-partner-track{display:flex;flex-direction:inherit;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
               '@keyframes cade-partner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}';
             document.head.appendChild(s6);
