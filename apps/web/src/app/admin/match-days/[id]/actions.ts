@@ -106,6 +106,12 @@ export async function addFixtureAction(formData: FormData) {
   await pingFixtures(sb, matchDayId, "match_added");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
+  // Bug 1 fix (2026-05-01): downstream surfaces that show fixture rows or
+  // counts must repaint after a mutation here.
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 export async function addMatchAction(formData: FormData) {
@@ -127,6 +133,10 @@ export async function editMatchAction(formData: FormData) {
   await pingFixtures(sb, matchDayId, "match_edited");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 export async function removeMatchAction(formData: FormData) {
@@ -139,6 +149,10 @@ export async function removeMatchAction(formData: FormData) {
   await pingFixtures(sb, matchDayId, "match_removed");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 /**
@@ -217,6 +231,10 @@ export async function enterResultAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 export async function editResultAction(formData: FormData) {
@@ -248,6 +266,10 @@ export async function editResultAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 export async function confirmResultAction(formData: FormData) {
@@ -260,6 +282,10 @@ export async function confirmResultAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 // Plan 27 — publish a match day to the public /fixtures page.
@@ -272,6 +298,9 @@ export async function publishMatchDayAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 // Plan 27 — withdraw a published match day from the public /fixtures page.
@@ -284,6 +313,9 @@ export async function unpublishMatchDayAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 // Mark a match day as completed — drops it from the homepage "Upcoming"
@@ -299,6 +331,9 @@ export async function markMatchDayCompleteAction(formData: FormData) {
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
   revalidatePath("/");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 // Reopen a previously-completed match day (back to scheduled). Used when
@@ -313,6 +348,9 @@ export async function reopenMatchDayAction(formData: FormData) {
   revalidatePath("/admin/match-days");
   revalidatePath("/fixtures");
   revalidatePath("/");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 /**
@@ -355,6 +393,10 @@ export async function reorderMatchAction(formData: FormData) {
   await pingFixtures(sb, matchDayId, "match_reordered");
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 /**
@@ -381,6 +423,10 @@ export async function unvoidMatchAction(formData: FormData) {
   revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
   revalidatePath("/fixtures");
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
 }
 
 export async function backToList() {

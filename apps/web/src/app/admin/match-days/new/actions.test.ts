@@ -8,6 +8,11 @@ const redirectMock = vi.hoisted(() => vi.fn((url: string) => {
 
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
+// `revalidatePath` is invoked on the success path before the redirect; the
+// vitest harness has no Next.js static-generation store, so we stub it so
+// the redirect-throw assertion still surfaces (Bug 1, 2026-05-01).
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
 const createMatchDayMock = vi.hoisted(() => vi.fn());
 vi.mock("@/server/matches/match-days", () => ({
   createMatchDay: createMatchDayMock,

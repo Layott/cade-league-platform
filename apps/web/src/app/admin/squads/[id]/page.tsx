@@ -105,37 +105,79 @@ export default async function AdminSquadDetailPage({
   // the match day's date+venue so the header can label it. Player↔admin
   // parity rule: the player's `/player/squad?matchDay=<id>` page surfaces
   // this match-day context — admin must too.
+  //
+  // Hardened (2026-05-01) — wrapped in try/catch so a transient Supabase
+  // failure during reopen-induced revalidate (status flip rejected→pending)
+  // can't crash the Server Component render. Logs to console.error so dev
+  // regressions are still visible; falls back to null label.
   let matchDayLabel: { matchDate: string; venueName: string } | null = null;
   if (submission.match_day_id) {
-    const { data: md } = await sb
-      .from("match_days")
-      .select("match_date, venue_name")
-      .eq("id", submission.match_day_id)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (md) {
-      matchDayLabel = {
-        matchDate: md.match_date,
-        venueName: md.venue_name,
-      };
+    try {
+      const { data: md, error: mdErr } = await sb
+        .from("match_days")
+        .select("match_date, venue_name")
+        .eq("id", submission.match_day_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (mdErr) {
+        console.error(
+          `[admin/squads/${submission.id}] match_days fetch failed:`,
+          mdErr,
+        );
+      } else if (md) {
+        matchDayLabel = {
+          matchDate: md.match_date,
+          venueName: md.venue_name,
+        };
+      }
+    } catch (err) {
+      console.error(
+        `[admin/squads/${submission.id}] match_days threw:`,
+        err,
+      );
     }
   }
 
   // Plan 10 extension — load the live Friday change request (if any) so
   // admins can see the player's proposed formation/slot/swap delta.
-  const { data: changeRow } = await sb
-    .from("squad_change_requests")
-    .select(
-      `id, created_at, new_formation, new_slot_positions,
-       player_out_name, player_out_item_id,
-       player_in_name, player_in_item_type, player_in_rating, player_in_value,
-       player_in_nationality_flag,
-       authorized_by_ref_user_id,
-       ref:users!squad_change_requests_authorized_by_ref_user_id_fkey (display_name)`,
-    )
-    .eq("submission_id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
+  //
+  // Hardened (2026-05-01) — wrapped in try/catch so a transient supabase
+  // error returned post-reopen revalidate doesn't crash the page. The
+  // local helper preserves the inferred PostgREST shape so the JSX block
+  // below — `new_slot_positions as Array<...>` and `ref` embed shape
+  // narrowing — keeps compiling.
+  async function loadChangeRow() {
+    try {
+      const { data, error: crErr } = await sb
+        .from("squad_change_requests")
+        .select(
+          `id, created_at, new_formation, new_slot_positions,
+           player_out_name, player_out_item_id,
+           player_in_name, player_in_item_type, player_in_rating, player_in_value,
+           player_in_nationality_flag,
+           authorized_by_ref_user_id,
+           ref:users!squad_change_requests_authorized_by_ref_user_id_fkey (display_name)`,
+        )
+        .eq("submission_id", id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (crErr) {
+        console.error(
+          `[admin/squads/${submission.id}] squad_change_requests fetch failed:`,
+          crErr,
+        );
+        return null;
+      }
+      return data;
+    } catch (err) {
+      console.error(
+        `[admin/squads/${submission.id}] squad_change_requests threw:`,
+        err,
+      );
+      return null;
+    }
+  }
+  const changeRow = await loadChangeRow();
 
   const itemById = new Map(items.map((it) => [it.id, it]));
 

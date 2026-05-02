@@ -69,7 +69,12 @@ export async function updateOrgAction(formData: FormData): Promise<void> {
   });
   revalidatePath(`/admin/people/orgs/${input.id}`);
   revalidatePath("/admin/people/orgs");
+  revalidatePath("/admin/people/players");
   revalidatePath("/overlay/v2/15-orgs", "page");
+  revalidatePath("/overlay/v2/16-coaches", "page");
+  revalidatePath("/overlay/v2/04-h2h-2", "page");
+  revalidatePath("/overlay/v2/05-h2h-3", "page");
+  revalidatePath("/overlay/v2/06-h2h-5", "page");
 }
 
 export async function linkPlayerAction(formData: FormData): Promise<void> {
@@ -77,6 +82,17 @@ export async function linkPlayerAction(formData: FormData): Promise<void> {
   const input = parseLinkPlayerForm(formData);
   await linkPlayer(sb, input);
   revalidatePath(`/admin/people/orgs/${input.orgId}`);
+  // Bug 12 fix (2026-05-01): a newly-linked player must surface in the
+  // orgs/coaches overlays + h2h endpoints (which embed org logos when
+  // the player has been linked). Revalidate broadly so the operator
+  // sees the linkage everywhere.
+  revalidatePath("/admin/people/orgs");
+  revalidatePath("/admin/people/players");
+  revalidatePath("/overlay/v2/15-orgs", "page");
+  revalidatePath("/overlay/v2/16-coaches", "page");
+  revalidatePath("/overlay/v2/04-h2h-2", "page");
+  revalidatePath("/overlay/v2/05-h2h-3", "page");
+  revalidatePath("/overlay/v2/06-h2h-5", "page");
 }
 
 export async function unlinkPlayerAction(formData: FormData): Promise<void> {
@@ -86,6 +102,13 @@ export async function unlinkPlayerAction(formData: FormData): Promise<void> {
   if (!orgId || !playerId) throw new Error("orgId + playerId required");
   await unlinkPlayer(sb, playerId);
   revalidatePath(`/admin/people/orgs/${orgId}`);
+  revalidatePath("/admin/people/orgs");
+  revalidatePath("/admin/people/players");
+  revalidatePath("/overlay/v2/15-orgs", "page");
+  revalidatePath("/overlay/v2/16-coaches", "page");
+  revalidatePath("/overlay/v2/04-h2h-2", "page");
+  revalidatePath("/overlay/v2/05-h2h-3", "page");
+  revalidatePath("/overlay/v2/06-h2h-5", "page");
 }
 
 export async function linkCoachAction(formData: FormData): Promise<void> {

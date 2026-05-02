@@ -48,6 +48,16 @@ export async function createOrgAction(formData: FormData): Promise<void> {
     contactRepUserId: input.contactRepUserId ?? null,
     status: "active",
   });
+  // Bug 12 fix (2026-05-01): a brand-new (empty) org should still appear
+  // in downstream surfaces — the orgs/coaches overlay enumerations + h2h
+  // endpoints embed org logos. Revalidate eagerly so the operator sees
+  // the new row everywhere even before linking players.
   revalidatePath("/admin/people/orgs");
+  revalidatePath("/admin/people/players");
+  revalidatePath("/overlay/v2/15-orgs", "page");
+  revalidatePath("/overlay/v2/16-coaches", "page");
+  revalidatePath("/overlay/v2/04-h2h-2", "page");
+  revalidatePath("/overlay/v2/05-h2h-3", "page");
+  revalidatePath("/overlay/v2/06-h2h-5", "page");
   redirect(`/admin/people/orgs/${row.id}`);
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { createMatchDay } from "@/server/matches/match-days";
 
@@ -47,5 +48,12 @@ export async function createMatchDayAction(formData: FormData) {
       `/admin/match-days/new?error=create-failed&detail=${encodeURIComponent(createError.slice(0, 200))}`
     );
   }
+  // Revalidate downstream pages whose row counts / lists depend on the new
+  // match day (calendar count column, tournament admin tabs).
+  revalidatePath("/admin/match-days");
+  revalidatePath("/admin/tournament/fixtures");
+  revalidatePath("/admin/tournament/results-entry");
+  revalidatePath("/admin/tournament/walkovers");
+  revalidatePath("/fixtures");
   redirect(`/admin/match-days/${newId}`);
 }
