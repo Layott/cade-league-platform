@@ -1168,3 +1168,66 @@ Confirmed: HTML's `renderSubs()` iterates `items.length` not hardcoded 7. CSS gr
 
 - `project_overlay_19_player_squads.md` (new) — full spec + scope + key gotchas.
 - `MEMORY.md` index — link entry under archive line.
+
+---
+
+## 2026-05-01 — 18-bug user brief — FINAL REVIEW
+
+All 18 bugs closed across 10 commits. Verification gate green: 2239/2239 tests, lint 0 errors, build clean.
+
+### Commit ledger
+
+| Commit | Slice | Bugs | Subject |
+|---|---|---|---|
+| `67ecd69d` | B | 2 | attendance: deny-direct RLS write policies |
+| `baa1eaa4` | D | 9 | squad-search: exact-match-first ranking + limit 10→25 + scroll indicator |
+| `14a13173` | J | 7 | scraper: capture nation name + flag + backfill nation_iso for ~22k rows |
+| `75e04531` | I | 3, 4 | squad-window: per-MD deadline override + Sunday matchday time fix |
+| `118f1c5f` | A | 1, 8, 12 | admin: revalidate downstream pages + guard squad reopen |
+| `7d30a9ad` | G | 13, 17, 18 | overlays: partner-strip anchor preserved with scroll + match-day refetch + score publish audit |
+| `58f9698c` | E | 10 | squad+broadcast: persist formation + compute chemistry for player-squads overlay |
+| `c42fc104` | F | 11 | auth: loosen login lockout threshold + admin unlock action + distinct error codes |
+| `c7df036b` | H | 14, 15, 16 | images: central processImage helper + OAS colored swap + h2h-2 org logo bigger |
+| `072522d5` | C | 5, 6 | player-squad: edit existing submission + clear roster + apply-to-other-match-days |
+
+### Migrations applied
+
+- `20260620000019_users_unlock_perm_seed.sql` (Slice F) — users.unlock perm seeded for admin/loc/idc.
+- `20260701000001_attendance_marks_rls_writes.sql` (Slice B) — deny-direct INSERT/UPDATE/DELETE for authenticated.
+- `20260701000002_squad_submissions_formation.sql` (Slice E) — formation column + check constraint covering 21 PitchLayout labels.
+- `20260701000003_match_day_schedule_overrides.sql` (Slice I) — per-MD submission deadline + change-window time overrides.
+- `20260701000004_sunday_matchday_times.sql` (Slice I) — backfill 4 Sundays to 12:00 arrival / 13:00 start.
+- `20260701000005_oas_colored_logo.sql` (Slice H) — swap OAS partner logo URL to colored variant.
+
+### Per-bug closure
+
+| # | Bug | Closure |
+|---|---|---|
+| 1 | Fixture mutations don't propagate | revalidatePath added to 13 mutation handlers + create. |
+| 2 | Attendance crash | RLS deny-direct migration. Service-role path was already correct; contract now explicit. |
+| 3 | Squad window admin override | New `match_day_schedule_overrides` table + ScheduleOverrideControls UI. Friday change-window stays automatic. |
+| 4 | Sunday matchday time | 4 Sundays backfilled to 12:00/13:00. New form defaults match. |
+| 5 | Per-MD revert + apply-to-multiple | New `applySquadToMultipleMatchDaysAction` + ApplySquadToOtherMDs UI. |
+| 6 | Edit submitted + clear + Submit→Edit toggle | Edit CTA on `submitted+windowOpen+pending`. Clear roster button. Picker hydrates from existing submission via `?edit=1`. |
+| 7 | Scraper coverage + Ajibade | 22,835/22,839 (99.98%) `nation_iso` resolved. 198 Nigerian rows tagged. Ajibade r83+r89 `iso=NG`. |
+| 8 | Reopen submission Server Component crash | try-catch + console.error on match_days + squad_change_requests fetches. |
+| 9 | Search ranking + scroll | Limit 10→25; exact-match-first ranking; "Showing N results" indicator. |
+| 10 | Chemistry + formation broadcast + 451→4411 | Chemistry computed end-to-end. Formation persisted. PitchLayout 4-5-1 → canonical LM/CM/CM/CM/RM/ST. |
+| 11 | Login lockout false positives | Threshold > not >=, window 1m→5m, distinct error codes, admin unlockPlayerAccountAction. |
+| 12 | New org for Mr Oga not on overlays | Org link/unlink/create now revalidate `/overlay/v2/{15-orgs,16-coaches,04-h2h-2,05-h2h-3,06-h2h-5}`. |
+| 13 | Partner-strip scroll breaks anchor | Bootstrap restructured: outer strip keeps anchor; inner track moves with scroll. |
+| 14 | OAS colored logo swap | Migration 20260701000005 swaps URL. Two new processed variants. |
+| 15 | h2h-2 org logos bigger | `.player-org` height 56px → 96px. |
+| 16 | Image upload auto-resize | `lib/image-processing.ts` with 5 use-case recipes. uploadPartnerLogoAction wired. |
+| 17 | Live overlay updates on score | 6 new publishScoreChanged/publishMatchEnded call sites: walkover insert/undo/confirm, forfeits, endMatch, unvoid. |
+| 18 | Match-scores-day stuck on week 1 | OverlayDataInjector tracks matchDayId from poll + bumps re-fetch tick on change. |
+
+### Verification gate
+
+- `npm run lint` — 0 errors, 20 pre-existing warnings.
+- `npm run build` — clean. All routes registered.
+- `npx vitest run` — 2239/2239 tests pass (was 2155 baseline → +84 net).
+
+### Post-push prod verification
+
+PENDING: route-by-route table per CLAUDE.md §12 against `https://cade-league.vercel.app`.
