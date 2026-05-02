@@ -44,6 +44,10 @@ export async function listMatchDays(
   sb: SupabaseClient,
   seasonId: string
 ): Promise<MatchDaySummary[]> {
+  // Bug 1 (2026-05-02): PostgREST embeds do not inherit parent .is filters.
+  // Without `matches.deleted_at IS NULL` the count() includes soft-deleted
+  // fixtures and never decrements on admin delete. See listMatchDaysWithTags
+  // for the same fix applied to the tag-bearing variant.
   const { data, error } = await sb
     .from("match_days")
     .select(
@@ -51,6 +55,7 @@ export async function listMatchDays(
     )
     .eq("season_id", seasonId)
     .is("deleted_at", null)
+    .is("matches.deleted_at", null)
     .order("match_date", { ascending: false });
   if (error) throw new Error(`listMatchDays failed: ${error.message}`);
   return (data ?? []).map(
@@ -87,6 +92,12 @@ export async function listMatchDaysWithTags(
   sb: SupabaseClient,
   seasonId: string
 ): Promise<MatchDaySummaryWithTags[]> {
+  // Bug 1 root cause (2026-05-02 deep dive): PostgREST embeds do NOT
+  // inherit the parent's `.is("deleted_at", null)` filter. Without an
+  // explicit `matches.deleted_at IS NULL`, soft-deleted fixtures still
+  // show up in the embed → `match_count` never decreases when admins
+  // delete a fixture. The earlier revalidate fix kept the page fresh
+  // but the data source itself was lying. Fix: filter the embed.
   const { data, error } = await sb
     .from("match_days")
     .select(
@@ -94,6 +105,7 @@ export async function listMatchDaysWithTags(
       id, season_id, match_date, venue_name, status, published_at,
       matches:matches (
         id,
+        deleted_at,
         home_player:home_player_id ( id, gamer_tag ),
         away_player:away_player_id ( id, gamer_tag )
       )
@@ -101,11 +113,13 @@ export async function listMatchDaysWithTags(
     )
     .eq("season_id", seasonId)
     .is("deleted_at", null)
+    .is("matches.deleted_at", null)
     .order("match_date", { ascending: false });
   if (error) throw new Error(`listMatchDaysWithTags failed: ${error.message}`);
 
   type MatchRow = {
     id: string;
+    deleted_at: string | null;
     home_player: { id: string; gamer_tag: string }[] | { id: string; gamer_tag: string } | null;
     away_player: { id: string; gamer_tag: string }[] | { id: string; gamer_tag: string } | null;
   };

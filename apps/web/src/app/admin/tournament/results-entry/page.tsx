@@ -27,13 +27,15 @@ export default async function ResultsEntryPage() {
     );
   }
 
+  // Bug 1 (2026-05-02): PostgREST embeds need explicit `matches.deleted_at`
+  // filter — soft-deleted fixtures otherwise leak into this list.
   const { data: rawDays, error } = await svc
     .from("match_days")
     .select(
       `
       id, match_date, venue_name,
       matches:matches (
-        id, scheduled_time,
+        id, scheduled_time, deleted_at,
         home:home_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
         away:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
         result:match_results ( id, result_type, home_score, away_score, notes )
@@ -42,6 +44,7 @@ export default async function ResultsEntryPage() {
     )
     .eq("season_id", season.id)
     .is("deleted_at", null)
+    .is("matches.deleted_at", null)
     .order("match_date", { ascending: true });
 
   if (error) {

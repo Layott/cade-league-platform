@@ -49,13 +49,17 @@ export default async function FixturesPage() {
     );
   }
 
+  // Bug 1 (2026-05-02): PostgREST embeds do not inherit parent .is filters.
+  // Filter the matches embed by deleted_at IS NULL so soft-deleted fixtures
+  // don't show up in the admin tournament fixtures list. Same root cause as
+  // listMatchDaysWithTags + listMatchDays in server/matches/match-days.ts.
   const { data: matchDays, error: mdErr } = await svc
     .from("match_days")
     .select(
       `
       id, match_date, venue_name,
       matches:matches (
-        id, match_day_id, scheduled_time, status,
+        id, match_day_id, scheduled_time, status, deleted_at,
         home:home_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
         away:away_player_id ( id, gamer_tag, users:users!players_user_id_fkey ( display_name ) ),
         result:match_results ( home_score, away_score, result_type, is_walkover, walkover_pending )
@@ -64,6 +68,7 @@ export default async function FixturesPage() {
     )
     .eq("season_id", season.id)
     .is("deleted_at", null)
+    .is("matches.deleted_at", null)
     .order("match_date", { ascending: true });
 
   if (mdErr) {
