@@ -385,6 +385,24 @@ async function main() {
     fs.writeFileSync(out, JSON.stringify(errors, null, 2));
     console.log(`  errors logged → ${out}`);
   }
+
+  // 2026-05-02 — fan out fcdb.refreshed so 19-player-squads overlay
+  // re-fetches chem without operator intervention. Skipped on dry-run.
+  if (!dryRun && stats.wrote > 0) {
+    try {
+      const { publishFcdbRefreshed } = require("./_lib_realtime");
+      await publishFcdbRefreshed(sb, {
+        rowsChanged: stats.wrote,
+        source: "backfill_upgraded_card_data",
+      });
+      console.log("  fcdb.refreshed: published");
+    } catch (err) {
+      console.error(
+        "  fcdb.refreshed: publish failed:",
+        err && err.message ? err.message : err,
+      );
+    }
+  }
 }
 
 main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });

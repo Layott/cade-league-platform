@@ -343,6 +343,17 @@ async function main() {
 
   fs.writeFileSync(path.resolve(__dirname, "futbin_new_inserted.json"), JSON.stringify(inserted, null, 2));
   fs.writeFileSync(path.resolve(__dirname, "futbin_new_updates.json"), JSON.stringify(updates, null, 2));
+  // 2026-05-02 — fan out fcdb.refreshed so 19-player-squads overlay
+  // re-fetches chem without operator intervention.
+  try {
+    const { publishFcdbRefreshed } = require("./_lib_realtime");
+    await publishFcdbRefreshed(sb, {
+      rowsChanged: inserted.length + updates.length,
+      source: "delta_scraper",
+    });
+  } catch (err) {
+    console.error("[new] fcdb.refreshed publish failed:", err && err.message ? err.message : err);
+  }
   await ctx.close();
 }
 main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });

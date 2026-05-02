@@ -447,6 +447,17 @@ async function main() {
   fs.writeFileSync(INSERTED_PATH, JSON.stringify(inserted, null, 2));
   fs.writeFileSync(UNMATCHED_PATH, JSON.stringify(unmatched, null, 2));
   console.log("[headful] done:", stats);
+  // 2026-05-02 — fan out fcdb.refreshed so 19-player-squads overlay
+  // re-fetches chem without operator intervention.
+  try {
+    const { publishFcdbRefreshed } = require("./_lib_realtime");
+    await publishFcdbRefreshed(sb, {
+      rowsChanged: (stats.inserted || 0) + (stats.updated || 0),
+      source: "headful_scraper",
+    });
+  } catch (err) {
+    console.error("[headful] fcdb.refreshed publish failed:", err && err.message ? err.message : err);
+  }
   console.log("[headful] You can close the browser window now.");
   await browser.close();
 }

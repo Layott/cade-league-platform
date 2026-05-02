@@ -301,5 +301,16 @@ async function main() {
   await Promise.all(slices.map((s) => worker(s.workerId, s.from, s.to, sb, sharedStats)));
 
   console.log("\n[parallel] done:", sharedStats);
+  // 2026-05-02 — fan out fcdb.refreshed so 19-player-squads overlay
+  // re-fetches chem without operator intervention.
+  try {
+    const { publishFcdbRefreshed } = require("./_lib_realtime");
+    await publishFcdbRefreshed(sb, {
+      rowsChanged: (sharedStats.inserted || 0) + (sharedStats.updated || 0),
+      source: "parallel_scraper",
+    });
+  } catch (err) {
+    console.error("[parallel] fcdb.refreshed publish failed:", err && err.message ? err.message : err);
+  }
 }
 main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });

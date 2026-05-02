@@ -929,6 +929,69 @@ export default function OverlayDataInjector({
   }, [overlayKey, currentSeasonId, currentSessionId, currentToken]);
 
   /* --------------------------------------------------------------- *
+   * 1b. fcdb.refreshed global channel (chem-dependent overlays)     *
+   *                                                                 *
+   * 2026-05-02 — `19-player-squads` reads chem live from the        *
+   * fc26_players table. When a scraper / backfill fills NULL club / *
+   * league / alt_positions on rows the overlay just rendered, the   *
+   * cached `payload.chemistry.total` stays stale (pre-backfill chem *
+   * was 7/33; post-backfill the cards finally contribute their tier *
+   * points and total flips to 32/33). Without this channel the OBS  *
+   * source keeps the stale total until the operator manually re-    *
+   * triggers the overlay.                                           *
+   *                                                                 *
+   * Channel is GLOBAL (not per-season) — fcdb refreshes affect      *
+   * every player. Single subscription on the iframe side covers all *
+   * 13 league players.                                              *
+   * --------------------------------------------------------------- */
+  useEffect(() => {
+    if (overlayKey !== "19-player-squads") return;
+    if (!currentSessionId) return;
+
+    const sb = getBrowserSupabase();
+    const channel = sb.channel("public:fcdb", {
+      config: { broadcast: { self: false } },
+    });
+
+    const fetchBuilder = INITIAL_FETCH_PATH[overlayKey];
+    if (!fetchBuilder) return;
+
+    channel.on("broadcast", { event: "fcdb.refreshed" }, () => {
+      const iframe = iframeRef.current;
+      if (!iframe || !iframe.contentWindow) return;
+      void (async () => {
+        try {
+          const url = fetchBuilder(currentSessionId, overlayKey);
+          const fetchUrl = currentToken
+            ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
+            : url;
+          const res = await fetch(fetchUrl, { cache: "no-store" });
+          if (!res.ok) return;
+          const data = await res.json();
+          const ifr = iframeRef.current;
+          if (!ifr || !ifr.contentWindow) return;
+          ifr.contentWindow.postMessage(
+            { type: "update", event: "fcdb.refreshed", payload: data, data: data },
+            "*",
+          );
+        } catch {
+          /* swallow — re-fire next time */
+        }
+      })();
+    });
+
+    channel.subscribe();
+
+    return () => {
+      try {
+        sb.removeChannel(channel);
+      } catch {
+        // best-effort cleanup
+      }
+    };
+  }, [overlayKey, currentSessionId, currentToken]);
+
+  /* --------------------------------------------------------------- *
    * 2. Parent postMessage relay (control panel → overlay iframe)    *
    * --------------------------------------------------------------- */
   useEffect(() => {
