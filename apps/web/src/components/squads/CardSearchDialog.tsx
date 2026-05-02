@@ -8,8 +8,9 @@ import { CardDetailModal } from "./CardDetailModal";
  * Plan 30 — typeahead search modal.
  *
  * Opens when the player clicks an empty slot. Debounces the input 250ms,
- * hits `POST /api/fcdb/search`, renders ≤10 results as clickable rows.
- * Arrow-key navigation + Enter to select. Esc + overlay click close.
+ * hits `POST /api/fcdb/search`, renders up to `SEARCH_LIMIT` results as
+ * clickable rows. Arrow-key navigation + Enter to select. Esc + overlay
+ * click close.
  *
  * Empty catalogue path: if the endpoint returns `{ results: [] }` after a
  * non-trivial query, show the "No matches — ask admin to import catalogue"
@@ -24,6 +25,12 @@ export type CardSearchDialogProps = {
 };
 
 const DEBOUNCE_MS = 250;
+
+// Bug 9 fix (2026-05-01): default was 10 — players couldn't see "Kaka"
+// because "Kanu" outranked it inside the truncated window. Bumped to 25 +
+// added exact-match-first ranking server-side. The result container is
+// scrollable so high-N is fine.
+const SEARCH_LIMIT = 25;
 
 export function CardSearchDialog({
   open,
@@ -70,7 +77,11 @@ export function CardSearchDialog({
         const res = await fetch("/api/fcdb/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ q: q.trim(), position: slotLabel }),
+          body: JSON.stringify({
+            q: q.trim(),
+            position: slotLabel,
+            limit: SEARCH_LIMIT,
+          }),
           signal: ctrl.signal,
         });
         if (!res.ok) {
@@ -163,8 +174,27 @@ export function CardSearchDialog({
           className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-2 text-sm text-[var(--chalk-0)] placeholder:text-[var(--chalk-3)] focus:border-[var(--signal)] focus:outline-none"
         />
 
+        {searched && !loading && !error && results.length > 0 ? (
+          <div
+            data-testid="card-search-result-count"
+            className="mt-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--chalk-3)]"
+          >
+            <span>
+              Showing {results.length} result{results.length === 1 ? "" : "s"}
+              {results.length >= SEARCH_LIMIT
+                ? " — refine search to narrow"
+                : ""}
+            </span>
+            <span className="text-[var(--chalk-4)] normal-case tracking-normal">
+              Scroll for more
+            </span>
+          </div>
+        ) : null}
+
         <div
           data-testid="card-search-results"
+          role="listbox"
+          aria-label="Search results"
           className="mt-3 flex-1 overflow-y-auto rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)]"
         >
           {loading ? (
@@ -197,6 +227,8 @@ export function CardSearchDialog({
                     key={r.id}
                     data-testid={`card-search-result-${idx}`}
                     data-active={idx === cursor ? "true" : undefined}
+                    role="option"
+                    aria-selected={idx === cursor ? true : false}
                     title={rowTitle}
                     className={
                       "flex items-center gap-3 p-2 transition-colors " +

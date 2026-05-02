@@ -9,10 +9,10 @@ export const runtime = "nodejs";
 
 /**
  * POST /api/fcdb/search
- * Body: { q: string (≥2 chars), position?: string }
+ * Body: { q: string (≥2 chars), position?: string, limit?: number }
  *
  * Plan 30 — typeahead endpoint for the Futbin-style squad picker. Returns up
- * to 10 cards ranked by match quality.
+ * to 25 cards by default (max 50) ranked by match quality.
  *
  * Auth gate: any authenticated user with a role ∈ { player, admin, loc,
  * referee, moderator }. We don't use a dedicated perm string for this
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   const parsed = searchCardsInputSchema.safeParse({
     q: body?.q ?? "",
     position: body?.position,
-    limit: body?.limit ?? 10,
+    limit: body?.limit ?? 25,
   });
   if (!parsed.success) {
     return NextResponse.json(

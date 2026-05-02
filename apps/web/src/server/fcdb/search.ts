@@ -21,7 +21,7 @@ import type { FCPlayer } from "./types";
 export const searchCardsInputSchema = z.object({
   q: z.string().trim().min(2).max(40),
   position: z.string().trim().min(1).max(8).optional(),
-  limit: z.number().int().min(1).max(25).default(10),
+  limit: z.number().int().min(1).max(50).default(25),
 });
 
 export type SearchCardsInput = z.infer<typeof searchCardsInputSchema>;
@@ -143,8 +143,10 @@ function scoreRow(row: CardSearchResult, positionFilter?: string): number {
 
 /**
  * Typeahead search. See module docstring for semantics. Returns up to
- * `limit` cards ranked (primary) by trigram similarity, (secondary) by
- * position-filter score, (tertiary) by rating desc.
+ * `limit` cards ranked: exact name match → starts-with → contains →
+ * position-filter score → trigram similarity → rating desc. The
+ * exact-match-first tier prevents "kaka" surfacing "Kanu" before "Kaka"
+ * (which it does under pure trigram + rating ordering).
  */
 export async function searchCards(
   sb: SupabaseClient,
@@ -185,10 +187,15 @@ export async function searchCards(
 
   // 2. Trigram fuzzy RPC. Graceful fallback when the RPC is missing
   //    (pre-migration dev DB) or returns an error.
+  //
+  //    Fetch 4× the requested limit so we have head-room for the
+  //    exact-match-first re-ranking pass below: trigram similarity alone
+  //    sorts "Kanu" above "Kaka" because of higher rating + comparable
+  //    overlap, but a player typing "kaka" wants Kaka top-of-list.
   const { data: fuzzy, error: fuzzyErr } = await sb.rpc("fc26_players_fuzzy", {
     p_name: v.q,
     p_threshold: FUZZY_THRESHOLD,
-    p_limit: v.limit * 2,
+    p_limit: v.limit * 4,
   });
   if (fuzzyErr) {
     // 42883 = "function does not exist" — pre-Plan 21 migration state.
@@ -200,8 +207,20 @@ export async function searchCards(
     sim: r.sim,
   }));
 
+  // Re-rank: exact match → starts-with → contains → position fit →
+  // trigram similarity → rating. Without this tier ordering, "kaka"
+  // surfaces "Kanu" first because the rating-weighted trigram tie-break
+  // promotes the higher-rated card.
+  const qLower = v.q.toLowerCase().trim();
+  const exactMatch = (n: string) => (n.toLowerCase() === qLower ? 1 : 0);
+  const startsWith = (n: string) => (n.toLowerCase().startsWith(qLower) ? 1 : 0);
+  const contains = (n: string) => (n.toLowerCase().includes(qLower) ? 1 : 0);
+
   fuzzyRows.sort(
     (a, b) =>
+      exactMatch(b.name) - exactMatch(a.name) ||
+      startsWith(b.name) - startsWith(a.name) ||
+      contains(b.name) - contains(a.name) ||
       scoreRow(b, v.position) - scoreRow(a, v.position) ||
       (b.sim ?? 0) - (a.sim ?? 0) ||
       b.rating - a.rating,

@@ -158,4 +158,78 @@ describe("searchCards", () => {
     const [hit] = await searchCards(sb as never, { q: "Lionel Messi", limit: 10 });
     expect(hit.variant).toBeNull();
   });
+
+  // Bug 9 (2026-05-01) — exact-match-first ranking. Without this tier
+  // ordering, "kaka" surfaces "Kanu" before "Kaka" because the higher-rated
+  // card wins on the trigram + rating tie-break.
+  it("ranks exact name matches above contains-only fuzzy hits (Kaka beats Kanu)", async () => {
+    // Both rows have slugs that DON'T equal slugify("kaka") so the
+    // exact-slug shortcut path misses and we exercise the fuzzy re-rank.
+    const kaka = mkPlayer({
+      id: "kaka",
+      slug: "kaka_classic",
+      name: "Kaka",
+      rating: 85,
+    });
+    const kanu = mkPlayer({
+      id: "kanu",
+      slug: "kanu_legend",
+      name: "Kanu",
+      rating: 84,
+    });
+    const { sb } = mkSb({
+      exact: { data: [], error: null },
+      // RPC returns Kanu first (higher sim score), Kaka second — the
+      // re-rank must flip them because "kaka" is an exact name match.
+      rpc: {
+        data: [
+          { ...kanu, sim: 0.55 },
+          { ...kaka, sim: 0.5 },
+        ],
+        error: null,
+      },
+    });
+    const out = await searchCards(sb as never, { q: "kaka", limit: 10 });
+    expect(out).toHaveLength(2);
+    expect(out[0].name).toBe("Kaka"); // exact match wins
+    expect(out[1].name).toBe("Kanu");
+  });
+
+  it("ranks starts-with hits above contains hits (kak → 'Kakuta' before 'Slokak')", async () => {
+    const kakuta = mkPlayer({
+      id: "kakuta",
+      slug: "kakuta",
+      name: "Kakuta",
+      rating: 80,
+    });
+    const slokak = mkPlayer({
+      id: "slokak",
+      slug: "slokak",
+      name: "Slokak",
+      rating: 88,
+    });
+    const { sb } = mkSb({
+      exact: { data: [], error: null },
+      rpc: {
+        data: [
+          // Slokak first (higher rating + decent sim)
+          { ...slokak, sim: 0.45 },
+          { ...kakuta, sim: 0.5 },
+        ],
+        error: null,
+      },
+    });
+    const out = await searchCards(sb as never, { q: "kak", limit: 10 });
+    expect(out).toHaveLength(2);
+    expect(out[0].name).toBe("Kakuta"); // starts-with beats contains
+    expect(out[1].name).toBe("Slokak");
+  });
+
+  it("accepts limit up to 50 (was capped at 25 before bug 9 fix)", async () => {
+    const { sb } = mkSb({ exact: { data: [], error: null }, rpc: { data: [], error: null } });
+    // Should not throw — limit=50 is valid post-bug-9.
+    await expect(
+      searchCards(sb as never, { q: "anything", limit: 50 }),
+    ).resolves.toEqual([]);
+  });
 });
