@@ -28,6 +28,15 @@ export type {
   SquadWindowResolution,
 } from "./match_day_window";
 export {
+  getMatchDayScheduleOverride,
+  setMatchDayScheduleOverride,
+  clearMatchDayScheduleOverride,
+} from "./schedule_overrides";
+export type {
+  MatchDayScheduleOverride,
+  MatchDayScheduleOverrideInput,
+} from "./schedule_overrides";
+export {
   getPlayerSquadOverride,
   setPlayerSquadOverride,
   clearPlayerSquadOverride,

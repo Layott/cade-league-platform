@@ -130,6 +130,9 @@ type ResolverState = {
   matchDayOverride?: { state: "force_open" | "force_close" } | null;
   matchDayDate?: string | null; // null means match_day row missing
   weeklyOverride?: { state: "force_open" | "force_close" } | null;
+  scheduleOverride?: {
+    submissionDeadlineAt: string | null;
+  } | null;
 };
 
 function mkResolverSb(state: ResolverState) {
@@ -187,6 +190,32 @@ function mkResolverSb(state: ResolverState) {
                         note: null,
                         set_by: "u-1",
                         set_at: "2026-04-27T20:00:00Z",
+                      }
+                    : null,
+                  error: null,
+                }),
+              })),
+            })),
+          })),
+        };
+      }
+      if (table === "match_day_schedule_overrides") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              is: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: state.scheduleOverride
+                    ? {
+                        id: "00000000-0000-4000-8000-00000000aaaa",
+                        match_day_id: MATCH_DAY,
+                        submission_deadline_at:
+                          state.scheduleOverride.submissionDeadlineAt,
+                        change_window_open_at: null,
+                        change_window_close_at: null,
+                        notes: null,
+                        set_by: "u-1",
+                        set_at: "2026-04-22T20:00:00Z",
                       }
                     : null,
                   error: null,
@@ -268,6 +297,35 @@ describe("resolveSquadWindowForMatchDay", () => {
     const sb = mkResolverSb({ matchDayDate: null });
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"),
+    });
+    expect(out).toEqual({ open: false, reason: "weekly_default_closed" });
+  });
+
+  it("schedule override extends the deadline past Thursday 10:00", async () => {
+    // Default Thursday 10:00 deadline would close the window at 10:00 WAT,
+    // but the override pushes it to 14:00 — submission still open.
+    const sb = mkResolverSb({
+      matchDayDate: "2026-04-16", // Thursday
+      scheduleOverride: {
+        submissionDeadlineAt: "2026-04-16T14:00:00+01:00",
+      },
+    });
+    const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
+      now: new Date("2026-04-16T13:00:00+01:00"), // 1pm WAT — past default
+    });
+    expect(out).toEqual({ open: true, reason: "weekly_default_open" });
+  });
+
+  it("schedule override shortens the deadline before Thursday 10:00", async () => {
+    // Override pulls deadline forward to 06:00 — submissions close earlier.
+    const sb = mkResolverSb({
+      matchDayDate: "2026-04-16", // Thursday
+      scheduleOverride: {
+        submissionDeadlineAt: "2026-04-16T06:00:00+01:00",
+      },
+    });
+    const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
+      now: new Date("2026-04-16T08:00:00+01:00"), // past 06:00 override
     });
     expect(out).toEqual({ open: false, reason: "weekly_default_closed" });
   });

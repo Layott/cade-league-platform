@@ -114,21 +114,24 @@ export default async function NewMatchDayPage({
             />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Arrival cutoff" hint="West Africa Time (WAT)">
+            <FormField
+              label="Arrival cutoff"
+              hint="WAT. Sunday default: 12:00."
+            >
               <input
                 name="arrivalCutoffTime"
                 type="time"
                 required
-                defaultValue="18:00"
+                defaultValue="12:00"
                 className={inputClass}
               />
             </FormField>
-            <FormField label="Kick-off" hint="West Africa Time (WAT)">
+            <FormField label="Kick-off" hint="WAT. Sunday default: 13:00.">
               <input
                 name="matchStartTime"
                 type="time"
                 required
-                defaultValue="19:00"
+                defaultValue="13:00"
                 className={inputClass}
               />
             </FormField>

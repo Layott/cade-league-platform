@@ -9,6 +9,9 @@ import {
   getMatchDayWindow,
   resolveSquadWindowForMatchDay,
   listPlayerSquadOverridesForWeek,
+  getMatchDayScheduleOverride,
+  thursdayDeadline,
+  fridayWindowBounds,
   type SubmissionRow,
   type PlayerSquadOverride,
 } from "@/server/squads";
@@ -23,6 +26,10 @@ import {
   SquadMatchDayWindowControls,
   type AdminMatchDayRow,
 } from "@/components/admin/SquadMatchDayWindowControls";
+import {
+  ScheduleOverrideControls,
+  type ScheduleOverrideRow,
+} from "@/components/admin/ScheduleOverrideControls";
 import { PlayerOverrideControls } from "@/components/admin/PlayerOverrideControls";
 import { SquadSubmissionsLiveRefresh } from "@/components/admin/SquadSubmissionsLiveRefresh";
 import {
@@ -34,6 +41,10 @@ import {
   setMatchDayWindowAction,
   clearMatchDayWindowAction,
 } from "./match_day_window_actions";
+import {
+  setScheduleOverrideAction,
+  clearScheduleOverrideAction,
+} from "./schedule-override-actions";
 import {
   banPlayerForWeekAction,
   forceOpenPlayerForWeekAction,
@@ -128,27 +139,47 @@ export default async function AdminSquadsListPage({
   // Per-match-day override panel data. Only build when the user has the
   // window perm — same gate as the weekly panel.
   let matchDayRows: AdminMatchDayRow[] = [];
+  let scheduleOverrideRows: ScheduleOverrideRow[] = [];
   if (canManageWindow && season) {
     const days = await listMatchDays(svc, season.id);
     const now = new Date();
-    matchDayRows = await Promise.all(
+    const both = await Promise.all(
       days.map(async (d) => {
-        const [override, resolution] = await Promise.all([
+        const [override, resolution, scheduleOverride] = await Promise.all([
           getMatchDayWindow(svc, d.id),
           resolveSquadWindowForMatchDay(svc, d.id, { now }),
+          getMatchDayScheduleOverride(svc, d.id),
         ]);
+        const ws = weekStartThursday(d.match_date);
+        const friday = fridayWindowBounds(ws);
         return {
-          id: d.id,
-          matchDate: d.match_date,
-          venueName: d.venue_name,
-          status: d.status,
-          matchCount: d.match_count,
-          override,
-          resolvedOpen: resolution.open,
-          resolvedReason: resolution.reason,
+          windowRow: {
+            id: d.id,
+            matchDate: d.match_date,
+            venueName: d.venue_name,
+            status: d.status,
+            matchCount: d.match_count,
+            override,
+            resolvedOpen: resolution.open,
+            resolvedReason: resolution.reason,
+          } satisfies AdminMatchDayRow,
+          scheduleRow: {
+            id: d.id,
+            matchDate: d.match_date,
+            venueName: d.venue_name,
+            status: d.status,
+            matchCount: d.match_count,
+            weekStart: ws,
+            override: scheduleOverride,
+            defaultSubmissionDeadlineAt: thursdayDeadline(ws).toISOString(),
+            defaultChangeWindowOpenAt: friday.openAt.toISOString(),
+            defaultChangeWindowCloseAt: friday.closeAt.toISOString(),
+          } satisfies ScheduleOverrideRow,
         };
       }),
     );
+    matchDayRows = both.map((b) => b.windowRow);
+    scheduleOverrideRows = both.map((b) => b.scheduleRow);
   }
 
   // Plan 56 — when any submission in the list is stamped with a
@@ -288,6 +319,14 @@ export default async function AdminSquadsListPage({
           rows={matchDayRows}
           setAction={setMatchDayWindowAction}
           clearAction={clearMatchDayWindowAction}
+        />
+      ) : null}
+
+      {canManageWindow ? (
+        <ScheduleOverrideControls
+          rows={scheduleOverrideRows}
+          setAction={setScheduleOverrideAction}
+          clearAction={clearScheduleOverrideAction}
         />
       ) : null}
 

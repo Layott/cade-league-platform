@@ -3,6 +3,7 @@ import { requirePermAsync } from "@/lib/perms-db";
 import type { Actor } from "@/perms";
 import { weekStartThursday } from "@/lib/time";
 import { getSquadWindowOverride } from "./window_override";
+import { getMatchDayScheduleOverride } from "./schedule_overrides";
 
 /**
  * Per-match-day admin override for the squad submission window.
@@ -179,8 +180,12 @@ export async function resolveSquadWindowForMatchDay(
   if (weekly?.state === "force_open") {
     return { open: true, reason: "weekly_force_open" };
   }
-  // Default time-based: open iff now < Thursday 10:00 WAT.
-  const deadline = new Date(`${weekStart}T10:00:00+01:00`);
+  // Default time-based: open iff now < submission deadline. The default
+  // is Thursday 10:00 WAT; admin can shift via match_day_schedule_overrides.
+  const schedule = await getMatchDayScheduleOverride(sb, matchDayId);
+  const deadline = schedule?.submissionDeadlineAt
+    ? new Date(schedule.submissionDeadlineAt)
+    : new Date(`${weekStart}T10:00:00+01:00`);
   if (now.getTime() < deadline.getTime()) {
     return { open: true, reason: "weekly_default_open" };
   }
