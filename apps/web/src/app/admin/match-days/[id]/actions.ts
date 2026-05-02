@@ -31,6 +31,28 @@ import {
 } from "@/server/fixtures/realtime";
 
 /**
+ * Bug 1 re-fix (2026-05-02): every fixture mutation MUST bust ALL admin
+ * surfaces that read fixture rows or counts — not just /admin/match-days/[id].
+ * Page-form revalidatePath only invalidates the EXACT URL; we use the
+ * `'layout'` form on parent paths so all child routes (incl. dynamic
+ * segments) get invalidated together. This handles the user-reported
+ * 2026-05-01 case: delete a fixture from match-day detail → /admin/match-days
+ * count + /admin/tournament/{fixtures,results-entry,walkovers} all stayed
+ * stale because nested routes share `match-days/layout.tsx` + `tournament/`
+ * shells.
+ */
+function revalidateFixtureSurfaces(matchDayId: string): void {
+  revalidatePath(`/admin/match-days/${matchDayId}`);
+  // 'layout' form busts the layout AND every page below it (including
+  // dynamic segments under /[id]/...). Page form would only hit the exact URL.
+  revalidatePath("/admin/match-days", "layout");
+  revalidatePath("/admin/tournament", "layout");
+  revalidatePath("/fixtures");
+  revalidatePath("/admin/players");
+  revalidatePath("/players", "layout");
+}
+
+/**
  * Live-refresh (2026-04-24) — wake the public `/fixtures` page
  * (mounts `<FixturesLiveRefresh />`) whenever a fixture mutation
  * lands. Resolves seasonId from the matchDayId. Fire-and-forget: a
@@ -104,14 +126,7 @@ export async function addFixtureAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await createMatch(sb, { matchDayId, homePlayerId, awayPlayerId, scheduledTime });
   await pingFixtures(sb, matchDayId, "match_added");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/fixtures");
-  // Bug 1 fix (2026-05-01): downstream surfaces that show fixture rows or
-  // counts must repaint after a mutation here.
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 export async function addMatchAction(formData: FormData) {
@@ -131,12 +146,7 @@ export async function editMatchAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await editMatch(sb, { matchId, homePlayerId, awayPlayerId });
   await pingFixtures(sb, matchDayId, "match_edited");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 export async function removeMatchAction(formData: FormData) {
@@ -147,12 +157,7 @@ export async function removeMatchAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await softDeleteMatch(sb, { matchId });
   await pingFixtures(sb, matchDayId, "match_removed");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 /**
@@ -228,13 +233,8 @@ export async function enterResultAction(formData: FormData) {
   );
   await bridgeScoreToBroadcast(sb, matchId, actor, resultType);
   await pingFixtures(sb, matchDayId, "result_entered");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 export async function editResultAction(formData: FormData) {
@@ -263,13 +263,8 @@ export async function editResultAction(formData: FormData) {
   const actor = await currentPublicUserId();
   await bridgeScoreToBroadcast(sb, matchId, actor, resultType);
   await pingFixtures(sb, matchDayId, "result_edited");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 export async function confirmResultAction(formData: FormData) {
@@ -279,13 +274,8 @@ export async function confirmResultAction(formData: FormData) {
   const actor = await currentPublicUserId();
   await confirmResult(sb, { matchId }, actor);
   await pingFixtures(sb, matchDayId, "result_confirmed");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 // Plan 27 — publish a match day to the public /fixtures page.
@@ -295,12 +285,7 @@ export async function publishMatchDayAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await publishMatchDay(sb, { userId, roles }, matchDayId);
   await pingFixtures(sb, matchDayId, "match_day_published");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/admin/match-days");
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 // Plan 27 — withdraw a published match day from the public /fixtures page.
@@ -310,12 +295,7 @@ export async function unpublishMatchDayAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await unpublishMatchDay(sb, { userId, roles }, matchDayId);
   await pingFixtures(sb, matchDayId, "match_day_unpublished");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/admin/match-days");
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 // Mark a match day as completed — drops it from the homepage "Upcoming"
@@ -327,13 +307,8 @@ export async function markMatchDayCompleteAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await setMatchDayStatus(sb, { userId, roles }, matchDayId, "completed");
   await pingFixtures(sb, matchDayId, "match_day_published");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/admin/match-days");
-  revalidatePath("/fixtures");
   revalidatePath("/");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 // Reopen a previously-completed match day (back to scheduled). Used when
@@ -344,13 +319,8 @@ export async function reopenMatchDayAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await setMatchDayStatus(sb, { userId, roles }, matchDayId, "scheduled");
   await pingFixtures(sb, matchDayId, "match_day_published");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/admin/match-days");
-  revalidatePath("/fixtures");
   revalidatePath("/");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 /**
@@ -391,12 +361,7 @@ export async function reorderMatchAction(formData: FormData) {
   [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
   await reorderMatches(sb, { userId, roles }, matchDayId, next);
   await pingFixtures(sb, matchDayId, "match_reordered");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 /**
@@ -420,13 +385,8 @@ export async function unvoidMatchAction(formData: FormData) {
   const sb = getServiceRoleSupabase();
   await unvoidMatchResult(sb, { matchId, actorUserId: userId, reason });
   await pingFixtures(sb, matchDayId, "result_edited");
-  revalidatePath(`/admin/match-days/${matchDayId}`);
   revalidatePath("/standings");
-  revalidatePath("/fixtures");
-  revalidatePath("/admin/match-days");
-  revalidatePath("/admin/tournament/fixtures");
-  revalidatePath("/admin/tournament/results-entry");
-  revalidatePath("/admin/tournament/walkovers");
+  revalidateFixtureSurfaces(matchDayId);
 }
 
 export async function backToList() {

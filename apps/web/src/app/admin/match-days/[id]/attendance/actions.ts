@@ -52,12 +52,47 @@ export async function markAction(formData: FormData) {
   const { sb, actorUserId } = await requireActor("attendance.mark");
 
   const input = { matchDayId, playerId, actorUserId };
-  if (status === "present") await markPresent(sb, input);
-  else if (status === "late") await markLate(sb, input);
-  else if (status === "absent") await markAbsent(sb, input);
-  else throw new Error(`bad status: ${status}`);
+
+  // Bug 2 re-fix (2026-05-02): defense-in-depth. If a mark already exists
+  // (race between two admin tabs, or page rendered stale because the
+  // user-session RLS hid the existing mark before the page-level fix), the
+  // mark*() helpers throw ConflictError "player ... already marked". Catch
+  // it and route through editMark instead so the click-target surface
+  // never 500s. We re-fetch the mark row to grab its id; treat
+  // re-mark-as-edit with a short audit reason. requireActor already
+  // confirmed attendance.mark; we trust the same actor for the silent edit.
+  try {
+    if (status === "present") await markPresent(sb, input);
+    else if (status === "late") await markLate(sb, input);
+    else if (status === "absent") await markAbsent(sb, input);
+    else throw new Error(`bad status: ${status}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("already marked")) {
+      const { data: existing } = await sb
+        .from("attendance_marks")
+        .select("id")
+        .eq("match_day_id", matchDayId)
+        .eq("player_id", playerId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (existing?.id) {
+        await editMark(sb, {
+          markId: String(existing.id),
+          newStatus: status as "present" | "late" | "absent",
+          reason: "re-mark via dashboard (auto-edit)",
+          actorUserId,
+        });
+      } else {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   revalidatePath(`/admin/match-days/${matchDayId}/attendance`);
+  revalidatePath("/admin/match-days", "layout");
   revalidatePath("/standings");
 }
 

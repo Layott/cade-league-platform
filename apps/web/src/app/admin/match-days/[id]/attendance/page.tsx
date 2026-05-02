@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { requirePermAsync } from "@/lib/perms-db";
 import { formatWat } from "@/lib/time";
 import { listByMatchDay } from "@/server/attendance";
 import { markAction, editAction, undoAction } from "./actions";
@@ -40,7 +43,36 @@ export default async function AttendancePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const sb = await getServerSupabase();
+
+  // Bug 2 re-fix (2026-05-02): the user-session client cannot read
+  // attendance_marks rows for OTHER players (RLS limits authenticated SELECT
+  // to the caller's own player_id via supabase_auth_id match per migration
+  // 20260520003000). The admin attendance roster needs to see ALL marks for
+  // the match day, so the listByMatchDay read uses the service-role client.
+  // We still gate the page on attendance.read so non-admins can't reach
+  // service-role data here. Without this fix the page silently rendered
+  // mark_id=null for every row, surfaced Present/Late/Absent buttons even
+  // when marks already existed, and the action-layer ConflictError surfaced
+  // as a 500 to the user.
+  const userClient = await getServerSupabase();
+  const { data: auth } = await userClient.auth.getUser();
+  if (!auth.user) redirect(`/login?next=/admin/match-days/${id}/attendance`);
+  const { data: pub } = await userClient
+    .from("users")
+    .select("id")
+    .eq("supabase_auth_id", auth.user.id)
+    .maybeSingle();
+  if (!pub) redirect(`/login?next=/admin/match-days/${id}/attendance`);
+  const { data: roleRows } = await userClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", pub.id)
+    .is("deleted_at", null);
+  const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
+
+  const sb = getServiceRoleSupabase();
+  await requirePermAsync(sb, { userId: pub.id, roles }, "attendance.mark");
+
   const roster = await listByMatchDay(sb, id);
 
   const { data: md } = await sb
