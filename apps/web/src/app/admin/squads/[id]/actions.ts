@@ -281,7 +281,16 @@ export async function reopenSubmissionAction(
   const actor = await loadActor(sb);
   const limited = await enforceAuthedWrite(actor.userId as string);
   if (limited) throw new Error("rate_limited");
-  await reopenSubmission(sb, actor, parsed.submissionId);
+  // Bug 8 deep root (2026-05-02): `reopenSubmission` inserts into
+  // notifications. notifications RLS has SELECT-self-only — there is NO
+  // INSERT policy for authenticated, so a user-session client INSERT
+  // throws "permission denied" → the action 500s with "reopen notify
+  // failed". Use the service-role client for the mutation (matches the
+  // attendance + accept-fcdb-candidate pattern). Perm check happens
+  // inside reopenSubmission via requirePermAsync; loadActor already
+  // resolved the admin's identity from the user-session client above.
+  const svc = getServiceRoleSupabase();
+  await reopenSubmission(svc, actor, parsed.submissionId);
   const subContext = await pingPlayerAfterReview(parsed.submissionId, "reopened");
   if (subContext) {
     revalidateSquadSurfaces({

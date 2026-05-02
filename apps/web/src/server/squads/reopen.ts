@@ -84,6 +84,13 @@ export async function reopenSubmission(
   const title = "Squad submission reopened";
   const body = `Your squad for week ${weekLabel} has been reopened by ${adminName}.`;
 
+  // Notify is best-effort. The status-flip above is the load-bearing
+  // part of reopen — if the in-app notification insert fails (RLS,
+  // network, transient) we log and continue. The player still regains
+  // access to the submission form via the UI. (Bug 8 root, 2026-05-02:
+  // previously a thrown error here surfaced as a 500 inside the
+  // ReopenSubmissionButton modal even when the underlying status flip
+  // had already succeeded.)
   const { error: notifErr } = await sb.from("notifications").insert({
     user_id: playerUserId,
     type: "squad_reopened",
@@ -93,7 +100,9 @@ export async function reopenSubmission(
     announcement_id: null,
   });
   if (notifErr) {
-    throw new Error(`reopen notify failed: ${notifErr.message}`);
+    console.error(
+      `[reopen] notify failed for submission ${submissionId} player ${playerUserId}: ${notifErr.code ?? ""} ${notifErr.message}`,
+    );
   }
 
   return {
