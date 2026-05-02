@@ -23,6 +23,14 @@ export type H2HCard = {
   playerId: string;
   name: string;
   gamerTag: string;
+  /**
+   * Lowercased gamer_tag with non-alphanumerics → "_" so the static H2H
+   * overlays (`04-h2h-2`, `05-h2h-3`, `06-h2h-5`) can fall back to their
+   * baked-in `PLAYER_PHOTO[slug]` map when the server doesn't send a
+   * photoUrl, AND join slugged display rules (`PLAYER_ORG_NAME[slug]`)
+   * to per-card render output.
+   */
+  slug: string;
   pos: number | null;
   played: number;
   wins: number;
@@ -34,6 +42,22 @@ export type H2HCard = {
   pts: number;
   winProbPct: number;
   drawProbPct: number;
+  /**
+   * Per-player org logo URL resolved from `players.organization_id →
+   * organizations.logo_url`. Source of truth is the admin Orgs UI (see
+   * `/admin/people/orgs/<id>` logo upload widget). Falls back to the
+   * static slug map (`PLAYER_ORG[slug]`) inside the overlay HTML when
+   * null. Bug fix 2026-05-02 — without this field, the h2h overlays
+   * always used the static map, which pinned FARUK to "OAS PLAIN" even
+   * after the admin uploaded the colored variant.
+   */
+  orgLogoUrl: string | null;
+  /**
+   * Per-player headshot URL pulled from `players.photo_url`. Same
+   * fallback rule as `orgLogoUrl` — null lets the overlay fall back to
+   * the baked-in `PLAYER_PHOTO[slug]` map.
+   */
+  photoUrl: string | null;
 };
 
 export async function buildH2HCards(
@@ -69,6 +93,13 @@ export async function buildH2HCards(
 
   // H2H records between every selected pair, season-scoped.
   const h2hMap = await loadPairwiseH2H(sb, seasonId, playerIds);
+
+  // Bug fix 2026-05-02 — pull org logo + headshot for every selected
+  // player so the H2H overlays don't fall back to the static
+  // `PLAYER_ORG[slug]` map (which pins FARUK to OAS PLAIN even when the
+  // admin has uploaded a new colored variant via /admin/people/orgs/).
+  // The admin-supplied `organizations.logo_url` is the source of truth.
+  const profileMap = await loadPlayerProfiles(sb, playerIds);
 
   const out: H2HCard[] = [];
   for (const pid of playerIds) {
@@ -107,10 +138,12 @@ export async function buildH2HCards(
     }
     const winProbPct = pCount > 0 ? pSum / pCount : 0;
     const drawProbPct = pCount > 0 ? dSum / pCount : 0;
+    const profile = profileMap.get(pid) ?? null;
     out.push({
       playerId: pid,
       name: row.name,
       gamerTag: row.gamerTag,
+      slug: tagToSlug(row.gamerTag),
       pos: row.pos,
       played: row.played,
       wins: row.wins,
@@ -122,9 +155,91 @@ export async function buildH2HCards(
       pts: row.pts,
       winProbPct,
       drawProbPct,
+      orgLogoUrl: profile?.orgLogoUrl ?? null,
+      photoUrl: profile?.photoUrl ?? null,
     });
   }
   return out;
+}
+
+/**
+ * Bug fix 2026-05-02 — resolve per-player org logo + headshot from the
+ * DB so the H2H broadcast overlays render the admin-managed visuals
+ * instead of the baked-in static slug map. Source of truth chain:
+ *
+ *   `players.organization_id`  →  `organizations.logo_url`
+ *   `players.photo_url`        →  direct
+ *
+ * Returns a Map keyed by player id. Missing rows / null FKs simply
+ * collapse to null on each field; the overlay HTML falls back to the
+ * static `PLAYER_ORG[slug]` / `PLAYER_PHOTO[slug]` maps in that case.
+ */
+type PlayerProfile = { orgLogoUrl: string | null; photoUrl: string | null };
+
+async function loadPlayerProfiles(
+  sb: SupabaseClient,
+  playerIds: string[],
+): Promise<Map<string, PlayerProfile>> {
+  const out = new Map<string, PlayerProfile>();
+  if (playerIds.length === 0) return out;
+
+  const { data, error } = await sb
+    .from("players")
+    .select(
+      `
+      id,
+      photo_url,
+      organization:organization_id ( logo_url )
+      `,
+    )
+    .in("id", playerIds)
+    .is("deleted_at", null);
+  if (error) {
+    // Soft-fail — missing org/photo data should NOT take down the H2H
+    // endpoint. The overlays fall back to static slug maps when these
+    // fields are null.
+    return out;
+  }
+
+  type Row = {
+    id: string;
+    photo_url: string | null;
+    organization:
+      | { logo_url: string | null }
+      | { logo_url: string | null }[]
+      | null;
+  };
+
+  for (const r of (data ?? []) as unknown as Row[]) {
+    const org = r.organization;
+    let orgLogoUrl: string | null = null;
+    if (org) {
+      if (Array.isArray(org)) {
+        orgLogoUrl = org[0]?.logo_url ?? null;
+      } else {
+        orgLogoUrl = org.logo_url ?? null;
+      }
+    }
+    out.set(r.id, {
+      orgLogoUrl,
+      photoUrl: r.photo_url ?? null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Lowercase + strip non-alphanumerics → `_`. Mirrors the slug rule the
+ * static H2H overlays use to look up `PLAYER_PHOTO[slug]` /
+ * `PLAYER_ORG[slug]` / `PLAYER_ORG_NAME[slug]`. Empty input → "".
+ */
+function tagToSlug(tag: string): string {
+  if (!tag) return "";
+  return tag
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 type PairwiseRow = {
