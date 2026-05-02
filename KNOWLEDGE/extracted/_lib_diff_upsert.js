@@ -78,17 +78,29 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs) {
   const oldAttrs = oldRow.attributes || {};
   if (oldRow.value_coins_estimate !== newCoins) changes.push("price");
   if (oldRow.item_type !== newItemType) changes.push("item_type");
-  if ((oldAttrs.card_image_url || null) !== (newAttrs.card_image_url || null)) changes.push("card_image");
+  // Card portrait + frame URLs are imgix-signed
+  // (`?fm=png&ixlib=...&w=51&s=<HMAC>`). The HMAC `s=` rotates when
+  // Futbin re-signs the asset, even when the underlying path is
+  // unchanged — so literal string equality flags a "change" on every
+  // re-scrape and burns through UPDATE writes + audit + realtime noise.
+  // Strip the query string before comparing to match the pattern used
+  // for nation/league/club flag URLs below. Only when the path itself
+  // changes (e.g. Futbin re-uploads a new portrait) do we re-write.
+  // The full signed URL is still STORED — strip is only for the
+  // path-equality test.
+  //
   // Card frame background (the gold/silver/bronze/icon/hero shell image
-  // from Futbin's /img/cards/tiny/ CDN path, signed with imgix HMAC).
-  // MUST be diffed — prior to this check a row that had `card_bg_url`
-  // freshly captured by a re-scrape (silvers + bronzes pre-86e4aba),
-  // but whose price/stats/image were otherwise unchanged, would be
-  // labelled "unchanged" and the UPDATE skipped → the bg never landed
-  // in the DB and the picker kept rendering a black rectangle. This
-  // single comparison was the primary reason 12,931 rows still lacked
-  // bg after the selector fix shipped.
-  if ((oldAttrs.card_bg_url || null) !== (newAttrs.card_bg_url || null)) changes.push("card_bg");
+  // from Futbin's /img/cards/tiny/ CDN path) MUST also be diffed — prior
+  // to the diff check a row that had `card_bg_url` freshly captured by
+  // a re-scrape (silvers + bronzes pre-86e4aba), but whose price/stats/
+  // image were otherwise unchanged, would be labelled "unchanged" and
+  // the UPDATE skipped → the bg never landed in the DB and the picker
+  // kept rendering a black rectangle. This single comparison was the
+  // primary reason 12,931 rows still lacked bg after the selector fix
+  // shipped.
+  const stripQS = (u) => (u || "").split("?")[0];
+  if (stripQS(oldAttrs.card_image_url) !== stripQS(newAttrs.card_image_url)) changes.push("card_image");
+  if (stripQS(oldAttrs.card_bg_url) !== stripQS(newAttrs.card_bg_url)) changes.push("card_bg");
   if ((oldAttrs.futbin_variant || null) !== (newAttrs.futbin_variant || null)) changes.push("variant");
   if ((oldAttrs.futbin_meta_rating || null) !== (newAttrs.futbin_meta_rating || null)) changes.push("meta");
   if ((oldAttrs.weak_foot ?? null) !== (newAttrs.weak_foot ?? null)) changes.push("weak_foot");
@@ -112,9 +124,8 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs) {
   if ((oldAttrs.futbin_club_id ?? null) !== (newAttrs.futbin_club_id ?? null)) changes.push("club_id");
   // Flag / logo CDN URLs. Diff so a row that previously lacked the URL
   // but now has it (post-scraper-patch re-run) gets persisted. URL
-  // signatures change when Futbin re-signs the imgix HMAC — strip the
-  // query string before comparing to avoid unnecessary churn.
-  const stripQS = (u) => (u || "").split("?")[0];
+  // signatures change when Futbin re-signs the imgix HMAC — same
+  // stripQS() helper declared above for the card portrait/frame test.
   if (stripQS(oldAttrs.nation_flag_url) !== stripQS(newAttrs.nation_flag_url)) changes.push("nation_flag_url");
   if (stripQS(oldAttrs.league_logo_url) !== stripQS(newAttrs.league_logo_url)) changes.push("league_logo_url");
   if (stripQS(oldAttrs.club_logo_url) !== stripQS(newAttrs.club_logo_url)) changes.push("club_logo_url");
