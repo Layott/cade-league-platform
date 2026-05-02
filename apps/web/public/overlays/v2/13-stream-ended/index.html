@@ -143,14 +143,37 @@
     var py = (+layout.positionYPx) || 0;
     var sx = ((+layout.scalePct) || 100) / 100;
     var transformOps = [];
-    // Bug 12 (2026-05-01) — *-center anchors must honour positionXPx /
-    // positionYPx as a NUDGE from canvas center. Earlier impl hard-set
-    // left:50% / top:50% and only emitted translateX(-50%) /
-    // translateY(-50%), causing the input field to be visually inert
-    // on bottom-center / middle-center / top-center anchors. Fix: keep
-    // left:50% / top:50% as the centre reference, but bake positionXPx
-    // / positionYPx into the translate via calc() so the strip nudges
-    // off centre by the user-entered px count (positive = right/down).
+    var paddingTop = 0, paddingRight = 0, paddingBottom = 0, paddingLeft = 0;
+    // Bug 12 (2026-05-01) - *-center anchor X/Y honour positionXPx /
+    // positionYPx as a NUDGE from canvas center.
+    //
+    // CRITICAL - earlier impl baked the nudge into a static
+    // transform: translateX(-50%) declaration. That broke for
+    // overlays whose author CSS already runs an entry animation on
+    // the same element (e.g. .partners has animation: top-fade ... on
+    // h2h-2 / 11-match-scores-day, animating translateY). When a
+    // CSS animation is running on transform, the keyframe transform
+    // value supersedes any static transform: declaration on the same
+    // element - so our translateX(-50%) got swallowed and the strip
+    // rendered with left:50% + animation transform:translateY(0),
+    // making its left edge sit at canvas centre and the content
+    // auto-extend right (visually drifting to the right half of the
+    // canvas). This was the root cause of the user "stays at the
+    // bottom right rather than bottom middle" report.
+    //
+    // Fix: when X is centered, span full canvas width (left:0;
+    // right:0; width:auto) and rely on display:flex +
+    // justify-content:center (already in this emit) to center the
+    // content. positionXPx then shifts the centered content via
+    // padding (positionXPx > 0 -> padding-left = 2*positionXPx so
+    // flex-center moves the content right by positionXPx; symmetric
+    // for negative values). Same approach for Y center -> full
+    // canvas-tall + align-items:center + padding-top adjustment.
+    //
+    // For *-left and *-right anchors, the existing direct-offset
+    // logic still works untouched (no transform involved on those
+    // axes - left:Npx / right:Npx are absolute and don't conflict
+    // with the running translateY animation).
     if (anchor.indexOf('top') === 0) {
       declarations.push('top:' + py + 'px');
       declarations.push('bottom:auto');
@@ -158,10 +181,12 @@
       declarations.push('bottom:' + (1080 - py) + 'px');
       declarations.push('top:auto');
     } else {
-      // middle-* — anchor at 50% Y, NUDGE by positionYPx.
-      declarations.push('top:50%');
-      declarations.push('bottom:auto');
-      transformOps.push(py === 0 ? 'translateY(-50%)' : 'translateY(calc(-50% + ' + py + 'px))');
+      // middle-* — span full canvas height + align center + Y nudge.
+      declarations.push('top:0');
+      declarations.push('bottom:0');
+      declarations.push('height:auto');
+      if (py > 0) paddingTop = 2 * py;
+      else if (py < 0) paddingBottom = 2 * -py;
     }
     if (anchor.indexOf('left') !== -1) {
       declarations.push('left:' + px + 'px');
@@ -170,10 +195,17 @@
       declarations.push('right:' + (1920 - px) + 'px');
       declarations.push('left:auto');
     } else {
-      // *-center — anchor at 50% X, NUDGE by positionXPx.
-      declarations.push('left:50%');
-      declarations.push('right:auto');
-      transformOps.push(px === 0 ? 'translateX(-50%)' : 'translateX(calc(-50% + ' + px + 'px))');
+      // *-center — span full canvas width + center via flex + X nudge.
+      declarations.push('left:0');
+      declarations.push('right:0');
+      declarations.push('width:auto');
+      if (px > 0) paddingLeft = 2 * px;
+      else if (px < 0) paddingRight = 2 * -px;
+    }
+    if (paddingTop || paddingRight || paddingBottom || paddingLeft) {
+      declarations.push(
+        'padding:' + paddingTop + 'px ' + paddingRight + 'px ' + paddingBottom + 'px ' + paddingLeft + 'px',
+      );
     }
     if (sx !== 1) transformOps.push('scale(' + sx + ')');
     if (transformOps.length) {
@@ -467,7 +499,7 @@
             // Y-anchor + scale still apply via the design-token
             // block; only the X-anchor + X-translate get neutralised.
             s6.textContent =
-              '[data-element-id="partners-strip"]{left:0 !important;right:0 !important;width:auto !important;transform:none !important;overflow:hidden !important;justify-content:flex-start !important;flex-wrap:nowrap !important;}' +
+              '[data-element-id="partners-strip"]{left:0 !important;right:0 !important;width:auto !important;padding:0 !important;transform:none !important;overflow:hidden !important;justify-content:flex-start !important;flex-wrap:nowrap !important;}' +
               '[data-element-id="partners-strip"] > .cade-partner-track{display:flex;flex-direction:inherit;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
               '@keyframes cade-partner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}';
             document.head.appendChild(s6);
