@@ -20,10 +20,13 @@ import {
   SquadPickerBuilder,
   type InitialSquad,
 } from "@/components/squads/SquadPickerBuilder";
-import {
-  SquadPitchView,
-  inferFormationFromItems,
-} from "@/components/squads/SquadPitchView";
+import { SquadPitchView } from "@/components/squads/SquadPitchView";
+// Bug fix 2026-05-02: helper now lives in a non-`"use client"` module so a
+// Server Component can call it. Importing from `SquadPitchView` (which has
+// `"use client"`) yields a client reference whose call from the server
+// throws `Attempted to call inferFormationFromItems() ...` on
+// `/player/squad?...&edit=1`.
+import { inferFormationFromItems } from "@/components/squads/formationInference";
 import { PlayerSquadLiveRefresh } from "@/components/player/PlayerSquadLiveRefresh";
 import {
   SquadMatchDayPicker,
@@ -33,6 +36,7 @@ import {
   ApplySquadToOtherMDs,
   type ApplySquadEligibleMatchDay,
 } from "@/components/player/ApplySquadToOtherMDs";
+import { WeekendApplyPrompt } from "@/components/player/WeekendApplyPrompt";
 import {
   requestUploadUrlAction,
   submitPickerAction,
@@ -85,11 +89,14 @@ type ResolvedRow = {
 export default async function PlayerSquadPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ matchDay?: string; edit?: string }>;
+  searchParams?: Promise<{
+    matchDay?: string;
+    edit?: string;
+    submitted?: string;
+  }>;
 }) {
-  const sp: { matchDay?: string; edit?: string } = searchParams
-    ? await searchParams
-    : {};
+  const sp: { matchDay?: string; edit?: string; submitted?: string } =
+    searchParams ? await searchParams : {};
   const sb = await getServerSupabase();
   const {
     data: { user },
@@ -460,11 +467,13 @@ export default async function PlayerSquadPage({
     };
   });
 
-  // 2026-04-30 — Aggregate Sat+Sun match days into ONE picker entry per
-  // weekend. Players submit ONE squad per weekend (per spec), and Sat+Sun
-  // match days in the same Thursday-anchor week share one
-  // squad_submissions row by definition. Keep the FIRST match day's id
-  // as the click target so existing per-match-day routing still works.
+  // 2026-04-30 — Group Sat+Sun match days by weekend.
+  // 2026-05-02 (user-reported, item 1) — when BOTH match days in the
+  // weekend are open AND neither has a submission yet, render them as
+  // SEPARATE rows so the player can pick which specific match day they
+  // want to submit for. Otherwise (one already submitted, both closed,
+  // both upcoming, etc.) collapse into the single "Weekend · May 2-3"
+  // row that ships today.
   const byWeekend = new Map<string, SquadMatchDayPickerItem[]>();
   for (const item of matchDayItems) {
     const wkKey = weekendStartSaturday(item.matchDate);
@@ -483,8 +492,20 @@ export default async function PlayerSquadPage({
       items.push(head);
       continue;
     }
-    // Two or more (Sat+Sun) — collapse. Status precedence: any open row
-    // wins, then any submitted row, then any upcoming, fallback to head.
+    // Detect the "both open + no submission" pair — keep separate rows so
+    // the player chooses Sat OR Sun explicitly. Submission status drives
+    // the gate: if EVERY row in the weekend is `status='open'` (which
+    // already implies no live submission per the matchDayItems mapper),
+    // we skip the collapse.
+    const allOpenNoSub = sorted.every((s) => s.status === "open");
+    if (allOpenNoSub) {
+      for (const row of sorted) {
+        items.push(row);
+      }
+      continue;
+    }
+    // Otherwise collapse. Status precedence: any open row wins, then any
+    // submitted row, then any upcoming, fallback to head.
     const pickStatus = (): SquadMatchDayPickerItem["status"] => {
       if (sorted.some((s) => s.status === "open")) return "open";
       if (sorted.some((s) => s.status === "submitted")) return "submitted";
@@ -511,6 +532,50 @@ export default async function PlayerSquadPage({
     });
   }
 
+  // 2026-05-02 (user-reported, item 1) — weekend continuation prompt.
+  // After a successful submit, the action redirects to
+  // `/player/squad?submitted=<mdId>`. Resolve the sibling MD in the same
+  // weekend; if it exists, has no live submission for this player, and
+  // its window is open, render the WeekendApplyPrompt above the picker
+  // so the player can one-click apply the same roster to it.
+  let weekendPrompt: {
+    sourceMatchDayId: string;
+    sourceMatchDate: string;
+    sourceDayLabel: string;
+    siblingMatchDayId: string;
+    siblingMatchDate: string;
+    siblingDayLabel: string;
+  } | null = null;
+  if (sp.submitted) {
+    const sourceRow = resolved.find((r) => r.matchDayId === sp.submitted);
+    if (sourceRow) {
+      const sourceWeekend = weekendStartSaturday(sourceRow.matchDate);
+      const sibling = resolved.find(
+        (r) =>
+          r.matchDayId !== sourceRow.matchDayId &&
+          weekendStartSaturday(r.matchDate) === sourceWeekend &&
+          r.isOpen &&
+          !r.submission,
+      );
+      if (sibling) {
+        weekendPrompt = {
+          sourceMatchDayId: sourceRow.matchDayId,
+          sourceMatchDate: sourceRow.matchDate,
+          sourceDayLabel: formatWat(
+            `${sourceRow.matchDate}T12:00:00Z`,
+            "EEEE MMMM d",
+          ),
+          siblingMatchDayId: sibling.matchDayId,
+          siblingMatchDate: sibling.matchDate,
+          siblingDayLabel: formatWat(
+            `${sibling.matchDate}T12:00:00Z`,
+            "EEEE MMMM d",
+          ),
+        };
+      }
+    }
+  }
+
   // Find the "this week" match day id for the live-refresh ping.
   const thisWeekItem = items.find((i) => i.bucket === "this_week");
 
@@ -525,6 +590,17 @@ export default async function PlayerSquadPage({
         title="My squads"
         description={`Pick a match day to view your submission or file a new squad. Deadline each match day: Thursday ${formatWat(thursdayDeadline(todayWeekStart), "HH:mm")} WAT.`}
       />
+      {weekendPrompt ? (
+        <WeekendApplyPrompt
+          sourceMatchDayId={weekendPrompt.sourceMatchDayId}
+          sourceMatchDate={weekendPrompt.sourceMatchDate}
+          sourceDayLabel={weekendPrompt.sourceDayLabel}
+          siblingMatchDayId={weekendPrompt.siblingMatchDayId}
+          siblingMatchDate={weekendPrompt.siblingMatchDate}
+          siblingDayLabel={weekendPrompt.siblingDayLabel}
+          applyAction={applySquadToMultipleMatchDaysAction}
+        />
+      ) : null}
       <SquadMatchDayPicker
         items={items}
         currentMatchDayId={thisWeekItem?.matchDayId ?? null}

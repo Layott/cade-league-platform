@@ -5,10 +5,15 @@ import { FutCard } from "./FutCard";
 import {
   getFormationSlots,
   formationLabel,
-  FORMATION_KEYS,
   type FormationKey,
 } from "./PitchLayout";
 import type { CardSearchResult } from "@/server/fcdb/search";
+import { inferFormationFromItems as inferFormationFromItemsImpl } from "./formationInference";
+
+// Re-export the helper from its non-client home so existing client-side
+// imports of `inferFormationFromItems` from this module keep working.
+// Server Components MUST import from `./formationInference` directly.
+export { inferFormationFromItemsImpl as inferFormationFromItems };
 
 /**
  * Read-only Futbin-style pitch visualizer for submitted squads.
@@ -88,7 +93,7 @@ export function SquadPitchView({
 
   const formation = useMemo<FormationKey>(() => {
     if (formationOverride) return formationOverride;
-    return inferFormationFromItems(starters);
+    return inferFormationFromItemsImpl(starters);
   }, [formationOverride, starters]);
 
   const slotDefs = getFormationSlots(formation);
@@ -181,62 +186,9 @@ export function SquadPitchView({
   );
 }
 
-/**
- * Infer a formation key from the 11 lineup positions saved in
- * `squad_player_items.position`. Strategy:
- *   1. Exact full-tuple match — compare the sorted position multiset
- *      against every known formation. Return the first hit.
- *   2. Defender/mid/attacker count signature match (looser). Falls back
- *      to the same heuristic used by /player/squad/change.
- *   3. Fallback to "433" so the pitch always has SOMETHING to render.
- */
-export function inferFormationFromItems(
-  items: SquadPitchViewItem[],
-): FormationKey {
-  if (items.length === 0) return "433";
-  const positionMultiset = items
-    .map((it) => (it.position ?? "").toUpperCase())
-    .sort()
-    .join("|");
-  for (const key of FORMATION_KEYS) {
-    const slots = getFormationSlots(key);
-    const keyMultiset = slots
-      .map((s) => s.label.toUpperCase())
-      .sort()
-      .join("|");
-    if (keyMultiset === positionMultiset) return key;
-  }
-
-  // Tuple mismatch — fall through to the def/mid/att signature match
-  // that /player/squad/change uses. Covers the common case where a
-  // player played a CM in an RM slot (same 4-3-3 shape overall).
-  const positions = items.map((it) => (it.position ?? "").toUpperCase());
-  const def = positions.filter((p) => /^(LB|RB|CB|LWB|RWB)$/.test(p)).length;
-  const mid = positions.filter((p) => /^(CDM|CM|CAM|LM|RM)$/.test(p)).length;
-  const att = positions.filter((p) => /^(LW|RW|LF|RF|CF|ST)$/.test(p)).length;
-  const sig = `${def}-${mid}-${att}`;
-  switch (sig) {
-    case "4-3-3":
-      return "433";
-    case "4-4-2":
-      return "442";
-    case "4-2-3-1":
-    case "4-5-1":
-      return "4231";
-    case "3-5-2":
-      return "352";
-    case "3-4-3":
-      return "343";
-    case "5-3-2":
-      return "532";
-    case "5-4-1":
-      return "541";
-    case "5-2-3":
-      return "523";
-    default:
-      return "433";
-  }
-}
+// `inferFormationFromItems` extracted to ./formationInference (non-client).
+// Re-exported via the module-top `export { ... }` so client callers keep
+// the same import path.
 
 /**
  * Shape a squad_player_items row (with optional fc26_players join) into
