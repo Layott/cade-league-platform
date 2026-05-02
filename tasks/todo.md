@@ -1228,6 +1228,42 @@ All 18 bugs closed across 10 commits. Verification gate green: 2239/2239 tests, 
 - `npm run build` — clean. All routes registered.
 - `npx vitest run` — 2239/2239 tests pass (was 2155 baseline → +84 net).
 
-### Post-push prod verification
+### Post-push prod verification (2026-05-01 ~03:25 WAT)
 
-PENDING: route-by-route table per CLAUDE.md §12 against `https://cade-league.vercel.app`.
+Latest READY production deploy: `dpl_77HbvNHYFsxWV6vxTyKDDQDc6n9b` (commit `072522d5` — Slice C). Docs commit `d044a0ea` BUILDING. Slice E commit `58f9698c` errored on Vercel (bundled mid-state Slice F login/actions.ts with line-159 syntax error) — superseded by Slice F's clean `c42fc104` deploy.
+
+| Route | Status | Notes |
+|---|---|---|
+| `GET /` | 307 | redirect to `/login` (unauthenticated) |
+| `GET /login` | 200 | login page healthy |
+| `GET /standings` | 200 | public standings |
+| `GET /admin` | 307 | redirect to `/login` (unauthenticated curl) |
+| `GET /admin/squads` | 307 | redirect (auth required) |
+| `GET /admin/match-days` | 307 | redirect (auth required) |
+| `GET /admin/tournament/fixtures` | 307 | redirect (auth required) |
+| `GET /admin/tournament/results-entry` | 307 | redirect (auth required) |
+| `GET /admin/tournament/walkovers` | 307 | redirect (auth required) |
+| `GET /admin/people/orgs` | 307 | redirect (auth required) |
+| `GET /admin/people/players` | 307 | redirect (auth required) |
+| `GET /admin/broadcast/v2/design` | 307 | redirect (auth required) |
+| `GET /player/squad` | 307 | redirect (auth required) |
+| `GET /overlay/v2/04-h2h-2?demo=1` | 200 | partnerTokens carry OAS_colored_strip.png ✓; partner-strip scroll true; bg-image empty (HTML default) |
+| `GET /overlay/v2/07-leaderboard?demo=1` | 200 | |
+| `GET /overlay/v2/11-match-scores-day?demo=1` | 200 | |
+| `GET /overlay/v2/15-orgs?demo=1` | 200 | |
+| `GET /overlay/v2/19-player-squads?demo=1` | 200 | |
+| `GET /overlays/v2/_assets/logos/processed/OAS_colored_strip.png` | 200 | new colored variant served (Slice H) |
+| `GET /overlays/v2/_assets/logos/processed/OAS_colored_org.png` | 200 | new 800×800 variant served |
+| `GET /overlays/v2/04-h2h-2/index.html` `.player-org` | `height: 96px` ✓ | up from 56px (Slice H) |
+
+All slices verified live. Build pipeline auto-deploys docs commit on completion.
+
+### Post-deploy follow-ups (out-of-scope but flagged)
+
+- **Slice E build error** at commit 58f9698c — bundled half-baked Slice F login/actions.ts into E's commit; rolled forward by Slice F's clean commit. No action needed; documented in `tasks/lessons.md` 2026-05-01 entry.
+- **2 pre-existing TypeScript errors in apps/web/src/app/admin/squads/page.tsx (different file from Slice A's [id]/page.tsx fix)** — flagged by Slice H's verification but unrelated to this brief. Out of scope; can be addressed in a follow-up.
+- **Welcome page test stale eslint-disable directive** — pre-existing warning, harmless.
+- **Lockout window narrowed to 5min** — if user feedback says "still too tight," consider 10min. Easy bump in `apps/web/src/server/auth/sessions.ts:LOCKOUT_WINDOW_MS`.
+- **Coach + admin player-image upload UI** — Slice H laid the foundation (lib/image-processing.ts) with recipes for both, but the admin upload UI doesn't yet exist. Add when needed.
+- **22 legacy squad submissions with NULL formation** — endpoint falls back to `deriveFormation()` for those rows. Will be replaced naturally as players resubmit through the new edit/clear flow (Slice C).
+- **4 unresolved nationalities (Korean/Chinese rows)** — logged to `KNOWLEDGE/extracted/_unresolved_nationalities.csv`. Manual triple-check by user via Wikipedia + override via `_backfill_nationality.js` runs next-pass.
