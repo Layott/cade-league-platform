@@ -14,6 +14,7 @@ import {
   resolveSquadWindowForMatchDay,
   FORMATION_LABEL_TO_KEY,
 } from "@/server/squads";
+import { ValidationError, ConflictError } from "@/server/squads/errors";
 import {
   publishSquadSubmitted,
   publishSquadChanged,
@@ -108,21 +109,36 @@ export async function submitPickerAction(
     throw new Error("at least 11 starting slots required");
   }
 
-  const submission = await submitPickerSquad(sb, {
-    seasonId,
-    playerId,
-    weekStartDate: payload.weekStartDate,
-    matchDayId: payload.matchDayId ?? null,
-    futbinScreenshotPath: payload.futbinScreenshotPath,
-    // Bug 10 (2026-05-01) — pass picker formation key through.
-    formation: payload.formation as
-      | "433" | "442" | "4231" | "4141" | "41212" | "4222"
-      | "424" | "4312" | "4321" | "4411" | "451"
-      | "352" | "343" | "3412" | "3511" | "3421" | "3142"
-      | "532" | "5212" | "541" | "523"
-      | undefined,
-    slots: payload.slots,
-  });
+  // Bug fix 2026-05-02: catch business-rule rejections (duplicate card,
+  // budget, validation) and redirect with a user-readable error param so
+  // the picker page renders an inline banner instead of bubbling a
+  // ValidationError up to a Server Components render crash.
+  let submission: { id: string };
+  try {
+    submission = await submitPickerSquad(sb, {
+      seasonId,
+      playerId,
+      weekStartDate: payload.weekStartDate,
+      matchDayId: payload.matchDayId ?? null,
+      futbinScreenshotPath: payload.futbinScreenshotPath,
+      // Bug 10 (2026-05-01) — pass picker formation key through.
+      formation: payload.formation as
+        | "433" | "442" | "4231" | "4141" | "41212" | "4222"
+        | "424" | "4312" | "4321" | "4411" | "451"
+        | "352" | "343" | "3412" | "3511" | "3421" | "3142"
+        | "532" | "5212" | "541" | "523"
+        | undefined,
+      slots: payload.slots,
+    });
+  } catch (err) {
+    if (err instanceof ValidationError || err instanceof ConflictError) {
+      const target = payload.matchDayId
+        ? `/player/squad?matchDay=${encodeURIComponent(payload.matchDayId)}&edit=1&error=${encodeURIComponent(err.message)}`
+        : `/player/squad?error=${encodeURIComponent(err.message)}`;
+      redirect(target);
+    }
+    throw err;
+  }
 
   // Live-refresh (2026-04-24) — ping the admin queue so a new
   // submission row appears without reload. Fire-and-forget.

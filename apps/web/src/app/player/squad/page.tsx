@@ -93,10 +93,15 @@ export default async function PlayerSquadPage({
     matchDay?: string;
     edit?: string;
     submitted?: string;
+    error?: string;
   }>;
 }) {
-  const sp: { matchDay?: string; edit?: string; submitted?: string } =
-    searchParams ? await searchParams : {};
+  const sp: {
+    matchDay?: string;
+    edit?: string;
+    submitted?: string;
+    error?: string;
+  } = searchParams ? await searchParams : {};
   const sb = await getServerSupabase();
   const {
     data: { user },
@@ -367,6 +372,17 @@ export default async function PlayerSquadPage({
           </>
         ) : selected.isOpen ? (
           <section data-testid="squad-match-day-picker">
+            {sp.error ? (
+              <div
+                className="mb-3 rounded-sm border border-[rgba(254,3,109,0.6)] bg-[rgba(254,3,109,0.12)] p-3 text-xs text-[var(--flare)]"
+                data-testid="squad-submit-error"
+              >
+                <span className="font-semibold uppercase tracking-[0.18em]">
+                  Submission rejected:{" "}
+                </span>
+                {sp.error}
+              </div>
+            ) : null}
             <div className="mb-3 rounded-sm border border-[rgba(107,205,6,0.45)] bg-[rgba(107,205,6,0.08)] p-3 text-xs text-[var(--chalk-1)]">
               {editing ? "Editing existing squad for match day " : "Building squad for match day "}
               <span className="font-mono font-semibold text-[var(--chalk-0)]">
