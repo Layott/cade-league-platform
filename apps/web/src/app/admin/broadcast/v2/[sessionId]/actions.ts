@@ -23,6 +23,7 @@ import {
 } from "@/components/broadcast/v2/overlay-keys";
 import { v2ToLegacy } from "@/components/broadcast/v2/template-mapping";
 import type { TemplateKey } from "@/server/overlays/registry";
+import { publishStandingsChanged } from "@/server/standings/realtime";
 
 /**
  * Plan 51 — broadcast v2 control panel server actions.
@@ -388,10 +389,11 @@ export async function setSessionMatchDayAction(formData: FormData) {
 
   // Confirm the target match_day exists + isn't soft-deleted. Cheap
   // single-row check; surfaces a clearer error than the generic
-  // "FK violation" the DB would otherwise return.
+  // "FK violation" the DB would otherwise return. Also fetch season_id
+  // so we can fire a Realtime broadcast after the swap (below).
   const { data: md, error: mdErr } = await sb
     .from("match_days")
-    .select("id")
+    .select("id, season_id")
     .eq("id", matchDayId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -441,6 +443,31 @@ export async function setSessionMatchDayAction(formData: FormData) {
       );
     }
     throw new Error(`update failed: ${upErr.message}`);
+  }
+
+  // 2026-05-02 — fire `standings.changed` on the season's public channel
+  // so any data-driven overlay subscribed via OverlayDataInjector
+  // (specifically `11-match-scores-day` + `20-highlight`) re-fetches the
+  // match-scores-day endpoint within one Realtime hop instead of waiting
+  // up to 30s for the next ambient poll. The endpoint reads the now-
+  // updated `stream_sessions.match_day_id` server-side so the iframe
+  // repaints with the fresh fixtures + label without operator action.
+  //
+  // Fire-and-forget: a dropped broadcast is harmless because the ambient
+  // poll's `matchDayChangeTick` (Bug 18, 2026-05-01) is the durable
+  // backstop. We swallow any failure so a Realtime hiccup never blocks
+  // the producer's match-day swap.
+  const md2 = md as { id: string; season_id?: string | null };
+  if (md2.season_id) {
+    try {
+      await publishStandingsChanged(sb, md2.season_id);
+    } catch (e) {
+      console.warn(
+        `[setSessionMatchDay] publish standings.changed failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
   }
 
   revalidatePath(`/admin/broadcast/v2/${sessionId}`);

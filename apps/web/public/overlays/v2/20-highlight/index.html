@@ -1074,9 +1074,15 @@
 
   <script>
     /* LIVE DATA — postMessage listener (data-feed driven).
-       Accepts BOTH shapes:
-         1. postMessage relay: { type:'update', data:{ recentFixtures:[...] } }
-         2. server endpoint:   { type:'update', data:{ payload:{ recentFixtures:[...] } } }
+       Accepts BOTH shapes (Bug 2026-05-02 fix — same root cause as 11):
+         1. Server endpoint shape (canonical, /api/broadcast/sessions/<id>/match-scores-day):
+              { type:'update', data:{ payload:{ matchDayLabel, rows:[
+                  {home, away, homeSlug?, awaySlug?,
+                   homeScore, awayScore, status} ] } } }
+         2. Legacy postMessage shape (still supported):
+              { type:'update', data:{ recentFixtures:[
+                  {playerA:{displayName}, playerB:{displayName},
+                   scoreA, scoreB} ] } }
        Top-right [data-element-id="highlight-stage"] stays as a
        transparent border in production (OBS composites video behind). */
     (function () {
@@ -1085,10 +1091,22 @@
 
       function rowHtml(f) {
         if (!f) return '';
-        var nameA = (f.playerA && (f.playerA.displayName || f.playerA.gamerTag || f.playerA.name)) || '—';
-        var nameB = (f.playerB && (f.playerB.displayName || f.playerB.gamerTag || f.playerB.name)) || '—';
-        var sA = (f.scoreA == null ? '–' : f.scoreA);
-        var sB = (f.scoreB == null ? '–' : f.scoreB);
+        // Legacy shape: f.playerA.displayName / f.playerB.displayName + scoreA/B.
+        // Server shape: f.home / f.away + homeScore / awayScore (status: "scheduled" → null score → render dash).
+        var nameA, nameB, sA, sB;
+        if (f.playerA != null || f.playerB != null) {
+          nameA = (f.playerA && (f.playerA.displayName || f.playerA.gamerTag || f.playerA.name)) || '—';
+          nameB = (f.playerB && (f.playerB.displayName || f.playerB.gamerTag || f.playerB.name)) || '—';
+          sA = (f.scoreA == null ? '–' : f.scoreA);
+          sB = (f.scoreB == null ? '–' : f.scoreB);
+        } else {
+          nameA = (typeof f.home === 'string' ? f.home : '—');
+          nameB = (typeof f.away === 'string' ? f.away : '—');
+          if (typeof nameA === 'string') nameA = nameA.toUpperCase();
+          if (typeof nameB === 'string') nameB = nameB.toUpperCase();
+          sA = (f.homeScore == null ? '–' : f.homeScore);
+          sB = (f.awayScore == null ? '–' : f.awayScore);
+        }
         return '<div class="recent-row">' +
           '<div class="name-pill">' + nameA + '</div>' +
           '<div class="score-pill">' + sA + '</div>' +
@@ -1111,7 +1129,10 @@
 
       function readPayload(data) {
         if (!data || typeof data !== 'object') return null;
+        // Already-unwrapped shapes.
         if (Array.isArray(data.recentFixtures) || Array.isArray(data.fixtures)) return data;
+        if (Array.isArray(data.rows) || data.matchDayLabel != null) return data;
+        // Server endpoint envelope: { payload: { matchDayLabel, rows }, seasonId, channels }.
         if (data.payload && typeof data.payload === 'object') return data.payload;
         return null;
       }
@@ -1119,7 +1140,12 @@
       function update(data) {
         var p = readPayload(data);
         if (!p) return;
-        var f = Array.isArray(p.recentFixtures) ? p.recentFixtures : (Array.isArray(p.fixtures) ? p.fixtures : null);
+        // Legacy shape: p.recentFixtures or p.fixtures.
+        // Server shape: p.rows (from the match-scores-day endpoint).
+        var f = Array.isArray(p.recentFixtures) ? p.recentFixtures
+              : Array.isArray(p.fixtures) ? p.fixtures
+              : Array.isArray(p.rows) ? p.rows
+              : null;
         if (f) rerender(f);
       }
 

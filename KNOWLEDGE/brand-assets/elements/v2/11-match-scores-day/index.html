@@ -12,9 +12,15 @@
   secondary, locked palette #6bcd06 / #fe036d / #050505 / #ffffff.
 
   DATA WIRES:
-    weekNumber: number
-    fixtures: Array<{playerA:{displayName}, playerB:{displayName},
-                     scoreA:number, scoreB:number}>
+    Server endpoint shape (canonical, /api/broadcast/sessions/<id>/match-scores-day):
+      { matchDayLabel: "MATCH DAY 2 RESULTS",
+        rows: Array<{home, away, homeSlug?, awaySlug?,
+                     homeScore:number|null, awayScore:number|null,
+                     status:"scheduled"|"in_progress"|"completed"}> }
+    Legacy postMessage shape (still supported for back-compat):
+      { weekNumber: number,
+        fixtures: Array<{playerA:{displayName}, playerB:{displayName},
+                         scoreA:number, scoreB:number}> }
 
   Demo loop: enter cards cascade, dwell ~5s, exit, loop. Guarded by
   ?demo=1 (no auto-show on default load).
@@ -1052,9 +1058,17 @@
 
   <script>
     /* LIVE DATA — postMessage listener (data-feed driven).
-       Accepts BOTH shapes:
-         1. postMessage relay: { type:'update', data:{ weekNumber, fixtures:[...] } }
-         2. server endpoint:   { type:'update', data:{ payload:{ weekNumber, fixtures:[...] } } }
+       Accepts BOTH shapes (Bug 2026-05-02 fix — match-scores-day stale-MD-1):
+         1. Server endpoint shape (canonical):
+              { type:'update', data:{ payload:{ matchDayLabel, rows:[
+                  {home, away, homeSlug?, awaySlug?,
+                   homeScore, awayScore, status} ] } } }
+            …or with the payload pre-unwrapped (control panel relay):
+              { type:'update', data:{ matchDayLabel, rows:[...] } }
+         2. Legacy postMessage shape (still supported for back-compat):
+              { type:'update', data:{ weekNumber, fixtures:[
+                  {playerA:{displayName}, playerB:{displayName},
+                   scoreA, scoreB} ] } }
        Falls back to placeholder when fields missing. */
     (function () {
       var stage = document.querySelector('.stage') || document.body;
@@ -1063,10 +1077,23 @@
 
       function rowHtml(f) {
         if (!f) return '';
-        var nameA = (f.playerA && (f.playerA.displayName || f.playerA.gamerTag || f.playerA.name)) || '—';
-        var nameB = (f.playerB && (f.playerB.displayName || f.playerB.gamerTag || f.playerB.name)) || '—';
-        var sA = (f.scoreA == null ? '–' : f.scoreA);
-        var sB = (f.scoreB == null ? '–' : f.scoreB);
+        // Legacy shape: f.playerA.displayName / f.playerB.displayName + scoreA/B.
+        // Server shape: f.home / f.away + homeScore / awayScore (status: "scheduled" → null score → render dash).
+        var nameA, nameB, sA, sB;
+        if (f.playerA != null || f.playerB != null) {
+          nameA = (f.playerA && (f.playerA.displayName || f.playerA.gamerTag || f.playerA.name)) || '—';
+          nameB = (f.playerB && (f.playerB.displayName || f.playerB.gamerTag || f.playerB.name)) || '—';
+          sA = (f.scoreA == null ? '–' : f.scoreA);
+          sB = (f.scoreB == null ? '–' : f.scoreB);
+        } else {
+          // Server shape — uppercase the name for the pill (matches design system).
+          nameA = (typeof f.home === 'string' ? f.home : '—');
+          nameB = (typeof f.away === 'string' ? f.away : '—');
+          if (typeof nameA === 'string') nameA = nameA.toUpperCase();
+          if (typeof nameB === 'string') nameB = nameB.toUpperCase();
+          sA = (f.homeScore == null ? '–' : f.homeScore);
+          sB = (f.awayScore == null ? '–' : f.awayScore);
+        }
         return '<div class="fixture-row">' +
           '<div class="name-pill name-pill--left">' + nameA + '</div>' +
           '<div class="score-pill">' + sA + '</div>' +
@@ -1093,7 +1120,10 @@
 
       function readPayload(data) {
         if (!data || typeof data !== 'object') return null;
+        // Already-unwrapped shapes (legacy or server with pre-stripped wrapper).
         if (Array.isArray(data.fixtures) || data.weekNumber != null) return data;
+        if (Array.isArray(data.rows) || data.matchDayLabel != null) return data;
+        // Server endpoint envelope: { payload: { matchDayLabel, rows }, seasonId, channels }.
         if (data.payload && typeof data.payload === 'object') return data.payload;
         return null;
       }
@@ -1101,10 +1131,22 @@
       function update(data) {
         var p = readPayload(data);
         if (!p) return;
-        if (p.weekNumber != null && weekPill) {
-          try { weekPill.textContent = 'WEEK ' + p.weekNumber; } catch (e) {}
+        // Title-bar text:
+        //  - Legacy: render "WEEK <n>".
+        //  - Server: render the literal matchDayLabel ("MATCH DAY 2 RESULTS").
+        // Note: the design uses a single `.week-pill` element regardless of label.
+        if (weekPill) {
+          if (p.weekNumber != null) {
+            try { weekPill.textContent = 'WEEK ' + p.weekNumber; } catch (e) {}
+          } else if (typeof p.matchDayLabel === 'string' && p.matchDayLabel.trim().length) {
+            try { weekPill.textContent = p.matchDayLabel; } catch (e) {}
+          }
         }
-        if (Array.isArray(p.fixtures)) rerender(p.fixtures);
+        // Fixtures:
+        //  - Legacy: p.fixtures (array of {playerA, playerB, scoreA, scoreB}).
+        //  - Server: p.rows (array of {home, away, homeScore, awayScore, status, ...}).
+        var arr = Array.isArray(p.fixtures) ? p.fixtures : (Array.isArray(p.rows) ? p.rows : null);
+        if (arr) rerender(arr);
       }
 
       function show() {
