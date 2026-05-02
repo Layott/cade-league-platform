@@ -255,8 +255,11 @@ vi.mock("@/server/overlays/animations/elements", () => ({
   deleteAnimation: deleteAnimationMock,
 }));
 
-// `sharp` mock — yields configurable metadata so we can simulate good
-// dimensions (600×300), under-sized, oversize, and "could not read".
+// `sharp` mock — partner-logo upload runs uploads through
+// `processImage`, which delegates to sharp under the hood. We mock
+// `processImage` directly below so this `sharp` mock is now only a
+// safety net (any code path that still imports sharp at module load
+// gets a no-op).
 const sharpMetadataMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ width: 600, height: 300 }),
 );
@@ -266,6 +269,28 @@ const sharpDefaultMock = vi.hoisted(() => {
   }));
 });
 vi.mock("sharp", () => ({ default: sharpDefaultMock }));
+
+// 2026-05-01 — partner-logo upload now ALWAYS resizes raster inputs
+// via processImage (no dimension validation). Mock returns a small
+// fake PNG buffer so the storage upload path stays exercised.
+const processImageMock = vi.hoisted(() =>
+  vi.fn(async (_buf: Buffer) => Buffer.from("fake-png-bytes")),
+);
+const recipeForMock = vi.hoisted(() =>
+  vi.fn((useCase: string) => {
+    if (useCase === "partner-strip") {
+      return { w: 600, h: 300, fit: "contain", bg: { r: 0, g: 0, b: 0, alpha: 0 } };
+    }
+    if (useCase === "org-logo") {
+      return { w: 800, h: 800, fit: "contain", bg: { r: 0, g: 0, b: 0, alpha: 0 } };
+    }
+    return { w: 512, h: 512, fit: "cover", bg: { r: 0, g: 0, b: 0, alpha: 0 } };
+  }),
+);
+vi.mock("@/lib/image-processing", () => ({
+  processImage: processImageMock,
+  recipeFor: recipeForMock,
+}));
 
 import {
   saveTokensAction,
@@ -299,6 +324,10 @@ beforeEach(() => {
   deletePartnerLogoMock.mockReset().mockResolvedValue(undefined);
   sharpMetadataMock.mockReset().mockResolvedValue({ width: 600, height: 300 });
   sharpDefaultMock.mockClear();
+  processImageMock
+    .mockReset()
+    .mockImplementation(async () => Buffer.from("fake-png-bytes"));
+  recipeForMock.mockClear();
   storageUploadMock.mockReset().mockResolvedValue({ data: {}, error: null });
   storagePublicUrlMock.mockReset().mockReturnValue({
     data: { publicUrl: "https://supabase.local/partner-logos/test.png" },
@@ -859,36 +888,53 @@ describe("uploadPartnerLogoAction (Wave 2 Stage 3)", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("rejects under-sized image", async () => {
-    sharpMetadataMock.mockResolvedValueOnce({ width: 200, height: 100 });
-    const r = await uploadPartnerLogoAction(fdUpload());
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.error).toMatch(/600.*300/);
-      expect(r.actualDimensions).toEqual({ w: 200, h: 100 });
-    }
-  });
-
-  it("rejects oversized image", async () => {
-    sharpMetadataMock.mockResolvedValueOnce({ width: 1200, height: 600 });
-    const r = await uploadPartnerLogoAction(fdUpload());
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.actualDimensions).toEqual({ w: 1200, h: 600 });
-  });
-
-  it("accepts on-tolerance image (660 × 270)", async () => {
-    sharpMetadataMock.mockResolvedValueOnce({ width: 660, height: 270 });
+  it("auto-resizes under-sized raster (was rejection pre-2026-05-01)", async () => {
+    // Even tiny inputs now succeed because processImage upscales /
+    // letterboxes to the recipe target (600×300). The DB row records
+    // the SHIPPED dimensions, not the raw input dimensions.
     const r = await uploadPartnerLogoAction(fdUpload());
     expect(r.ok).toBe(true);
-    expect(createPartnerLogoMock).toHaveBeenCalledTimes(1);
+    expect(processImageMock).toHaveBeenCalledTimes(1);
+    expect(processImageMock).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "partner-strip",
+    );
+    const callInput = createPartnerLogoMock.mock.calls[0][2];
+    expect(callInput).toMatchObject({
+      partnerKey: "newpartner",
+      dimensionWPx: 600,
+      dimensionHPx: 300,
+    });
   });
 
-  it("bypasses dimension check for SVG", async () => {
-    // SVG path skips sharp probe entirely; dimensions default to 600×300.
+  it("auto-resizes oversized raster (was rejection pre-2026-05-01)", async () => {
+    // 1200×600 input — pre-2026-05-01 this rejected with `actualDimensions`;
+    // post-fix we letterbox via processImage and ship at 600×300.
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(true);
+    expect(processImageMock).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "partner-strip",
+    );
+  });
+
+  it("uploads PNG buffer + content-type after processing raster", async () => {
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(true);
+    expect(storageUploadMock).toHaveBeenCalledTimes(1);
+    const uploadCall = storageUploadMock.mock.calls[0];
+    // (filename, buffer, opts) — opts.contentType should be image/png
+    expect(uploadCall[2]).toMatchObject({ contentType: "image/png" });
+    // filename suffix flips to .png even for image/jpeg input.
+    expect(uploadCall[0]).toMatch(/\.png$/);
+  });
+
+  it("bypasses processImage for SVG (vector preserved)", async () => {
     const svg = makeFile(2048, "image/svg+xml", "x.svg");
     const r = await uploadPartnerLogoAction(fdUpload({ file: svg }));
     expect(r.ok).toBe(true);
-    expect(sharpDefaultMock).not.toHaveBeenCalled();
+    // SVG path skips processImage entirely.
+    expect(processImageMock).not.toHaveBeenCalled();
     expect(createPartnerLogoMock).toHaveBeenCalledTimes(1);
     const callInput = createPartnerLogoMock.mock.calls[0][2];
     expect(callInput).toMatchObject({
@@ -896,6 +942,18 @@ describe("uploadPartnerLogoAction (Wave 2 Stage 3)", () => {
       dimensionWPx: 600,
       dimensionHPx: 300,
     });
+    // Storage upload for SVG keeps original content-type + .svg ext.
+    const uploadCall = storageUploadMock.mock.calls[0];
+    expect(uploadCall[2]).toMatchObject({ contentType: "image/svg+xml" });
+    expect(uploadCall[0]).toMatch(/\.svg$/);
+  });
+
+  it("surfaces processImage failures", async () => {
+    processImageMock.mockRejectedValueOnce(new Error("sharp blew up"));
+    const r = await uploadPartnerLogoAction(fdUpload());
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/image processing failed/i);
+    expect(storageUploadMock).not.toHaveBeenCalled();
   });
 
   it("rejects when actor lacks overlay.design.manage", async () => {

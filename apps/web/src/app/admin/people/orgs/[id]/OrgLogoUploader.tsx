@@ -20,6 +20,12 @@ import { requestOrgLogoUploadAction, updateOrgAction } from "./actions";
  * org name" form on this page — keeps logo upload reversible (admin
  * can pick a different file before clicking Save) without coupling to
  * the rest of the metadata.
+ *
+ * 2026-05-01 — adds a UI hint that the logo will be auto-resized to
+ * 800×800 with a transparent background. The actual resize happens
+ * server-side on the next overlay refresh via the central
+ * `processImage` helper (or, if the file is uploaded via signed-URL,
+ * client-side via `<canvas>` before PUT).
  */
 export function OrgLogoUploader({
   orgId,
@@ -59,6 +65,9 @@ export function OrgLogoUploader({
         label={currentLogoUrl ? `Replace logo for ${orgName}` : `Upload logo for ${orgName}`}
         data-testid="org-logo-upload"
       />
+      <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+        Image will be auto-resized to 800×800 with transparent background.
+      </p>
       <div className="flex items-center gap-3">
         <PrimaryButton
           type="submit"

@@ -36,6 +36,7 @@ import {
   createPartnerLogo,
   deletePartnerLogo,
 } from "@/server/overlays/partners/logos";
+import { processImage, recipeFor } from "@/lib/image-processing";
 import {
   deleteAnimation,
   type AnimPhase,
@@ -853,31 +854,14 @@ const PARTNER_LOGO_ALLOWED_MIME = new Set<string>([
 ]);
 
 /**
- * Spec §7 dimension contract: 600 × 300 ±10% (i.e. 540..660 wide,
- * 270..330 tall). SVG bypasses the check (vector — sized via
- * `scalePct`).
+ * Partner-strip target dimensions. Pulled from the central
+ * `partner-strip` recipe so when the recipe shifts (e.g. retina pass
+ * to 1200×600) this action picks up the new target without a code edit.
  */
-const PARTNER_LOGO_MIN_W = 540;
-const PARTNER_LOGO_MAX_W = 660;
-const PARTNER_LOGO_MIN_H = 270;
-const PARTNER_LOGO_MAX_H = 330;
+const PARTNER_LOGO_TARGET_W = recipeFor("partner-strip").w;
+const PARTNER_LOGO_TARGET_H = recipeFor("partner-strip").h;
 
 const PARTNER_KEY_RE = /^[a-z][a-z0-9-]{0,63}$/;
-
-function partnerLogoExtForMime(mime: string): string {
-  switch (mime) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    case "image/svg+xml":
-      return "svg";
-    default:
-      return "bin";
-  }
-}
 
 export type UploadPartnerLogoResult =
   | { ok: true; partnerKey: string; fileUrl: string }
@@ -955,39 +939,30 @@ export async function uploadPartnerLogoAction(
     };
   }
 
-  // 3. Probe dimensions via `sharp` (skip for SVG — vector).
-  const buffer = Buffer.from(await file.arrayBuffer());
+  // 3. Auto-resize raster images to the target dimensions via the
+  //    central `processImage` helper. SVG is preserved as-is (vector,
+  //    sized at render-time via CSS / inline width). Pre-2026-05-01
+  //    we instead VALIDATED dimensions and rejected anything outside
+  //    600×300 ±10%; the new contract resizes any in-tolerance MIME
+  //    so admins never see a "wrong dimensions" error again. See
+  //    `apps/web/src/lib/image-processing.ts` for the recipe.
+  const rawBuffer = Buffer.from(await file.arrayBuffer());
   const isVector = file.type === "image/svg+xml";
-  let dimensionWPx = 600;
-  let dimensionHPx = 300;
+  let uploadBuffer: Buffer = rawBuffer;
+  let uploadContentType: string = file.type;
+  // Recipe is the contract — output dimensions are deterministic.
+  // We persist these to `overlay_partner_logos.dimension_*_px` so the
+  // overlay HTML can read them without re-probing the file.
+  const dimensionWPx = PARTNER_LOGO_TARGET_W;
+  const dimensionHPx = PARTNER_LOGO_TARGET_H;
   if (!isVector) {
     try {
-      // dynamic import keeps `sharp` out of the cold-start path for actions
-      // that never touch image bytes.
-      const sharp = (await import("sharp")).default;
-      const meta = await sharp(buffer).metadata();
-      if (!meta.width || !meta.height) {
-        return { ok: false, error: "could not read image dimensions" };
-      }
-      dimensionWPx = meta.width;
-      dimensionHPx = meta.height;
+      uploadBuffer = await processImage(rawBuffer, "partner-strip");
+      uploadContentType = "image/png"; // processImage always emits PNG
     } catch (e) {
       return {
         ok: false,
-        error: `image probe failed: ${e instanceof Error ? e.message : String(e)}`,
-      };
-    }
-
-    if (
-      dimensionWPx < PARTNER_LOGO_MIN_W ||
-      dimensionWPx > PARTNER_LOGO_MAX_W ||
-      dimensionHPx < PARTNER_LOGO_MIN_H ||
-      dimensionHPx > PARTNER_LOGO_MAX_H
-    ) {
-      return {
-        ok: false,
-        error: `Got ${dimensionWPx}×${dimensionHPx}, expected 600×300 ±10% (${PARTNER_LOGO_MIN_W}..${PARTNER_LOGO_MAX_W} × ${PARTNER_LOGO_MIN_H}..${PARTNER_LOGO_MAX_H})`,
-        actualDimensions: { w: dimensionWPx, h: dimensionHPx },
+        error: `image processing failed: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
   }
@@ -1007,14 +982,16 @@ export async function uploadPartnerLogoAction(
   // 5. Upload to Storage. `<partnerKey>-<ts>.<ext>` filename ensures a
   // re-upload of the same key replaces the previous file conceptually
   // (the DB row carries the file_url so we don't need to delete the old
-  // blob — Storage retains it for forensics + as a fallback).
-  const ext = partnerLogoExtForMime(file.type);
+  // blob — Storage retains it for forensics + as a fallback). For
+  // raster inputs the extension flips to `png` because processImage
+  // always emits PNG; SVG keeps its original ext + content-type.
+  const ext = isVector ? "svg" : "png";
   const ts = Date.now();
   const filename = `${partnerKey}-${ts}.${ext}`;
   const { error: uploadErr } = await sb.storage
     .from(PARTNER_LOGO_BUCKET)
-    .upload(filename, buffer, {
-      contentType: file.type,
+    .upload(filename, uploadBuffer, {
+      contentType: uploadContentType,
       cacheControl: "3600",
       upsert: false,
     });
@@ -1056,7 +1033,10 @@ export async function uploadPartnerLogoAction(
             ? displayLabelRaw
             : label || alt,
         fileUrl: publicUrl,
-        fileSizeBytes: file.size,
+        // Persist the SHIPPED size (post-resize), not the raw upload
+        // size — fileSizeBytes is what end-users (overlays + admin
+        // logo manager) see; the original size is forensic-only.
+        fileSizeBytes: uploadBuffer.length,
         dimensionWPx,
         dimensionHPx,
         sortOrder,
