@@ -24,8 +24,12 @@
  * surface the breakdown + positional-gate warnings.
  */
 import type { FCItemType } from "@/server/fcdb/types";
-import type { FormationKey } from "@/components/squads/PitchLayout";
-import { getFormationSlots } from "@/components/squads/PitchLayout";
+// Bug fix 2026-05-02: import from non-`"use client"` formations module so
+// server callers (broadcast endpoints, submit_picker) don't get client
+// references at runtime. Importing from PitchLayout (which carries
+// `"use client"`) makes the named exports unreachable from the server.
+import type { FormationKey } from "@/components/squads/formations";
+import { getFormationSlots } from "@/components/squads/formations";
 
 export type ChemistryCard = {
   club: string | null;

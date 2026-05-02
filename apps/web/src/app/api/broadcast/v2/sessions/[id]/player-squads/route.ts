@@ -10,11 +10,13 @@ import {
   type ChemistryCard,
   type SlotFill,
 } from "@/lib/chemistry";
+// Bug fix 2026-05-02: import from non-`"use client"` formations module
+// so this server-only API route doesn't get client references.
 import {
   getFormationSlots,
   type FormationKey,
   type SlotPosition,
-} from "@/components/squads/PitchLayout";
+} from "@/components/squads/formations";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

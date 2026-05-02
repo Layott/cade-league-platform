@@ -15,6 +15,7 @@ import {
 import { createSignedUpload } from "@/server/storage/signed";
 import { ORG_LOGOS_BUCKET, buildOrgLogoPath } from "@/server/storage/paths";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { processImage } from "@/lib/image-processing";
 import {
   parseLinkPlayerForm,
   parseLinkCoachForm,
@@ -53,9 +54,35 @@ export async function updateOrgAction(formData: FormData): Promise<void> {
   // `<img src>` on /admin/people/orgs and the 15-orgs broadcast overlay,
   // so we must resolve the path to a fully-qualified PUBLIC URL here.
   // Bucket is public so getPublicUrl is sufficient (no signed-read).
+  //
+  // Bug fix 2026-05-02: also auto-resize the just-uploaded image to the
+  // org-logo recipe (800x800 transparent bg) via processImage. The
+  // SignedFileInput uploads the raw file directly; without this, broadcast
+  // overlays render whatever resolution the admin uploaded — often
+  // mis-sized on the 15-orgs canvas. We download, resize, and re-upload to
+  // the same path so the public URL is unchanged.
   let resolvedLogoUrl = input.logoPath;
   if (input.logoPath && !/^https?:\/\//i.test(input.logoPath) && !input.logoPath.startsWith("/")) {
     const svc = getServiceRoleSupabase();
+    try {
+      const { data: blob, error: dlErr } = await svc.storage
+        .from(ORG_LOGOS_BUCKET)
+        .download(input.logoPath);
+      if (!dlErr && blob) {
+        const buf = Buffer.from(await blob.arrayBuffer());
+        const resized = await processImage(buf, "org-logo");
+        await svc.storage
+          .from(ORG_LOGOS_BUCKET)
+          .upload(input.logoPath, resized, {
+            contentType: "image/png",
+            upsert: true,
+          });
+      }
+    } catch (err) {
+      console.error(
+        `[orgs] processImage failed for ${input.logoPath}; saving raw upload: ${String(err)}`,
+      );
+    }
     const { data } = svc.storage.from(ORG_LOGOS_BUCKET).getPublicUrl(input.logoPath);
     resolvedLogoUrl = data?.publicUrl || input.logoPath;
   }

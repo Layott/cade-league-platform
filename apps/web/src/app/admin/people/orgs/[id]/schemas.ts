@@ -32,12 +32,20 @@ export const updateOrgFormSchema = z.object({
 export type UpdateOrgForm = z.infer<typeof updateOrgFormSchema>;
 
 export function parseUpdateOrgForm(fd: FormData): UpdateOrgForm {
+  // Bug fix 2026-05-02: FormData.get() returns null for missing fields.
+  // Zod v4 `.optional()` accepts undefined but rejects null. Coerce null →
+  // undefined here so schema parses cleanly when the form omits a field
+  // (e.g. logo-only save without name/contactRepUserId/status).
+  const opt = (k: string): string | undefined => {
+    const v = fd.get(k);
+    return typeof v === "string" && v.length > 0 ? v : undefined;
+  };
   return updateOrgFormSchema.parse({
     id: fd.get("id"),
-    name: fd.get("name") || undefined,
-    logoPath: fd.get("logoPath"),
-    contactRepUserId: fd.get("contactRepUserId"),
-    status: (fd.get("status") as string) || undefined,
+    name: opt("name"),
+    logoPath: opt("logoPath"),
+    contactRepUserId: opt("contactRepUserId"),
+    status: opt("status"),
   });
 }
 
