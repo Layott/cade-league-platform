@@ -41,6 +41,14 @@ export type SquadMatchDayPickerItem = {
   submittedAt?: string | null;
   validationStatus?: "pending" | "approved" | "rejected" | null;
   windowOpensAt?: string | null;
+  /**
+   * 2026-05-01 — bug 6. When status==='submitted' AND windowOpen===true AND
+   * validationStatus==='pending', the row swaps the "View squad" CTA for
+   * "Edit squad" so a player can revise before the deadline. Plumbed
+   * through from the page-level `r.isOpen` resolver. Defaults to false at
+   * render time so legacy / unspecified rows behave like before.
+   */
+  windowOpen?: boolean;
   bucket: "past" | "this_week" | "upcoming";
   // 2026-04-30 — weekend grouping. When a weekend has BOTH Sat + Sun match
   // days, the page aggregates them into ONE row pointing at the Sat
@@ -80,9 +88,27 @@ function pillFor(item: SquadMatchDayPickerItem) {
 
 function ctaFor(item: SquadMatchDayPickerItem) {
   const href = `/player/squad?matchDay=${encodeURIComponent(item.matchDayId)}`;
+  const editHref = `${href}&edit=1`;
   const baseCls =
     "inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors";
   if (item.status === "submitted") {
+    // 2026-05-01 — bug 6. Surface "Edit squad" while the window is still
+    // open AND the submission is pending review (an admin hasn't already
+    // approved/rejected). Players can revise their picks until the
+    // deadline. Otherwise fall back to the read-only "View squad" CTA.
+    const editable =
+      item.windowOpen === true && item.validationStatus === "pending";
+    if (editable) {
+      return (
+        <Link
+          href={editHref}
+          className={`${baseCls} border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-ink)] hover:bg-[#82e21a]`}
+          data-testid={`md-cta-edit-${item.matchDayId}`}
+        >
+          Edit squad
+        </Link>
+      );
+    }
     return (
       <Link
         href={href}

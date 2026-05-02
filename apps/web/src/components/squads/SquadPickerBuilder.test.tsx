@@ -162,6 +162,128 @@ describe("SquadPickerBuilder", () => {
     expect(cbFilled).toBeGreaterThanOrEqual(2);
   });
 
+  it("hydrates state from initialSquad (edit mode) overriding initialDraft", () => {
+    const draftCard = mkCard({ name: "Draft Pick", id: "draft-id" });
+    const editCard = mkCard({ name: "Live Submission", id: "live-id" });
+    render(
+      <SquadPickerBuilder
+        weekStartDate="2026-04-16"
+        rule={null}
+        submitAction={vi.fn()}
+        requestUploadUrlAction={vi.fn()}
+        initialDraft={{
+          formation: "433",
+          slots: [{ slotIndex: 0, card: draftCard }],
+          subs: Array(7).fill(null),
+          screenshotPath: null,
+          updatedAt: "2026-04-30T10:00:00Z",
+        }}
+        initialSquad={{
+          formation: "442",
+          slots: [{ slotIndex: 0, card: editCard }],
+          subs: [editCard, null, null, null, null, null, null],
+        }}
+      />,
+    );
+    // Slot 0 picks the live submission (live-id), NOT the draft (draft-id).
+    expect(screen.getByTestId("pitch-slot-0").getAttribute("data-card-id")).toBe(
+      "live-id",
+    );
+    // Sub slot 0 hydrated from initialSquad.
+    expect(screen.getByTestId("sub-slot-0").getAttribute("data-card-id")).toBe(
+      "live-id",
+    );
+  });
+
+  it("clears all roster state when clear-roster button is confirmed", async () => {
+    const card = mkCard({ name: "Will be cleared", id: "to-clear" });
+    const clearDraftAction = vi.fn().mockResolvedValue({ ok: true });
+    // Stub window.confirm → true so the click proceeds without prompting.
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn().mockReturnValue(true);
+
+    render(
+      <SquadPickerBuilder
+        weekStartDate="2026-04-16"
+        rule={null}
+        submitAction={vi.fn()}
+        requestUploadUrlAction={vi.fn()}
+        initialSquad={{
+          formation: "442",
+          slots: [
+            { slotIndex: 0, card },
+            { slotIndex: 1, card: mkCard({ id: "card-1" }) },
+          ],
+          subs: [card, null, null, null, null, null, null],
+        }}
+        clearDraftAction={clearDraftAction}
+      />,
+    );
+
+    // Pre-state: slot 0 carries the hydrated card.
+    expect(
+      screen.getByTestId("pitch-slot-0").getAttribute("data-card-id"),
+    ).toBe("to-clear");
+
+    // Click the clear-roster button.
+    fireEvent.click(screen.getByTestId("picker-clear-roster-btn"));
+
+    // After clearing, no slots should carry data-card-id.
+    await waitFor(() => {
+      const cleared =
+        screen.getByTestId("pitch-slot-0").getAttribute("data-card-id") ===
+          null &&
+        screen.getByTestId("pitch-slot-1").getAttribute("data-card-id") ===
+          null;
+      expect(cleared).toBe(true);
+    });
+    // Sub slot 0 should be empty too.
+    expect(
+      screen.getByTestId("sub-slot-0").getAttribute("data-card-id"),
+    ).toBeNull();
+
+    // clearDraftAction was invoked with the right input.
+    expect(clearDraftAction).toHaveBeenCalledTimes(1);
+    expect(clearDraftAction.mock.calls[0][0]).toEqual({
+      weekStartDate: "2026-04-16",
+      matchDayId: null,
+    });
+
+    window.confirm = originalConfirm;
+  });
+
+  it("does NOT clear roster when the clear-roster confirmation is dismissed", () => {
+    const card = mkCard({ name: "Stays", id: "stays-id" });
+    const clearDraftAction = vi.fn();
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn().mockReturnValue(false);
+
+    render(
+      <SquadPickerBuilder
+        weekStartDate="2026-04-16"
+        rule={null}
+        submitAction={vi.fn()}
+        requestUploadUrlAction={vi.fn()}
+        initialSquad={{
+          formation: "433",
+          slots: [{ slotIndex: 0, card }],
+          subs: Array(7).fill(null),
+        }}
+        clearDraftAction={clearDraftAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("picker-clear-roster-btn"));
+
+    // Slot still carries the original card — confirm dismissed.
+    expect(
+      screen.getByTestId("pitch-slot-0").getAttribute("data-card-id"),
+    ).toBe("stays-id");
+    expect(clearDraftAction).not.toHaveBeenCalled();
+
+    window.confirm = originalConfirm;
+  });
+
   it("hydrates state from initialDraft on mount (formation + slot 0 visible)", () => {
     const card = mkCard({ name: "Hydrated" });
     render(

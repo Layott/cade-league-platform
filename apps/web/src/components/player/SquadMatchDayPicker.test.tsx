@@ -145,6 +145,69 @@ describe("SquadMatchDayPicker", () => {
     expect(screen.getAllByText(/coming up/i).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("renders an Edit CTA when submission is pending + window is still open", () => {
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "edit-1",
+            matchDate: "2026-04-29",
+            status: "submitted",
+            validationStatus: "pending",
+            submittedAt: "2026-04-28T08:00:00Z",
+            windowOpen: true,
+            bucket: "this_week",
+          }),
+        ]}
+      />,
+    );
+    const cta = screen.getByTestId("md-cta-edit-edit-1") as HTMLAnchorElement;
+    expect(cta).toBeTruthy();
+    expect(cta.getAttribute("href")).toContain("matchDay=edit-1");
+    expect(cta.getAttribute("href")).toContain("edit=1");
+    expect(cta.textContent?.toLowerCase()).toContain("edit");
+  });
+
+  it("falls back to View CTA when submission is pending but window has closed", () => {
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "view-after-close",
+            matchDate: "2026-04-22",
+            status: "submitted",
+            validationStatus: "pending",
+            submittedAt: "2026-04-21T08:00:00Z",
+            windowOpen: false,
+            bucket: "past",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("md-cta-view-view-after-close")).toBeTruthy();
+    expect(screen.queryByTestId("md-cta-edit-view-after-close")).toBeNull();
+  });
+
+  it("falls back to View CTA when window is open but submission is approved", () => {
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "view-after-approve",
+            matchDate: "2026-04-29",
+            status: "submitted",
+            validationStatus: "approved",
+            submittedAt: "2026-04-28T08:00:00Z",
+            windowOpen: true,
+            bucket: "this_week",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("md-cta-view-view-after-approve")).toBeTruthy();
+    expect(screen.queryByTestId("md-cta-edit-view-after-approve")).toBeNull();
+  });
+
   it("renders a Rejected pill when validationStatus=rejected", () => {
     render(
       <SquadMatchDayPicker

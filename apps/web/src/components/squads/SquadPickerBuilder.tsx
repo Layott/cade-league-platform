@@ -33,6 +33,24 @@ import type { DraftRow } from "@/server/squads/draft";
 
 const MAX_SUBS = 7;
 
+/**
+ * 2026-05-01 — bug 6. Edit-mode hydration shape. When the page renders the
+ * picker for an existing pending submission, it builds an `InitialSquad`
+ * from the live `squad_player_items` rows + an inferred / persisted
+ * formation key. The picker treats `initialSquad` as the strongest seed
+ * (overrides `initialDraft` when present) so a player who hits "Edit
+ * squad" sees their actual XI, not a half-saved autosave.
+ */
+export type InitialSquadSlot = {
+  slotIndex: number;
+  card: CardSearchResult;
+};
+export type InitialSquad = {
+  formation: string;
+  slots: InitialSquadSlot[];
+  subs: Array<CardSearchResult | null>;
+};
+
 export type SquadPickerBuilderProps = {
   weekStartDate: string;
   rule: LiveTotalsRule | null;
@@ -73,6 +91,14 @@ export type SquadPickerBuilderProps = {
    */
   initialDraft?: DraftRow | null;
   /**
+   * 2026-05-01 — Edit mode hydration. When a player clicks "Edit squad"
+   * on a still-pending submission, the page passes the already-submitted
+   * formation + slots + subs through this prop. Takes precedence over
+   * `initialDraft` so a partial autosave doesn't clobber the live
+   * submission. Null on the new-submission path.
+   */
+  initialSquad?: InitialSquad | null;
+  /**
    * Server Action — autosave the in-flight pick state. Called after every
    * change with an 800ms debounce. The action returns a structured `{ok}`
    * envelope; the picker logs failures to console.warn but never blocks
@@ -91,6 +117,17 @@ export type SquadPickerBuilderProps = {
     subs: Array<CardSearchResult | null>;
     screenshotPath: string | null;
   }) => Promise<{ ok: boolean; error?: string; updatedAt?: string }>;
+  /**
+   * 2026-05-01 — bug 6. Clear-the-roster button calls this server action
+   * to soft-delete any persisted draft for (player, week, match-day) so
+   * the page re-renders with a clean slate on the next visit. NULL-safe:
+   * the picker still resets its in-memory state regardless of whether the
+   * action exists or succeeds.
+   */
+  clearDraftAction?: (input: {
+    weekStartDate: string;
+    matchDayId?: string | null;
+  }) => Promise<{ ok: boolean; error?: string }>;
 };
 
 export function SquadPickerBuilder({
@@ -100,21 +137,32 @@ export function SquadPickerBuilder({
   submitAction,
   requestUploadUrlAction,
   initialDraft,
+  initialSquad,
   saveDraftAction,
+  clearDraftAction,
 }: SquadPickerBuilderProps) {
-  // Lazy initializers seed from `initialDraft` so a returning player sees
-  // their previous picks immediately, with NO flash of empty state. Missing
-  // / malformed fields fall back to empty defaults — the JSON columns are
-  // intentionally schemaless (see server/squads/draft.ts).
+  // Lazy initializers seed from `initialSquad` (edit mode — strongest
+  // signal, the live submission) when present, otherwise from
+  // `initialDraft` (autosave hydration). Missing / malformed fields fall
+  // back to empty defaults — the JSON columns are intentionally schemaless
+  // (see server/squads/draft.ts).
   const [formation, setFormation] = useState<FormationKey>(() => {
-    const f = initialDraft?.formation;
-    return isFormationKey(f) ? f : "433";
+    const fSquad = initialSquad?.formation;
+    if (isFormationKey(fSquad)) return fSquad;
+    const fDraft = initialDraft?.formation;
+    return isFormationKey(fDraft) ? fDraft : "433";
   });
   const [slots, setSlots] = useState<Record<number, CardSearchResult | null>>(
-    () => seedSlotsFromDraft(initialDraft),
+    () =>
+      initialSquad
+        ? seedSlotsFromInitialSquad(initialSquad)
+        : seedSlotsFromDraft(initialDraft),
   );
   const [subs, setSubs] = useState<Array<CardSearchResult | null>>(
-    () => seedSubsFromDraft(initialDraft),
+    () =>
+      initialSquad
+        ? seedSubsFromInitialSquad(initialSquad)
+        : seedSubsFromDraft(initialDraft),
   );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTarget, setDialogTarget] = useState<
@@ -406,6 +454,44 @@ export function SquadPickerBuilder({
     [slots, subs],
   );
 
+  /**
+   * 2026-05-01 — bug 6. Clear-roster button. Confirms with the player,
+   * resets every in-memory picker field (formation back to 4-3-3, every
+   * slot empty, every sub null, captain unset, screenshot pointer wiped),
+   * and best-effort calls `clearDraftAction` to soft-delete the persisted
+   * draft so a return visit doesn't rehydrate stale picks. The action is
+   * fire-and-forget — a failed network call never blocks the UI reset.
+   */
+  const onClearRoster = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        "Clear all picks and restart? This will remove your formation, starting XI, subs, and screenshot for this match day.",
+      );
+      if (!ok) return;
+    }
+    setFormation("433");
+    setSlots(emptySlots());
+    setSubs(Array.from({ length: MAX_SUBS }, () => null));
+    setScreenshotPath(null);
+    setError(null);
+    setDialogOpen(false);
+    setDialogTarget(null);
+    if (clearDraftAction) {
+      clearDraftAction({
+        weekStartDate,
+        matchDayId: matchDayId ?? null,
+      })
+        .then((res) => {
+          if (!res.ok) {
+            console.warn("squad draft clear failed:", res.error);
+          }
+        })
+        .catch((err) => {
+          console.warn("squad draft clear threw:", err);
+        });
+    }
+  }, [clearDraftAction, weekStartDate, matchDayId]);
+
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -535,6 +621,17 @@ export function SquadPickerBuilder({
                 {formationLabel(f)}
               </button>
             ))}
+          </div>
+          <div className="ml-auto">
+            <button
+              type="button"
+              onClick={onClearRoster}
+              disabled={isPending || uploading}
+              data-testid="picker-clear-roster-btn"
+              className="rounded-sm border border-[var(--flare)] bg-transparent px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--flare)] transition-colors hover:bg-[rgba(255,91,59,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Clear roster
+            </button>
           </div>
         </div>
 
@@ -751,6 +848,34 @@ function seedSubsFromDraft(
     const c = draft.subs[i];
     if (c && typeof c === "object" && typeof (c as CardSearchResult).id === "string") {
       base[i] = c as CardSearchResult;
+    }
+  }
+  return base;
+}
+
+function seedSlotsFromInitialSquad(
+  initial: InitialSquad,
+): Record<number, CardSearchResult | null> {
+  const out = emptySlots();
+  for (const s of initial.slots) {
+    if (s && s.card && s.slotIndex >= 0 && s.slotIndex < 11) {
+      out[s.slotIndex] = s.card;
+    }
+  }
+  return out;
+}
+
+function seedSubsFromInitialSquad(
+  initial: InitialSquad,
+): Array<CardSearchResult | null> {
+  const base: Array<CardSearchResult | null> = Array.from(
+    { length: MAX_SUBS },
+    () => null,
+  );
+  for (let i = 0; i < MAX_SUBS; i++) {
+    const c = initial.subs[i];
+    if (c && typeof c === "object" && typeof (c as CardSearchResult).id === "string") {
+      base[i] = c;
     }
   }
   return base;

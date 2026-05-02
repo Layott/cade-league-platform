@@ -102,6 +102,18 @@ export const FORMATION_KEY_TO_LABEL = {
   "532": "5-3-2", "5212": "5-2-1-2", "541": "5-4-1", "523": "5-2-3",
 } as const satisfies Record<string, FormationLabel>;
 
+// Bug 5 (2026-05-01) — reverse map for the apply-to-multiple flow that
+// reads the persisted label from `squad_submissions.formation` and needs
+// to thread it back into the picker KEY form for `submitPickerSquad`.
+export const FORMATION_LABEL_TO_KEY = {
+  "4-3-3": "433", "4-4-2": "442", "4-2-3-1": "4231", "4-1-4-1": "4141",
+  "4-1-2-1-2": "41212", "4-2-2-2": "4222", "4-2-4": "424", "4-3-1-2": "4312",
+  "4-3-2-1": "4321", "4-4-1-1": "4411", "4-5-1": "451",
+  "3-5-2": "352", "3-4-3": "343", "3-4-1-2": "3412", "3-5-1-1": "3511",
+  "3-4-2-1": "3421", "3-1-4-2": "3142",
+  "5-3-2": "532", "5-2-1-2": "5212", "5-4-1": "541", "5-2-3": "523",
+} as const satisfies Record<FormationLabel, FormationKey>;
+
 export const reviewSchema = z
   .object({
     submissionId: z.string().uuid(),

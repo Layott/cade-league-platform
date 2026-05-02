@@ -3,7 +3,7 @@
 import type { CardSearchResult } from "@/server/fcdb/search";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { enforceAuthedWrite } from "@/lib/api-rate-limit";
-import { saveDraft } from "@/server/squads";
+import { saveDraft, clearDraft } from "@/server/squads";
 
 /**
  * Squad picker autosave — server action.
@@ -91,5 +91,55 @@ export async function saveSquadDraftAction(
     return { ok: true, updatedAt: result.updatedAt };
   } catch (err) {
     return { ok: false, error: (err as Error).message ?? "save failed" };
+  }
+}
+
+/**
+ * 2026-05-01 — bug 6. Clear-roster server action. Soft-deletes the active
+ * draft row for (player, weekStartDate). The picker calls this from its
+ * "Clear roster" button so the page-level draft hydrator doesn't rebuild
+ * stale picks on the next visit. Best-effort: every error path returns a
+ * structured envelope and the picker logs to console.warn but does not
+ * block the in-memory reset.
+ */
+export async function clearSquadDraftAction(input: {
+  weekStartDate: string;
+  matchDayId?: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const sb = await getServerSupabase();
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (!user) return { ok: false, error: "unauthenticated" };
+
+    const { data: pub } = await sb
+      .from("users")
+      .select("id")
+      .eq("supabase_auth_id", user.id)
+      .single();
+    if (!pub) return { ok: false, error: "no public user row" };
+
+    const userId = (pub as { id: string }).id;
+
+    const limited = await enforceAuthedWrite(userId);
+    if (limited) return { ok: false, error: "rate_limited" };
+
+    if (
+      !input.weekStartDate ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(input.weekStartDate)
+    ) {
+      return { ok: false, error: "invalid weekStartDate" };
+    }
+
+    // The matchDayId is honoured by the page-level hydrator (per-MD scope)
+    // but the durable draft row is keyed only on (player_id, week_start_date)
+    // — soft-delete by week so a clear from the per-MD picker also wipes
+    // any stale weekly fallback row.
+    await clearDraft(sb, userId, input.weekStartDate);
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message ?? "clear failed" };
   }
 }

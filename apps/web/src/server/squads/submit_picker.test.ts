@@ -16,7 +16,7 @@ function mkSb(opts: {
     item_type: string;
     nation_iso: string | null;
   }>;
-  existing?: { id: string } | null;
+  existing?: { id: string; validation_status?: string } | null;
   insertedId?: string;
 }) {
   const cards = opts.cards ?? [
@@ -60,6 +60,12 @@ function mkSb(opts: {
         };
       }
       if (table === "squad_submissions") {
+        const existing = opts.existing
+          ? {
+              id: opts.existing.id,
+              validation_status: opts.existing.validation_status ?? "pending",
+            }
+          : null;
         return {
           select: () => ({
             eq: () => ({
@@ -67,7 +73,7 @@ function mkSb(opts: {
                 is: () => ({
                   maybeSingle: vi
                     .fn()
-                    .mockResolvedValue({ data: opts.existing ?? null, error: null }),
+                    .mockResolvedValue({ data: existing, error: null }),
                 }),
               }),
             }),
@@ -79,6 +85,7 @@ function mkSb(opts: {
                 .mockResolvedValue({ data: { id: insertedId }, error: null }),
             }),
           }),
+          update: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
           delete: () => ({ eq: vi.fn().mockResolvedValue({ error: null }) }),
         };
       }
@@ -96,12 +103,27 @@ function mkSb(opts: {
               }),
             }),
           }),
-          update: () => ({
-            eq: vi.fn().mockImplementation(async () => {
-              itemUpdate();
-              return { error: null };
-            }),
-          }),
+          update: () => {
+            // Two callers in createSubmission + submitPickerSquad reach here:
+            //  1. Soft-delete on resubmit: `.eq().is()` chain.
+            //  2. Annotate FCDB id post-insert: `.eq()` chain (terminal).
+            // Branch on whether the consumer threads `.is(...)` through.
+            const eqFn: ReturnType<typeof vi.fn> = vi.fn(
+              (col: unknown, value: unknown) => {
+                if (col === "submission_id" || (col === "deleted_at")) {
+                  // Soft-delete path: returns an object with `.is()` next.
+                  return {
+                    is: vi.fn().mockResolvedValue({ error: null }),
+                  };
+                }
+                // Annotate path — terminal.
+                void value;
+                itemUpdate();
+                return Promise.resolve({ error: null });
+              },
+            );
+            return { eq: eqFn };
+          },
         };
       }
       if (table === "squad_window_overrides") {
@@ -232,6 +254,29 @@ describe("submitPickerSquad", () => {
         { now: new Date("2026-04-16T08:00:00+01:00") },
       ),
     ).rejects.toThrow(/duplicate slotIndex/i);
+  });
+
+  it("re-submits over an existing pending submission for the same week (bug 6 edit flow)", async () => {
+    const sb = mkSb({
+      existing: { id: "old-sub", validation_status: "pending" },
+      insertedId: "new-sub",
+    });
+    const out = await submitPickerSquad(sb as never, mkInput(), {
+      now: new Date("2026-04-16T08:00:00+01:00"),
+    });
+    // The fresh submission id wins.
+    expect(out.id).toBe("new-sub");
+  });
+
+  it("rejects an existing approved submission (admin reopen path required)", async () => {
+    const sb = mkSb({
+      existing: { id: "old-sub", validation_status: "approved" },
+    });
+    await expect(
+      submitPickerSquad(sb as never, mkInput(), {
+        now: new Date("2026-04-16T08:00:00+01:00"),
+      }),
+    ).rejects.toThrow(/already exists/i);
   });
 
   it("falls back to rating-derived item_type when source is 'normal'", async () => {
