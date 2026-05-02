@@ -1085,7 +1085,9 @@
 
   .player-org {
     margin-top: 8px;
-    height: 96px;
+    max-height: 96px;
+    max-width: 180px;
+    height: auto;
     width: auto;
     object-fit: contain;
     display: block;
@@ -1643,7 +1645,7 @@
 
       <div class="player-photo-wrap">
         <img class="player-photo"
-             src="/overlays/v2/_assets/players/processed/anife/fullbody_02_nobg.png"
+             src="/overlays/v2/_assets/players/processed/anife/fullbody_05_nobg.png"
              alt="ANIFE"
              onerror="this.classList.add('broken')" />
         <div class="photo-fallback" aria-hidden="true">A</div>
@@ -1772,15 +1774,15 @@
       // Slug → asset paths (absolute so they resolve in the iframe context).
       var PLAYER_PHOTO = {
         adefola:      '/overlays/v2/_assets/players/processed/adefola/fullbody_01_nobg.png',
-        anife:        '/overlays/v2/_assets/players/processed/anife/fullbody_02_nobg.png',
+        anife:        '/overlays/v2/_assets/players/processed/anife/fullbody_05_nobg.png',
         baji_jnr:     '/overlays/v2/_assets/players/processed/baji_jnr/fullbody_01_nobg.png',
         dadaboi:      '/overlays/v2/_assets/players/processed/dadaboi/fullbody_01_nobg.png',
         faruk:        '/overlays/v2/_assets/players/processed/faruk/fullbody_01_nobg.png',
         guru:         '/overlays/v2/_assets/players/processed/guru/fullbody_01_nobg.png',
         kaykay:       '/overlays/v2/_assets/players/processed/kaykay/fullbody_01_nobg.png',
         killer_freak: '/overlays/v2/_assets/players/processed/killer_freak/fullbody_01_nobg.png',
-        kingnonex:    '/overlays/v2/_assets/players/processed/kingnonex/fullbody_03_nobg.png',
-        king_nonex:   '/overlays/v2/_assets/players/processed/kingnonex/fullbody_03_nobg.png',
+        kingnonex:    '/overlays/v2/_assets/players/processed/kingnonex/fullbody_02_nobg.png',
+        king_nonex:   '/overlays/v2/_assets/players/processed/kingnonex/fullbody_02_nobg.png',
         mitch:        '/overlays/v2/_assets/players/processed/mitch/fullbody_01_nobg.png',
         mr_oga:       '/overlays/v2/_assets/players/processed/mr_oga/fullbody_01_nobg.png',
         tactical:     '/overlays/v2/_assets/players/processed/tactical/fullbody_01_nobg.png',

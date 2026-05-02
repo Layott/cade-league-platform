@@ -15,6 +15,20 @@ Append patterns after any correction from the user. Keep each entry short: what 
 ## Entries
 
 **Date:** 2026-05-02
+**Context:** User reviewed 04-h2h-2 overlay on prod and reported (a) KingNonex's photo `kingnonex/fullbody_03_nobg.png` shows him facing partly backwards/away (face barely visible); (b) Anife's photo `anife/fullbody_02_nobg.png` has the face cut/cropped awkwardly; (c) KayKay's "Lumo Hubs" org logo (file: `LUMO LABS (WHITE) - KAYKAY.png`) displays oversized because its aspect ratio is much wider than the other org logos at the global `.player-org { height: 96px; width: auto }` rule.
+**Mistake:** Default photo picks for 04-h2h-2 (and the player-photo fallback map at the bottom of the HTML) used poses that the user finds unflattering. Also, `.player-org` only constrained height — wide-aspect logos blew past width=180px+ and dominated the player column visually.
+**Correction:** `KNOWLEDGE/brand-assets/elements/v2/04-h2h-2/index.html` — swapped anife `fullbody_02` → `fullbody_05`, kingnonex `fullbody_03` → `fullbody_02`, in BOTH the inline `<img src=>` tag AND the `PLAYER_PHOTO` fallback map. Added `max-width: 180px` to `.player-org` so wide logos shrink proportionally instead of growing horizontally past the player column. Ran `node apps/web/scripts/sync-v2-overlays.mjs` to mirror into `apps/web/public/overlays/v2/04-h2h-2/index.html`.
+**Rule for future:**
+1. **NEVER reference these specific photo files in any overlay HTML, server module, manifest, or AI-generated output:**
+   - `players/processed/anife/fullbody_02_nobg.png` + `_02.png` (face cut)
+   - `players/processed/kingnonex/fullbody_03_nobg.png` + `_03.png` (facing away)
+   These poses are user-rejected and must stay banned even if a future scrape/re-process suggests them. If a designer agent picks them, swap to anife `fullbody_05` (clean front-facing) or kingnonex `fullbody_02` (arms-crossed, face visible).
+2. **For org logos with extreme aspect ratios** (LUMO Labs/Hubs is the canonical example — ~3:1 wide), height-only constraints make them dominate. Always cap BOTH `max-height` AND `max-width` on org-logo CSS so the layout is bounded by whichever axis hits first. Default suggestion: `max-height: 96px; max-width: 180px; height: auto; width: auto; object-fit: contain;`.
+3. **Before claiming a player photo "works" in any overlay, visually inspect the file via `Read tool → image render` first.** A file path test like `headshot_01_nobg.png exists` says nothing about whether the subject is facing the camera, framed cleanly, or in an awkward pose. The photos at `KNOWLEDGE/brand-assets/players/processed/<slug>/` are NOT all flattering — many are walkthrough takes with eyes closed, hands on face, profile shots, or back-of-jersey angles. Pick poses where face_detected=true in `processed/manifest.json` AND a quick visual check shows full-face front-facing.
+
+---
+
+**Date:** 2026-05-02
 **Context:** Side-by-side chemistry validation. Pulled Mr Oga's submitted XI from `squad_submissions` (id `b90c8bc0`), built the same 11-card squad on `https://www.futbin.com/squad-builder` via claude-in-chrome automation, compared per-slot + total chem.
 **Mistake:** None in `apps/web/src/lib/chemistry.ts` — algorithm produced **32/33** matching Futbin **32/33** EXACTLY across all 11 slots after correcting two MY-side data-input errors during the manual modeling: (a) assumed Jacobo Ramón Naveros plays for Real Sociedad/La Liga; Futbin's tooltip showed `club="Como", league="Serie A TIM"`. (b) similarly McTominay & Palestra all aggregated under `Serie A TIM` not `Serie A Enilive`. Every per-slot deviation traced to MY input data, not the algo. The Plan 30.1 implementation (tier thresholds club 2/4/7→1/2/3, league 3/5/8→1/2/3, nation 2/5/8→1/2/3, in-position gate, icon flat-3, hero +2 league bonus, icon-counts-as-any-league) is correct against FC26 rules.
 **Correction:** No code change. The CADE-side algorithm is verified correct. Two REAL data-quality findings the test surfaced (NOT chem-calc bugs):
