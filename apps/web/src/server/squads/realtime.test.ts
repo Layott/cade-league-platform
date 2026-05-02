@@ -2,10 +2,13 @@ import { describe, it, expect, vi } from "vitest";
 import {
   publishSquadSubmitted,
   publishSquadStatusChanged,
+  publishSquadChanged,
   squadsAdminChannelName,
   playerSquadChannelName,
+  squadStandingsChannelName,
   SQUAD_EVENT_SUBMITTED,
   SQUAD_EVENT_STATUS_CHANGED,
+  SQUAD_EVENT_UPDATED,
 } from "./realtime";
 
 describe("squads realtime helpers", () => {
@@ -16,11 +19,15 @@ describe("squads realtime helpers", () => {
     expect(playerSquadChannelName("player-abc", "2026-04-30")).toBe(
       "public:squad:player-abc:2026-04-30",
     );
+    expect(squadStandingsChannelName("season-1")).toBe(
+      "public:standings:season-1",
+    );
   });
 
   it("exposes stable event constants", () => {
     expect(SQUAD_EVENT_SUBMITTED).toBe("squad.submitted");
     expect(SQUAD_EVENT_STATUS_CHANGED).toBe("squad.status_changed");
+    expect(SQUAD_EVENT_UPDATED).toBe("squad.updated");
   });
 
   it("publishSquadSubmitted sends correct payload on admin topic", async () => {
@@ -87,6 +94,42 @@ describe("squads realtime helpers", () => {
         submissionId: "y",
       }),
     ).rejects.toThrow("boom");
+    expect(removeChannel).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishSquadChanged sends squad.updated on the per-season standings channel (2026-05-02)", async () => {
+    const send = vi.fn().mockResolvedValue("ok");
+    const removeChannel = vi.fn();
+    const channel = vi.fn(() => ({ send }));
+    const sb = { channel, removeChannel } as unknown as Parameters<
+      typeof publishSquadChanged
+    >[0];
+    const at = new Date("2026-05-02T12:00:00.000Z");
+    const res = await publishSquadChanged(
+      sb,
+      {
+        seasonId: "season-1",
+        playerId: "p-1",
+        matchDayId: "md-1",
+        weekStartDate: "2026-04-30",
+        submissionId: "sub-9",
+      },
+      at,
+    );
+    expect(channel).toHaveBeenCalledWith("public:standings:season-1");
+    expect(send).toHaveBeenCalledWith({
+      type: "broadcast",
+      event: "squad.updated",
+      payload: {
+        seasonId: "season-1",
+        playerId: "p-1",
+        matchDayId: "md-1",
+        weekStartDate: "2026-04-30",
+        submissionId: "sub-9",
+        at: at.toISOString(),
+      },
+    });
+    expect(res).toBe("ok");
     expect(removeChannel).toHaveBeenCalledTimes(1);
   });
 });

@@ -117,9 +117,18 @@ export async function clearMatchDayWindow(
  * short machine-readable tag describing WHY (used for telemetry +
  * surfacing CTAs differently when the source is "match_day_force_open"
  * vs "weekly_default").
+ *
+ * `forceOpen` (2026-05-02 — bug "edit-always-when-window-open") flags
+ * whether the open state was reached through an explicit admin force-
+ * open (per-match-day OR per-week OR player-level), as opposed to the
+ * ambient pre-deadline default. Callers that need to distinguish "admin
+ * intent" from "still within Thursday window" — chiefly the re-submit
+ * gate in `submit.ts` and the player-side picker CTA — read this flag
+ * to decide whether to allow editing rejected/approved squads.
  */
 export type SquadWindowResolution = {
   open: boolean;
+  forceOpen: boolean;
   reason:
     | "match_day_force_open"
     | "match_day_force_close"
@@ -154,10 +163,10 @@ export async function resolveSquadWindowForMatchDay(
   // 1. Per-match-day override fast-path.
   const mdOverride = await getMatchDayWindow(sb, matchDayId);
   if (mdOverride?.state === "force_open") {
-    return { open: true, reason: "match_day_force_open" };
+    return { open: true, forceOpen: true, reason: "match_day_force_open" };
   }
   if (mdOverride?.state === "force_close") {
-    return { open: false, reason: "match_day_force_close" };
+    return { open: false, forceOpen: false, reason: "match_day_force_close" };
   }
 
   // 2. Fall through to weekly. Need the match day's date to derive the
@@ -170,15 +179,15 @@ export async function resolveSquadWindowForMatchDay(
     .is("deleted_at", null)
     .maybeSingle();
   if (mdErr || !md) {
-    return { open: false, reason: "weekly_default_closed" };
+    return { open: false, forceOpen: false, reason: "weekly_default_closed" };
   }
   const weekStart = weekStartThursday(md.match_date);
   const weekly = await getSquadWindowOverride(sb, weekStart);
   if (weekly?.state === "force_close") {
-    return { open: false, reason: "weekly_force_close" };
+    return { open: false, forceOpen: false, reason: "weekly_force_close" };
   }
   if (weekly?.state === "force_open") {
-    return { open: true, reason: "weekly_force_open" };
+    return { open: true, forceOpen: true, reason: "weekly_force_open" };
   }
   // Default time-based: open iff now < submission deadline. The default
   // is Thursday 10:00 WAT; admin can shift via match_day_schedule_overrides.
@@ -187,7 +196,7 @@ export async function resolveSquadWindowForMatchDay(
     ? new Date(schedule.submissionDeadlineAt)
     : new Date(`${weekStart}T10:00:00+01:00`);
   if (now.getTime() < deadline.getTime()) {
-    return { open: true, reason: "weekly_default_open" };
+    return { open: true, forceOpen: false, reason: "weekly_default_open" };
   }
-  return { open: false, reason: "weekly_default_closed" };
+  return { open: false, forceOpen: false, reason: "weekly_default_closed" };
 }

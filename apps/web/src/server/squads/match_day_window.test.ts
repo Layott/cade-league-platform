@@ -239,7 +239,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-30T12:00:00+01:00"), // way past deadline
     });
-    expect(out).toEqual({ open: true, reason: "match_day_force_open" });
+    expect(out).toEqual({
+      open: true,
+      forceOpen: true,
+      reason: "match_day_force_open",
+    });
   });
 
   it("match-day force_close wins regardless of weekly", async () => {
@@ -250,7 +254,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-15T08:00:00+01:00"), // pre-deadline
     });
-    expect(out).toEqual({ open: false, reason: "match_day_force_close" });
+    expect(out).toEqual({
+      open: false,
+      forceOpen: false,
+      reason: "match_day_force_close",
+    });
   });
 
   it("falls through to weekly force_close when no match-day override", async () => {
@@ -260,7 +268,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-15T08:00:00+01:00"),
     });
-    expect(out).toEqual({ open: false, reason: "weekly_force_close" });
+    expect(out).toEqual({
+      open: false,
+      forceOpen: false,
+      reason: "weekly_force_close",
+    });
   });
 
   it("falls through to weekly force_open when no match-day override", async () => {
@@ -270,7 +282,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-30T12:00:00+01:00"), // past deadline
     });
-    expect(out).toEqual({ open: true, reason: "weekly_force_open" });
+    expect(out).toEqual({
+      open: true,
+      forceOpen: true,
+      reason: "weekly_force_open",
+    });
   });
 
   it("default open before Thursday deadline", async () => {
@@ -280,7 +296,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"), // 2h before deadline
     });
-    expect(out).toEqual({ open: true, reason: "weekly_default_open" });
+    expect(out).toEqual({
+      open: true,
+      forceOpen: false,
+      reason: "weekly_default_open",
+    });
   });
 
   it("default closed past Thursday deadline", async () => {
@@ -290,7 +310,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-17T12:00:00+01:00"), // day after
     });
-    expect(out).toEqual({ open: false, reason: "weekly_default_closed" });
+    expect(out).toEqual({
+      open: false,
+      forceOpen: false,
+      reason: "weekly_default_closed",
+    });
   });
 
   it("returns closed when match_day row missing", async () => {
@@ -298,7 +322,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"),
     });
-    expect(out).toEqual({ open: false, reason: "weekly_default_closed" });
+    expect(out).toEqual({
+      open: false,
+      forceOpen: false,
+      reason: "weekly_default_closed",
+    });
   });
 
   it("schedule override extends the deadline past Thursday 10:00", async () => {
@@ -313,7 +341,11 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T13:00:00+01:00"), // 1pm WAT — past default
     });
-    expect(out).toEqual({ open: true, reason: "weekly_default_open" });
+    expect(out).toEqual({
+      open: true,
+      forceOpen: false,
+      reason: "weekly_default_open",
+    });
   });
 
   it("schedule override shortens the deadline before Thursday 10:00", async () => {
@@ -327,6 +359,10 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"), // past 06:00 override
     });
-    expect(out).toEqual({ open: false, reason: "weekly_default_closed" });
+    expect(out).toEqual({
+      open: false,
+      forceOpen: false,
+      reason: "weekly_default_closed",
+    });
   });
 });

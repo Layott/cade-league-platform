@@ -226,4 +226,73 @@ describe("SquadMatchDayPicker", () => {
     expect(screen.getByText(/rejected/i)).toBeTruthy();
     expect(screen.getByTestId("md-cta-view-rej-1")).toBeTruthy();
   });
+
+  it("renders an Edit CTA on a REJECTED submission when window is force-open (2026-05-02)", () => {
+    // Per the user-reported bug "edit-always-when-window-open": admin
+    // force-open is the explicit signal that the player should be able
+    // to revise a rejected squad without first asking for a manual
+    // reopen.
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "force-rej-1",
+            matchDate: "2026-04-29",
+            status: "submitted",
+            validationStatus: "rejected",
+            submittedAt: "2026-04-28T08:00:00Z",
+            windowOpen: true,
+            forceOpen: true,
+            bucket: "this_week",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("md-cta-edit-force-rej-1")).toBeTruthy();
+    expect(screen.queryByTestId("md-cta-view-force-rej-1")).toBeNull();
+  });
+
+  it("renders an Edit CTA on an APPROVED submission when window is force-open (2026-05-02)", () => {
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "force-app-1",
+            matchDate: "2026-04-29",
+            status: "submitted",
+            validationStatus: "approved",
+            submittedAt: "2026-04-28T08:00:00Z",
+            windowOpen: true,
+            forceOpen: true,
+            bucket: "this_week",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("md-cta-edit-force-app-1")).toBeTruthy();
+    expect(screen.queryByTestId("md-cta-view-force-app-1")).toBeNull();
+  });
+
+  it("falls back to View CTA on a REJECTED submission when window is open via ambient pre-deadline (no force-open)", () => {
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "ambient-rej-1",
+            matchDate: "2026-04-29",
+            status: "submitted",
+            validationStatus: "rejected",
+            submittedAt: "2026-04-28T08:00:00Z",
+            windowOpen: true,
+            forceOpen: false,
+            bucket: "this_week",
+          }),
+        ]}
+      />,
+    );
+    // Without force-open the legacy gate applies — rejected stays pinned
+    // for the admin reopen path.
+    expect(screen.getByTestId("md-cta-view-ambient-rej-1")).toBeTruthy();
+    expect(screen.queryByTestId("md-cta-edit-ambient-rej-1")).toBeNull();
+  });
 });

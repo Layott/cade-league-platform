@@ -101,3 +101,7 @@ export type {
   SquadItemReviewStatus,
   SquadFcdbReviewSummary,
 } from "./fcdb_review";
+// 2026-05-02 — single source of truth for "a squad changed → bust every
+// surface that consumes squad data".
+export { revalidateSquadSurfaces } from "./revalidate";
+export type { RevalidateSquadSurfacesInput } from "./revalidate";

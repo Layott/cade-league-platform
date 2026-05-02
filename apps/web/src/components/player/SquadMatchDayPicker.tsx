@@ -49,6 +49,18 @@ export type SquadMatchDayPickerItem = {
    * render time so legacy / unspecified rows behave like before.
    */
   windowOpen?: boolean;
+  /**
+   * 2026-05-02 — "edit always when window open" extension.
+   *
+   * `forceOpen=true` means the open state was reached through an explicit
+   * admin (per-match-day OR per-week) force-open. In that case the picker
+   * shows "Edit squad" even when the submission is rejected / approved,
+   * because admin force-open is the signal that the player should be
+   * able to revise. When `forceOpen=false` (window is open through the
+   * ambient pre-deadline default) the legacy gate still applies — only
+   * pending submissions get the Edit CTA.
+   */
+  forceOpen?: boolean;
   bucket: "past" | "this_week" | "upcoming";
   // 2026-04-30 — weekend grouping. When a weekend has BOTH Sat + Sun match
   // days, the page aggregates them into ONE row pointing at the Sat
@@ -92,12 +104,22 @@ function ctaFor(item: SquadMatchDayPickerItem) {
   const baseCls =
     "inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors";
   if (item.status === "submitted") {
-    // 2026-05-01 — bug 6. Surface "Edit squad" while the window is still
-    // open AND the submission is pending review (an admin hasn't already
-    // approved/rejected). Players can revise their picks until the
-    // deadline. Otherwise fall back to the read-only "View squad" CTA.
+    // 2026-05-01 — bug 6 (extended 2026-05-02 — "edit-always-when-window-
+    // open"). Surface "Edit squad" whenever the window is open AND the
+    // player can resubmit. Two cases:
+    //   1. Window open via ambient pre-deadline default — only pending
+    //      submissions are editable (legacy behaviour). Approved /
+    //      rejected go through the admin reopen path.
+    //   2. Window open via explicit admin force-open (per-match-day or
+    //      per-week) — ALL statuses are editable. Force-open is the
+    //      signal that the admin wants the player to revise, regardless
+    //      of prior approval/rejection. The submit.ts re-submit gate
+    //      mirrors this branching.
+    // Otherwise fall back to the read-only "View squad" CTA.
     const editable =
-      item.windowOpen === true && item.validationStatus === "pending";
+      item.windowOpen === true &&
+      (item.forceOpen === true ||
+        item.validationStatus === "pending");
     if (editable) {
       return (
         <Link

@@ -73,6 +73,12 @@ type ResolvedRow = {
   venueName: string;
   reason: string;
   isOpen: boolean;
+  // 2026-05-02 — surfaced from `resolveSquadWindowForMatchDay` so the
+  // picker CTA + the detail-view edit gate can distinguish admin
+  // force-open from ambient pre-deadline default. Force-open lifts the
+  // "only-pending-can-edit" rule so a player whose squad was rejected
+  // can fix it without first asking for a manual reopen.
+  forceOpen: boolean;
   submission: PlayerSubmissionSummary | null;
 };
 
@@ -163,6 +169,10 @@ export default async function PlayerSquadPage({
         venueName: d.venue_name,
         reason: r.reason,
         isOpen: r.open,
+        // 2026-05-02 — admin-explicit force-open signal (per-match-day or
+        // per-week). Lets the picker CTA + detail-view show "Edit squad"
+        // even on rejected/approved submissions when admin intent is clear.
+        forceOpen: r.forceOpen,
         submission: direct ?? legacy ?? null,
       };
     }),
@@ -203,17 +213,21 @@ export default async function PlayerSquadPage({
 
     const matchDayWeekStart = weekStartThursday(selected.matchDate);
 
-    // 2026-05-01 — bug 6. Edit mode: when `?edit=1` is set AND a live
-    // submission exists AND the window is still open AND the submission
-    // is pending, hydrate the picker from the existing submission instead
+    // 2026-05-01 — bug 6 (extended 2026-05-02). Edit mode: when `?edit=1`
+    // is set AND a live submission exists AND the window is open AND
+    // EITHER the submission is pending OR the window is admin-force-
+    // opened, hydrate the picker from the existing submission instead
     // of rendering the read-only summary. Submitting with the same week
     // anchor + matchDayId triggers the soft-delete + re-insert path in
-    // submit.ts.
+    // submit.ts. The force-open branch lets a player whose squad was
+    // rejected/approved revise it during an admin-explicit reopen
+    // without first asking for a manual `reopenSubmission` flip.
     const editing =
       sp.edit === "1" &&
       !!subWithItems &&
       selected.isOpen &&
-      subWithItems.submission.validation_status === "pending";
+      (subWithItems.submission.validation_status === "pending" ||
+        selected.forceOpen);
 
     // Picker autosave hydration — only relevant when we'll mount the
     // picker (open match day, no live submission). Fetch via the service
@@ -322,7 +336,8 @@ export default async function PlayerSquadPage({
                 <SquadPitchView items={subWithItems.items} />
               </div>
               {selected.isOpen &&
-              subWithItems.submission.validation_status === "pending" ? (
+              (subWithItems.submission.validation_status === "pending" ||
+                selected.forceOpen) ? (
                 <div className="mt-4">
                   <Link
                     href={`/player/squad?matchDay=${encodeURIComponent(
@@ -436,6 +451,11 @@ export default async function PlayerSquadPage({
       // row can flip "View squad" → "Edit squad" while the deadline is
       // still pending.
       windowOpen: r.isOpen,
+      // 2026-05-02 — explicit admin force-open signal. Drives the picker
+      // CTA logic: when an admin force-opens a window, ALL statuses
+      // (pending / approved / rejected) get an Edit CTA so the player
+      // can revise without needing a manual reopen.
+      forceOpen: r.forceOpen,
       bucket,
     };
   });
@@ -482,6 +502,10 @@ export default async function PlayerSquadPage({
       // collapsed weekend row. Use the head row's open state — Sat+Sun
       // pairs share the same Thursday-anchor week, so `isOpen` agrees.
       windowOpen: head.windowOpen ?? false,
+      // 2026-05-02 — same reasoning for forceOpen: Sat+Sun pairs share
+      // the same week anchor so the resolver result for the head row is
+      // representative of the whole weekend slot.
+      forceOpen: head.forceOpen ?? false,
       displayLabel: weekendLabel(satYmd, sorted.map((s) => s.matchDate)),
       secondaryMatchDate: sorted[1]?.matchDate ?? null,
     });

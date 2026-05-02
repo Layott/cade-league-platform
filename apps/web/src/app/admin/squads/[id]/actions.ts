@@ -10,41 +10,84 @@ import {
   acceptFcdbCandidate,
   reopenSubmission,
 } from "@/server/squads";
-import { publishSquadStatusChanged } from "@/server/squads/realtime";
+import {
+  publishSquadStatusChanged,
+  publishSquadChanged,
+} from "@/server/squads/realtime";
+import { revalidateSquadSurfaces } from "@/server/squads/revalidate";
 import { notify } from "@/server/notifications";
 import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import type { Actor } from "@/perms";
 import { reopenSubmissionSchema } from "./schemas";
 
 /**
- * Live-refresh (2026-04-24) — fire a `squad.status_changed` broadcast
- * on the player's scoped channel so `/player/squad` updates without
- * a manual reload. Uses the service-role client for the lookup so
- * RLS on squad_submissions doesn't hide the row. Fire-and-forget.
+ * Live-refresh (2026-04-24, extended 2026-05-02) — fire two broadcasts:
+ *   1. `squad.status_changed` on the player's scoped channel so
+ *      `/player/squad` updates without a manual reload.
+ *   2. `squad.updated` on the season's standings channel so broadcast
+ *      overlays subscribed via `OverlayDataInjector` repaint mid-stream
+ *      (added 2026-05-02 — admins approving/rejecting/reopening during
+ *      a live event need the 19-player-squads overlay to reflect the
+ *      decision immediately, not on the next ambient poll).
+ *
+ * Uses the service-role client for both the lookup + the publish so RLS
+ * on squad_submissions doesn't hide the row. Fire-and-forget — failure
+ * never blocks the API response.
+ *
+ * Returns the submission's `{ playerId, matchDayId }` so the caller can
+ * pass them to `revalidateSquadSurfaces` without a second DB read.
  */
 async function pingPlayerAfterReview(
   submissionId: string,
   status: "approved" | "rejected" | "reopened" | "pending",
-): Promise<void> {
+): Promise<{
+  playerId: string;
+  matchDayId: string | null;
+  weekStartDate: string;
+} | null> {
   try {
     const svc = getServiceRoleSupabase();
     const { data } = await svc
       .from("squad_submissions")
-      .select("player_id, week_start_date")
+      .select("player_id, week_start_date, match_day_id, season_id")
       .eq("id", submissionId)
       .maybeSingle();
     const row = data as
-      | { player_id: string; week_start_date: string }
+      | {
+          player_id: string;
+          week_start_date: string;
+          match_day_id: string | null;
+          season_id: string | null;
+        }
       | null;
-    if (!row) return;
+    if (!row) return null;
     await publishSquadStatusChanged(svc, {
       submissionId,
       playerId: row.player_id,
       weekStartDate: row.week_start_date,
       status,
     });
+    if (row.season_id) {
+      try {
+        await publishSquadChanged(svc, {
+          seasonId: row.season_id,
+          playerId: row.player_id,
+          matchDayId: row.match_day_id,
+          weekStartDate: row.week_start_date,
+          submissionId,
+        });
+      } catch {
+        // best-effort
+      }
+    }
+    return {
+      playerId: row.player_id,
+      matchDayId: row.match_day_id,
+      weekStartDate: row.week_start_date,
+    };
   } catch {
     // best-effort
+    return null;
   }
 }
 
@@ -108,7 +151,7 @@ export async function approveAction(submissionId: string): Promise<void> {
   const limited = await enforceAuthedWrite(actor.userId as string);
   if (limited) throw new Error("rate_limited");
   await approveSubmission(sb, actor, submissionId);
-  await pingPlayerAfterReview(submissionId, "approved");
+  const subContext = await pingPlayerAfterReview(submissionId, "approved");
 
   // Notify the submitting player via the service-role client so the
   // player → user join survives whatever RLS is active on squad_submissions.
@@ -130,9 +173,20 @@ export async function approveAction(submissionId: string): Promise<void> {
     console.error(`[notifications] squad_approved fan-out failed: ${String(err)}`);
   }
 
-  revalidatePath(`/admin/squads/${submissionId}`);
-  revalidatePath("/admin/squads");
-  revalidatePath("/player/squad");
+  // 2026-05-02 — central revalidation (player + admin + broadcast preview).
+  if (subContext) {
+    revalidateSquadSurfaces({
+      playerId: subContext.playerId,
+      matchDayId: subContext.matchDayId,
+      submissionId,
+    });
+  } else {
+    // Owner lookup failed (race / soft-deleted) — still bust the admin
+    // queue so the operator sees the action took effect.
+    revalidatePath(`/admin/squads/${submissionId}`);
+    revalidatePath("/admin/squads");
+    revalidatePath("/player/squad");
+  }
   redirect(`/admin/squads/${submissionId}`);
 }
 
@@ -145,7 +199,7 @@ export async function rejectAction(formData: FormData): Promise<void> {
   const limited = await enforceAuthedWrite(actor.userId as string);
   if (limited) throw new Error("rate_limited");
   await rejectSubmission(sb, actor, submissionId, reason);
-  await pingPlayerAfterReview(submissionId, "rejected");
+  const subContext = await pingPlayerAfterReview(submissionId, "rejected");
 
   try {
     const svc = getServiceRoleSupabase();
@@ -169,9 +223,17 @@ export async function rejectAction(formData: FormData): Promise<void> {
     console.error(`[notifications] squad_rejected fan-out failed: ${String(err)}`);
   }
 
-  revalidatePath(`/admin/squads/${submissionId}`);
-  revalidatePath("/admin/squads");
-  revalidatePath("/player/squad");
+  if (subContext) {
+    revalidateSquadSurfaces({
+      playerId: subContext.playerId,
+      matchDayId: subContext.matchDayId,
+      submissionId,
+    });
+  } else {
+    revalidatePath(`/admin/squads/${submissionId}`);
+    revalidatePath("/admin/squads");
+    revalidatePath("/player/squad");
+  }
   redirect(`/admin/squads/${submissionId}`);
 }
 
@@ -220,9 +282,17 @@ export async function reopenSubmissionAction(
   const limited = await enforceAuthedWrite(actor.userId as string);
   if (limited) throw new Error("rate_limited");
   await reopenSubmission(sb, actor, parsed.submissionId);
-  await pingPlayerAfterReview(parsed.submissionId, "reopened");
-  revalidatePath(`/admin/squads/${parsed.submissionId}`);
-  revalidatePath("/admin/squads");
-  revalidatePath("/player/squad");
+  const subContext = await pingPlayerAfterReview(parsed.submissionId, "reopened");
+  if (subContext) {
+    revalidateSquadSurfaces({
+      playerId: subContext.playerId,
+      matchDayId: subContext.matchDayId,
+      submissionId: parsed.submissionId,
+    });
+  } else {
+    revalidatePath(`/admin/squads/${parsed.submissionId}`);
+    revalidatePath("/admin/squads");
+    revalidatePath("/player/squad");
+  }
   redirect(`/admin/squads/${parsed.submissionId}`);
 }

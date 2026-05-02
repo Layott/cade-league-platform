@@ -163,6 +163,45 @@ describe("createSubmission", () => {
     ).rejects.toThrow(/submission already exists/i);
   });
 
+  it("allows replacing a rejected submission when league force_open is set (2026-05-02)", async () => {
+    // Rejected status normally requires the admin reopen path; with an
+    // explicit force-open we accept the resubmit.
+    const sb = mkSb({
+      existing: { id: "existing", validation_status: "rejected" },
+      leagueOverride: { state: "force_open" },
+      insertedId: "fresh-after-force-open",
+    });
+    const out = await createSubmission(sb as never, mkInput(), {
+      now: new Date("2026-04-17T12:00:00+01:00"), // past default deadline
+    });
+    expect(out.id).toBe("fresh-after-force-open");
+  });
+
+  it("allows replacing an approved submission when player force_open is set (2026-05-02)", async () => {
+    const sb = mkSb({
+      existing: { id: "existing", validation_status: "approved" },
+      playerOverride: { state: "force_open" },
+      insertedId: "fresh-after-player-force",
+    });
+    const out = await createSubmission(sb as never, mkInput(), {
+      now: new Date("2026-04-17T12:00:00+01:00"), // past default deadline
+    });
+    expect(out.id).toBe("fresh-after-player-force");
+  });
+
+  it("still rejects replacing a rejected submission when only ambient pre-deadline (no force-open)", async () => {
+    // Pre-deadline default open WITHOUT force-open => legacy behaviour:
+    // rejected status remains pinned, admin reopen required.
+    const sb = mkSb({
+      existing: { id: "existing", validation_status: "rejected" },
+    });
+    await expect(
+      createSubmission(sb as never, mkInput(), {
+        now: new Date("2026-04-16T08:00:00+01:00"), // pre-deadline, no override
+      }),
+    ).rejects.toThrow(/submission already exists/i);
+  });
+
   it("replaces an existing pending submission when still pre-deadline", async () => {
     const sb = mkSb({
       existing: { id: "existing", validation_status: "pending" },

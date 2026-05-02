@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -15,7 +14,11 @@ import {
   resolveSquadWindowForMatchDay,
   FORMATION_LABEL_TO_KEY,
 } from "@/server/squads";
-import { publishSquadSubmitted } from "@/server/squads/realtime";
+import {
+  publishSquadSubmitted,
+  publishSquadChanged,
+} from "@/server/squads/realtime";
+import { revalidateSquadSurfaces } from "@/server/squads/revalidate";
 
 /**
  * Plan 30 — player-side server actions for the picker flow.
@@ -133,8 +136,30 @@ export async function submitPickerAction(
     // best-effort; DB row is the durable record
   }
 
-  revalidatePath("/player/squad");
-  revalidatePath("/admin/squads");
+  // 2026-05-02 — fire `squad.updated` on the season's standings channel
+  // so broadcast overlays subscribed via `OverlayDataInjector` repaint
+  // mid-stream. Channel matches `standings.changed` so a single
+  // subscription drives both events.
+  try {
+    await publishSquadChanged(sb, {
+      seasonId,
+      playerId,
+      matchDayId: payload.matchDayId ?? null,
+      weekStartDate: payload.weekStartDate,
+      submissionId: submission.id,
+    });
+  } catch {
+    // best-effort
+  }
+
+  // 2026-05-02 — bust every surface that consumes squad data: player's
+  // own page, admin queue + detail, admin broadcast hub + design preview,
+  // public player profile.
+  revalidateSquadSurfaces({
+    playerId,
+    matchDayId: payload.matchDayId ?? null,
+    submissionId: submission.id,
+  });
   redirect("/player/squad");
 }
 
@@ -337,6 +362,27 @@ export async function applySquadToMultipleMatchDaysAction(input: {
       } catch {
         // best-effort
       }
+      // 2026-05-02 — overlay subscribers repaint via the standings
+      // channel. Per applied target so admins watching mid-broadcast
+      // see each clone land in sequence.
+      try {
+        await publishSquadChanged(sb, {
+          seasonId,
+          playerId,
+          matchDayId: targetId,
+          weekStartDate: targetWeek,
+          submissionId: result.id,
+        });
+      } catch {
+        // best-effort
+      }
+      // 2026-05-02 — bust caches per applied target so the per-detail
+      // admin route + design preview pick up the new submission row.
+      revalidateSquadSurfaces({
+        playerId,
+        matchDayId: targetId,
+        submissionId: result.id,
+      });
 
       applied.push(targetId);
     } catch (err) {
@@ -347,7 +393,9 @@ export async function applySquadToMultipleMatchDaysAction(input: {
     }
   }
 
-  revalidatePath("/player/squad");
-  revalidatePath("/admin/squads");
+  // Final umbrella revalidate so the player + admin LIST surfaces are
+  // fresh even when zero targets applied (e.g. all skipped due to
+  // closed windows).
+  revalidateSquadSurfaces({ playerId, matchDayId: null });
   return { applied, skipped };
 }

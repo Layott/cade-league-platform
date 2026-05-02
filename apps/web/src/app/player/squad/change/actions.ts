@@ -1,11 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requestChange } from "@/server/squads";
-import { publishSquadStatusChanged } from "@/server/squads/realtime";
+import {
+  publishSquadStatusChanged,
+  publishSquadChanged,
+} from "@/server/squads/realtime";
+import { revalidateSquadSurfaces } from "@/server/squads/revalidate";
 import type { SquadChangeSubmitPayload } from "@/components/squads/SquadChangeEditor";
 
 const submissionIdSchema = z.string().uuid();
@@ -48,30 +51,57 @@ export async function requestChangeAction(
 
   // Live-refresh (2026-04-24) — Friday change touches an approved
   // submission; notify admin queue + the player's scoped channel.
+  type SubmissionRow = {
+    player_id: string;
+    week_start_date: string;
+    match_day_id: string | null;
+    season_id: string | null;
+  };
+  let subRow: SubmissionRow | null = null;
   try {
     const { data: sub } = await sb
       .from("squad_submissions")
-      .select("player_id, week_start_date")
+      .select("player_id, week_start_date, match_day_id, season_id")
       .eq("id", submissionId)
       .maybeSingle();
-    const row = sub as
-      | { player_id: string; week_start_date: string }
-      | null;
-    if (row) {
+    subRow = sub as SubmissionRow | null;
+    if (subRow) {
       await publishSquadStatusChanged(sb, {
         submissionId,
-        playerId: row.player_id,
-        weekStartDate: row.week_start_date,
+        playerId: subRow.player_id,
+        weekStartDate: subRow.week_start_date,
         status: "pending",
       });
+      // 2026-05-02 — fire `squad.updated` on the standings channel for
+      // overlay subscribers.
+      if (subRow.season_id) {
+        try {
+          await publishSquadChanged(sb, {
+            seasonId: subRow.season_id,
+            playerId: subRow.player_id,
+            matchDayId: subRow.match_day_id,
+            weekStartDate: subRow.week_start_date,
+            submissionId,
+          });
+        } catch {
+          // best-effort
+        }
+      }
     }
   } catch {
     // best-effort
   }
 
-  revalidatePath(`/player/squad/change`);
-  revalidatePath(`/player/squad`);
-  revalidatePath("/admin/squads");
-  revalidatePath(`/admin/squads/${submissionId}`);
+  // 2026-05-02 — central revalidation. Friday-change touches the same
+  // surfaces as a fresh submission (admin queue, design preview, public
+  // profile, etc.) so we use the shared helper rather than duplicating
+  // the path list.
+  if (subRow) {
+    revalidateSquadSurfaces({
+      playerId: subRow.player_id,
+      matchDayId: subRow.match_day_id,
+      submissionId,
+    });
+  }
   redirect("/player/squad/change?ok=1");
 }

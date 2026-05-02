@@ -55,7 +55,15 @@ type KeyEvent =
   | "score.changed"
   | "match.ended"
   | "walkover.confirmed"
-  | "snapshot.captured";
+  | "snapshot.captured"
+  // 2026-05-02 — fired on the public:standings:<seasonId> channel by
+  // `publishSquadChanged` when a player submits / re-submits / Friday-
+  // changes / admin-approves|rejects|reopens. Subscribed by the
+  // 19-player-squads overlay so the live OBS source repaints with the
+  // fresh roster mid-stream rather than waiting on the next ambient
+  // poll. Channel reuses standings-channel so a single subscription
+  // drives both standings + squad updates.
+  | "squad.updated";
 
 const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   // Phase B4-B5 + C — H2H overlays subscribe to standings.changed so the
@@ -76,10 +84,17 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   "14-top-scorers": ["match.ended", "standings.changed"],
   "17-penalties": ["standings.changed"],
   // 19-player-squads — repaint when standings recompute (proxy for
-  // disciplinary edits affecting the displayed player) and when a new
-  // match-day boundary lands. Squad-submission edits don't hit the
-  // overlay mid-stream — submissions land outside live-broadcast windows.
-  "19-player-squads": ["standings.changed", "match.ended"],
+  // disciplinary edits affecting the displayed player), when a new
+  // match-day boundary lands, AND when a squad submission lands /
+  // changes (added 2026-05-02). The squad.updated event fires from
+  // submitPickerAction / applySquadToMultipleMatchDaysAction /
+  // requestChangeAction / admin approve/reject/reopen so any roster
+  // edit propagates to the live OBS source within one Realtime hop.
+  "19-player-squads": [
+    "standings.changed",
+    "match.ended",
+    "squad.updated",
+  ],
   // 20-highlight — same as match-scores-day; bottom strip shows recent
   // fixtures so we resubscribe to score + match-end events.
   "20-highlight": ["score.changed", "match.ended", "standings.changed"],

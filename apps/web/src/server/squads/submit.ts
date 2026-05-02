@@ -74,6 +74,17 @@ export async function createSubmission(
   }
 
   let windowOpen: boolean;
+  // 2026-05-02 — `forceOpen` flags whether the open state was reached
+  // through an explicit admin / player force-open (per-match-day, per-
+  // week, or per-player) as opposed to the ambient pre-deadline default.
+  // Re-submit gate below uses it to allow rejected/approved replacements
+  // when an admin has explicitly re-opened the window — matching the
+  // user's stated requirement that "while submit is open (including
+  // force_open), players can edit/resubmit". The default-time path
+  // (still within Thursday window) does NOT lift the status check, so a
+  // pre-deadline submitter cannot accidentally overwrite an approved
+  // squad without admin intent.
+  let forceOpen = false;
   if (v.matchDayId) {
     // Per-match-day window mode — the resolver bakes in match-day override
     // + falls through to the weekly resolver. Player force_open keeps the
@@ -88,6 +99,8 @@ export async function createSubmission(
       );
     }
     windowOpen = resolution.open || playerOverride?.state === "force_open";
+    forceOpen =
+      resolution.forceOpen || playerOverride?.state === "force_open";
   } else {
     // Plan 10 weekly mode — unchanged.
     const leagueOverride = await getSquadWindowOverride(sb, v.weekStartDate);
@@ -105,6 +118,9 @@ export async function createSubmission(
       playerOverride?.state === "force_open" ||
       leagueOverride?.state === "force_open" ||
       beforeDeadline;
+    forceOpen =
+      playerOverride?.state === "force_open" ||
+      leagueOverride?.state === "force_open";
   }
 
   // Check for an existing live submission.
@@ -118,10 +134,19 @@ export async function createSubmission(
 
   if (existing) {
     // Pre-deadline (or force-open) re-submissions: soft-delete the old
-    // submission + its items, then insert a fresh one below. Only allowed
-    // when the submission is still pending — approved/rejected go through
-    // the admin reopen path (Plan 41).
-    const canReplace = windowOpen && existing.validation_status === "pending";
+    // submission + its items, then insert a fresh one below. Default
+    // policy: only pending submissions can be replaced — approved /
+    // rejected go through the admin reopen path (Plan 41). EXCEPTION:
+    // when the window was force-opened by an admin (per-match-day, per-
+    // week, or per-player), the player CAN replace a rejected /
+    // approved submission. Force-open is the explicit signal that the
+    // admin wants the player to edit; without this branch a player
+    // whose squad was rejected couldn't fix it during a force-open
+    // window without first asking for a manual reopen, which is exactly
+    // the friction the user reported on 2026-05-02.
+    const canReplace =
+      windowOpen &&
+      (existing.validation_status === "pending" || forceOpen);
     if (!canReplace) {
       throw new ConflictError(
         `submission already exists for player ${v.playerId} week ${v.weekStartDate} (status=${existing.validation_status})`,
