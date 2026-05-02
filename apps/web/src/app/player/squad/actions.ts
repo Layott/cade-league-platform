@@ -160,6 +160,15 @@ export async function submitPickerAction(
     matchDayId: payload.matchDayId ?? null,
     submissionId: submission.id,
   });
+  // 2026-05-02 — pass the just-submitted matchDayId through the redirect
+  // so /player/squad can render the WeekendApplyPrompt banner asking
+  // whether to apply the same roster to the sibling weekend MD. The page
+  // resolves the sibling itself; we only need the source id here.
+  if (payload.matchDayId) {
+    redirect(
+      `/player/squad?submitted=${encodeURIComponent(payload.matchDayId)}`,
+    );
+  }
   redirect("/player/squad");
 }
 

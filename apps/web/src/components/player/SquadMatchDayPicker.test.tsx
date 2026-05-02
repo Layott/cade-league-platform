@@ -273,6 +273,39 @@ describe("SquadMatchDayPicker", () => {
     expect(screen.queryByTestId("md-cta-view-force-app-1")).toBeNull();
   });
 
+  it("renders Sat + Sun as TWO separate rows when both are open and have no submission (no displayLabel)", () => {
+    // 2026-05-02 (user-reported, item 1) — when both Saturday and Sunday
+    // match days in the same weekend are open AND neither has a
+    // submission yet, the page-level grouper skips the collapse so the
+    // player can pick which specific match day they want to file for.
+    // This component test exercises the rendered shape: each row carries
+    // its raw matchDate (no displayLabel) and its own Submit CTA.
+    render(
+      <SquadMatchDayPicker
+        items={[
+          mk({
+            matchDayId: "sat-md",
+            matchDate: "2026-05-02",
+            status: "open",
+            bucket: "this_week",
+          }),
+          mk({
+            matchDayId: "sun-md",
+            matchDate: "2026-05-03",
+            status: "open",
+            bucket: "this_week",
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("squad-match-day-row-sat-md")).toBeTruthy();
+    expect(screen.getByTestId("squad-match-day-row-sun-md")).toBeTruthy();
+    expect(screen.getByTestId("md-cta-submit-sat-md")).toBeTruthy();
+    expect(screen.getByTestId("md-cta-submit-sun-md")).toBeTruthy();
+    // Neither row carries the collapsed "Weekend · May 2-3" label.
+    expect(screen.queryByText(/Weekend · /)).toBeNull();
+  });
+
   it("falls back to View CTA on a REJECTED submission when window is open via ambient pre-deadline (no force-open)", () => {
     render(
       <SquadMatchDayPicker
