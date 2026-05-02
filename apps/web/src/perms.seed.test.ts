@@ -330,4 +330,28 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
       }
     }
   });
+
+  // Bug 11 (2026-05-01) — `users.unlock` is held by admin (via '*'),
+  // loc, and idc; nobody else can clear another player's lockout.
+  it("Bug 11: users.unlock seeds for admin/loc/idc only", () => {
+    expect(PERMS.loc).toContain("users.unlock");
+    expect(PERMS.idc).toContain("users.unlock");
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "users.unlock")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["loc"] }, "users.unlock")).toBe(true);
+    expect(hasPerm({ userId: null, roles: ["idc"] }, "users.unlock")).toBe(true);
+    for (const r of [
+      "referee",
+      "technical",
+      "production",
+      "design",
+      "moderator",
+      "coach",
+      "team_manager",
+      "player",
+      "viewer",
+    ] as const) {
+      expect(PERMS[r]).not.toContain("users.unlock");
+      expect(hasPerm({ userId: null, roles: [r] }, "users.unlock")).toBe(false);
+    }
+  });
 });

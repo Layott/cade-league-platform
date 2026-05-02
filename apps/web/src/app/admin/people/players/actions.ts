@@ -7,6 +7,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
 import { enforceAuthedWrite } from "@/lib/api-rate-limit";
+import { clearLockoutForEmail } from "@/server/auth/sessions";
 
 // Plan 39 sanitize — strict schema for the player-edit endpoint. Caps
 // every text field so a wedge upload can't blow past the DB column
@@ -44,7 +45,7 @@ const updatePlayerSchema = z.object({
   teamManagerId: z.string().uuid().nullable().optional(),
 });
 
-async function gate(): Promise<{
+async function gate(perm: string = "users.edit"): Promise<{
   sb: ReturnType<typeof getServiceRoleSupabase>;
   publicUserId: string;
 }> {
@@ -65,10 +66,10 @@ async function gate(): Promise<{
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
   const sb = getServiceRoleSupabase();
   try {
-    await requirePermAsync(sb, { userId: pub.id, roles }, "users.edit");
+    await requirePermAsync(sb, { userId: pub.id, roles }, perm);
   } catch (e) {
     if (e instanceof PermissionError) {
-      throw new Error("Forbidden: missing users.edit");
+      throw new Error(`Forbidden: missing ${perm}`);
     }
     throw e;
   }
@@ -165,4 +166,49 @@ export async function updatePlayerAction(formData: FormData) {
   revalidatePath("/admin/people/players");
   revalidatePath(`/admin/people/players/${playerId}/edit`);
   redirect(`/admin/people/players/${playerId}/edit?saved=1`);
+}
+
+/**
+ * Bug 11 fix (2026-05-01) — clear the failed-login lockout for the
+ * player whose form this is submitted from. Reads the player's email
+ * via the service-role client and hands off to clearLockoutForEmail
+ * (sessions.ts), which deletes in-window `login_failed` rows so the
+ * lockout counter drops below threshold immediately.
+ *
+ * Perm-gated: `users.unlock` (seeded for admin / loc / idc — see
+ * migration 20260620000019_users_unlock_perm_seed.sql).
+ */
+const unlockSchema = z.object({
+  playerId: z.string().uuid(),
+});
+
+export async function unlockPlayerAccountAction(formData: FormData) {
+  const parsed = unlockSchema.parse({
+    playerId: String(formData.get("playerId") ?? ""),
+  });
+  const { playerId } = parsed;
+
+  const { sb } = await gate("users.unlock");
+
+  // Look up the player's user → email through the service-role client
+  // (Plan 39 C2 revoked anon SELECT on users.email).
+  const { data: row, error } = await sb
+    .from("players")
+    .select(`user_id, users:users!players_user_id_fkey ( email )`)
+    .eq("id", playerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error(`player ${playerId} not found`);
+
+  const email = ((row as unknown as { users: { email: string } }).users
+    ?.email ?? "")
+    .trim()
+    .toLowerCase();
+  if (!email) throw new Error(`player ${playerId} has no email`);
+
+  await clearLockoutForEmail(sb, email);
+
+  revalidatePath(`/admin/people/players/${playerId}/edit`);
+  redirect(`/admin/people/players/${playerId}/edit?unlocked=1`);
 }

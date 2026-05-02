@@ -232,5 +232,4 @@ export async function clearLockoutForEmail(
   if (error) throw error;
   return { cleared: (deleted ?? []).length };
 }
-</content>
-</invoke>
+

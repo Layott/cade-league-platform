@@ -177,5 +177,3 @@ export function hasPerm(actor: Actor, action: string): boolean {
   }
   return false;
 }
-</content>
-</invoke>

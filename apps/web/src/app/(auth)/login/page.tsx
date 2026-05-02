@@ -5,12 +5,41 @@ import { PrimaryButton } from "@/components/admin/buttons";
 import { PRIMARY_LOGOS } from "@/lib/brand";
 import { PasswordInput } from "./PasswordInput";
 
+/**
+ * Map machine-readable error codes (set by `actions.ts`) to user-facing
+ * copy. Bug 11 fix (2026-05-01) replaced free-form encoded error strings
+ * with stable codes so admin tooling, e2e tests, and the LOC's verbal
+ * troubleshooting all agree on the same vocabulary.
+ *
+ * Legacy free-form strings (anything that doesn't match a known code) is
+ * passed through verbatim so old bookmarked URLs / saved redirects don't
+ * suddenly start showing "Unknown error".
+ */
+function describeError(code: string, minutes: string | undefined): string {
+  if (code === "account_locked") {
+    const n = minutes ? Math.max(1, parseInt(minutes, 10) || 1) : 5;
+    return `Account temporarily locked due to too many failed attempts. Try again in ~${n} ${n === 1 ? "minute" : "minutes"}, or ask the LOC to unlock you.`;
+  }
+  if (code === "rate_limited") {
+    return "Too many requests. Slow down and try again in a moment.";
+  }
+  if (code === "invalid_credentials") {
+    return "Invalid email or password.";
+  }
+  if (code === "unknown_error") {
+    return "Something went wrong. Try again, or contact the LOC if it persists.";
+  }
+  // Legacy fallback — preserve verbatim copy from older error encodings.
+  return code;
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; minutes?: string }>;
 }) {
   const sp = await searchParams;
+  const errorCopy = sp.error ? describeError(sp.error, sp.minutes) : null;
 
   return (
     <main
@@ -100,10 +129,11 @@ export default async function LoginPage({
           </div>
 
           <form action={login} className="px-7 pt-6 pb-7 space-y-5">
-            {sp.error ? (
+            {errorCopy ? (
               <div
                 role="alert"
                 data-testid="login-error"
+                data-error-code={sp.error}
                 style={{
                   background: "rgba(255,91,59,0.1)",
                   border: "1px solid rgba(255,91,59,0.4)",
@@ -112,9 +142,10 @@ export default async function LoginPage({
                   borderRadius: 4,
                   fontSize: 12,
                   letterSpacing: "0.04em",
+                  lineHeight: 1.5,
                 }}
               >
-                {sp.error}
+                {errorCopy}
               </div>
             ) : null}
 

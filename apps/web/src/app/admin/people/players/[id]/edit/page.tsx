@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
-import { requirePermAsync } from "@/lib/perms-db";
+import { hasPermAsync, requirePermAsync } from "@/lib/perms-db";
 import { SectionHeader } from "@/components/admin/SectionHeader";
 import {
+  DangerButton,
   PrimaryButton,
   SecondaryButton,
 } from "@/components/admin/buttons";
@@ -15,11 +16,19 @@ import {
   textareaClass,
 } from "@/components/admin/FormField";
 import { StatusPill } from "@/components/admin/StatusPill";
-import { updatePlayerAction } from "../../actions";
+import {
+  getLockoutInfo,
+  LOCKOUT_THRESHOLD,
+} from "@/server/auth/sessions";
+import { unlockPlayerAccountAction, updatePlayerAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-async function resolveAdmin() {
+async function resolveAdmin(): Promise<{
+  sb: ReturnType<typeof getServiceRoleSupabase>;
+  canUnlock: boolean;
+  publicUserId: string;
+}> {
   const userClient = await getServerSupabase();
   const { data: auth } = await userClient.auth.getUser();
   if (!auth.user) redirect("/login");
@@ -37,7 +46,15 @@ async function resolveAdmin() {
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
   const sb = getServiceRoleSupabase();
   await requirePermAsync(sb, { userId: pub.id, roles }, "users.edit");
-  return sb;
+  // Bug 11 fix — gate the inline "Unlock account" button on
+  // `users.unlock` (admin / loc / idc). users.edit is sufficient to view
+  // the page; users.unlock is required to actually clear the lockout.
+  const canUnlock = await hasPermAsync(
+    sb,
+    { userId: pub.id, roles },
+    "users.unlock",
+  );
+  return { sb, canUnlock, publicUserId: pub.id };
 }
 
 type PlayerDetail = {
@@ -60,11 +77,11 @@ export default async function EditPlayerPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; unlocked?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const sb = await resolveAdmin();
+  const { sb, canUnlock } = await resolveAdmin();
 
   const { data: player } = await sb
     .from("players")
@@ -117,6 +134,16 @@ export default async function EditPlayerPage({
     email: string;
   }>);
 
+  // Bug 11 — fetch the live lockout state for this player's email so
+  // we can render either an "Account locked" warning + Unlock button
+  // OR a passive "N attempts in last window" hint. Service-role read
+  // dodges the RLS deny-all on auth_events.
+  const lockInfo = await getLockoutInfo(sb, p.users.email);
+  const lockMinutesRemaining = Math.max(
+    1,
+    Math.ceil(lockInfo.msRemaining / 60_000),
+  );
+
   return (
     <div className="space-y-8">
       <SectionHeader
@@ -133,6 +160,66 @@ export default async function EditPlayerPage({
       {sp.saved ? (
         <div className="rounded-sm border border-[var(--primary)] bg-[rgba(107,205,6,0.08)] p-3 text-xs text-[var(--primary)]">
           Saved · changes live immediately.
+        </div>
+      ) : null}
+
+      {sp.unlocked ? (
+        <div className="rounded-sm border border-[var(--primary)] bg-[rgba(107,205,6,0.08)] p-3 text-xs text-[var(--primary)]">
+          Account unlocked · the player can sign in immediately.
+        </div>
+      ) : null}
+
+      {/*
+        Bug 11 fix — surface the lockout state so an admin/LOC/IDC sees
+        WHY a player is reporting "wrong password" before the page
+        prompts them to actually unlock. Three states:
+          • locked → red badge + Unlock button (gated on users.unlock)
+          • approaching → orange "warning" badge (3+ attempts in window)
+          • clear → no banner at all
+      */}
+      {lockInfo.locked ? (
+        <div
+          className="flex flex-wrap items-start gap-3 rounded-sm border p-3 text-xs"
+          style={{
+            borderColor: "rgba(255,91,59,0.45)",
+            background: "rgba(255,91,59,0.08)",
+            color: "var(--flare)",
+          }}
+        >
+          <div className="flex-1 min-w-[240px] space-y-1">
+            <div className="font-semibold uppercase tracking-[0.18em]">
+              Account locked
+            </div>
+            <div className="text-[var(--chalk-1)]">
+              {lockInfo.attemptsInWindow} failed sign-in attempts in the
+              last 5 minutes. Auto-unlock in ~{lockMinutesRemaining}{" "}
+              {lockMinutesRemaining === 1 ? "minute" : "minutes"}, or
+              clear it now if the player is on the phone.
+            </div>
+          </div>
+          {canUnlock ? (
+            <form action={unlockPlayerAccountAction}>
+              <input type="hidden" name="playerId" value={p.id} />
+              <DangerButton type="submit">Unlock account</DangerButton>
+            </form>
+          ) : (
+            <span className="text-[var(--chalk-3)]">
+              users.unlock perm required
+            </span>
+          )}
+        </div>
+      ) : lockInfo.attemptsInWindow >= 3 ? (
+        <div
+          className="rounded-sm border p-3 text-xs"
+          style={{
+            borderColor: "rgba(245,158,11,0.45)",
+            background: "rgba(245,158,11,0.08)",
+            color: "#f59e0b",
+          }}
+        >
+          {lockInfo.attemptsInWindow} of {LOCKOUT_THRESHOLD + 1} failed
+          sign-in attempts in the last 5 minutes. Auto-locks on the next
+          failure.
         </div>
       ) : null}
 

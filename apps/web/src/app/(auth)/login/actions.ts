@@ -156,5 +156,3 @@ export async function login(formData: FormData) {
   const roles = (roleRows ?? []).map((r: { role: string }) => r.role);
   redirect(defaultLandingForRoles(roles));
 }
-</content>
-</invoke>
