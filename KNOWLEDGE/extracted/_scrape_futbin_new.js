@@ -130,6 +130,13 @@ async function extract(page) {
         nationId: pathId(nationImg?.getAttribute("src")),
         leagueId: pathId(leagueImg?.getAttribute("src")),
         clubId: pathId(clubImg?.getAttribute("src")),
+        // Full flag / logo CDN URL — display convenience. Futbin's
+        // nation icons have no alt/title attribute, so human-readable
+        // nation names are resolved via the id→name table in
+        // _backfill_nationality.js.
+        nationFlagUrl: nationImg?.getAttribute("src") || null,
+        leagueFlagUrl: leagueImg?.getAttribute("src") || null,
+        clubLogoUrl: clubImg?.getAttribute("src") || null,
       });
     }
     return out;

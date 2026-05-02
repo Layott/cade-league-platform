@@ -49,6 +49,27 @@ function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
   if (r.nationId != null) attrs.futbin_nation_id = r.nationId;
   if (r.leagueId != null) attrs.futbin_league_id = r.leagueId;
   if (r.clubId != null) attrs.futbin_club_id = r.clubId;
+  // Full CDN flag/logo URL (signed imgix). Useful where a UI surface
+  // wants to render the Futbin-styled flag directly without rebuilding
+  // the CDN path from the integer ID. Futbin's <img class="nation">
+  // exposes only `src` (no alt/title) so the human-readable nation
+  // name is resolved post-scrape via _backfill_nationality.js mapping
+  // the futbin_nation_id → ISO/name.
+  if (r.nationFlagUrl) {
+    attrs.nation_flag_url = r.nationFlagUrl.startsWith("http")
+      ? r.nationFlagUrl
+      : `https://www.futbin.com${r.nationFlagUrl}`;
+  }
+  if (r.leagueFlagUrl) {
+    attrs.league_logo_url = r.leagueFlagUrl.startsWith("http")
+      ? r.leagueFlagUrl
+      : `https://www.futbin.com${r.leagueFlagUrl}`;
+  }
+  if (r.clubLogoUrl) {
+    attrs.club_logo_url = r.clubLogoUrl.startsWith("http")
+      ? r.clubLogoUrl
+      : `https://www.futbin.com${r.clubLogoUrl}`;
+  }
   return attrs;
 }
 
@@ -89,6 +110,14 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs) {
   if ((oldAttrs.futbin_nation_id ?? null) !== (newAttrs.futbin_nation_id ?? null)) changes.push("nation_id");
   if ((oldAttrs.futbin_league_id ?? null) !== (newAttrs.futbin_league_id ?? null)) changes.push("league_id");
   if ((oldAttrs.futbin_club_id ?? null) !== (newAttrs.futbin_club_id ?? null)) changes.push("club_id");
+  // Flag / logo CDN URLs. Diff so a row that previously lacked the URL
+  // but now has it (post-scraper-patch re-run) gets persisted. URL
+  // signatures change when Futbin re-signs the imgix HMAC — strip the
+  // query string before comparing to avoid unnecessary churn.
+  const stripQS = (u) => (u || "").split("?")[0];
+  if (stripQS(oldAttrs.nation_flag_url) !== stripQS(newAttrs.nation_flag_url)) changes.push("nation_flag_url");
+  if (stripQS(oldAttrs.league_logo_url) !== stripQS(newAttrs.league_logo_url)) changes.push("league_logo_url");
+  if (stripQS(oldAttrs.club_logo_url) !== stripQS(newAttrs.club_logo_url)) changes.push("club_logo_url");
   return changes;
 }
 

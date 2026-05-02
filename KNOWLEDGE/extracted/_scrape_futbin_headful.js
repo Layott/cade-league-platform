@@ -168,6 +168,13 @@ async function extractListPage(page) {
       const nationId = pathId(nationIconEl?.getAttribute("src"));
       const leagueId = pathId(leagueIconEl?.getAttribute("src"));
       const clubId = pathId(clubIconEl?.getAttribute("src"));
+      // Full CDN flag/logo URL — captured for direct display use.
+      // Futbin's <img class="nation"> exposes only `src` (no alt or
+      // title), so the human-readable nation name has to be resolved
+      // via a separate id→name table (see _backfill_nationality.js).
+      const nationFlagUrl = nationIconEl?.getAttribute("src") || null;
+      const leagueFlagUrl = leagueIconEl?.getAttribute("src") || null;
+      const clubLogoUrl = clubIconEl?.getAttribute("src") || null;
 
       if (!name || !rating) continue;
       out.push({
@@ -191,6 +198,9 @@ async function extractListPage(page) {
         nationId,
         leagueId,
         clubId,
+        nationFlagUrl,
+        leagueFlagUrl,
+        clubLogoUrl,
       });
     }
 
@@ -236,6 +246,10 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     if (r.nationId != null) attrs.futbin_nation_id = r.nationId;
     if (r.leagueId != null) attrs.futbin_league_id = r.leagueId;
     if (r.clubId != null) attrs.futbin_club_id = r.clubId;
+    // Direct CDN flag/logo URLs — display convenience.
+    if (r.nationFlagUrl) attrs.nation_flag_url = r.nationFlagUrl.startsWith("http") ? r.nationFlagUrl : `https://www.futbin.com${r.nationFlagUrl}`;
+    if (r.leagueFlagUrl) attrs.league_logo_url = r.leagueFlagUrl.startsWith("http") ? r.leagueFlagUrl : `https://www.futbin.com${r.leagueFlagUrl}`;
+    if (r.clubLogoUrl) attrs.club_logo_url = r.clubLogoUrl.startsWith("http") ? r.clubLogoUrl : `https://www.futbin.com${r.clubLogoUrl}`;
 
     // item_type bucket from variant string.
     const vLower = (r.variant || "").toLowerCase();
