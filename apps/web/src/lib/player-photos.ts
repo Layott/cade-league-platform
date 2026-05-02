@@ -39,6 +39,25 @@ type ManifestShape = {
 const players = (manifest as unknown as ManifestShape).players;
 
 /**
+ * Per-slug default pose override.
+ *
+ * `getPlayerHeadshotUrl(...)` defaults to pose_index=1 for every player,
+ * but for some roster members pose 01 happens to be a take the user has
+ * rejected (back-of-jersey, face-covered, eyes closed, etc). Listing a
+ * slug here changes the DEFAULT pose payload-driven overlays receive
+ * (h2h-2/3/5, score-bug, lower-third, etc) so post-update repaints don't
+ * snap back to a banned pose.
+ *
+ * Banned poses are also documented in tasks/lessons.md (2026-05-02 entry)
+ * so future scrapes / re-processes know not to re-introduce them.
+ */
+const DEFAULT_POSE_BY_SLUG: Record<string, number> = {
+  anife: 5, // pose_01 = hands-covering-mouth (BANNED), pose_02 has face crop user rejected
+  kingnonex: 2, // pose_01 = back-of-jersey (BANNED), pose_03 = head down / face dim
+  king_nonex: 2, // alias for "KING NONEX" gamer_tag form (gamerTagToSlug collapses space → underscore)
+};
+
+/**
  * Public: convert a gamer tag (or display name) to the manifest slug.
  * Lowercased; whitespace and hyphens collapsed to underscores; trims
  * surrounding whitespace. e.g. "Killer Freak" → "killer_freak",
@@ -70,14 +89,18 @@ export function gamerTagToSlug(gamerTag: string): string {
 export function getPlayerHeadshotUrl(
   gamerTag: string | null | undefined,
   variant: PlayerPhotoVariant = "normal",
-  poseIndex: number = 1,
+  poseIndex?: number,
 ): string | null {
   if (!gamerTag) return null;
   const slug = gamerTagToSlug(gamerTag);
   if (!slug) return null;
   const entry = players[slug];
   if (!entry) return null;
-  const pose = entry.poses.find((p) => p.pose_index === poseIndex);
+  // Resolve default pose: explicit caller arg wins, else per-slug
+  // override, else 1.
+  const effectivePose =
+    poseIndex != null ? poseIndex : (DEFAULT_POSE_BY_SLUG[slug] ?? 1);
+  const pose = entry.poses.find((p) => p.pose_index === effectivePose);
   if (!pose) return null;
   // The v2 sync script publishes both `headshot_<NN>.png` and
   // `headshot_<NN>_nobg.png` under `/overlays/v2/_assets/players/
@@ -85,16 +108,18 @@ export function getPlayerHeadshotUrl(
   // variant the v2 overlays expect; non-overlay consumers (the
   // CadePlayerCard photo well, /players/[id]) read the same files.
   void variant; // reserved for `headshot` (no-suffix) variant in future
-  const padded = String(poseIndex).padStart(2, "0");
+  const padded = String(effectivePose).padStart(2, "0");
   return `/overlays/v2/_assets/players/processed/${slug}/headshot_${padded}_nobg.png`;
 }
 
 /**
- * Convenience: small avatar URL (pose 01, normal). Used by row-level UIs
- * (standings, fixture list, match-day admin). Same fallback semantics.
+ * Convenience: small avatar URL (default pose, normal). Used by row-level
+ * UIs (standings, fixture list, match-day admin). Honours
+ * `DEFAULT_POSE_BY_SLUG` so banned poses are never shown anywhere on the
+ * platform.
  */
 export function getPlayerAvatarUrl(gamerTag: string | null | undefined): string | null {
-  return getPlayerHeadshotUrl(gamerTag, "normal", 1);
+  return getPlayerHeadshotUrl(gamerTag, "normal");
 }
 
 /** Test-only: list known slugs. Useful for sanity checks. */

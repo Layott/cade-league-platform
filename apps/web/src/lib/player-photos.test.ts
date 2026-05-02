@@ -70,12 +70,41 @@ describe("getPlayerHeadshotUrl", () => {
     expect(getPlayerHeadshotUrl(undefined)).toBeNull();
     expect(getPlayerHeadshotUrl("")).toBeNull();
   });
+
+  it("honours per-slug DEFAULT_POSE_BY_SLUG override when poseIndex is not specified", () => {
+    // Anife pose_01 = hands-covering-mouth (BANNED). Default falls
+    // through to pose 5.
+    expect(getPlayerHeadshotUrl("Anife")).toBe(
+      "/overlays/v2/_assets/players/processed/anife/headshot_05_nobg.png",
+    );
+    // KingNonex pose_01 = back-of-jersey (BANNED). Default falls
+    // through to pose 2.
+    expect(getPlayerHeadshotUrl("KINGNONEX")).toBe(
+      "/overlays/v2/_assets/players/processed/kingnonex/headshot_02_nobg.png",
+    );
+  });
+
+  it("explicit poseIndex caller arg overrides DEFAULT_POSE_BY_SLUG", () => {
+    // If a caller still wants pose 01 for Anife it can ask for it.
+    expect(getPlayerHeadshotUrl("Anife", "normal", 1)).toBe(
+      "/overlays/v2/_assets/players/processed/anife/headshot_01_nobg.png",
+    );
+  });
 });
 
 describe("getPlayerAvatarUrl", () => {
-  it("delegates to pose-1 v2 _nobg headshot", () => {
+  it("delegates to default pose v2 _nobg headshot for players without override", () => {
     expect(getPlayerAvatarUrl("Tactical")).toBe(
       "/overlays/v2/_assets/players/processed/tactical/headshot_01_nobg.png",
+    );
+  });
+
+  it("honours per-slug pose override (banned poses don't leak into row UIs)", () => {
+    expect(getPlayerAvatarUrl("Anife")).toBe(
+      "/overlays/v2/_assets/players/processed/anife/headshot_05_nobg.png",
+    );
+    expect(getPlayerAvatarUrl("KINGNONEX")).toBe(
+      "/overlays/v2/_assets/players/processed/kingnonex/headshot_02_nobg.png",
     );
   });
 

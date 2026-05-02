@@ -1085,14 +1085,23 @@
 
   .player-org {
     margin-top: 8px;
-    max-height: 96px;
-    max-width: 180px;
+    max-height: 80px;
+    max-width: 140px;
     height: auto;
     width: auto;
     object-fit: contain;
     display: block;
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.65));
     border-radius: 6px;
+  }
+  /* Wide-aspect logos (Lumo Hubs, etc) need extra clamp so they don't
+     dominate the player column. The selector matches the URL-encoded
+     filename in the static fallback + any payload-driven path the
+     server sends. */
+  .player-org[src*="LUMO"],
+  .player-org[alt*="Lumo" i] {
+    max-height: 56px;
+    max-width: 120px;
   }
   .player-col--b .player-org { margin-left: auto; }
 
