@@ -13,6 +13,7 @@ import {
 import {
   getFormationSlots,
   type FormationKey,
+  type SlotPosition,
 } from "@/components/squads/PitchLayout";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +40,15 @@ export const runtime = "nodejs";
  *     payload: {
  *       draftOwner: { playerId, displayName, gamerTag, headshotUrl },
  *       submission: { id, weekStartDate, validationStatus, submittedAt },
- *       formation: string | null,        // derived from starting positions
- *       chemistry: string | null,        // not in DB → always null
+ *       formation: string | null,        // label from squad_submissions.formation
+ *       chemistry: { total, perSlot } | null,
+ *       pitchSlots: PitchSlot[] | null,  // server-resolved from getFormationSlots(formationKey).
+ *                                        // 11 entries each `{ slotIndex, label, top, left }`
+ *                                        // (`top`/`left` are 0-100 percentages of the pitch
+ *                                        // area, matching the picker's PitchLayout). When the
+ *                                        // submitted formation can't be mapped to a known
+ *                                        // FormationKey we fall back to '4-3-3' so the overlay
+ *                                        // never shows fixed pre-canned positions.
  *       starting: SquadItem[],           // slot_index 0..10
  *       subs: SquadItem[]                // slot_index 11..22 truncated to 12
  *     } | null,
@@ -300,6 +308,7 @@ export async function GET(
           submission: null,
           formation: null,
           chemistry: null,
+          pitchSlots: null,
           starting: [],
           subs: [],
         },
@@ -431,9 +440,14 @@ export async function GET(
 
   // Bug 10 (2026-05-01) — formation + chemistry resolution.
   const formation = submission.formation ?? deriveFormation(starting);
+  // User report 2026-05-02 — also resolve the FormationKey from the
+  // derived label (legacy rows had `submission.formation = null` but
+  // `deriveFormation()` still produced "4-3-3"/"4-4-2"/etc.). Without
+  // this branch the chemistry call returned null AND the pitch fell
+  // back to '4-3-3' even when the derived label was perfectly mappable.
   const formationKey: FormationKey | null =
-    submission.formation && submission.formation in FORMATION_LABEL_TO_KEY
-      ? FORMATION_LABEL_TO_KEY[submission.formation]
+    formation && formation in FORMATION_LABEL_TO_KEY
+      ? FORMATION_LABEL_TO_KEY[formation]
       : null;
   let chemistryTotal: number | null = null;
   let chemistryPerSlot: number[] | null = null;
@@ -458,6 +472,24 @@ export async function GET(
     chemistryPerSlot = chem.perSlot;
   }
 
+  // User report 2026-05-02 — the overlay was rendering 11 starters in a
+  // hard-coded 4-3-3 CSS grid regardless of the player's submitted
+  // formation. Resolve the slot map server-side from the picker's single
+  // source of truth (`getFormationSlots`) so the overlay can paint each
+  // card at the same `(top%, left%)` coordinate the player saw on
+  // /player/squad. When the formation label can't be mapped to a known
+  // FormationKey (legacy NULL rows, deriveFormation result that doesn't
+  // match the 21 catalog labels), fall back to '4-3-3' so the overlay
+  // never reverts to a baked-in arrangement.
+  const slotKey: FormationKey = formationKey ?? "433";
+  const slotDefs: SlotPosition[] = getFormationSlots(slotKey);
+  const pitchSlots = slotDefs.map((s) => ({
+    slotIndex: s.slotIndex,
+    label: s.label,
+    top: s.top,
+    left: s.left,
+  }));
+
   return NextResponse.json(
     {
       payload: {
@@ -479,6 +511,10 @@ export async function GET(
           chemistryTotal != null
             ? { total: chemistryTotal, perSlot: chemistryPerSlot ?? [] }
             : null,
+        // User report 2026-05-02 — server-resolved pitch slot positions
+        // so the overlay rearranges cards to match the player's
+        // formation choice instead of using a fixed 4-3-3 grid.
+        pitchSlots,
         starting,
         subs,
       },

@@ -815,38 +815,28 @@
     border-radius: 50%;
     transform: translate(-50%, -50%);
   }
+  /* User report 2026-05-02 — pitch slot layout is now ABSOLUTELY
+     positioned from server-emitted `pitchSlots[]` (resolved from the
+     picker's getFormationSlots() so picker + overlay always agree).
+     Each slot div is placed at top:Y% / left:X% of the pitch box and
+     translated -50%/-50% so the card centres on its coordinate.
+     Padding moved INSIDE the box via inset to leave 0..100% addressable
+     for the coordinate math (slot-positions in the picker are in 0..100
+     percent of the pitch panel and we mirror that exactly here). */
   .pitch {
     position: relative;
     width: 100%;
     height: 100%;
-    display: grid;
-    /* 5 columns wide × 4 rows. Each card sits in its own ~170px column
-       (920 inner - 32 padding - 4×12 gap = 840 / 5 = 168px) so 150-wide
-       cards have ~18px breathing room and never overlap an adjacent
-       slot. The DEF row spans cols 1-5 with col 3 empty for the centre
-       channel; the GK row centres in col 3. */
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: 1fr 1fr 1fr 1fr;
-    grid-template-areas:
-      ".  lw  st  rw ."
-      ".  cml cmc cmr ."
-      "lb cbl .   cbr rb"
-      ".  .   gk  .   .";
-    gap: 12px;
-    padding: 20px 16px 32px;
   }
-  .slot { display: flex; align-items: center; justify-content: center; }
-  .slot-gk  { grid-area: gk; }
-  .slot-lb  { grid-area: lb; }
-  .slot-cbl { grid-area: cbl; }
-  .slot-cbr { grid-area: cbr; }
-  .slot-rb  { grid-area: rb; }
-  .slot-cml { grid-area: cml; }
-  .slot-cmc { grid-area: cmc; }
-  .slot-cmr { grid-area: cmr; }
-  .slot-lw  { grid-area: lw; }
-  .slot-st  { grid-area: st; }
-  .slot-rw  { grid-area: rw; }
+  .slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
   @keyframes pitch-fade {
     from { opacity: 0; transform: scale(0.96); }
     to   { opacity: 1; transform: scale(1); }
@@ -1216,11 +1206,8 @@
   }
   .sub-card .card-flag { font-size: 14px; }
 
-  /* slot label under each card (e.g. "GK ++") */
-  .slot {
-    flex-direction: column;
-    gap: 4px;
-  }
+  /* slot label under each card (e.g. "GK ++") — element-specific styles
+     (.slot positioning + flex layout lives in the .pitch block above). */
   .slot-label {
     font-family: var(--accent);
     font-weight: 700;
@@ -1393,23 +1380,14 @@
            alt="National E-Soccer Pro League" />
     </header>
 
-    <!-- PITCH (4-3-3 formation) -->
+    <!-- PITCH — server-resolved formation. Slots are CREATED DYNAMICALLY
+         by renderPitch() at absolute (top%, left%) coordinates derived
+         from the player's submitted formation. The picker's
+         getFormationSlots() catalog is the single source of truth so
+         the overlay always mirrors what the player saw on /player/squad. -->
     <section class="pitch-wrap" data-element-id="pitch-wrap">
       <div class="pitch-bg" aria-hidden="true"></div>
-      <div class="pitch" data-element-id="pitch">
-        <!-- Cards rendered by JS into these slots -->
-        <div class="slot slot-lw"  data-slot-index="8"></div>
-        <div class="slot slot-st"  data-slot-index="9"></div>
-        <div class="slot slot-rw"  data-slot-index="10"></div>
-        <div class="slot slot-cml" data-slot-index="5"></div>
-        <div class="slot slot-cmc" data-slot-index="6"></div>
-        <div class="slot slot-cmr" data-slot-index="7"></div>
-        <div class="slot slot-lb"  data-slot-index="1"></div>
-        <div class="slot slot-cbl" data-slot-index="2"></div>
-        <div class="slot slot-cbr" data-slot-index="3"></div>
-        <div class="slot slot-rb"  data-slot-index="4"></div>
-        <div class="slot slot-gk"  data-slot-index="0"></div>
-      </div>
+      <div class="pitch" data-element-id="pitch"></div>
     </section>
 
     <!-- SUBS PANEL (right) -->
@@ -1448,12 +1426,35 @@
                                   subs:     [{slot_index, name, rating, position, item_type, nationality_flag}] } }
        Also accepts the server-shaped payload: { payload: { ... } }. */
     (function () {
-      var POSITION_LABEL = {
-        0: 'GK',
-        1: 'LB',  2: 'CB',  3: 'CB',  4: 'RB',
-        5: 'CM',  6: 'CM',  7: 'CM',
-        8: 'LW',  9: 'ST', 10: 'RW'
-      };
+      // Default 4-3-3 slot map — used as a SAFE FALLBACK when the
+      // payload arrives without server-resolved `pitchSlots[]` (e.g. the
+      // demo loop, legacy postMessage payloads from the broadcast control
+      // panel that pre-date the May-2026 layout fix). Coordinates here
+      // mirror PitchLayout.tsx::FORMATIONS["433"] verbatim — picker +
+      // overlay must agree.
+      var DEFAULT_PITCH_SLOTS_433 = [
+        { slotIndex: 0,  label: 'GK', top: 92, left: 50 },
+        { slotIndex: 1,  label: 'LB', top: 72, left: 12 },
+        { slotIndex: 2,  label: 'CB', top: 74, left: 34 },
+        { slotIndex: 3,  label: 'CB', top: 74, left: 66 },
+        { slotIndex: 4,  label: 'RB', top: 72, left: 88 },
+        { slotIndex: 5,  label: 'CM', top: 48, left: 22 },
+        { slotIndex: 6,  label: 'CM', top: 52, left: 50 },
+        { slotIndex: 7,  label: 'CM', top: 48, left: 78 },
+        { slotIndex: 8,  label: 'LW', top: 20, left: 16 },
+        { slotIndex: 9,  label: 'ST', top: 14, left: 50 },
+        { slotIndex: 10, label: 'RW', top: 20, left: 84 }
+      ];
+      // Lookup helper: returns 'GK' for slot 0, 'CM' for slot 6, etc.
+      function defaultLabelForSlot(idx) {
+        var s = DEFAULT_PITCH_SLOTS_433[idx];
+        return s ? s.label : '';
+      }
+      // Currently-rendered pitch slot map (latest update() wins). Used
+      // by renderPitch when starting items arrive without a fresh
+      // pitchSlots[] (e.g. mid-stream `update` postMessage that only
+      // refreshed score/chemistry).
+      var currentPitchSlots = DEFAULT_PITCH_SLOTS_433;
 
       function escHtml(s) {
         return String(s == null ? '' : s)
@@ -1504,7 +1505,7 @@
         if (hasFutbinComposite) cls += ' has-fut-card';
         else if (hasFaceOnly)   cls += ' has-img';
         var rating = (item && item.rating != null) ? String(item.rating) : '--';
-        var pos    = (item && item.position) || POSITION_LABEL[slotIdx] || '';
+        var pos    = (item && item.position) || defaultLabelForSlot(slotIdx) || '';
         var name   = (item && item.name) || '';
         var flag   = nationalityFlag || '';
 
@@ -1557,31 +1558,54 @@
         '</div>';
       }
 
-      function renderPitch(items) {
-        if (!Array.isArray(items)) return;
-        var slots = document.querySelectorAll('.pitch .slot');
-        // Wipe each slot, then place item by slot index. Accept both
-        // camelCase (server feed) and snake_case (postMessage demo / control
-        // panel) shapes via the `pick()` helper.
+      // Build the absolute-positioned slot divs from a pitchSlots[]
+      // map (server-resolved from the player's submitted formation via
+      // PitchLayout::getFormationSlots). The pitch box is wiped and
+      // rebuilt on every render so a formation change between refreshes
+      // never leaves stale slots from the previous formation.
+      function renderPitch(items, pitchSlots) {
+        var pitch = document.querySelector('[data-element-id="pitch"]');
+        if (!pitch) return;
+        // Pick the slot map, in priority order:
+        //   1. caller-supplied pitchSlots[] (server feed shape).
+        //   2. last known map (currentPitchSlots — re-renders triggered
+        //      by mid-stream chemistry updates without a fresh formation).
+        //   3. baked-in 4-3-3 fallback.
+        var slotMap = Array.isArray(pitchSlots) && pitchSlots.length === 11
+          ? pitchSlots
+          : (Array.isArray(currentPitchSlots) && currentPitchSlots.length === 11
+            ? currentPitchSlots
+            : DEFAULT_PITCH_SLOTS_433);
+        // Persist for subsequent renders that omit pitchSlots.
+        currentPitchSlots = slotMap;
+        // Index items by slotIndex. Accept both camelCase (server feed)
+        // and snake_case (postMessage demo / control panel) shapes.
         var bySlot = {};
-        items.forEach(function (it) {
-          if (!it) return;
-          var idx = pick(it, 'slotIndex', 'slot_index');
-          if (idx == null) return;
-          bySlot[idx] = it;
-        });
-        slots.forEach(function (slot) {
-          var idx = parseInt(slot.getAttribute('data-slot-index'), 10);
-          var posLabel = POSITION_LABEL[idx] || '';
-          var item = bySlot[idx];
+        if (Array.isArray(items)) {
+          items.forEach(function (it) {
+            if (!it) return;
+            var idx = pick(it, 'slotIndex', 'slot_index');
+            if (idx == null) return;
+            bySlot[idx] = it;
+          });
+        }
+        // Wipe + rebuild.
+        pitch.innerHTML = '';
+        slotMap.forEach(function (s) {
+          var slot = document.createElement('div');
+          slot.className = 'slot';
+          slot.setAttribute('data-slot-index', String(s.slotIndex));
+          slot.style.top = (typeof s.top === 'number' ? s.top : 50) + '%';
+          slot.style.left = (typeof s.left === 'number' ? s.left : 50) + '%';
+          var item = bySlot[s.slotIndex];
+          var posLabel = s.label || defaultLabelForSlot(s.slotIndex);
           if (item) {
             slot.innerHTML = cardHtml(item, false) +
               '<span class="slot-label">' + escHtml(posLabel) +
                 (item.chemistry ? ' <span class="chem">' + escHtml(item.chemistry) + '</span>' : '') +
               '</span>';
-          } else {
-            slot.innerHTML = '';
           }
+          pitch.appendChild(slot);
         });
       }
 
@@ -1673,8 +1697,18 @@
           }
           chemEl.textContent = chemVal;
         }
-        if (Array.isArray(p.starting)) renderPitch(p.starting);
-        else if (!hasSubmission) renderPitch([]);
+        // User report 2026-05-02 — repaint pitch at the formation the
+        // player actually submitted. `pitchSlots` arrives from
+        // /api/broadcast/v2/sessions/<id>/player-squads as 11 entries
+        // each `{ slotIndex, label, top, left }` (server-resolved from
+        // PitchLayout::getFormationSlots so picker + overlay agree).
+        // When the payload is the legacy demo-loop / postMessage shape
+        // it omits pitchSlots — we fall back to the last-rendered map.
+        if (Array.isArray(p.starting)) {
+          renderPitch(p.starting, Array.isArray(p.pitchSlots) ? p.pitchSlots : null);
+        } else if (!hasSubmission) {
+          renderPitch([], Array.isArray(p.pitchSlots) ? p.pitchSlots : null);
+        }
         if (Array.isArray(p.subs))     renderSubs(p.subs);
         else if (!hasSubmission) renderSubs([]);
       }

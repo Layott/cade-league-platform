@@ -335,8 +335,14 @@ describe("GET /api/broadcast/v2/sessions/[id]/player-squads — Bug 10", () => {
     const body = await res.json();
     // 4 def + 3 mid + 3 fwd → "4-3-3" via deriveFormation.
     expect(body.payload.formation).toBe("4-3-3");
-    // Chemistry can't be computed without a FormationKey → null.
-    expect(body.payload.chemistry).toBeNull();
+    // User report 2026-05-02 — when the derived label maps to a known
+    // FormationKey (the 21-formation catalog from PitchLayout), the
+    // route now computes chemistry against that derived shape so the
+    // overlay isn't stuck on null for legacy rows. The 11 cards above
+    // sit in a perfect 4-3-3 with their primary positions matching
+    // each slot label, so chem should hit 33/33.
+    expect(body.payload.chemistry).not.toBeNull();
+    expect(body.payload.chemistry.total).toBe(33);
   });
 
   it("recomputes chemistry as { total, perSlot } and returns total > 0 for a coherent squad", async () => {
@@ -489,8 +495,110 @@ describe("GET /api/broadcast/v2/sessions/[id]/player-squads — Bug 10", () => {
     expect(body.payload.submission).toBeNull();
     expect(body.payload.formation).toBeNull();
     expect(body.payload.chemistry).toBeNull();
+    expect(body.payload.pitchSlots).toBeNull();
     expect(body.payload.starting).toEqual([]);
     expect(body.payload.subs).toEqual([]);
+  });
+
+  // User report 2026-05-02 — the overlay was rendering 11 starters in a
+  // hard-coded 4-3-3 CSS grid regardless of the player's submitted
+  // formation. The endpoint now ships server-resolved `pitchSlots[]`
+  // (from PitchLayout's getFormationSlots), so the overlay can paint
+  // each starting card at the same coordinate the picker showed.
+  it("returns pitchSlots[] resolved from the persisted formation (4-5-1 ⇒ 5-man midfield)", async () => {
+    const items = [
+      mkItem({ slot_index: 0, name: "GK1", rating: 85, position: "GK" }),
+      mkItem({ slot_index: 1, name: "LB1", rating: 80, position: "LB" }),
+      mkItem({ slot_index: 2, name: "CB1", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 3, name: "CB2", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 4, name: "RB1", rating: 80, position: "RB" }),
+      mkItem({ slot_index: 5, name: "LM1", rating: 82, position: "LM" }),
+      mkItem({ slot_index: 6, name: "CM1", rating: 82, position: "CM" }),
+      mkItem({ slot_index: 7, name: "CM2", rating: 82, position: "CM" }),
+      mkItem({ slot_index: 8, name: "CM3", rating: 82, position: "CM" }),
+      mkItem({ slot_index: 9, name: "RM1", rating: 82, position: "RM" }),
+      mkItem({ slot_index: 10, name: "ST1", rating: 88, position: "ST" }),
+    ];
+    const sb = mkSb({
+      submission: {
+        id: SUBMISSION_ID,
+        week_start_date: WEEK,
+        validation_status: "pending",
+        submitted_at: "2026-04-30T10:00:00Z",
+        formation: "4-5-1",
+      },
+      items,
+      fc: items.map((it) =>
+        mkFc({ name: it.name, rating: it.rating, alt_positions: [] }),
+      ),
+    });
+    getServiceRoleSupabaseMock.mockReturnValue(sb);
+
+    const res = await GET(mkReq({ week: WEEK }), {
+      params: Promise.resolve({ id: SESSION_ID }),
+    });
+    const body = await res.json();
+    expect(Array.isArray(body.payload.pitchSlots)).toBe(true);
+    expect(body.payload.pitchSlots).toHaveLength(11);
+    // Every slot has a numeric coordinate + label.
+    for (const s of body.payload.pitchSlots) {
+      expect(typeof s.slotIndex).toBe("number");
+      expect(typeof s.label).toBe("string");
+      expect(typeof s.top).toBe("number");
+      expect(typeof s.left).toBe("number");
+      expect(s.top).toBeGreaterThanOrEqual(0);
+      expect(s.top).toBeLessThanOrEqual(100);
+      expect(s.left).toBeGreaterThanOrEqual(0);
+      expect(s.left).toBeLessThanOrEqual(100);
+    }
+    // 4-5-1 must include a 5-man midfield band (LM, CM, CM, CM, RM)
+    // and exactly one ST — proves we're not falling back to '4-3-3'.
+    const labels = body.payload.pitchSlots.map((s: { label: string }) => s.label);
+    expect(labels.filter((l: string) => l === "ST")).toHaveLength(1);
+    expect(labels.filter((l: string) => l === "CM" || l === "LM" || l === "RM")).toHaveLength(5);
+    expect(labels.filter((l: string) => l === "LW" || l === "RW")).toHaveLength(0);
+  });
+
+  it("falls back to '4-3-3' pitchSlots when formation can't be mapped to a FormationKey", async () => {
+    // No submission.formation, lineup also doesn't yield a derive-able
+    // standard label (5 defenders → "5-1-3" which isn't in the catalog).
+    const items = [
+      mkItem({ slot_index: 0, name: "GK", rating: 85, position: "GK" }),
+      mkItem({ slot_index: 1, name: "CB1", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 2, name: "CB2", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 3, name: "CB3", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 4, name: "CB4", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 5, name: "CB5", rating: 80, position: "CB" }),
+      mkItem({ slot_index: 6, name: "CM1", rating: 82, position: "CM" }),
+      mkItem({ slot_index: 7, name: "ST1", rating: 88, position: "ST" }),
+      mkItem({ slot_index: 8, name: "ST2", rating: 88, position: "ST" }),
+      mkItem({ slot_index: 9, name: "ST3", rating: 88, position: "ST" }),
+      mkItem({ slot_index: 10, name: "ST4", rating: 88, position: "ST" }),
+    ];
+    const sb = mkSb({
+      submission: {
+        id: SUBMISSION_ID,
+        week_start_date: WEEK,
+        validation_status: "pending",
+        submitted_at: "2026-04-30T10:00:00Z",
+        formation: null,
+      },
+      items,
+      fc: items.map((it) =>
+        mkFc({ name: it.name, rating: it.rating, alt_positions: [] }),
+      ),
+    });
+    getServiceRoleSupabaseMock.mockReturnValue(sb);
+
+    const res = await GET(mkReq({ week: WEEK }), {
+      params: Promise.resolve({ id: SESSION_ID }),
+    });
+    const body = await res.json();
+    // Defensive: we always emit 11 pitch slots, never null when a
+    // submission exists, so the overlay never reverts to its baked-in
+    // fixed 4-3-3 grid.
+    expect(Array.isArray(body.payload.pitchSlots)).toBe(true);
+    expect(body.payload.pitchSlots).toHaveLength(11);
   });
 });
 
