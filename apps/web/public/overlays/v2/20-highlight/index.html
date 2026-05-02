@@ -384,9 +384,22 @@
       }
       // Phase D — partner-strip scroll. Token `partner-strip-scroll`
       // controls whether logos scroll continuously sideways. When "true",
-      // wrap the strip's children in a flex track + clone them once for
-      // a seamless 50% translateX loop. Inject @keyframes + animation
-      // rule via a dedicated <style> block so OBS sees the motion.
+      // wrap the strip's children in an INNER flex track + clone them
+      // once for a seamless 50% translateX loop.
+      //
+      // Bug 13 (2026-05-01) — earlier impl wrapped children in
+      // .cade-partner-track but kept the OUTER strip's layout CSS as
+      // plain flex with justify-content:center, causing the
+      // width:max-content track to overflow past the anchor reference
+      // (anchor became visually meaningless on h2h-2, match-scores-day,
+      // etc). Fix: when scroll is on, the strip becomes a fixed-width
+      // OVERFLOW window anchored exactly where the design tokens placed
+      // it, and the inner track is the moving element. The track's
+      // 'gap' is INHERITED from the strip so the design-token spacing
+      // still applies between logos. width:100% on the strip caps it at
+      // the layout-token-provided dimensions; overflow:hidden clips the
+      // track. Anchor + transform tokens on the strip remain
+      // authoritative.
       var scrollOn = false;
       if (design && design['partner-strip-scroll'] === 'true') scrollOn = true;
       if (preview && preview['partner-strip-scroll'] === 'true') scrollOn = true;
@@ -403,9 +416,20 @@
             stripScroll.appendChild(track);
             var s6 = document.createElement('style');
             s6.id = 'cade-injected-partner-scroll';
+            // The strip becomes a fixed-width window:
+            //  - keeps its anchor/position/transform from layout tokens
+            //  - overflow:hidden clips the moving track
+            //  - justify-content reset to flex-start so the track always
+            //    begins flush with the strip's left edge (anchor side)
+            //  - flex-wrap forced nowrap so the track is single-row
+            // The track itself:
+            //  - width:max-content so it can hold all kids + clones
+            //  - gap inherited so brand spacing stays consistent
+            //  - flex-direction matches the strip (vertical/horizontal)
+            //  - animation translateX -50% creates the seamless loop
             s6.textContent =
-              '[data-element-id="partners-strip"]{overflow:hidden !important;}' +
-              '.cade-partner-track{display:flex;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
+              '[data-element-id="partners-strip"]{overflow:hidden !important;justify-content:flex-start !important;flex-wrap:nowrap !important;}' +
+              '[data-element-id="partners-strip"] > .cade-partner-track{display:flex;flex-direction:inherit;align-items:center;flex-wrap:nowrap;width:max-content;gap:inherit;animation:cade-partner-scroll 35s linear infinite;}' +
               '@keyframes cade-partner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}';
             document.head.appendChild(s6);
           }

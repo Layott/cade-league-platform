@@ -14,6 +14,8 @@ import {
   resetClock,
   getClock,
 } from "@/server/overlays/match_clock";
+import { publishScoreChanged } from "@/server/realtime/publishers/score_changed";
+import { publishMatchEnded } from "@/server/realtime/publishers/match_ended";
 
 /**
  * Plan 42 / 42.1 — match-flow orchestration for the broadcast control panel.
@@ -769,7 +771,7 @@ export async function endMatch(
     }
   }
 
-  // 6. Broadcast `match.ended`.
+  // 6. Broadcast `match.ended` on the per-session overlay channel.
   try {
     await publish(sb, sessionId, REALTIME.eventMatchEnded, {
       matchId,
@@ -782,6 +784,66 @@ export async function endMatch(
     });
   } catch {
     // swallow
+  }
+
+  // 7. Bug 17 (2026-05-01) — fan-out score.changed + match.ended on the
+  // standings channel (`public:standings:<seasonId>`) so data-driven
+  // overlays (h2h-2/3/5, leaderboard, match-scores-day, top-scorers,
+  // 20-highlight) repaint the moment broadcast control hits End Match.
+  // The DB trigger already fires standings.changed via SQL recompute
+  // when match_results mutates, but score.changed + match.ended are
+  // application-layer events the OverlayDataInjector subscribes to
+  // independently. Without this fan-out, h2h-2 and match-scores-day
+  // would lag by one realtime hop.
+  try {
+    const { data: matchRow } = await sb
+      .from("matches")
+      .select(
+        "home_player_id, away_player_id, match_day_id, match_days:match_day_id ( season_id )",
+      )
+      .eq("id", matchId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    const m = matchRow as
+      | {
+          home_player_id: string;
+          away_player_id: string;
+          match_days:
+            | { season_id: string }
+            | { season_id: string }[]
+            | null;
+        }
+      | null;
+    if (m) {
+      const md = Array.isArray(m.match_days)
+        ? m.match_days[0] ?? null
+        : m.match_days;
+      const seasonId = md?.season_id;
+      if (seasonId) {
+        await publishScoreChanged(sb, {
+          seasonId,
+          matchId,
+          homePlayerId: m.home_player_id,
+          awayPlayerId: m.away_player_id,
+          homeScore: finalScores.homeScore,
+          awayScore: finalScores.awayScore,
+          at: endedAt,
+        });
+        await publishMatchEnded(sb, {
+          seasonId,
+          matchId,
+          homePlayerId: m.home_player_id,
+          awayPlayerId: m.away_player_id,
+          homeScore: finalScores.homeScore,
+          awayScore: finalScores.awayScore,
+          resultType: "normal",
+          at: endedAt,
+        });
+      }
+    }
+  } catch (err) {
+    // Best-effort — durable record + per-session event already sent.
+    console.error("endMatch standings publish failed", err);
   }
 
   return { matchId, slot, endedAt };

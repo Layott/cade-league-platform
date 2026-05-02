@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publishWalkoverConfirmed } from "@/server/realtime/publishers/walkover_confirmed";
+import { publishScoreChanged } from "@/server/realtime/publishers/score_changed";
+import { publishMatchEnded } from "@/server/realtime/publishers/match_ended";
 
 /**
  * Plan 51 — walkover orchestration.
@@ -54,6 +56,14 @@ type MatchRow = {
 /**
  * Plan 51: best-effort fire walkover.confirmed on the standings channel.
  * Resolves seasonId via match → match_day → season. Failures swallowed.
+ *
+ * Bug 17 (2026-05-01) — also fires `score.changed` + `match.ended` on
+ * the same standings channel so live data-feed overlays subscribed to
+ * those events (h2h-2/3/5, leaderboard, match-scores-day, top-scorers)
+ * repaint mid-stream the moment a walkover lands. Without these fan-
+ * outs the overlays only repainted when the SQL trigger eventually
+ * fired `standings.changed` — which lagged the visual feedback the
+ * producer expected on hitting "Confirm walkover".
  */
 async function emitWalkoverConfirmed(
   sb: SupabaseClient,
@@ -64,12 +74,16 @@ async function emitWalkoverConfirmed(
   try {
     const { data, error } = await sb
       .from("matches")
-      .select("id, match_day_id, match_days:match_day_id ( season_id )")
+      .select(
+        "id, home_player_id, away_player_id, match_day_id, match_days:match_day_id ( season_id )",
+      )
       .eq("id", matchId)
       .is("deleted_at", null)
       .maybeSingle();
     if (error || !data) return;
     const row = data as {
+      home_player_id: string;
+      away_player_id: string;
       match_days:
         | { season_id: string }
         | { season_id: string }[]
@@ -81,15 +95,107 @@ async function emitWalkoverConfirmed(
       : row.match_days;
     const seasonId = md?.season_id;
     if (!seasonId) return;
+    const at = new Date().toISOString();
+
+    // Read the post-walkover scores so we publish exactly what the
+    // standings recompute will see. The walkover insert/update lands
+    // before this helper is called, so the row is durable.
+    const { data: resRow } = await sb
+      .from("match_results")
+      .select("home_score, away_score")
+      .eq("match_id", matchId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    const homeScore = (resRow as { home_score?: number } | null)?.home_score ?? 0;
+    const awayScore = (resRow as { away_score?: number } | null)?.away_score ?? 0;
+
     await publishWalkoverConfirmed(sb, {
       seasonId,
       matchId,
       winnerPlayerId: winnerId,
       initiatedBy,
+      at,
+    });
+    // Bug 17 — fan-out for live overlay repaint.
+    try {
+      await publishScoreChanged(sb, {
+        seasonId,
+        matchId,
+        homePlayerId: row.home_player_id,
+        awayPlayerId: row.away_player_id,
+        homeScore,
+        awayScore,
+        at,
+      });
+    } catch (err) {
+      console.error("emitWalkoverConfirmed score.changed failed", err);
+    }
+    try {
+      await publishMatchEnded(sb, {
+        seasonId,
+        matchId,
+        homePlayerId: row.home_player_id,
+        awayPlayerId: row.away_player_id,
+        homeScore,
+        awayScore,
+        resultType: "forfeit",
+        at,
+      });
+    } catch (err) {
+      console.error("emitWalkoverConfirmed match.ended failed", err);
+    }
+  } catch (err) {
+    console.error("emitWalkoverConfirmed failed", err);
+  }
+}
+
+/**
+ * Bug 17 (2026-05-01) — best-effort fire `score.changed` for any
+ * match_results write that falls outside the walkover-confirmed flow
+ * (markRefPendingWalkover, undoWalkover). Same channel + payload shape
+ * as `emitPlan51SideEffects` in matches/results.ts so all overlays that
+ * subscribe to `public:standings:<seasonId>` repaint identically.
+ */
+async function emitWalkoverScoreChange(
+  sb: SupabaseClient,
+  matchId: string,
+  homeScore: number,
+  awayScore: number,
+): Promise<void> {
+  try {
+    const { data, error } = await sb
+      .from("matches")
+      .select(
+        "id, home_player_id, away_player_id, match_day_id, match_days:match_day_id ( season_id )",
+      )
+      .eq("id", matchId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error || !data) return;
+    const row = data as {
+      home_player_id: string;
+      away_player_id: string;
+      match_days:
+        | { season_id: string }
+        | { season_id: string }[]
+        | null;
+    };
+    const md = Array.isArray(row.match_days)
+      ? row.match_days[0] ?? null
+      : row.match_days;
+    const seasonId = md?.season_id;
+    if (!seasonId) return;
+    await publishScoreChanged(sb, {
+      seasonId,
+      matchId,
+      homePlayerId: row.home_player_id,
+      awayPlayerId: row.away_player_id,
+      homeScore,
+      awayScore,
       at: new Date().toISOString(),
     });
   } catch (err) {
-    console.error("emitWalkoverConfirmed failed", err);
+    console.error("emitWalkoverScoreChange failed", err);
   }
 }
 
@@ -256,6 +362,12 @@ export async function markRefPendingWalkover(
       `markRefPendingWalkover insert failed: ${error?.message ?? "no row"}`,
     );
   }
+  // Bug 17 — fire score.changed even on the provisional ref-pending row
+  // so live overlays show the 3-0 immediately rather than waiting for
+  // admin confirm. The DB trigger already publishes standings.changed
+  // when this row mutates, but score.changed is the application-layer
+  // event most overlays subscribe to.
+  await emitWalkoverScoreChange(sb, matchId, home, away);
   return data as MatchResult;
 }
 
@@ -381,6 +493,12 @@ export async function undoWalkover(
     .from("matches")
     .update({ status: "scheduled" })
     .eq("id", matchId);
+
+  // Bug 17 — fire score.changed with 0-0 so live overlays clear the
+  // walkover scoreline immediately. This mirrors the unvoid flow's
+  // expectation that a removed result reverts the displayed score to
+  // an unplayed state.
+  await emitWalkoverScoreChange(sb, matchId, 0, 0);
 
   return data as MatchResult;
 }

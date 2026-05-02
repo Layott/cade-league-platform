@@ -268,6 +268,14 @@ export async function unvoidMatchResult(
   // `current_setting('app.current_user_id')` = args.actorUserId (set by
   // the API middleware). Reason captured above via the precheck.
   void args.actorUserId;
+
+  // Bug 17 (2026-05-01) — fire score.changed (0-0) + match.ended-equivalent
+  // so live overlays repaint when an admin un-voids a match. The DB
+  // trigger fires standings.changed when the match_results row is deleted,
+  // but score.changed is the application-layer event most overlay
+  // subscriptions key off. We publish 0-0 because the row is gone and
+  // the match is back to scheduled — there is no score to display.
+  await emitPlan51SideEffects(sb, args.matchId, "normal", 0, 0);
 }
 
 export async function confirmResult(

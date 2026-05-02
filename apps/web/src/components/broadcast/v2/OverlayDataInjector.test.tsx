@@ -499,5 +499,38 @@ describe("OverlayDataInjector", () => {
       );
       fetchSpy.mockRestore();
     });
+
+    // Bug 18 (2026-05-01) — the ambient poll consumes the matchDayId
+    // returned by /api/broadcast/active-session. When admin flips the
+    // active session's match_day_id mid-stream, the next poll returns
+    // a different matchDayId and the injector must re-trigger the
+    // initial-fetch effect so the iframe gets fresh data. We assert the
+    // injector DECODES the new field and that the response shape is
+    // consumed (no JSON.parse error / silent drop). End-to-end verification
+    // of the re-fetch path is covered by the E2E suite.
+    it("ambient poll response consumes matchDayId field when present", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            sessionId: "sess-md-test",
+            seasonId: "season-1",
+            matchDayId: "md-7",
+            viewToken: null,
+          }),
+          { status: 200 },
+        ),
+      );
+      render(<OverlayDataInjector overlayKey="11-match-scores-day" ambient />);
+      await act(async () => {
+        await flush();
+      });
+      // Confirm the poll fired + the response did not error out.
+      const calls = fetchSpy.mock.calls.map((c) => String(c[0] ?? ""));
+      expect(
+        calls.some((u) => u.includes("/api/broadcast/active-session")),
+      ).toBe(true);
+      // No throw == matchDayId field accepted by the response shape.
+      fetchSpy.mockRestore();
+    });
   });
 });

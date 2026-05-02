@@ -481,6 +481,27 @@ export default function OverlayDataInjector({
   // Without this, the initial-fetch effect would keep using the stale
   // token from the prior session and 401 against the new one.
   const [currentToken, setCurrentToken] = useState<string | undefined>(token);
+  // Bug 18 (2026-05-01) — match_day_id tracked locally so the ambient
+  // poll can detect when an admin flips the session's match_day_id
+  // mid-stream (e.g. switching from MD-1 to MD-8 via the broadcast
+  // control room's match-day selector). Bumping `matchDayChangeTick`
+  // is the trigger that forces the initial-fetch effect below to
+  // re-fire and post fresh `update` data to the iframe.
+  //
+  // Why a tick counter instead of just keying off matchDayId:
+  // most overlay endpoints DON'T accept matchDayId in their URL —
+  // they read it server-side from the session row (which we just
+  // mutated). So the URL doesn't change; only the upstream data
+  // does. A counter forces the effect to re-run regardless of URL
+  // identity. Bumping happens both:
+  //   1. ambient poll observes nextMatchDayId !== currentMatchDayId
+  //   2. control panel directly invalidates via parent props (future
+  //      hook — out of scope for this fix; ambient covers the live
+  //      OBS source case).
+  const [currentMatchDayId, setCurrentMatchDayId] = useState<string | null>(
+    null,
+  );
+  const [matchDayChangeTick, setMatchDayChangeTick] = useState<number>(0);
 
   // Sync incoming prop changes (e.g. parent re-renders with a new explicit
   // session) into local state so user-driven URL changes still take effect.
@@ -536,12 +557,14 @@ export default function OverlayDataInjector({
         const json = (await res.json()) as {
           sessionId?: string | null;
           seasonId?: string | null;
+          matchDayId?: string | null;
           viewToken?: string | null;
         };
         if (cancelled) return;
         const nextSession = json.sessionId ?? null;
         const nextSeason = json.seasonId ?? null;
         const nextToken = json.viewToken ?? null;
+        const nextMatchDay = json.matchDayId ?? null;
         // Don't blank a live overlay just because the poll briefly saw
         // null — keep the latched id. New ids overwrite; explicit session
         // termination is signalled via the `session.ended` Realtime event.
@@ -554,6 +577,21 @@ export default function OverlayDataInjector({
         if (nextToken && nextToken !== currentToken) {
           setCurrentToken(nextToken);
         }
+        // Bug 18 (2026-05-01) — when the admin switches the active
+        // session's match_day_id (via /admin/broadcast/v2/<id> match-day
+        // selector), the SAME session id stays live but its underlying
+        // matchDayId flips. The injector previously kept rendering MD-1
+        // data because the iframe URL didn't change. Bumping
+        // matchDayChangeTick forces the initial-fetch effect to re-run
+        // and post fresh data to the iframe.
+        if (nextMatchDay && nextMatchDay !== currentMatchDayId) {
+          setCurrentMatchDayId(nextMatchDay);
+          // Don't bump on the first observation when nothing was
+          // latched — the initial mount fetch already covers that.
+          if (currentMatchDayId !== null) {
+            setMatchDayChangeTick((t) => t + 1);
+          }
+        }
       } catch {
         /* network blip — try again next tick */
       }
@@ -564,7 +602,13 @@ export default function OverlayDataInjector({
       cancelled = true;
       clearInterval(handle);
     };
-  }, [ambient, currentSessionId, currentSeasonId, currentToken]);
+  }, [
+    ambient,
+    currentSessionId,
+    currentSeasonId,
+    currentToken,
+    currentMatchDayId,
+  ]);
 
   /* --------------------------------------------------------------- *
    * 0. Initial-state fetch — seed iframe with current data on mount  *
@@ -634,7 +678,19 @@ export default function OverlayDataInjector({
     return () => {
       cancelled = true;
     };
-  }, [overlayKey, currentSessionId, currentToken, iframeLoaded, active]);
+  }, [
+    overlayKey,
+    currentSessionId,
+    currentToken,
+    iframeLoaded,
+    active,
+    // Bug 18 (2026-05-01) — re-fire initial-fetch when the ambient poll
+    // notices the session's match_day_id changed mid-stream. The URL
+    // typically doesn't change (the endpoint reads matchDayId server-
+    // side from the session row) so we add a counter to force the
+    // effect to re-run.
+    matchDayChangeTick,
+  ]);
 
   /* --------------------------------------------------------------- *
    * 1a. Trigger channel — overlay:<sessionId>                        *

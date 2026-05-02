@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { publishScoreChanged } from "@/server/realtime/publishers/score_changed";
+import { publishMatchEnded } from "@/server/realtime/publishers/match_ended";
 
 export const issueSchema = z
   .object({
@@ -463,7 +465,9 @@ export async function applyForfeitMatchResult(
 ): Promise<void> {
   const { data: match, error } = await sb
     .from("matches")
-    .select("id, home_player_id, away_player_id")
+    .select(
+      "id, home_player_id, away_player_id, match_day_id, match_days:match_day_id ( season_id )",
+    )
     .eq("id", matchId)
     .single();
   if (error || !match) throw new Error(`forfeit: match ${matchId} not found`);
@@ -487,4 +491,50 @@ export async function applyForfeitMatchResult(
   );
 
   await sb.from("matches").update({ status: "forfeited" }).eq("id", matchId);
+
+  // Bug 17 (2026-05-01) — fire score.changed + match.ended on the
+  // standings channel so data-driven overlays (h2h-2/3/5, leaderboard,
+  // match-scores-day, top-scorers) repaint the moment a sanction-driven
+  // forfeit lands. The DB trigger already fires standings.changed on
+  // the match_results upsert, but app-layer overlays subscribe to the
+  // application-fired events too.
+  try {
+    const matchRow = match as {
+      home_player_id: string;
+      away_player_id: string;
+      match_days:
+        | { season_id: string }
+        | { season_id: string }[]
+        | null;
+    };
+    const md = Array.isArray(matchRow.match_days)
+      ? matchRow.match_days[0] ?? null
+      : matchRow.match_days;
+    const seasonId = md?.season_id;
+    if (seasonId) {
+      const at = new Date().toISOString();
+      await publishScoreChanged(sb, {
+        seasonId,
+        matchId,
+        homePlayerId: matchRow.home_player_id,
+        awayPlayerId: matchRow.away_player_id,
+        homeScore,
+        awayScore,
+        at,
+      });
+      await publishMatchEnded(sb, {
+        seasonId,
+        matchId,
+        homePlayerId: matchRow.home_player_id,
+        awayPlayerId: matchRow.away_player_id,
+        homeScore,
+        awayScore,
+        resultType: "forfeit",
+        at,
+      });
+    }
+  } catch (err) {
+    // Best-effort — durable record is already persisted.
+    console.error("applyForfeitMatchResult publish failed", err);
+  }
 }
