@@ -56,6 +56,8 @@ export type SquadPickerBuilderProps = {
     futbinScreenshotPath: string;
     slots: Array<{ slotIndex: number; fcdbPlayerId: string; positionInLineup: string }>;
     matchDayId?: string;
+    // Bug 10 (2026-05-01) — formation for broadcast overlay.
+    formation?: string;
   }) => Promise<void>;
   requestUploadUrlAction: (input: { extension: "png" | "jpg" | "webp" }) => Promise<{
     path: string;
@@ -474,6 +476,8 @@ export function SquadPickerBuilder({
           futbinScreenshotPath: screenshotPath,
           slots: [...starterRows, ...subRows],
           matchDayId: matchDayId ?? undefined,
+          // Bug 10 (2026-05-01) — pass picker formation through.
+          formation,
         });
       } catch (e) {
         setError((e as Error).message);

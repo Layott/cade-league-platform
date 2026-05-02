@@ -57,11 +57,17 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     // Plan 51 — read-only tournament view + report exports.
     "tournament.read",
     "tournament.export",
+    // Bug 11 (2026-05-01) — let LOC unlock players who tripped the
+    // login lockout in the field without paging an admin.
+    "users.unlock",
   ],
   idc: [
     // Plan 51 — read-only tournament view + report exports.
     "tournament.read",
     "tournament.export",
+    // Bug 11 (2026-05-01) — IDC handles match-day comms; allow them to
+    // unlock players locked out right before kickoff.
+    "users.unlock",
   ],
   // Plan 46 — refs mark attendance from /referee/attendance (migration
   // 20260510000200). attendance.edit lets them correct a prior mark.
@@ -171,3 +177,5 @@ export function hasPerm(actor: Actor, action: string): boolean {
   }
   return false;
 }
+</content>
+</invoke>

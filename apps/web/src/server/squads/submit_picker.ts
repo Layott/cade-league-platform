@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createSubmission } from "./submit";
 import { clearDraft } from "./draft";
 import { ConflictError, ValidationError } from "./errors";
+// Bug 10 (2026-05-01) — formation conversion.
+import { FORMATION_KEY_TO_LABEL, formationKeyEnum } from "./schemas";
 
 /**
  * Plan 30 — picker-flow submission helper.
@@ -45,6 +47,8 @@ export const submitPickerInputSchema = z.object({
       (v) => !v.includes("..") && !v.includes("\\"),
       "futbinScreenshotPath must not contain '..' or backslashes",
     ),
+  // Bug 10 (2026-05-01) — picker FormationKey.
+  formation: formationKeyEnum.nullable().optional(),
   slots: z.array(pickerSlotSchema).min(1).max(23),
 });
 
@@ -218,6 +222,8 @@ export async function submitPickerSquad(
 
   // 3. Delegate to Plan 10's `createSubmission` — keeps the unique-week
   //    guard, weekStartDate enforcement, and schema validation in one place.
+  // Bug 10 (2026-05-01) — convert FormationKey → label for persistence.
+  const formationLabel = v.formation ? FORMATION_KEY_TO_LABEL[v.formation] : null;
   const result = await createSubmission(
     sb,
     {
@@ -226,6 +232,7 @@ export async function submitPickerSquad(
       weekStartDate: v.weekStartDate,
       matchDayId: v.matchDayId ?? null,
       futbinScreenshotPath: v.futbinScreenshotPath,
+      formation: formationLabel,
       items,
     },
     opts,

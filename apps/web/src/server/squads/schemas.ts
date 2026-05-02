@@ -57,6 +57,15 @@ export const uploadScreenshotSchema = z.object({
   weekStartDate: ymd,
 });
 
+// Bug 10 (2026-05-01) — formation persistence (label form for overlay).
+export const formationLabelEnum = z.enum([
+  "4-3-3", "4-4-2", "4-2-3-1", "4-1-4-1", "4-1-2-1-2",
+  "4-2-2-2", "4-2-4", "4-3-1-2", "4-3-2-1", "4-4-1-1", "4-5-1",
+  "3-5-2", "3-4-3", "3-4-1-2", "3-5-1-1", "3-4-2-1", "3-1-4-2",
+  "5-3-2", "5-2-1-2", "5-4-1", "5-2-3",
+]);
+export type FormationLabel = z.infer<typeof formationLabelEnum>;
+
 export const createSubmissionSchema = z.object({
   seasonId: z.string().uuid(),
   playerId: z.string().uuid(),
@@ -76,10 +85,22 @@ export const createSubmissionSchema = z.object({
       (v) => !v.includes("..") && !v.includes("\\"),
       "futbinScreenshotPath must not contain '..' or backslashes",
     ),
+  // Bug 10 (2026-05-01) — picker formation label.
+  formation: formationLabelEnum.nullable().optional(),
   items: z.array(itemSchema).min(1).max(23),
 });
 
 export type CreateSubmissionInput = z.infer<typeof createSubmissionSchema>;
+
+// Bug 10 (2026-05-01) — server-pure key→label converter.
+export const FORMATION_KEY_TO_LABEL = {
+  "433": "4-3-3", "442": "4-4-2", "4231": "4-2-3-1", "4141": "4-1-4-1",
+  "41212": "4-1-2-1-2", "4222": "4-2-2-2", "424": "4-2-4", "4312": "4-3-1-2",
+  "4321": "4-3-2-1", "4411": "4-4-1-1", "451": "4-5-1",
+  "352": "3-5-2", "343": "3-4-3", "3412": "3-4-1-2", "3511": "3-5-1-1",
+  "3421": "3-4-2-1", "3142": "3-1-4-2",
+  "532": "5-3-2", "5212": "5-2-1-2", "541": "5-4-1", "523": "5-2-3",
+} as const satisfies Record<string, FormationLabel>;
 
 export const reviewSchema = z
   .object({

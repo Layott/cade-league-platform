@@ -79,6 +79,8 @@ export type SubmitPickerActionPayload = {
   // strip the key.
   matchDayId?: string | null;
   futbinScreenshotPath: string;
+  // Bug 10 (2026-05-01) — picker FormationKey.
+  formation?: string;
   slots: Array<{
     slotIndex: number;
     fcdbPlayerId: string;
@@ -106,6 +108,13 @@ export async function submitPickerAction(
     weekStartDate: payload.weekStartDate,
     matchDayId: payload.matchDayId ?? null,
     futbinScreenshotPath: payload.futbinScreenshotPath,
+    // Bug 10 (2026-05-01) — pass picker formation key through.
+    formation: payload.formation as
+      | "433" | "442" | "4231" | "4141" | "41212" | "4222"
+      | "424" | "4312" | "4321" | "4411" | "451"
+      | "352" | "343" | "3412" | "3511" | "3421" | "3142"
+      | "532" | "5212" | "541" | "523"
+      | undefined,
     slots: payload.slots,
   });
 

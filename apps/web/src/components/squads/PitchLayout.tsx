@@ -197,19 +197,20 @@ const FORMATIONS: Record<FormationKey, SlotPosition[]> = {
     { slotIndex: 9, label: "CAM", top: 28, left: 50 },
     { slotIndex: 10, label: "ST", top: 12, left: 50 },
   ],
-  // 4-5-1 (attacking variant — wide mids push up alongside a CAM)
+  // 4-5-1 (Bug 10 fix 2026-05-01 — true 5-man midfield, no CAM, no
+  // shape collision with 4-4-1-1).
   "451": [
     { slotIndex: 0, label: "GK", top: 92, left: 50 },
     { slotIndex: 1, label: "LB", top: 72, left: 12 },
     { slotIndex: 2, label: "CB", top: 74, left: 34 },
     { slotIndex: 3, label: "CB", top: 74, left: 66 },
     { slotIndex: 4, label: "RB", top: 72, left: 88 },
-    { slotIndex: 5, label: "LM", top: 40, left: 12 },
-    { slotIndex: 6, label: "CM", top: 52, left: 34 },
-    { slotIndex: 7, label: "CM", top: 52, left: 66 },
-    { slotIndex: 8, label: "RM", top: 40, left: 88 },
-    { slotIndex: 9, label: "CAM", top: 28, left: 50 },
-    { slotIndex: 10, label: "ST", top: 12, left: 50 },
+    { slotIndex: 5, label: "LM", top: 44, left: 10 },
+    { slotIndex: 6, label: "CM", top: 48, left: 30 },
+    { slotIndex: 7, label: "CM", top: 50, left: 50 },
+    { slotIndex: 8, label: "CM", top: 48, left: 70 },
+    { slotIndex: 9, label: "RM", top: 44, left: 90 },
+    { slotIndex: 10, label: "ST", top: 14, left: 50 },
   ],
 
   // ─── BACK-THREE ────────────────────────────────────────────────────────

@@ -4,6 +4,16 @@ import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
 import { getPlayerHeadshotUrl } from "@/lib/player-photos";
 import { weekStartThursday } from "@/lib/time";
+// Bug 10 (2026-05-01) — chemistry recompute + formation read.
+import {
+  computeChemistry,
+  type ChemistryCard,
+  type SlotFill,
+} from "@/lib/chemistry";
+import {
+  getFormationSlots,
+  type FormationKey,
+} from "@/components/squads/PitchLayout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -249,9 +259,10 @@ export async function GET(
   // `?week=`, fall back to the player's MOST RECENT submission so the
   // overlay always has something to render between submission windows.
   // The exact-week match still wins when present.
+  // Bug 10 (2026-05-01) — read stored `formation` LABEL.
   const { data: exactRaw } = await sb
     .from("squad_submissions")
-    .select("id, week_start_date, validation_status, submitted_at")
+    .select("id, week_start_date, validation_status, submitted_at, formation")
     .eq("player_id", resolvedPlayerId)
     .eq("week_start_date", weekStartDate)
     .is("deleted_at", null)
@@ -261,12 +272,13 @@ export async function GET(
     week_start_date: string;
     validation_status: string;
     submitted_at: string;
+    formation: string | null;
   };
   let submission = exactRaw as SubmissionRow | null;
   if (!submission && !requestedWeek) {
     const { data: latestRaw } = await sb
       .from("squad_submissions")
-      .select("id, week_start_date, validation_status, submitted_at")
+      .select("id, week_start_date, validation_status, submitted_at, formation")
       .eq("player_id", resolvedPlayerId)
       .is("deleted_at", null)
       .order("week_start_date", { ascending: false })
@@ -324,9 +336,14 @@ export async function GET(
   // cards with `attributes.card_image_url` populated (Kaggle / fut.gg
   // rows are kept for provenance but lack the image). 100% hit rate
   // confirmed against existing Faruk submission (2026-04-30).
+  // Bug 10 (2026-05-01) — also pull club / league / nation / alt_positions.
   type FcRow = {
     name: string;
     rating: number;
+    club: string | null;
+    league: string | null;
+    nation: string | null;
+    alt_positions: string[] | null;
     attributes: Record<string, unknown> | null;
   };
   let enrichByKey = new Map<string, FcRow>();
@@ -334,7 +351,7 @@ export async function GET(
     const namesUnique = Array.from(new Set(itemRows.map((r) => r.name)));
     const { data: fcRaw } = await sb
       .from("fc26_players")
-      .select("name, rating, attributes")
+      .select("name, rating, club, league, nation, alt_positions, attributes")
       .eq("source_dataset", "futbin.com")
       .is("deleted_at", null)
       .in("name", namesUnique);
@@ -412,10 +429,34 @@ export async function GET(
   const starting = allItems.filter((i) => i.slotIndex >= 0 && i.slotIndex <= 10);
   const subs = allItems.filter((i) => i.slotIndex >= 11 && i.slotIndex <= 22);
 
-  // Best-effort formation derivation from starting positions. Counts D/M/F
-  // based on conventional position groupings; falls back to null when fewer
-  // than 11 starters are present.
-  const formation = deriveFormation(starting);
+  // Bug 10 (2026-05-01) — formation + chemistry resolution.
+  const formation = submission.formation ?? deriveFormation(starting);
+  const formationKey: FormationKey | null =
+    submission.formation && submission.formation in FORMATION_LABEL_TO_KEY
+      ? FORMATION_LABEL_TO_KEY[submission.formation]
+      : null;
+  let chemistryTotal: number | null = null;
+  let chemistryPerSlot: number[] | null = null;
+  if (formationKey && starting.length === 11) {
+    const startingFills: SlotFill[] = getFormationSlots(formationKey).map((s) => {
+      const item = starting.find((i) => i.slotIndex === s.slotIndex) ?? null;
+      if (!item) return { card: null, positionInLineup: s.label };
+      const fc = lookup(item.name, item.rating);
+      const card: ChemistryCard = {
+        club: fc?.club ?? null,
+        league: fc?.league ?? null,
+        nation: fc?.nation ?? null,
+        position: item.position,
+        positionsAlt: fc?.alt_positions ?? [],
+        itemType: item.itemType,
+        name: item.name,
+      };
+      return { card, positionInLineup: s.label };
+    });
+    const chem = computeChemistry(startingFills, formationKey);
+    chemistryTotal = chem.totalChem;
+    chemistryPerSlot = chem.perSlot;
+  }
 
   return NextResponse.json(
     {
@@ -433,7 +474,11 @@ export async function GET(
           submittedAt: submission.submitted_at,
         },
         formation,
-        chemistry: null,
+        // Bug 10 (2026-05-01) — structured chemistry shape.
+        chemistry:
+          chemistryTotal != null
+            ? { total: chemistryTotal, perSlot: chemistryPerSlot ?? [] }
+            : null,
         starting,
         subs,
       },
@@ -443,6 +488,16 @@ export async function GET(
     { headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" } },
   );
 }
+
+// Bug 10 (2026-05-01) — inverse of FORMATION_KEY_TO_LABEL.
+const FORMATION_LABEL_TO_KEY: Record<string, FormationKey> = {
+  "4-3-3": "433", "4-4-2": "442", "4-2-3-1": "4231", "4-1-4-1": "4141",
+  "4-1-2-1-2": "41212", "4-2-2-2": "4222", "4-2-4": "424", "4-3-1-2": "4312",
+  "4-3-2-1": "4321", "4-4-1-1": "4411", "4-5-1": "451",
+  "3-5-2": "352", "3-4-3": "343", "3-4-1-2": "3412", "3-5-1-1": "3511",
+  "3-4-2-1": "3421", "3-1-4-2": "3142",
+  "5-3-2": "532", "5-2-1-2": "5212", "5-4-1": "541", "5-2-3": "523",
+};
 
 const DEF_POSITIONS = new Set(["GK", "CB", "LB", "RB", "LWB", "RWB", "SW"]);
 const MID_POSITIONS = new Set([
