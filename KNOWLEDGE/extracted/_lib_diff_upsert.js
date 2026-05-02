@@ -70,14 +70,44 @@ function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
       ? r.clubLogoUrl
       : `https://www.futbin.com${r.clubLogoUrl}`;
   }
+  // Mirror the readable club / league strings into attributes too — keeps
+  // legacy consumers that read attributes->>'club_name' working without a
+  // separate join. Top-level columns are still the source of truth for
+  // chemistry (lib/chemistry.ts reads `card.club` / `card.league`).
+  if (r.club) attrs.club_name = r.club;
+  if (r.league) attrs.league_name = r.league;
+  if (Array.isArray(r.altPositions) && r.altPositions.length > 0) {
+    attrs.alt_positions = [...r.altPositions];
+  }
   return attrs;
 }
 
-function diffFields(oldRow, newCoins, newItemType, newAttrs) {
+function diffFields(oldRow, newCoins, newItemType, newAttrs, newTop) {
   const changes = [];
   const oldAttrs = oldRow.attributes || {};
   if (oldRow.value_coins_estimate !== newCoins) changes.push("price");
   if (oldRow.item_type !== newItemType) changes.push("item_type");
+  // Top-level columns the loader now manages — chemistry calc reads these
+  // directly off `fc26_players.{club, league, alt_positions, position}` so
+  // a NULL→string transition MUST trigger a write. This is the field set
+  // that was silently NULL on every upgraded variant (icon/hero/tots/toty/
+  // rttf/special) prior to the May-2026 fix — root cause of Mr Oga's chem
+  // collapsing from a true 32/33 down to 7/33.
+  const top = newTop || {};
+  if (top.club !== undefined && (oldRow.club ?? null) !== (top.club ?? null)) {
+    changes.push("club");
+  }
+  if (top.league !== undefined && (oldRow.league ?? null) !== (top.league ?? null)) {
+    changes.push("league");
+  }
+  if (top.alt_positions !== undefined) {
+    const oldAlts = Array.isArray(oldRow.alt_positions) ? oldRow.alt_positions : [];
+    const newAlts = Array.isArray(top.alt_positions) ? top.alt_positions : [];
+    if (oldAlts.join(",") !== newAlts.join(",")) changes.push("alt_positions");
+  }
+  if (top.position !== undefined && top.position && (oldRow.position ?? null) !== top.position) {
+    changes.push("position");
+  }
   // Card portrait + frame URLs are imgix-signed
   // (`?fm=png&ixlib=...&w=51&s=<HMAC>`). The HMAC `s=` rotates when
   // Futbin re-signs the asset, even when the underlying path is
@@ -149,15 +179,33 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
   const sourceRowId = `futbin_${r.resourceId}`;
   const itemType = classifyVariant(r.variant);
 
+  // Pull the top-level columns the chemistry calc reads directly. Pre-May-
+  // 2026 the loader only wrote to `attributes` jsonb — every upgraded
+  // variant had top-level club/league/alt_positions NULL. Now the loader
+  // mirrors the readable strings into both attributes (for legacy
+  // consumers) AND top-level columns (for chemistry).
   const { data: exist } = await sb
     .from("fc26_players")
-    .select("id, value_coins_estimate, item_type, attributes")
+    .select("id, value_coins_estimate, item_type, attributes, club, league, alt_positions, position")
     .eq("source_dataset", "futbin.com")
     .eq("source_row_id", sourceRowId)
     .is("deleted_at", null)
     .maybeSingle();
 
   const newAttrs = buildAttrs(r, coinsPs, coinsPc, exist?.attributes);
+
+  // Top-level column candidates derived from the scraped row. We only
+  // write columns where we have a non-null value — never overwrite an
+  // existing populated column with NULL (defensive: scraper might miss a
+  // selector on one variant of the row, the existing value is more
+  // reliable than dropping the data).
+  const newTop = {};
+  if (r.club) newTop.club = r.club;
+  if (r.league) newTop.league = r.league;
+  if (Array.isArray(r.altPositions) && r.altPositions.length > 0) {
+    newTop.alt_positions = [...r.altPositions];
+  }
+  if (r.position) newTop.position = r.position;
 
   if (!exist) {
     await sb.from("fc26_players").insert({
@@ -170,12 +218,20 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
       item_type: itemType,
       value_coins_estimate: coins,
       attributes: newAttrs,
+      // Top-level columns chemistry reads. Insert them on first write so
+      // the row is chemistry-ready immediately — no separate backfill
+      // pass needed for newly discovered cards.
+      ...(r.club ? { club: r.club } : {}),
+      ...(r.league ? { league: r.league } : {}),
+      ...(Array.isArray(r.altPositions) && r.altPositions.length > 0
+        ? { alt_positions: r.altPositions }
+        : {}),
     });
     stats.inserted++;
     return { status: "inserted", diff: [] };
   }
 
-  const changes = diffFields(exist, coins, itemType, newAttrs);
+  const changes = diffFields(exist, coins, itemType, newAttrs, newTop);
   if (changes.length === 0) {
     // Price snapshot timestamp differs, but nothing else. Skip the write —
     // saves audit + realtime noise. Users don't see snapshot timestamps.
@@ -183,12 +239,24 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
     return { status: "unchanged", diff: [] };
   }
 
-  await sb.from("fc26_players").update({
+  // Build the UPDATE payload. Top-level chemistry columns are included
+  // ONLY when the scraper produced a fresh value AND it differs from the
+  // existing row — keeps the writes minimal + audit clean. We never
+  // null-overwrite a populated column.
+  const update = {
     value_coins_estimate: coins,
     item_type: itemType,
     attributes: newAttrs,
     updated_at: new Date().toISOString(),
-  }).eq("id", exist.id);
+  };
+  if (changes.includes("club") && newTop.club) update.club = newTop.club;
+  if (changes.includes("league") && newTop.league) update.league = newTop.league;
+  if (changes.includes("alt_positions") && newTop.alt_positions) {
+    update.alt_positions = newTop.alt_positions;
+  }
+  if (changes.includes("position") && newTop.position) update.position = newTop.position;
+
+  await sb.from("fc26_players").update(update).eq("id", exist.id);
   stats.updated++;
   return { status: "updated", diff: changes };
 }

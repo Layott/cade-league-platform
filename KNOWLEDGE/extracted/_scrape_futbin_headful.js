@@ -146,14 +146,38 @@ async function extractListPage(page) {
       const variantM = cardBgSrc.match(/\/cards\/[^/]+\/([^.?]+)\.(?:png|webp|jpg)/i);
       const variant = variantM ? variantM[1].replace(/_/g, "-") : null;
 
-      // Position — Futbin list page sometimes lacks a dedicated position column.
-      // When present it's under td.table-position or inside the card's alt-pos row.
-      const positionText = row.querySelector("td.table-position, .table-position-pos, .playercard-s-26-pos")?.textContent?.trim() || null;
+      // Position + alt-positions — `td.table-pos > .table-pos-main span`
+      // holds the primary chip ("ST"); `td.table-pos > .xs-font.text-faded
+      // .bold` holds a comma-separated alts list ("CAM, RW"). Pre-May-2026
+      // the scraper read `td.table-position` (not present on the modern
+      // list) and missed alts entirely → top-level alt_positions stayed
+      // NULL on every Futbin row, breaking chemistry's positional gate.
+      const posTd = row.querySelector("td.table-pos");
+      const primaryPos = posTd?.querySelector(".table-pos-main span")?.textContent?.trim() || null;
+      const altPosText = posTd?.querySelector(".xs-font.text-faded.bold")?.textContent?.trim() || "";
+      const altPositions = altPosText
+        ? altPosText.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const positionText = primaryPos
+        || row.querySelector("td.table-position, .table-position-pos, .playercard-s-26-pos")?.textContent?.trim()
+        || null;
 
       // Nation + club from icon <img alt>
       const nationImg = row.querySelector("img[alt='Nation']");
       const clubImg = row.querySelector("img[alt='Club'], img[alt*='Club']");
       // Futbin stores nation/club names on the card anchor title attribute in some views — fall back blank.
+
+      // Readable club + league NAMES — Futbin exposes these via the
+      // `title` attribute on icon <img> tags inside the
+      // `td.table-name .table-player-sub-info` block. Same DOM for ALL
+      // variants (normal/icon/hero/tots/toty/rttf/special). Pre-May-2026
+      // these were never extracted; chem calc reads top-level
+      // `fc26_players.{club, league}`, so most upgraded variants
+      // contributed zero chem points.
+      const clubAnchor = row.querySelector("a.table-player-club img[title]");
+      const leagueAnchor = row.querySelector("a.table-player-league img[title]");
+      const club = clubAnchor?.getAttribute("title")?.trim() || null;
+      const league = leagueAnchor?.getAttribute("title")?.trim() || null;
 
       // Futbin-internal IDs — CDN icons are keyed by Futbin's internal
       // registry. Capture the ID from the path; names are resolved via
@@ -183,6 +207,9 @@ async function extractListPage(page) {
         name,
         rating,
         position: positionText,
+        altPositions,
+        club,
+        league,
         variant,
         pricePs,
         pricePc,
@@ -222,7 +249,7 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
 
     const { data: exist } = await sb
       .from("fc26_players")
-      .select("id, attributes, item_type")
+      .select("id, attributes, item_type, club, league, alt_positions, position")
       .eq("source_dataset", "futbin.com")
       .eq("source_row_id", sourceRowId)
       .is("deleted_at", null)
@@ -250,6 +277,15 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     if (r.nationFlagUrl) attrs.nation_flag_url = r.nationFlagUrl.startsWith("http") ? r.nationFlagUrl : `https://www.futbin.com${r.nationFlagUrl}`;
     if (r.leagueFlagUrl) attrs.league_logo_url = r.leagueFlagUrl.startsWith("http") ? r.leagueFlagUrl : `https://www.futbin.com${r.leagueFlagUrl}`;
     if (r.clubLogoUrl) attrs.club_logo_url = r.clubLogoUrl.startsWith("http") ? r.clubLogoUrl : `https://www.futbin.com${r.clubLogoUrl}`;
+    // Mirror readable club + league strings into attributes too — keeps
+    // legacy consumers reading attributes->>'club_name' working without
+    // a separate join. Top-level columns are the source of truth for
+    // chemistry (lib/chemistry.ts reads `card.club` / `card.league`).
+    if (r.club) attrs.club_name = r.club;
+    if (r.league) attrs.league_name = r.league;
+    if (Array.isArray(r.altPositions) && r.altPositions.length > 0) {
+      attrs.alt_positions = [...r.altPositions];
+    }
 
     // item_type bucket from variant string.
     const vLower = (r.variant || "").toLowerCase();
@@ -263,13 +299,35 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
     else if (!/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/.test(vLower)) itemType = "special";
 
     if (exist) {
-      await sb.from("fc26_players")
-        .update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() })
-        .eq("id", exist.id);
+      // Top-level chemistry columns — only write when scraper produced a
+      // non-null value AND it differs from the existing row. Defensive:
+      // never overwrite a populated column with NULL (scraper might miss
+      // a selector on one variant; the existing value is more reliable
+      // than dropping the data).
+      const update = {
+        value_coins_estimate: coins,
+        item_type: itemType,
+        attributes: attrs,
+        updated_at: new Date().toISOString(),
+      };
+      if (r.club && (exist.club ?? null) !== r.club) update.club = r.club;
+      if (r.league && (exist.league ?? null) !== r.league) update.league = r.league;
+      if (Array.isArray(r.altPositions) && r.altPositions.length > 0) {
+        const oldAlts = Array.isArray(exist.alt_positions) ? exist.alt_positions : [];
+        if (oldAlts.join(",") !== r.altPositions.join(",")) {
+          update.alt_positions = r.altPositions;
+        }
+      }
+      if (r.position && r.position !== "ST" && (exist.position ?? null) !== r.position) {
+        update.position = r.position;
+      }
+      await sb.from("fc26_players").update(update).eq("id", exist.id);
       stats.updated++;
     } else {
       // Always insert as its own futbin.com row. No slug+rating merge —
       // Futbin is the source of truth; Kaggle/fut.gg rows stay untouched.
+      // Top-level chemistry columns inserted on first write so the row
+      // is chemistry-ready immediately — no separate backfill pass.
       await sb.from("fc26_players").insert({
         source_dataset: "futbin.com",
         source_row_id: sourceRowId,
@@ -280,6 +338,11 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
         item_type: itemType,
         value_coins_estimate: coins,
         attributes: attrs,
+        ...(r.club ? { club: r.club } : {}),
+        ...(r.league ? { league: r.league } : {}),
+        ...(Array.isArray(r.altPositions) && r.altPositions.length > 0
+          ? { alt_positions: r.altPositions }
+          : {}),
       });
       inserted.push({ name: r.name, rating: r.rating, variant: r.variant });
       stats.inserted++;

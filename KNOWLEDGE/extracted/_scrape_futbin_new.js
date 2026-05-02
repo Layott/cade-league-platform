@@ -115,9 +115,35 @@ async function extract(page) {
         return m ? parseInt(m[1], 10) : null;
       };
 
+      // Readable club + league NAMES — Futbin exposes these via the
+      // `title` attribute on the icon <img> tags inside the
+      // `td.table-name .table-player-sub-info` block. Same DOM for ALL
+      // variants (normal/icon/hero/tots/toty/rttf/special) so this single
+      // selector pulls everything. Pre-May-2026 the scrapers only stored
+      // numeric `futbin_*_id` and skipped the human-readable names — chem
+      // calc went off these top-level strings, so most upgraded variants
+      // contributed zero chem points.
+      const clubAnchor = row.querySelector("a.table-player-club img[title]");
+      const leagueAnchor = row.querySelector("a.table-player-league img[title]");
+      const club = clubAnchor?.getAttribute("title")?.trim() || null;
+      const league = leagueAnchor?.getAttribute("title")?.trim() || null;
+
+      // Primary + alt positions — `td.table-pos > .table-pos-main span`
+      // is the primary; `td.table-pos > .xs-font.text-faded.bold` is a
+      // comma-separated alts list ("CAM, RW") shown beneath. Pre-May-2026
+      // the scraper read `td.table-position` (a column that doesn't
+      // exist on the modern list) and missed alts entirely.
+      const posTd = row.querySelector("td.table-pos");
+      const primaryPos = posTd?.querySelector(".table-pos-main span")?.textContent?.trim() || null;
+      const altPosText = posTd?.querySelector(".xs-font.text-faded.bold")?.textContent?.trim() || "";
+      const altPositions = altPosText
+        ? altPosText.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+
       out.push({
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
-        position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
+        position: primaryPos || row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
+        altPositions,
         variant: variantM ? variantM[1].replace(/_/g, "-") : null,
         pricePs, pricePc, stats,
         weakFoot: intText("td.table-weak-foot"),
@@ -127,6 +153,8 @@ async function extract(page) {
         cardBgUrl: cardBgSrc || null,
         // Kept for debug — show raw string even when the /cards/ regex misses.
         cardBgRaw: cardBgSrc || null,
+        club,
+        league,
         nationId: pathId(nationImg?.getAttribute("src")),
         leagueId: pathId(leagueImg?.getAttribute("src")),
         clubId: pathId(clubImg?.getAttribute("src")),

@@ -106,9 +106,32 @@ async function extract(page) {
         const m = (src || "").match(/\/img\/(?:nation|league|clubs)\/(?:dark\/|light\/)?(\d+)\.(?:png|webp|jpg)/i);
         return m ? parseInt(m[1], 10) : null;
       };
+
+      // Readable club + league NAMES — Futbin exposes these via the
+      // `title` attribute on icon <img> tags inside the
+      // `td.table-name .table-player-sub-info` block. Same DOM for ALL
+      // variants (normal/icon/hero/tots/toty/rttf/special). Pre-May-2026
+      // the scraper only stored numeric ids; chem calc reads top-level
+      // text, so most upgraded variants contributed zero chem points.
+      const clubAnchor = row.querySelector("a.table-player-club img[title]");
+      const leagueAnchor = row.querySelector("a.table-player-league img[title]");
+      const club = clubAnchor?.getAttribute("title")?.trim() || null;
+      const league = leagueAnchor?.getAttribute("title")?.trim() || null;
+
+      // Primary + alt positions — `td.table-pos > .table-pos-main span`
+      // is the primary; `td.table-pos > .xs-font.text-faded.bold` is a
+      // comma-separated alts list ("CAM, RW") shown beneath.
+      const posTd = row.querySelector("td.table-pos");
+      const primaryPos = posTd?.querySelector(".table-pos-main span")?.textContent?.trim() || null;
+      const altPosText = posTd?.querySelector(".xs-font.text-faded.bold")?.textContent?.trim() || "";
+      const altPositions = altPosText
+        ? altPosText.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+
       out.push({
         resourceId: hrefM[1], slug: hrefM[2], name, rating,
-        position: row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
+        position: primaryPos || row.querySelector("td.table-position, .playercard-s-26-pos")?.textContent?.trim() || null,
+        altPositions,
         variant: variantM ? variantM[1].replace(/_/g, "-") : null,
         pricePs, pricePc, stats,
         weakFoot: intText("td.table-weak-foot"),
@@ -116,6 +139,8 @@ async function extract(page) {
         metaTag: row.querySelector(".futbin-rating-tag")?.textContent?.trim() || null,
         cardImageUrl: cardImgEl?.getAttribute("src") || null,
         cardBgUrl: cardBgSrc || null,
+        club,
+        league,
         nationId: pathId(nationImg?.getAttribute("src")),
         leagueId: pathId(leagueImg?.getAttribute("src")),
         clubId: pathId(clubImg?.getAttribute("src")),
