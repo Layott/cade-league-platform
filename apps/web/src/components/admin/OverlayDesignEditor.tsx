@@ -2240,6 +2240,44 @@ function TextElementEditorRow({
             </select>
           </div>
           <div className="space-y-1">
+            <label className={labelStyle}>Letter spacing (em)</label>
+            <input
+              type="number"
+              min={-0.5}
+              max={1}
+              step={0.01}
+              value={row.letterSpacing ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  letterSpacing:
+                    e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              placeholder="0.10"
+              className={inputStyle}
+              data-testid={`text-row-${row.elementId}-letter-spacing`}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Line height</label>
+            <input
+              type="number"
+              min={0.5}
+              max={3}
+              step={0.05}
+              value={row.lineHeight ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  lineHeight:
+                    e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              placeholder="1.00"
+              className={inputStyle}
+              data-testid={`text-row-${row.elementId}-line-height`}
+            />
+          </div>
+          <div className="space-y-1">
             <label className={labelStyle}>Pos X</label>
             <input
               type="number"
