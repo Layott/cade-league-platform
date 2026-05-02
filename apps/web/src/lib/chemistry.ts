@@ -104,6 +104,86 @@ function norm(s: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+/**
+ * EA FC 26 league-family map — collapses men's + women's editions of the
+ * same competition (and seasonal rebrands) into a single family key for
+ * tier-link counting. Verified 2026-05-02 against Futbin chemistry totals
+ * (Adefola squad audit: -5 delta vs Futbin closed when Premier League ↔
+ * Barclays WSL and Ligue 1 ↔ D1 Arkema were grouped).
+ *
+ * Sources:
+ *   - operationsports.com FC 26 chemistry guide
+ *   - fifauteam.com FC 26 chemistry rules
+ *   - empirical Futbin squad-builder totals
+ *   - Wikipedia / FFF.fr for sponsor-rebrand confirmations
+ *     (Serie A TIM → Serie A Enilive 2024; D1 Arkema → Arkema Première
+ *     Ligue 2024; Liga F → Liga F Moeve 2024)
+ *
+ * Keys are LOWERCASED league strings (matching `norm()`); values are the
+ * canonical family slug. League names not in the map default to themselves
+ * (each unmapped league is its own family — handled in `getLeagueFamily`).
+ */
+export const LEAGUE_FAMILIES: Record<string, string> = {
+  // ─── England ────────────────────────────────────────────────────────────
+  "premier league": "fam-eng-top",
+  "barclays wsl": "fam-eng-top",
+  // ─── Italy ──────────────────────────────────────────────────────────────
+  // Serie A TIM (legacy sponsor) ≡ Serie A Enilive (current). Same league.
+  "serie a tim": "fam-ita-top",
+  "serie a enilive": "fam-ita-top",
+  // Italian women's top flight.
+  "calcio a femminile": "fam-ita-top",
+  // ─── France ─────────────────────────────────────────────────────────────
+  "ligue 1 mcdonald's": "fam-fra-top",
+  // D1 Arkema → Arkema Première Ligue (rebrand 2024). Both DB strings live.
+  "d1 arkema": "fam-fra-top",
+  "arkema pl": "fam-fra-top",
+  // ─── Germany ────────────────────────────────────────────────────────────
+  // Bundesliga + Frauen-Bundesliga (no Frauen entry in current FCDB; kept
+  // as singleton family for forward-compat).
+  bundesliga: "fam-ger-top",
+  // ─── Spain ──────────────────────────────────────────────────────────────
+  "laliga ea sports": "fam-esp-top",
+  // Liga F → Liga F Moeve (sponsor rebrand 2024). Same league.
+  "liga f": "fam-esp-top",
+  "liga f moeve": "fam-esp-top",
+  // ─── Netherlands ────────────────────────────────────────────────────────
+  eredivisie: "fam-ned-top",
+  "nederland vrouwen liga": "fam-ned-top",
+  // ─── Portugal ───────────────────────────────────────────────────────────
+  "liga portugal": "fam-por-top",
+  "liga portugal feminino": "fam-por-top",
+  // ─── Switzerland ────────────────────────────────────────────────────────
+  // Brack Super League ≡ Swiss Super League (sponsor rebrand). Plus women's.
+  "swiss super league": "fam-sui-top",
+  "brack super league": "fam-sui-top",
+  "schweizer damen liga": "fam-sui-top",
+  // ─── Czech Republic ─────────────────────────────────────────────────────
+  "česká liga": "fam-cze-top",
+  "ceska liga žen": "fam-cze-top",
+  // ─── Scotland ───────────────────────────────────────────────────────────
+  // "Scottish Prem" + "Scottish Premiership" appear as separate strings in
+  // the FCDB DISTINCT list — same competition, scrape-pass naming variance.
+  "scottish prem": "fam-sco-top",
+  "scottish premiership": "fam-sco-top",
+  "scottish women's league": "fam-sco-top",
+  // ─── Sweden ─────────────────────────────────────────────────────────────
+  // Allsvenskan (men) ≡ Sverige Liga (FCDB string variant).
+  allsvenskan: "fam-swe-top",
+  "sverige liga": "fam-swe-top",
+};
+
+/**
+ * Resolve a league string to its chemistry family key. Unknown leagues
+ * default to their own normalized name (each unmapped league is its own
+ * family). NULL / empty input returns NULL.
+ */
+export function getLeagueFamily(league: string | null | undefined): string | null {
+  const key = norm(league);
+  if (!key) return null;
+  return LEAGUE_FAMILIES[key] ?? key;
+}
+
 function pickTier(
   count: number,
   table: readonly { min: number; pts: number }[],
@@ -148,7 +228,13 @@ function buildContributions(cards: ChemistryCard[]): LinkContributions {
     const isHero = itemType === "hero";
 
     const clubKey = norm(c.club);
-    const leagueKey = norm(c.league);
+    // Bug fix 2026-05-02: collapse men's + women's editions and seasonal
+    // rebrands of the same competition into a single league family key for
+    // tier counting (FC 26 rule). E.g. Premier League ↔ Barclays WSL,
+    // Serie A TIM ↔ Serie A Enilive, D1 Arkema ↔ Arkema PL. Unknown
+    // leagues default to themselves (each unmapped league is its own
+    // family). Closed -5 delta vs Futbin on Adefola's squad audit.
+    const leagueKey = getLeagueFamily(c.league);
     const nationKey = norm(c.nation);
 
     // Icons: +1 club/nation, league = "any" (tracked as iconCount below).
@@ -205,7 +291,8 @@ function scoreSlot(
   }
 
   const clubKey = norm(card.club);
-  const leagueKey = norm(card.league);
+  // Bug fix 2026-05-02: resolve to family key (matches `buildContributions`).
+  const leagueKey = getLeagueFamily(card.league);
   const nationKey = norm(card.nation);
 
   const clubCount = clubKey ? (pool.clubs.get(clubKey) ?? 0) : 0;

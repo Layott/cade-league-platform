@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   calculateChemistry,
   computeChemistry,
+  getLeagueFamily,
   isInPosition,
+  LEAGUE_FAMILIES,
   slotsToSlotFills,
   TIER_THRESHOLDS,
   type ChemistryCard,
@@ -548,6 +550,343 @@ describe("computeChemistry", () => {
     }));
     const r = computeChemistry(starting);
     expect(r.totalChem).toBeLessThanOrEqual(33);
+  });
+});
+
+// ─── getLeagueFamily / LEAGUE_FAMILIES (FC 26 league grouping) ────────────
+
+describe("getLeagueFamily", () => {
+  it("returns null for null/empty input", () => {
+    expect(getLeagueFamily(null)).toBeNull();
+    expect(getLeagueFamily(undefined)).toBeNull();
+    expect(getLeagueFamily("")).toBeNull();
+    expect(getLeagueFamily("   ")).toBeNull();
+  });
+
+  it("normalizes case + whitespace before lookup", () => {
+    expect(getLeagueFamily("Premier League")).toBe("fam-eng-top");
+    expect(getLeagueFamily("PREMIER LEAGUE")).toBe("fam-eng-top");
+    expect(getLeagueFamily("  premier league  ")).toBe("fam-eng-top");
+  });
+
+  it("groups Premier League and Barclays WSL into the same family", () => {
+    expect(getLeagueFamily("Premier League")).toBe(
+      getLeagueFamily("Barclays WSL"),
+    );
+  });
+
+  it("groups Serie A men's + women's + sponsor rebrands into one family", () => {
+    const fam = getLeagueFamily("Serie A TIM");
+    expect(fam).toBe("fam-ita-top");
+    expect(getLeagueFamily("Serie A Enilive")).toBe(fam);
+    expect(getLeagueFamily("Calcio A Femminile")).toBe(fam);
+  });
+
+  it("groups Ligue 1 + D1 Arkema + Arkema PL into one family", () => {
+    const fam = getLeagueFamily("Ligue 1 McDonald's");
+    expect(fam).toBe("fam-fra-top");
+    expect(getLeagueFamily("D1 Arkema")).toBe(fam);
+    expect(getLeagueFamily("Arkema PL")).toBe(fam);
+  });
+
+  it("groups LALIGA EA SPORTS + Liga F variants", () => {
+    const fam = getLeagueFamily("LALIGA EA SPORTS");
+    expect(fam).toBe("fam-esp-top");
+    expect(getLeagueFamily("Liga F")).toBe(fam);
+    expect(getLeagueFamily("Liga F Moeve")).toBe(fam);
+  });
+
+  it("keeps genuinely different competitions in separate families", () => {
+    expect(getLeagueFamily("Bundesliga")).not.toBe(
+      getLeagueFamily("Ligue 1 McDonald's"),
+    );
+    expect(getLeagueFamily("Premier League")).not.toBe(
+      getLeagueFamily("Serie A TIM"),
+    );
+    expect(getLeagueFamily("LALIGA EA SPORTS")).not.toBe(
+      getLeagueFamily("Premier League"),
+    );
+  });
+
+  it("unmapped league becomes its own family (its normalized name)", () => {
+    const fam = getLeagueFamily("Some Unmapped Liga");
+    expect(fam).toBe("some unmapped liga");
+    // And two unmapped strings stay distinct.
+    expect(getLeagueFamily("Other Unmapped Liga")).not.toBe(fam);
+  });
+});
+
+describe("LEAGUE_FAMILIES map", () => {
+  it("includes the high-volume FC 26 men's/women's pairs", () => {
+    // English top flight
+    expect(LEAGUE_FAMILIES["premier league"]).toBe(
+      LEAGUE_FAMILIES["barclays wsl"],
+    );
+    // French top flight + women's rebrand
+    expect(LEAGUE_FAMILIES["ligue 1 mcdonald's"]).toBe(
+      LEAGUE_FAMILIES["d1 arkema"],
+    );
+    // Italian top flight + sponsor rebrand
+    expect(LEAGUE_FAMILIES["serie a tim"]).toBe(
+      LEAGUE_FAMILIES["serie a enilive"],
+    );
+  });
+});
+
+describe("computeChemistry — league-family grouping", () => {
+  // Build 11 cards split into mixed-gender top-flight English so the league
+  // family rule pushes the league count above the next tier threshold.
+  it("Premier League + Barclays WSL count toward the SAME tier (count = 5 → 2 league pts)", () => {
+    const labels = LINEUP_433;
+    // 3 Premier League + 2 Barclays WSL, ALL DISTINCT clubs + nations so
+    // ONLY league grouping can drive points (no club, no nation links).
+    // Plus 6 dummies so the squad has 11 starters.
+    const pl = (i: number, label: string) =>
+      mk({
+        league: "Premier League",
+        club: `PLC${i}`,
+        nation: `PLN${i}`,
+        position: label,
+      });
+    const wsl = (i: number, label: string) =>
+      mk({
+        league: "Barclays WSL",
+        club: `WSLC${i}`,
+        nation: `WSLN${i}`,
+        position: label,
+      });
+    const dummy = (i: number, label: string) =>
+      mk({
+        league: `OtherLeague${i}`,
+        club: `OtherC${i}`,
+        nation: `OtherN${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      pl(0, labels[0]),
+      pl(1, labels[1]),
+      pl(2, labels[2]),
+      wsl(3, labels[3]),
+      wsl(4, labels[4]),
+      dummy(5, labels[5]),
+      dummy(6, labels[6]),
+      dummy(7, labels[7]),
+      dummy(8, labels[8]),
+      dummy(9, labels[9]),
+      dummy(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Family count = 3 + 2 = 5 → tier ≥5 → 2 league pts each.
+    // No club, no nation links → slot chem = 2 for the 5 family cards.
+    for (let i = 0; i < 5; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    // Dummies → 0.
+    for (let i = 5; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+    expect(r.totalChem).toBe(5 * 2);
+  });
+
+  it("Serie A TIM + Calcio A Femminile (women's Italian) count together", () => {
+    const labels = LINEUP_433;
+    const tim = (i: number, label: string) =>
+      mk({
+        league: "Serie A TIM",
+        club: `TIMC${i}`,
+        nation: `TIMN${i}`,
+        position: label,
+      });
+    const fem = (i: number, label: string) =>
+      mk({
+        league: "Calcio A Femminile",
+        club: `FEMC${i}`,
+        nation: `FEMN${i}`,
+        position: label,
+      });
+    const dummy = (i: number, label: string) =>
+      mk({
+        league: `D${i}`,
+        club: `DC${i}`,
+        nation: `DN${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      tim(0, labels[0]),
+      tim(1, labels[1]),
+      tim(2, labels[2]),
+      fem(3, labels[3]),
+      fem(4, labels[4]),
+      fem(5, labels[5]),
+    ];
+    while (cards.length < 11) cards.push(dummy(cards.length, labels[cards.length]));
+
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Family count = 6 → tier ≥5 → 2 league pts.
+    for (let i = 0; i < 6; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+  });
+
+  it("Ligue 1 McDonald's + D1 Arkema → same family", () => {
+    const labels = LINEUP_433;
+    const ligue = (i: number, label: string) =>
+      mk({
+        league: "Ligue 1 McDonald's",
+        club: `LC${i}`,
+        nation: `LN${i}`,
+        position: label,
+      });
+    const arkema = (i: number, label: string) =>
+      mk({
+        league: "D1 Arkema",
+        club: `AC${i}`,
+        nation: `AN${i}`,
+        position: label,
+      });
+    const dummy = (i: number, label: string) =>
+      mk({
+        league: `D${i}`,
+        club: `DC${i}`,
+        nation: `DN${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      ligue(0, labels[0]),
+      ligue(1, labels[1]),
+      ligue(2, labels[2]),
+      arkema(3, labels[3]),
+      arkema(4, labels[4]),
+    ];
+    while (cards.length < 11) cards.push(dummy(cards.length, labels[cards.length]));
+
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Family count 5 → tier ≥5 → 2 league pts.
+    for (let i = 0; i < 5; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+  });
+
+  it("Bundesliga + Ligue 1 stay in SEPARATE families", () => {
+    const labels = LINEUP_433;
+    const buli = (i: number, label: string) =>
+      mk({
+        league: "Bundesliga",
+        club: `BC${i}`,
+        nation: `BN${i}`,
+        position: label,
+      });
+    const ligue = (i: number, label: string) =>
+      mk({
+        league: "Ligue 1 McDonald's",
+        club: `LC${i}`,
+        nation: `LN${i}`,
+        position: label,
+      });
+    const cards: ChemistryCard[] = [];
+    // 3 Buli + 3 Ligue 1 + 5 dummies. NEITHER family hits tier 1 (≥3) on
+    // its own with 3 cards each, so we need to confirm they don't share.
+    // We use 2 of each + some non-family fills to fall just below the
+    // tier-1 threshold of 3.
+    cards.push(buli(0, labels[0]));
+    cards.push(buli(1, labels[1]));
+    cards.push(ligue(2, labels[2]));
+    cards.push(ligue(3, labels[3]));
+    while (cards.length < 11) {
+      const i = cards.length;
+      cards.push(
+        mk({
+          league: `Other${i}`,
+          club: `OC${i}`,
+          nation: `ON${i}`,
+          position: labels[i],
+        }),
+      );
+    }
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Buli count = 2 → below tier 1 (≥3) → 0 league pts.
+    expect(r.perSlot[0]).toBe(0);
+    expect(r.perSlot[1]).toBe(0);
+    // Ligue 1 count = 2 → 0 too.
+    expect(r.perSlot[2]).toBe(0);
+    expect(r.perSlot[3]).toBe(0);
+    // Sanity: total = 0 (no other links).
+    expect(r.totalChem).toBe(0);
+  });
+
+  it("seasonal sponsor rebrand: Serie A TIM ≡ Serie A Enilive", () => {
+    const labels = LINEUP_433;
+    const cards: ChemistryCard[] = [];
+    // 2 cards "Serie A TIM" + 1 card "Serie A Enilive" → effective
+    // count = 3 → tier 1 (≥3 → 1 league pt). All distinct clubs/nations
+    // so league is the only contributor.
+    cards.push(
+      mk({
+        league: "Serie A TIM",
+        club: "TC1",
+        nation: "TN1",
+        position: labels[0],
+      }),
+    );
+    cards.push(
+      mk({
+        league: "Serie A TIM",
+        club: "TC2",
+        nation: "TN2",
+        position: labels[1],
+      }),
+    );
+    cards.push(
+      mk({
+        league: "Serie A Enilive",
+        club: "EC1",
+        nation: "EN1",
+        position: labels[2],
+      }),
+    );
+    while (cards.length < 11) {
+      const i = cards.length;
+      cards.push(
+        mk({
+          league: `Z${i}`,
+          club: `ZC${i}`,
+          nation: `ZN${i}`,
+          position: labels[i],
+        }),
+      );
+    }
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+    // Family count 3 → ≥3 → 1 league pt for each Serie A* card.
+    expect(r.perSlot[0]).toBe(1);
+    expect(r.perSlot[1]).toBe(1);
+    expect(r.perSlot[2]).toBe(1);
   });
 });
 
