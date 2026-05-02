@@ -354,6 +354,7 @@ export async function GET(
     club: string | null;
     league: string | null;
     nation: string | null;
+    position: string | null;
     alt_positions: string[] | null;
     attributes: Record<string, unknown> | null;
   };
@@ -362,7 +363,7 @@ export async function GET(
     const namesUnique = Array.from(new Set(itemRows.map((r) => r.name)));
     const { data: fcRaw } = await sb
       .from("fc26_players")
-      .select("name, rating, club, league, nation, alt_positions, attributes")
+      .select("name, rating, club, league, nation, position, alt_positions, attributes")
       .eq("source_dataset", "futbin.com")
       .is("deleted_at", null)
       .in("name", namesUnique);
@@ -453,23 +454,48 @@ export async function GET(
       : null;
   let chemistryTotal: number | null = null;
   let chemistryPerSlot: number[] | null = null;
-  if (formationKey && starting.length === 11) {
-    const startingFills: SlotFill[] = getFormationSlots(formationKey).map((s) => {
-      const item = starting.find((i) => i.slotIndex === s.slotIndex) ?? null;
-      if (!item) return { card: null, positionInLineup: s.label };
-      const fc = lookup(item.name, item.rating);
-      const card: ChemistryCard = {
-        club: fc?.club ?? null,
-        league: fc?.league ?? null,
-        nation: fc?.nation ?? null,
-        position: item.position,
-        positionsAlt: fc?.alt_positions ?? [],
-        itemType: item.itemType,
-        name: item.name,
-      };
-      return { card, positionInLineup: s.label };
-    });
-    const chem = computeChemistry(startingFills, formationKey);
+  if (starting.length === 11) {
+    // Bug fix 2026-05-02: use the PLAYER'S OWN slot labels (from
+    // squad_player_items.position, written by the picker at submit time)
+    // as `positionInLineup`, not the formation map's slot labels. 12 of
+    // 13 legacy submissions have `submission.formation = NULL` so
+    // `deriveFormation()` had to guess — and often guessed a formation
+    // whose slot labels didn't match what the player actually picked.
+    // E.g. picker wrote slot 5 as "LM" (player's 4-5-1) but derived
+    // 4-3-3 makes slot 5 a "CM"; the chem calc compared the card's
+    // primary against "CM" and marked Schweinsteiger CM (alts CDM/LM)
+    // out of position when in reality the player put him at his alt.
+    //
+    // Also fix `position` to use the card's CANONICAL primary
+    // (fc.position) rather than the slot label, so the in-position gate
+    // is `fc.position === slot || fc.alt_positions.includes(slot)` per
+    // FC26 rules.
+    const startingFills: SlotFill[] = starting
+      .slice()
+      .sort((a, b) => a.slotIndex - b.slotIndex)
+      .map((item) => {
+        const fc = lookup(item.name, item.rating);
+        const card: ChemistryCard = {
+          club: fc?.club ?? null,
+          league: fc?.league ?? null,
+          nation: fc?.nation ?? null,
+          // Canonical primary from fc26_players (fallback to slot label
+          // for legacy rows where fc lookup misses).
+          position: fc?.position ?? item.position,
+          positionsAlt: fc?.alt_positions ?? [],
+          itemType: item.itemType,
+          name: item.name,
+        };
+        return { card, positionInLineup: item.position };
+      });
+    // Pass any FormationKey for the calc — chem doesn't depend on
+    // formation slots once we've already resolved positionInLineup per
+    // card. Default to derived key when available; arbitrary "433"
+    // fallback when not.
+    const chem = computeChemistry(
+      startingFills,
+      formationKey ?? "433",
+    );
     chemistryTotal = chem.totalChem;
     chemistryPerSlot = chem.perSlot;
   }
