@@ -1,0 +1,450 @@
+/**
+ * Pure formation data + helpers, no "use client". Imported by
+ * PitchLayout (client) AND by Server Components (page.tsx, broadcast endpoints).
+ * Bug fix 2026-05-02: previously co-located in PitchLayout.tsx which carries
+ * 'use client'; importing FORMATION_KEYS / getFormationSlots into a Server
+ * Component left them as client references — runtime threw
+ * 'TypeError: q.FORMATION_KEYS' on /player/squad?...&edit=1.
+ */
+
+export type FormationKey =
+  // Back-four
+  | "433"
+  | "442"
+  | "4231"
+  | "4141"
+  | "41212"
+  | "4222"
+  | "424"
+  | "4312"
+  | "4321"
+  | "4411"
+  | "451"
+  // Back-three
+  | "352"
+  | "343"
+  | "3412"
+  | "3511"
+  | "3421"
+  | "3142"
+  // Back-five
+  | "532"
+  | "5212"
+  | "541"
+  | "523";
+
+export type SlotPosition = {
+  slotIndex: number;
+  label: string; // ST, LM, etc.
+  top: number; // 0-100
+  left: number; // 0-100
+};
+
+// 0-based slotIndex mapping. GK = 0 always; defenders cluster at the back
+// (top ~70-92), midfielders in the middle band (top ~32-58), attackers up
+// top (top ~10-24). Shape-per-formation below; every entry has 11 slots,
+// every slot has a non-empty label, and every (top,left) pair is unique
+// within that formation (asserted by the unit tests).
+export const FORMATIONS: Record<FormationKey, SlotPosition[]> = {
+  // ─── BACK-FOUR ─────────────────────────────────────────────────────────
+  "433": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CM", top: 48, left: 22 },
+    { slotIndex: 6, label: "CM", top: 52, left: 50 },
+    { slotIndex: 7, label: "CM", top: 48, left: 78 },
+    { slotIndex: 8, label: "LW", top: 20, left: 16 },
+    { slotIndex: 9, label: "ST", top: 14, left: 50 },
+    { slotIndex: 10, label: "RW", top: 20, left: 84 },
+  ],
+  "442": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "LM", top: 48, left: 12 },
+    { slotIndex: 6, label: "CM", top: 50, left: 36 },
+    { slotIndex: 7, label: "CM", top: 50, left: 64 },
+    { slotIndex: 8, label: "RM", top: 48, left: 88 },
+    { slotIndex: 9, label: "ST", top: 16, left: 36 },
+    { slotIndex: 10, label: "ST", top: 16, left: 64 },
+  ],
+  "4231": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CDM", top: 56, left: 36 },
+    { slotIndex: 6, label: "CDM", top: 56, left: 64 },
+    { slotIndex: 7, label: "LM", top: 32, left: 14 },
+    { slotIndex: 8, label: "CAM", top: 32, left: 50 },
+    { slotIndex: 9, label: "RM", top: 32, left: 86 },
+    { slotIndex: 10, label: "ST", top: 14, left: 50 },
+  ],
+  // 4-1-4-1 (balanced, single CDM shield, 4-man mid, lone ST)
+  "4141": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CDM", top: 58, left: 50 },
+    { slotIndex: 6, label: "LM", top: 36, left: 12 },
+    { slotIndex: 7, label: "CM", top: 38, left: 36 },
+    { slotIndex: 8, label: "CM", top: 38, left: 64 },
+    { slotIndex: 9, label: "RM", top: 36, left: 88 },
+    { slotIndex: 10, label: "ST", top: 14, left: 50 },
+  ],
+  // 4-1-2-1-2 Narrow (diamond midfield)
+  "41212": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CDM", top: 58, left: 50 },
+    { slotIndex: 6, label: "CM", top: 44, left: 28 },
+    { slotIndex: 7, label: "CM", top: 44, left: 72 },
+    { slotIndex: 8, label: "CAM", top: 28, left: 50 },
+    { slotIndex: 9, label: "ST", top: 14, left: 38 },
+    { slotIndex: 10, label: "ST", top: 14, left: 62 },
+  ],
+  // 4-2-2-2 (box midfield, two strikers)
+  "4222": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CDM", top: 56, left: 34 },
+    { slotIndex: 6, label: "CDM", top: 56, left: 66 },
+    { slotIndex: 7, label: "CAM", top: 30, left: 30 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 70 },
+    { slotIndex: 9, label: "ST", top: 14, left: 38 },
+    { slotIndex: 10, label: "ST", top: 14, left: 62 },
+  ],
+  // 4-2-4 (wide, attacking; two CMs behind four attackers)
+  "424": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CM", top: 50, left: 36 },
+    { slotIndex: 6, label: "CM", top: 50, left: 64 },
+    { slotIndex: 7, label: "LW", top: 22, left: 14 },
+    { slotIndex: 8, label: "ST", top: 14, left: 38 },
+    { slotIndex: 9, label: "ST", top: 14, left: 62 },
+    { slotIndex: 10, label: "RW", top: 22, left: 86 },
+  ],
+  // 4-3-1-2 (flat 3 CMs, a CAM, two STs)
+  "4312": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CM", top: 52, left: 22 },
+    { slotIndex: 6, label: "CM", top: 54, left: 50 },
+    { slotIndex: 7, label: "CM", top: 52, left: 78 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 50 },
+    { slotIndex: 9, label: "ST", top: 14, left: 38 },
+    { slotIndex: 10, label: "ST", top: 14, left: 62 },
+  ],
+  // 4-3-2-1 "Christmas tree" (3 CMs, 2 CAMs, lone ST)
+  "4321": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "CM", top: 54, left: 22 },
+    { slotIndex: 6, label: "CM", top: 56, left: 50 },
+    { slotIndex: 7, label: "CM", top: 54, left: 78 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 34 },
+    { slotIndex: 9, label: "CAM", top: 30, left: 66 },
+    { slotIndex: 10, label: "ST", top: 12, left: 50 },
+  ],
+  // 4-4-1-1 (flat 4-mid with CAM sitting off the ST)
+  "4411": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "LM", top: 48, left: 12 },
+    { slotIndex: 6, label: "CM", top: 50, left: 36 },
+    { slotIndex: 7, label: "CM", top: 50, left: 64 },
+    { slotIndex: 8, label: "RM", top: 48, left: 88 },
+    { slotIndex: 9, label: "CAM", top: 28, left: 50 },
+    { slotIndex: 10, label: "ST", top: 12, left: 50 },
+  ],
+  // 4-5-1 (Bug 10 fix 2026-05-01 — true 5-man midfield, no CAM, no
+  // shape collision with 4-4-1-1).
+  "451": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 72, left: 12 },
+    { slotIndex: 2, label: "CB", top: 74, left: 34 },
+    { slotIndex: 3, label: "CB", top: 74, left: 66 },
+    { slotIndex: 4, label: "RB", top: 72, left: 88 },
+    { slotIndex: 5, label: "LM", top: 44, left: 10 },
+    { slotIndex: 6, label: "CM", top: 48, left: 30 },
+    { slotIndex: 7, label: "CM", top: 50, left: 50 },
+    { slotIndex: 8, label: "CM", top: 48, left: 70 },
+    { slotIndex: 9, label: "RM", top: 44, left: 90 },
+    { slotIndex: 10, label: "ST", top: 14, left: 50 },
+  ],
+
+  // ─── BACK-THREE ────────────────────────────────────────────────────────
+  "352": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 74, left: 22 },
+    { slotIndex: 2, label: "CB", top: 76, left: 50 },
+    { slotIndex: 3, label: "CB", top: 74, left: 78 },
+    { slotIndex: 4, label: "LM", top: 46, left: 10 },
+    { slotIndex: 5, label: "CM", top: 52, left: 30 },
+    { slotIndex: 6, label: "CM", top: 54, left: 50 },
+    { slotIndex: 7, label: "CM", top: 52, left: 70 },
+    { slotIndex: 8, label: "RM", top: 46, left: 90 },
+    { slotIndex: 9, label: "ST", top: 18, left: 36 },
+    { slotIndex: 10, label: "ST", top: 18, left: 64 },
+  ],
+  // 3-4-3 (wing-backs + front three)
+  "343": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 74, left: 22 },
+    { slotIndex: 2, label: "CB", top: 76, left: 50 },
+    { slotIndex: 3, label: "CB", top: 74, left: 78 },
+    { slotIndex: 4, label: "LM", top: 46, left: 10 },
+    { slotIndex: 5, label: "CM", top: 50, left: 36 },
+    { slotIndex: 6, label: "CM", top: 50, left: 64 },
+    { slotIndex: 7, label: "RM", top: 46, left: 90 },
+    { slotIndex: 8, label: "LW", top: 20, left: 16 },
+    { slotIndex: 9, label: "ST", top: 14, left: 50 },
+    { slotIndex: 10, label: "RW", top: 20, left: 84 },
+  ],
+  // 3-4-1-2 (wing-back 4-mid, CAM, two STs)
+  "3412": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 74, left: 22 },
+    { slotIndex: 2, label: "CB", top: 76, left: 50 },
+    { slotIndex: 3, label: "CB", top: 74, left: 78 },
+    { slotIndex: 4, label: "LM", top: 48, left: 10 },
+    { slotIndex: 5, label: "CM", top: 52, left: 36 },
+    { slotIndex: 6, label: "CM", top: 52, left: 64 },
+    { slotIndex: 7, label: "RM", top: 48, left: 90 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 50 },
+    { slotIndex: 9, label: "ST", top: 14, left: 38 },
+    { slotIndex: 10, label: "ST", top: 14, left: 62 },
+  ],
+  // 3-5-1-1 (5-mid, CAM behind ST)
+  "3511": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 74, left: 22 },
+    { slotIndex: 2, label: "CB", top: 76, left: 50 },
+    { slotIndex: 3, label: "CB", top: 74, left: 78 },
+    { slotIndex: 4, label: "LM", top: 46, left: 10 },
+    { slotIndex: 5, label: "CM", top: 54, left: 30 },
+    { slotIndex: 6, label: "CM", top: 56, left: 50 },
+    { slotIndex: 7, label: "CM", top: 54, left: 70 },
+    { slotIndex: 8, label: "RM", top: 46, left: 90 },
+    { slotIndex: 9, label: "CAM", top: 28, left: 50 },
+    { slotIndex: 10, label: "ST", top: 12, left: 50 },
+  ],
+  // 3-4-2-1 (wing-back 4-mid, two CAMs, lone ST)
+  "3421": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 74, left: 22 },
+    { slotIndex: 2, label: "CB", top: 76, left: 50 },
+    { slotIndex: 3, label: "CB", top: 74, left: 78 },
+    { slotIndex: 4, label: "LM", top: 48, left: 10 },
+    { slotIndex: 5, label: "CM", top: 52, left: 36 },
+    { slotIndex: 6, label: "CM", top: 52, left: 64 },
+    { slotIndex: 7, label: "RM", top: 48, left: 90 },
+    { slotIndex: 8, label: "CAM", top: 28, left: 30 },
+    { slotIndex: 9, label: "CAM", top: 28, left: 70 },
+    { slotIndex: 10, label: "ST", top: 12, left: 50 },
+  ],
+  // 3-1-4-2 (CDM anchor, 4 mids, two STs)
+  "3142": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 74, left: 22 },
+    { slotIndex: 2, label: "CB", top: 76, left: 50 },
+    { slotIndex: 3, label: "CB", top: 74, left: 78 },
+    { slotIndex: 4, label: "CDM", top: 60, left: 50 },
+    { slotIndex: 5, label: "LM", top: 40, left: 12 },
+    { slotIndex: 6, label: "CM", top: 42, left: 36 },
+    { slotIndex: 7, label: "CM", top: 42, left: 64 },
+    { slotIndex: 8, label: "RM", top: 40, left: 88 },
+    { slotIndex: 9, label: "ST", top: 14, left: 38 },
+    { slotIndex: 10, label: "ST", top: 14, left: 62 },
+  ],
+
+  // ─── BACK-FIVE ─────────────────────────────────────────────────────────
+  // 5-3-2
+  "532": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 74, left: 28 },
+    { slotIndex: 3, label: "CB", top: 76, left: 50 },
+    { slotIndex: 4, label: "CB", top: 74, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "CM", top: 46, left: 28 },
+    { slotIndex: 7, label: "CM", top: 48, left: 50 },
+    { slotIndex: 8, label: "CM", top: 46, left: 72 },
+    { slotIndex: 9, label: "ST", top: 16, left: 38 },
+    { slotIndex: 10, label: "ST", top: 16, left: 62 },
+  ],
+  // 5-2-1-2 (double-pivot, CAM, two STs)
+  "5212": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 74, left: 28 },
+    { slotIndex: 3, label: "CB", top: 76, left: 50 },
+    { slotIndex: 4, label: "CB", top: 74, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "CDM", top: 52, left: 34 },
+    { slotIndex: 7, label: "CDM", top: 52, left: 66 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 50 },
+    { slotIndex: 9, label: "ST", top: 14, left: 38 },
+    { slotIndex: 10, label: "ST", top: 14, left: 62 },
+  ],
+  // 5-4-1
+  "541": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 74, left: 28 },
+    { slotIndex: 3, label: "CB", top: 76, left: 50 },
+    { slotIndex: 4, label: "CB", top: 74, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "LM", top: 42, left: 14 },
+    { slotIndex: 7, label: "CM", top: 44, left: 36 },
+    { slotIndex: 8, label: "CM", top: 44, left: 64 },
+    { slotIndex: 9, label: "RM", top: 42, left: 86 },
+    { slotIndex: 10, label: "ST", top: 14, left: 50 },
+  ],
+  // 5-2-3 (wing-back + double-pivot + front three)
+  "523": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 74, left: 28 },
+    { slotIndex: 3, label: "CB", top: 76, left: 50 },
+    { slotIndex: 4, label: "CB", top: 74, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "CM", top: 48, left: 36 },
+    { slotIndex: 7, label: "CM", top: 48, left: 64 },
+    { slotIndex: 8, label: "LW", top: 20, left: 16 },
+    { slotIndex: 9, label: "ST", top: 14, left: 50 },
+    { slotIndex: 10, label: "RW", top: 20, left: 84 },
+  ],
+};
+
+// Allowed FC-position codes (used by tests to assert labels are sensible).
+export const ALLOWED_POSITIONS = [
+  "GK",
+  "LB",
+  "LWB",
+  "CB",
+  "RB",
+  "RWB",
+  "CDM",
+  "CM",
+  "CAM",
+  "LM",
+  "LW",
+  "RM",
+  "RW",
+  "LF",
+  "RF",
+  "ST",
+  "CF",
+] as const;
+
+export type PositionCode = (typeof ALLOWED_POSITIONS)[number];
+
+export const FORMATION_KEYS: FormationKey[] = [
+  "433",
+  "442",
+  "4231",
+  "4141",
+  "41212",
+  "4222",
+  "424",
+  "4312",
+  "4321",
+  "4411",
+  "451",
+  "352",
+  "343",
+  "3412",
+  "3511",
+  "3421",
+  "3142",
+  "532",
+  "5212",
+  "541",
+  "523",
+];
+
+/**
+ * Formations grouped by defender count (back-three / back-four / back-five)
+ * so the dropdown can render them in a coherent order.
+ */
+export const FORMATION_GROUPS: {
+  label: string;
+  defenders: 3 | 4 | 5;
+  keys: FormationKey[];
+}[] = [
+  {
+    label: "Back four",
+    defenders: 4,
+    keys: ["433", "442", "4231", "4141", "41212", "4222", "424", "4312", "4321", "4411", "451"],
+  },
+  {
+    label: "Back three",
+    defenders: 3,
+    keys: ["352", "343", "3412", "3511", "3421", "3142"],
+  },
+  {
+    label: "Back five",
+    defenders: 5,
+    keys: ["532", "5212", "541", "523"],
+  },
+];
+
+export function getFormationSlots(formation: FormationKey): SlotPosition[] {
+  return FORMATIONS[formation];
+}
+
+const LABELS: Record<FormationKey, string> = {
+  "433": "4-3-3",
+  "442": "4-4-2",
+  "4231": "4-2-3-1",
+  "4141": "4-1-4-1",
+  "41212": "4-1-2-1-2",
+  "4222": "4-2-2-2",
+  "424": "4-2-4",
+  "4312": "4-3-1-2",
+  "4321": "4-3-2-1",
+  "4411": "4-4-1-1",
+  "451": "4-5-1",
+  "352": "3-5-2",
+  "343": "3-4-3",
+  "3412": "3-4-1-2",
+  "3511": "3-5-1-1",
+  "3421": "3-4-2-1",
+  "3142": "3-1-4-2",
+  "532": "5-3-2",
+  "5212": "5-2-1-2",
+  "541": "5-4-1",
+  "523": "5-2-3",
+};
+
+export function formationLabel(formation: FormationKey): string {
+  return LABELS[formation];
+}

@@ -11,11 +11,15 @@
  * `/player/squad?matchDay=…&edit=1` route.
  */
 
+// Bug fix 2026-05-02: import from `./formations` (no "use client") instead
+// of `./PitchLayout` (which is "use client") so this helper module stays
+// server-callable. Importing the consts via PitchLayout left them as client
+// references at runtime → "TypeError: q.FORMATION_KEYS" on server render.
 import {
   getFormationSlots,
   FORMATION_KEYS,
   type FormationKey,
-} from "./PitchLayout";
+} from "./formations";
 
 export type FormationInferenceItem = {
   position: string | null | undefined;
