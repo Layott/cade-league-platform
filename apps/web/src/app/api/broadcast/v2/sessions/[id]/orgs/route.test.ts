@@ -21,12 +21,12 @@ const {
   enforcePublicReadMock,
   getServiceRoleSupabaseMock,
   checkViewTokenMock,
-  getPlayerAvatarUrlMock,
+  resolvePlayerPoseMock,
 } = vi.hoisted(() => ({
   enforcePublicReadMock: vi.fn(),
   getServiceRoleSupabaseMock: vi.fn(),
   checkViewTokenMock: vi.fn(),
-  getPlayerAvatarUrlMock: vi.fn(),
+  resolvePlayerPoseMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api-rate-limit", () => ({
@@ -38,8 +38,11 @@ vi.mock("@/lib/supabase/service", () => ({
 vi.mock("@/server/broadcast/view_token_gate", () => ({
   checkViewToken: checkViewTokenMock,
 }));
-vi.mock("@/lib/player-photos", () => ({
-  getPlayerAvatarUrl: getPlayerAvatarUrlMock,
+// Plan 53 (2026-05-04) — route now imports `gamerTagToSlug` (real) +
+// `resolvePlayerPose` (mocked, deterministic pose 1) +
+// `buildPhotoUrl` / `getVariantKindForOverlay` (real, just URL math).
+vi.mock("@/server/overlays/player-photos/resolver", () => ({
+  resolvePlayerPose: resolvePlayerPoseMock,
 }));
 
 import { GET } from "./route";
@@ -57,10 +60,12 @@ beforeEach(() => {
   enforcePublicReadMock.mockReset().mockResolvedValue(null);
   getServiceRoleSupabaseMock.mockReset();
   checkViewTokenMock.mockReset();
-  getPlayerAvatarUrlMock.mockReset().mockImplementation((tag: string | null) => {
-    if (!tag) return null;
-    return `/overlays/v2/_assets/players/processed/${tag.toLowerCase()}/headshot_01_nobg.png`;
-  });
+  // Plan 53 (2026-05-04) — return manifest pose 1 so the URL builder
+  // produces the same path the previous `getPlayerAvatarUrl` produced
+  // (manifest, headshot, pose 01) for unchanged assertion shapes.
+  resolvePlayerPoseMock
+    .mockReset()
+    .mockResolvedValue({ poseIndex: 1, source: "manifest" });
 });
 
 /**

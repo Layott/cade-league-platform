@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
-import { getPlayerAvatarUrl } from "@/lib/player-photos";
+import { gamerTagToSlug } from "@/lib/player-photos";
+import { resolvePlayerPose } from "@/server/overlays/player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "@/server/overlays/player-photos/variant-map";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -124,19 +129,51 @@ export async function GET(
         console.error("[broadcast/v2/orgs] players read failed:", playerErr);
       }
 
+      // Plan 53 (2026-05-04) — avatarUrl now flows through
+      // `resolvePlayerPose` + `buildPhotoUrl` so per-(player x overlay)
+      // selection rows in `player_photo_selections` win when present.
+      // Falls back through legacy DEFAULT_POSE_BY_SLUG / pose 1 inside
+      // the resolver when no DB row exists.
+      const overlayKey = "15-orgs";
+      const variantKind = getVariantKindForOverlay(overlayKey);
+      const playerRowsTyped = (playerRows ?? []) as unknown as PlayerRow[];
+
+      const enrichedPlayers = await Promise.all(
+        playerRowsTyped.map(async (p) => {
+          const displayName =
+            p.users?.display_name ?? p.gamer_tag ?? "Player";
+          const slug = p.gamer_tag ? gamerTagToSlug(p.gamer_tag) : "";
+          let avatarUrl: string | null = null;
+          if (slug) {
+            const resolved = await resolvePlayerPose(sb, p.id, overlayKey, {
+              slug,
+            });
+            avatarUrl = buildPhotoUrl({
+              slug,
+              playerId: p.id,
+              poseIndex: resolved.poseIndex,
+              variantKind,
+              source: resolved.source,
+            });
+          }
+          return {
+            organizationId: p.organization_id,
+            payload: {
+              playerId: p.id,
+              displayName,
+              gamerTag: p.gamer_tag ?? null,
+              avatarUrl,
+            },
+          };
+        }),
+      );
+
       const byOrg = new Map<string, OrgPayload["players"]>();
-      for (const p of (playerRows ?? []) as unknown as PlayerRow[]) {
-        if (!p.organization_id) continue;
-        const displayName =
-          p.users?.display_name ?? p.gamer_tag ?? "Player";
-        const list = byOrg.get(p.organization_id) ?? [];
-        list.push({
-          playerId: p.id,
-          displayName,
-          gamerTag: p.gamer_tag ?? null,
-          avatarUrl: getPlayerAvatarUrl(p.gamer_tag),
-        });
-        byOrg.set(p.organization_id, list);
+      for (const ep of enrichedPlayers) {
+        if (!ep.organizationId) continue;
+        const list = byOrg.get(ep.organizationId) ?? [];
+        list.push(ep.payload);
+        byOrg.set(ep.organizationId, list);
       }
       orgs = (orgRows as Array<{ id: string; name: string; logo_url: string | null }>).map(
         (o) => ({
