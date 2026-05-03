@@ -52,7 +52,10 @@ const players = (manifest as unknown as ManifestShape).players;
  * so future scrapes / re-processes know not to re-introduce them.
  */
 const DEFAULT_POSE_BY_SLUG: Record<string, number> = {
-  anife: 5, // pose_01 = hands-covering-mouth (BANNED), pose_02 has face crop user rejected
+  // 2026-05-03 — pose_05 not currently deployed to Vercel (build cache lag);
+  // pose_03 (Anife flexing arm, clean face) is on prod. Switch back to 5
+  // once Vercel re-syncs `_assets/players/processed/` post-prebuild.
+  anife: 3, // pose_01 = hands-covering-mouth (BANNED), pose_02 has face crop user rejected, pose_05 = preferred but not yet on prod
   kingnonex: 2, // pose_01 = back-of-jersey (BANNED), pose_03 = head down / face dim
   king_nonex: 2, // alias for "KING NONEX" gamer_tag form (gamerTagToSlug collapses space → underscore)
 };

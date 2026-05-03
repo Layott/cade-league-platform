@@ -1280,9 +1280,14 @@
   }
   .sub-card .card-flag { font-size: 14px; }
 
-  /* slot label under each card (e.g. "GK ++") — element-specific styles
-     (.slot positioning + flex layout lives in the .pitch block above). */
+  /* slot label under each card (e.g. "GK ++") — HIDDEN 2026-05-03.
+     The card itself carries an internal pos chip (`.card-pos`) so an
+     external label below the card duplicates the position name AND
+     adds ~20px of vertical bleed that makes adjacent rows visually
+     overlap when CAM stacks under ST in 4-2-3-1 / 4-4-1-1 / 4-1-2-1-2.
+     Keeping the styles for forward-compat; only hiding via display. */
   .slot-label {
+    display: none;
     font-family: var(--accent);
     font-weight: 700;
     font-size: 13px;
