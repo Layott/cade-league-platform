@@ -5,6 +5,11 @@ import {
   type MatchScoresDayPayload,
 } from "./schemas";
 import { formatWat } from "@/lib/time";
+import { resolvePlayerPose } from "./player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "./player-photos/variant-map";
 
 /**
  * Audit Slice 1 (2026-04-24) — server reader for `/overlay/match-scores-day`.
@@ -50,6 +55,13 @@ export type MatchScoreRow = {
    */
   home_slug: string;
   away_slug: string;
+  /**
+   * Plan 53 (2026-05-04) — server-resolved photo URL via
+   * `resolvePlayerPose` + `buildPhotoUrl`. Null when no
+   * gamer_tag-derived slug exists.
+   */
+  home_photo_url: string | null;
+  away_photo_url: string | null;
   home_score: number | null;
   away_score: number | null;
   status: "scheduled" | "in_progress" | "completed";
@@ -129,6 +141,13 @@ type MatchRowDb = {
   id: string;
   scheduled_time: string | null;
   status: string;
+  /**
+   * Plan 53 (2026-05-04) — added so the resolver can key off
+   * `players.id` directly. The embedded `home_player` / `away_player`
+   * objects don't surface the FK id field, so we select it explicitly.
+   */
+  home_player_id: string | null;
+  away_player_id: string | null;
   home_player: {
     gamer_tag: string | null;
     users: { display_name: string | null } | null;
@@ -284,6 +303,8 @@ export async function fetchMatchScoresDayData(
       id,
       scheduled_time,
       status,
+      home_player_id,
+      away_player_id,
       home_player:home_player_id (
         gamer_tag,
         users:users!players_user_id_fkey ( display_name )
@@ -309,37 +330,69 @@ export async function fetchMatchScoresDayData(
 
   const rawRows = (matchesRaw ?? []) as unknown as MatchRowDb[];
 
-  const rows: MatchScoreRow[] = rawRows.map((m) => {
-    // Supabase may return one-row relations as object instead of array.
-    // Normalize to array first.
-    const rawResults = Array.isArray(m.match_results)
-      ? m.match_results
-      : (m.match_results ? [m.match_results] : []);
-    const results = rawResults.filter((r) => r.result_type !== "void");
-    const r = pickResult(results);
-    let status: "scheduled" | "in_progress" | "completed" = "scheduled";
-    if (m.status === "completed" || r?.confirmed) {
-      status = "completed";
-    } else if (m.status === "in_progress") {
-      status = "in_progress";
-    } else if (m.status === "forfeited") {
-      status = "completed";
-    } else if (m.status === "voided") {
-      // void rows still show but with null scores.
-      status = "scheduled";
-    }
-    return {
-      match_id: m.id,
-      home: pickName(m.home_player),
-      away: pickName(m.away_player),
-      home_slug: pickSlug(m.home_player),
-      away_slug: pickSlug(m.away_player),
-      home_score: r ? r.home_score : null,
-      away_score: r ? r.away_score : null,
-      status,
-      scheduled_time: m.scheduled_time,
-    };
-  });
+  // Plan 53 (2026-05-04) — resolve photoUrl per player via the
+  // resolver. variantKind is `headshot` for `11-match-scores-day`.
+  const overlayKey = "11-match-scores-day";
+  const variantKind = getVariantKindForOverlay(overlayKey);
+
+  async function resolveSidePhotoUrl(
+    playerId: string | null,
+    slug: string,
+  ): Promise<string | null> {
+    if (!playerId || !slug) return null;
+    const resolved = await resolvePlayerPose(sb, playerId, overlayKey, {
+      slug,
+    });
+    return buildPhotoUrl({
+      slug,
+      playerId,
+      poseIndex: resolved.poseIndex,
+      variantKind,
+      source: resolved.source,
+    });
+  }
+
+  const rows: MatchScoreRow[] = await Promise.all(
+    rawRows.map(async (m) => {
+      // Supabase may return one-row relations as object instead of array.
+      // Normalize to array first.
+      const rawResults = Array.isArray(m.match_results)
+        ? m.match_results
+        : (m.match_results ? [m.match_results] : []);
+      const results = rawResults.filter((r) => r.result_type !== "void");
+      const r = pickResult(results);
+      let status: "scheduled" | "in_progress" | "completed" = "scheduled";
+      if (m.status === "completed" || r?.confirmed) {
+        status = "completed";
+      } else if (m.status === "in_progress") {
+        status = "in_progress";
+      } else if (m.status === "forfeited") {
+        status = "completed";
+      } else if (m.status === "voided") {
+        // void rows still show but with null scores.
+        status = "scheduled";
+      }
+      const homeSlug = pickSlug(m.home_player);
+      const awaySlug = pickSlug(m.away_player);
+      const [homePhotoUrl, awayPhotoUrl] = await Promise.all([
+        resolveSidePhotoUrl(m.home_player_id, homeSlug),
+        resolveSidePhotoUrl(m.away_player_id, awaySlug),
+      ]);
+      return {
+        match_id: m.id,
+        home: pickName(m.home_player),
+        away: pickName(m.away_player),
+        home_slug: homeSlug,
+        away_slug: awaySlug,
+        home_photo_url: homePhotoUrl,
+        away_photo_url: awayPhotoUrl,
+        home_score: r ? r.home_score : null,
+        away_score: r ? r.away_score : null,
+        status,
+        scheduled_time: m.scheduled_time,
+      };
+    }),
+  );
 
   return {
     matchDayId,
@@ -409,6 +462,11 @@ export function toMatchScoresDayPayload(
       away: r.away,
       homeSlug: r.home_slug || undefined,
       awaySlug: r.away_slug || undefined,
+      // Plan 53 (2026-05-04) — emit resolver-driven photo URLs so a
+      // future variant of this overlay can render player faces in the
+      // score grid without a second round-trip.
+      homePhotoUrl: r.home_photo_url ?? undefined,
+      awayPhotoUrl: r.away_photo_url ?? undefined,
       homeScore: r.home_score,
       awayScore: r.away_score,
       status: r.status,

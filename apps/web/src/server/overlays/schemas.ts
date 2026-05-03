@@ -382,6 +382,15 @@ export const matchScoresDaySchema = z.object({
         // `/overlays/v2/_assets/players/processed/<slug>/headshot_*_nobg.png`.
         homeSlug: z.string().trim().min(1).max(40).optional(),
         awaySlug: z.string().trim().min(1).max(40).optional(),
+        // Plan 53 (2026-05-04) — server-resolved photo URLs from
+        // `resolvePlayerPose` + `buildPhotoUrl` so per-(player x overlay)
+        // selection rows in `player_photo_selections` can override the
+        // displayed pose for this overlay (`11-match-scores-day`). The
+        // current static HTML doesn't render headshots in the score
+        // grid, so these fields are reserved for future variant
+        // designs that include player faces alongside the score pills.
+        homePhotoUrl: photoUrlSchema.optional(),
+        awayPhotoUrl: photoUrlSchema.optional(),
         homeScore: z.coerce.number().int().min(0).max(99).nullable(),
         awayScore: z.coerce.number().int().min(0).max(99).nullable(),
         status: z.enum(["scheduled", "in_progress", "completed"]),
