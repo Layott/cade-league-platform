@@ -21,12 +21,12 @@ const {
   enforcePublicReadMock,
   getServiceRoleSupabaseMock,
   checkViewTokenMock,
-  getPlayerHeadshotUrlMock,
+  resolvePlayerPoseMock,
 } = vi.hoisted(() => ({
   enforcePublicReadMock: vi.fn(),
   getServiceRoleSupabaseMock: vi.fn(),
   checkViewTokenMock: vi.fn(),
-  getPlayerHeadshotUrlMock: vi.fn(),
+  resolvePlayerPoseMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api-rate-limit", () => ({
@@ -38,8 +38,11 @@ vi.mock("@/lib/supabase/service", () => ({
 vi.mock("@/server/broadcast/view_token_gate", () => ({
   checkViewToken: checkViewTokenMock,
 }));
-vi.mock("@/lib/player-photos", () => ({
-  getPlayerHeadshotUrl: getPlayerHeadshotUrlMock,
+// Plan 53 (2026-05-04) — route now imports `gamerTagToSlug` (real) +
+// `resolvePlayerPose` (mocked, returns deterministic pose 1) +
+// `buildPhotoUrl` / `getVariantKindForOverlay` (real, just URL math).
+vi.mock("@/server/overlays/player-photos/resolver", () => ({
+  resolvePlayerPose: resolvePlayerPoseMock,
 }));
 
 import { GET } from "./route";
@@ -54,9 +57,12 @@ beforeEach(() => {
   enforcePublicReadMock.mockReset().mockResolvedValue(null);
   getServiceRoleSupabaseMock.mockReset();
   checkViewTokenMock.mockReset().mockResolvedValue({ ok: true, response: null });
-  getPlayerHeadshotUrlMock
+  // Plan 53 (2026-05-04) — return manifest pose 1 for any player so the
+  // legacy badge URL pattern is preserved in tests. Real prod resolver
+  // would consult `player_photo_selections` first.
+  resolvePlayerPoseMock
     .mockReset()
-    .mockReturnValue("/overlays/v2/_assets/players/processed/faruk/headshot_01_nobg.png");
+    .mockResolvedValue({ poseIndex: 1, source: "manifest" });
 });
 
 type FcSeed = {

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
-import { getPlayerHeadshotUrl } from "@/lib/player-photos";
+import { gamerTagToSlug } from "@/lib/player-photos";
+import { resolvePlayerPose } from "@/server/overlays/player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "@/server/overlays/player-photos/variant-map";
 import { weekStartThursday } from "@/lib/time";
 // Bug 10 (2026-05-01) — chemistry recompute + formation read.
 import {
@@ -267,13 +272,30 @@ export async function GET(
   }
 
   const displayName = player.users?.display_name ?? player.gamer_tag ?? "Player";
-  // Pose index intentionally omitted so `DEFAULT_POSE_BY_SLUG` overrides
-  // (e.g. Anife → pose 5, KingNonex → pose 2) take effect. Hardcoding
-  // `1` previously bypassed those overrides + surfaced banned poses
-  // (Anife pose_01 = hands-covering-mouth, KingNonex pose_01 = back-of-
-  // jersey) on the 19-player-squads overlay.
-  const headshotUrl =
-    getPlayerHeadshotUrl(player.gamer_tag, "transparent") ?? null;
+  // Plan 53 (2026-05-04) — resolve the draftOwner badge URL through
+  // `resolvePlayerPose` + `buildPhotoUrl`. The overlay key
+  // `19-player-squads` maps to the `card` variant in
+  // OVERLAY_VARIANT_KIND, so the badge displays the player's full FUT
+  // card art (matching the wider squad layout). Per-overlay rows in
+  // `player_photo_selections` win when present; otherwise the resolver
+  // falls back through global default → legacy DEFAULT_POSE_BY_SLUG
+  // (Anife → 3, KingNonex → 2) → pose 1.
+  const overlayKey = "19-player-squads";
+  const variantKind = getVariantKindForOverlay(overlayKey);
+  const ownerSlug = player.gamer_tag ? gamerTagToSlug(player.gamer_tag) : "";
+  let headshotUrl: string | null = null;
+  if (ownerSlug) {
+    const resolvedOwner = await resolvePlayerPose(sb, player.id, overlayKey, {
+      slug: ownerSlug,
+    });
+    headshotUrl = buildPhotoUrl({
+      slug: ownerSlug,
+      playerId: player.id,
+      poseIndex: resolvedOwner.poseIndex,
+      variantKind,
+      source: resolvedOwner.source,
+    });
+  }
 
   // Live submission for this week. If the operator didn't pin a specific
   // `?week=`, fall back to the player's MOST RECENT submission so the
