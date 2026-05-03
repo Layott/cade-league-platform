@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
-import { getPlayerAvatarUrl } from "@/lib/player-photos";
+import { gamerTagToSlug } from "@/lib/player-photos";
+import { resolvePlayerPose } from "@/server/overlays/player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "@/server/overlays/player-photos/variant-map";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -108,17 +113,40 @@ export async function GET(
     }
   }
 
-  const rows = players.map((p) => {
-    const coach = p.coach_id ? coachesById.get(p.coach_id) ?? null : null;
-    const userRow = Array.isArray(p.users) ? p.users[0] ?? null : p.users;
-    return {
-      playerId: p.id,
-      name: userRow?.display_name ?? p.gamer_tag ?? "Player",
-      avatarUrl: getPlayerAvatarUrl(p.gamer_tag),
-      coachId: coach?.id ?? null,
-      coachName: coach?.name ?? null,
-    };
-  });
+  // Plan 53 (2026-05-04) — avatarUrl now flows through
+  // `resolvePlayerPose` + `buildPhotoUrl` so per-(player x overlay)
+  // selection rows in `player_photo_selections` win when present.
+  // Falls back through legacy DEFAULT_POSE_BY_SLUG / pose 1 inside the
+  // resolver when no DB row exists.
+  const overlayKey = "16-coaches";
+  const variantKind = getVariantKindForOverlay(overlayKey);
+  const rows = await Promise.all(
+    players.map(async (p) => {
+      const coach = p.coach_id ? coachesById.get(p.coach_id) ?? null : null;
+      const userRow = Array.isArray(p.users) ? p.users[0] ?? null : p.users;
+      const slug = p.gamer_tag ? gamerTagToSlug(p.gamer_tag) : "";
+      let avatarUrl: string | null = null;
+      if (slug) {
+        const resolved = await resolvePlayerPose(sb, p.id, overlayKey, {
+          slug,
+        });
+        avatarUrl = buildPhotoUrl({
+          slug,
+          playerId: p.id,
+          poseIndex: resolved.poseIndex,
+          variantKind,
+          source: resolved.source,
+        });
+      }
+      return {
+        playerId: p.id,
+        name: userRow?.display_name ?? p.gamer_tag ?? "Player",
+        avatarUrl,
+        coachId: coach?.id ?? null,
+        coachName: coach?.name ?? null,
+      };
+    }),
+  );
 
   return NextResponse.json(
     { payload: { rows }, seasonId: md.season_id },
