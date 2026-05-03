@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
+import { gamerTagToSlug } from "@/lib/player-photos";
+import { resolvePlayerPose } from "@/server/overlays/player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "@/server/overlays/player-photos/variant-map";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -80,46 +86,86 @@ export async function GET(
   }
 
   // Hydrate player names.
+  //
+  // Plan 53 (2026-05-04) — `display_name` and `avatar_url` are NOT
+  // columns on `public.players`; `display_name` lives on the joined
+  // `users` row, and `avatar_url` was always null on this table (the
+  // resolver replaces that field). Read `gamer_tag` + the embedded
+  // user display name, then derive avatarUrl through `resolvePlayerPose`
+  // + `buildPhotoUrl` for the overlay key '17-penalties'.
   const playerIds = Array.from(new Set(actions.map((a) => a.player_id)));
-  let nameById = new Map<string, { name: string; avatarUrl: string | null }>();
+  type PlayerMeta = {
+    name: string;
+    gamerTag: string | null;
+  };
+  let metaById = new Map<string, PlayerMeta>();
   if (playerIds.length > 0) {
     try {
       const { data } = await sb
         .from("players")
-        .select("id, display_name, gamer_tag, avatar_url")
-        .in("id", playerIds);
-      for (const p of (data ?? []) as Array<{
+        .select(
+          `
+          id,
+          gamer_tag,
+          users:users!players_user_id_fkey ( display_name )
+          `,
+        )
+        .in("id", playerIds)
+        .is("deleted_at", null);
+      type PlayerJoinRow = {
         id: string;
-        display_name: string | null;
         gamer_tag: string | null;
-        avatar_url: string | null;
-      }>) {
-        nameById.set(p.id, {
-          name: p.display_name ?? p.gamer_tag ?? "Player",
-          avatarUrl: p.avatar_url,
+        users:
+          | { display_name: string | null }
+          | { display_name: string | null }[]
+          | null;
+      };
+      for (const p of (data ?? []) as unknown as PlayerJoinRow[]) {
+        const userRow = Array.isArray(p.users) ? p.users[0] ?? null : p.users;
+        metaById.set(p.id, {
+          name: userRow?.display_name ?? p.gamer_tag ?? "Player",
+          gamerTag: p.gamer_tag,
         });
       }
     } catch {
-      nameById = new Map();
+      metaById = new Map();
     }
   }
 
-  const rows = actions.map((a) => {
-    const meta = nameById.get(a.player_id);
-    return {
-      actionId: a.id,
-      playerId: a.player_id,
-      playerName: meta?.name ?? "Player",
-      avatarUrl: meta?.avatarUrl ?? null,
-      pointsAdj: a.points_adj ?? 0,
-      gdAdj: a.gd_adj ?? 0,
-      severity: a.severity ?? null,
-      incidentType: a.incident_type ?? null,
-      summary: a.summary ?? null,
-      decidedAt: a.decided_at ?? null,
-      expiresAt: a.expires_at ?? null,
-    };
-  });
+  const overlayKey = "17-penalties";
+  const variantKind = getVariantKindForOverlay(overlayKey);
+  const rows = await Promise.all(
+    actions.map(async (a) => {
+      const meta = metaById.get(a.player_id);
+      const slug = meta?.gamerTag ? gamerTagToSlug(meta.gamerTag) : "";
+      let avatarUrl: string | null = null;
+      if (slug) {
+        const resolved = await resolvePlayerPose(sb, a.player_id, overlayKey, {
+          slug,
+        });
+        avatarUrl = buildPhotoUrl({
+          slug,
+          playerId: a.player_id,
+          poseIndex: resolved.poseIndex,
+          variantKind,
+          source: resolved.source,
+        });
+      }
+      return {
+        actionId: a.id,
+        playerId: a.player_id,
+        playerName: meta?.name ?? "Player",
+        avatarUrl,
+        pointsAdj: a.points_adj ?? 0,
+        gdAdj: a.gd_adj ?? 0,
+        severity: a.severity ?? null,
+        incidentType: a.incident_type ?? null,
+        summary: a.summary ?? null,
+        decidedAt: a.decided_at ?? null,
+        expiresAt: a.expires_at ?? null,
+      };
+    }),
+  );
 
   return NextResponse.json(
     { payload: { rows }, seasonId: md.season_id },
