@@ -4,6 +4,12 @@ import {
   leaderboardAnimatedSchema,
   type LeaderboardAnimatedPayload,
 } from "./schemas";
+import { gamerTagToSlug } from "@/lib/player-photos";
+import { resolvePlayerPose } from "./player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "./player-photos/variant-map";
 
 /**
  * Audit Slice 1 (2026-04-24) — server reader for the `/overlay/leaderboard-
@@ -37,6 +43,13 @@ export type LeaderboardRowDb = {
   player_name: string;
   /** gamer_tag from players table — used to resolve photo + org assets. */
   slug: string | null;
+  /**
+   * Plan 53 (2026-05-04) — server-resolved photoUrl from
+   * `resolvePlayerPose` + `buildPhotoUrl`. `null` when slug can't be
+   * derived; downstream payload mapper falls back to the legacy
+   * slug-based path so the wire shape stays compatible.
+   */
+  photo_url: string | null;
   matches_played: number;
   wins: number;
   draws: number;
@@ -123,6 +136,7 @@ export async function fetchLeaderboardData(
     player_name:
       r.player?.users?.display_name ?? r.player?.gamer_tag ?? "(unknown)",
     slug: r.player?.gamer_tag ?? null,
+    photo_url: null,
     matches_played: r.matches_played,
     wins: r.wins,
     draws: r.draws,
@@ -170,6 +184,7 @@ export async function fetchLeaderboardData(
         player_name:
           p.player?.users?.display_name ?? p.player?.gamer_tag ?? "(unknown)",
         slug: p.player?.gamer_tag ?? null,
+        photo_url: null,
         matches_played: 0,
         wins: 0,
         draws: 0,
@@ -181,6 +196,33 @@ export async function fetchLeaderboardData(
       }));
     }
   }
+
+  // Plan 53 (2026-05-04) — resolve photoUrl per row via
+  // `resolvePlayerPose` + `buildPhotoUrl` so per-(player x overlay)
+  // selection rows in `player_photo_selections` win when present.
+  // Falls back through the resolver's legacy DEFAULT_POSE_BY_SLUG /
+  // pose 1 chain when no DB row exists. The variantKind is
+  // `headshot` for `07-leaderboard` per `OVERLAY_VARIANT_KIND`.
+  const overlayKey = "07-leaderboard";
+  const variantKind = getVariantKindForOverlay(overlayKey);
+  rows = await Promise.all(
+    rows.map(async (r) => {
+      if (!r.slug) return r;
+      const slug = gamerTagToSlug(r.slug);
+      if (!slug) return r;
+      const resolved = await resolvePlayerPose(sb, r.player_id, overlayKey, {
+        slug,
+      });
+      const photoUrl = buildPhotoUrl({
+        slug,
+        playerId: r.player_id,
+        poseIndex: resolved.poseIndex,
+        variantKind,
+        source: resolved.source,
+      });
+      return { ...r, photo_url: photoUrl };
+    }),
+  );
 
   return {
     seasonId,
@@ -224,9 +266,6 @@ const PLAYER_ORG_LOGO: Record<string, string | null> = {
   wolevation: "/overlays/v2/_assets/Orgs/BREAKING%20GAMING%20BARRIERS%20LOGO%20-%20WOLEVATION.jpeg",
 };
 
-/** Pose override for canonical headshot — kingnonex pose 01 is back-facing. */
-const POSE_FOR_SLUG: Record<string, string> = { kingnonex: "03" };
-
 function canonSlug(raw: string | null): string {
   if (!raw) return "";
   const s = raw.toString().toLowerCase().trim();
@@ -241,10 +280,14 @@ export function toLeaderboardAnimatedPayload(
   if (data.rows.length === 0) return null;
   const rows = data.rows.map((r) => {
     const slug = canonSlug(r.slug);
-    const pose = POSE_FOR_SLUG[slug] || "01";
-    const photoUrl = slug
-      ? `/overlays/v2/_assets/players/processed/${slug}/headshot_${pose}_nobg.png`
+    // Plan 53 (2026-05-04) — server-resolved photoUrl from
+    // `fetchLeaderboardData` wins. Legacy slug-based fallback only
+    // kicks in when the server reader couldn't derive a slug
+    // (extremely rare — would mean the player has no gamer_tag).
+    const fallbackPhotoUrl = slug
+      ? `/overlays/v2/_assets/players/processed/${slug}/headshot_01_nobg.png`
       : undefined;
+    const photoUrl = r.photo_url ?? fallbackPhotoUrl;
     const orgLogoUrl = slug && PLAYER_ORG_LOGO[slug] ? PLAYER_ORG_LOGO[slug]! : undefined;
     return {
       rank: r.rank,
