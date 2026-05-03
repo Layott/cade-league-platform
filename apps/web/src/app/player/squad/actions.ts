@@ -1,13 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { randomUUID } from "node:crypto";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
-  buildScreenshotPath,
-  createSignedUpload,
   submitPickerSquad,
   weekStartThursday,
   getSubmissionForPlayerAndMatchDay,
@@ -24,10 +21,10 @@ import { revalidateSquadSurfaces } from "@/server/squads/revalidate";
 /**
  * Plan 30 — player-side server actions for the picker flow.
  *
- * `requestUploadUrlAction` is carried over from Plan 10 (same contract).
- * `submitPickerAction` replaces the old text-item `createSubmissionAction`
- * by taking a `{ weekStartDate, futbinScreenshotPath, slots[] }` shape
- * built in the browser.
+ * 2026-05-04 — screenshot upload removed from picker. The legacy
+ * `requestUploadUrlAction` was deleted (no consumer). `submitPickerAction`
+ * still accepts `futbinScreenshotPath` as an optional / nullable field so
+ * legacy admin tooling that pre-uploads a screenshot keeps working.
  */
 
 async function loadPlayerContext() {
@@ -62,21 +59,6 @@ async function loadPlayerContext() {
   return { sb, userId: pub.id, playerId: player.id, seasonId: season.id };
 }
 
-export async function requestUploadUrlAction(input: {
-  extension: "png" | "jpg" | "webp";
-}): Promise<{ path: string; signedUrl: string; token?: string; weekStartDate: string }> {
-  const { userId, playerId, seasonId } = await loadPlayerContext();
-  const limited = await enforceAuthedWrite(userId);
-  if (limited) throw new Error("rate_limited");
-  const weekStartDate = weekStartThursday(new Date());
-  const filename = `${randomUUID()}.${input.extension}`;
-  const path = buildScreenshotPath({ seasonId, playerId, weekStartDate, filename });
-
-  const svc = getServiceRoleSupabase();
-  const signed = await createSignedUpload(svc, path);
-  return { ...signed, weekStartDate };
-}
-
 export type SubmitPickerActionPayload = {
   weekStartDate: string;
   // Optional admin-controlled per-match-day window. When supplied, the
@@ -85,7 +67,9 @@ export type SubmitPickerActionPayload = {
   // through the explicit "no match day" signal without callers having to
   // strip the key.
   matchDayId?: string | null;
-  futbinScreenshotPath: string;
+  // 2026-05-04 — screenshot upload removed from picker. Field optional
+  // so the picker can simply omit it; legacy admin tools may still set it.
+  futbinScreenshotPath?: string | null;
   // Bug 10 (2026-05-01) — picker FormationKey.
   formation?: string;
   slots: Array<{
@@ -102,8 +86,8 @@ export async function submitPickerAction(
   const limited = await enforceAuthedWrite(userId);
   if (limited) throw new Error("rate_limited");
 
-  if (!payload.futbinScreenshotPath || !payload.weekStartDate) {
-    throw new Error("missing screenshot path or week");
+  if (!payload.weekStartDate) {
+    throw new Error("missing week start date");
   }
   if (!Array.isArray(payload.slots) || payload.slots.length < 11) {
     throw new Error("at least 11 starting slots required");
@@ -120,7 +104,7 @@ export async function submitPickerAction(
       playerId,
       weekStartDate: payload.weekStartDate,
       matchDayId: payload.matchDayId ?? null,
-      futbinScreenshotPath: payload.futbinScreenshotPath,
+      futbinScreenshotPath: payload.futbinScreenshotPath ?? null,
       // Bug 10 (2026-05-01) — pass picker formation key through.
       formation: payload.formation as
         | "433" | "442" | "4231" | "4141" | "41212" | "4222"

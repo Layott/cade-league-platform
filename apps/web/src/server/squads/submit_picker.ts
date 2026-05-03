@@ -37,16 +37,18 @@ export const submitPickerInputSchema = z.object({
   // resulting squad_submissions row is stamped with this match_day_id.
   // Plan 10 weekly mode submissions leave it null.
   matchDayId: z.string().uuid().nullable().optional(),
-  // Plan 39 sanitize — block `..` traversal + backslash so a poisoned
-  // path can't escape the squad-screenshots bucket sub-tree.
+  // 2026-05-04 — screenshot upload removed from player submit flow. The
+  // field is accepted (legacy callers + admin tooling still pass it) but
+  // null/empty is now valid. Plan 39 path-sanitize still applies when set.
   futbinScreenshotPath: z
     .string()
-    .min(1)
     .max(500)
     .refine(
       (v) => !v.includes("..") && !v.includes("\\"),
       "futbinScreenshotPath must not contain '..' or backslashes",
-    ),
+    )
+    .nullable()
+    .optional(),
   // Bug 10 (2026-05-01) — picker FormationKey.
   formation: formationKeyEnum.nullable().optional(),
   slots: z.array(pickerSlotSchema).min(1).max(23),
@@ -231,7 +233,7 @@ export async function submitPickerSquad(
       playerId: v.playerId,
       weekStartDate: v.weekStartDate,
       matchDayId: v.matchDayId ?? null,
-      futbinScreenshotPath: v.futbinScreenshotPath,
+      futbinScreenshotPath: v.futbinScreenshotPath ?? null,
       formation: formationLabel,
       items,
     },

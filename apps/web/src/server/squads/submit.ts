@@ -214,7 +214,7 @@ export async function createSubmission(
       player_id: v.playerId,
       week_start_date: v.weekStartDate,
       match_day_id: v.matchDayId ?? null,
-      futbin_screenshot_path: v.futbinScreenshotPath,
+      futbin_screenshot_path: v.futbinScreenshotPath ?? null,
       // Bug 10 (2026-05-01) — persist picker formation label.
       formation: v.formation ?? null,
       validation_status: "pending",

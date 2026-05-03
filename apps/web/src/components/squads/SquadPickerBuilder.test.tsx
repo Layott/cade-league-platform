@@ -52,7 +52,6 @@ describe("SquadPickerBuilder", () => {
           bannedItemTypes: [],
         }}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
       />,
     );
 
@@ -64,13 +63,12 @@ describe("SquadPickerBuilder", () => {
     }
   });
 
-  it("keeps submit disabled until 11 slots filled + screenshot uploaded", () => {
+  it("keeps submit disabled until 11 slots filled", () => {
     render(
       <SquadPickerBuilder
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
       />,
     );
     const btn = screen.getByTestId("picker-submit-btn") as HTMLButtonElement;
@@ -87,7 +85,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
       />,
     );
 
@@ -129,7 +126,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
       />,
     );
 
@@ -170,7 +166,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
         initialDraft={{
           formation: "433",
           slots: [{ slotIndex: 0, card: draftCard }],
@@ -207,7 +202,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
         initialSquad={{
           formation: "442",
           slots: [
@@ -263,7 +257,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
         initialSquad={{
           formation: "433",
           slots: [{ slotIndex: 0, card }],
@@ -291,7 +284,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
         initialDraft={{
           formation: "442",
           slots: [{ slotIndex: 0, card }],
@@ -309,8 +301,6 @@ describe("SquadPickerBuilder", () => {
     expect(
       screen.getByTestId("sub-slot-0").getAttribute("data-card-id"),
     ).toBeTruthy();
-    // Screenshot pre-populated → upload-ok pip is rendered.
-    expect(screen.queryByTestId("picker-upload-ok")).toBeTruthy();
   });
 
   it("fires saveDraftAction (debounced) after a pick", async () => {
@@ -332,7 +322,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={vi.fn()}
         saveDraftAction={saveDraftAction}
       />,
     );
@@ -358,7 +347,7 @@ describe("SquadPickerBuilder", () => {
     expect(payload.slots[0].slotIndex).toBe(0);
   });
 
-  it("enables submit button once 11 slots + screenshot landed", async () => {
+  it("enables submit button once all 11 slots are filled", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (String(url).startsWith("/api/fcdb/search")) {
         return Promise.resolve({
@@ -366,14 +355,7 @@ describe("SquadPickerBuilder", () => {
           json: async () => ({ results: [mkCard()] }),
         });
       }
-      // PUT to signed URL
       return Promise.resolve({ ok: true });
-    });
-
-    const requestUploadUrlAction = vi.fn().mockResolvedValue({
-      path: "seasons/s/players/p/weeks/w/f.png",
-      signedUrl: "https://example/signed",
-      weekStartDate: "2026-04-16",
     });
 
     render(
@@ -381,7 +363,6 @@ describe("SquadPickerBuilder", () => {
         weekStartDate="2026-04-16"
         rule={null}
         submitAction={vi.fn()}
-        requestUploadUrlAction={requestUploadUrlAction}
       />,
     );
 
@@ -394,16 +375,6 @@ describe("SquadPickerBuilder", () => {
       const row = await screen.findByTestId("card-search-result-0");
       fireEvent.click(row.querySelector("button[type='button']")!);
     }
-
-    // Upload a screenshot.
-    const file = new File([new Uint8Array([0, 1, 2])], "x.png", {
-      type: "image/png",
-    });
-    const fileInput = screen.getByTestId("picker-file-input") as HTMLInputElement;
-    fireEvent.change(fileInput, { target: { files: [file] } });
-    await waitFor(() => {
-      expect(screen.queryByTestId("picker-upload-ok")).toBeTruthy();
-    });
 
     const btn = screen.getByTestId("picker-submit-btn") as HTMLButtonElement;
     await waitFor(() => expect(btn.disabled).toBe(false));

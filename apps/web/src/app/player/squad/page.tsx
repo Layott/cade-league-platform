@@ -38,7 +38,6 @@ import {
 } from "@/components/player/ApplySquadToOtherMDs";
 import { WeekendApplyPrompt } from "@/components/player/WeekendApplyPrompt";
 import {
-  requestUploadUrlAction,
   submitPickerAction,
   applySquadToMultipleMatchDaysAction,
 } from "./actions";
@@ -398,7 +397,6 @@ export default async function PlayerSquadPage({
               rule={rule}
               matchDayId={selected.matchDayId}
               submitAction={submitPickerAction}
-              requestUploadUrlAction={requestUploadUrlAction}
               initialDraft={initialDraft}
               initialSquad={initialSquad}
               saveDraftAction={saveSquadDraftAction}

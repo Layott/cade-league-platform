@@ -74,17 +74,18 @@ export const createSubmissionSchema = z.object({
   // submission is stamped with this match_day_id so the admin queue can
   // group by match day. Plan 10 weekly submissions leave it null.
   matchDayId: z.string().uuid().nullable().optional(),
-  // Plan 39 sanitize — `..` traversal in a storage path lets a poisoned
-  // upload escape the bucket sub-tree. Reject parent-path token + back-
-  // slash. Cap at 500 chars (matches other storage path schemas).
+  // 2026-05-04 — screenshot upload removed from player submit flow. The
+  // field accepts null/empty now (column is nullable per migration
+  // 20260701000020). Plan 39 path-sanitize still applies when present.
   futbinScreenshotPath: z
     .string()
-    .min(1)
     .max(500)
     .refine(
       (v) => !v.includes("..") && !v.includes("\\"),
       "futbinScreenshotPath must not contain '..' or backslashes",
-    ),
+    )
+    .nullable()
+    .optional(),
   // Bug 10 (2026-05-01) — picker formation label.
   formation: formationLabelEnum.nullable().optional(),
   items: z.array(itemSchema).min(1).max(23),

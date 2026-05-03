@@ -71,18 +71,11 @@ export type SquadPickerBuilderProps = {
    */
   submitAction: (payload: {
     weekStartDate: string;
-    futbinScreenshotPath: string;
     slots: Array<{ slotIndex: number; fcdbPlayerId: string; positionInLineup: string }>;
     matchDayId?: string;
     // Bug 10 (2026-05-01) — formation for broadcast overlay.
     formation?: string;
   }) => Promise<void>;
-  requestUploadUrlAction: (input: { extension: "png" | "jpg" | "webp" }) => Promise<{
-    path: string;
-    signedUrl: string;
-    token?: string;
-    weekStartDate: string;
-  }>;
   /**
    * Hydrated picker state from a previously-autosaved draft. NULL on first
    * visit (no draft yet). The picker seeds its formation / slots / subs /
@@ -135,7 +128,6 @@ export function SquadPickerBuilder({
   rule,
   matchDayId,
   submitAction,
-  requestUploadUrlAction,
   initialDraft,
   initialSquad,
   saveDraftAction,
@@ -170,10 +162,6 @@ export function SquadPickerBuilder({
     | { kind: "sub"; index: number }
     | null
   >(null);
-  const [screenshotPath, setScreenshotPath] = useState<string | null>(
-    () => initialDraft?.screenshotPath ?? null,
-  );
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   // Drag-to-reorder source. Lifted here so drops can cross the pitch <->
@@ -185,10 +173,10 @@ export function SquadPickerBuilder({
   >(null);
 
   // Debounced autosave (~800ms). Fires whenever any field the player can
-  // change moves: formation, slots, subs, or the screenshot upload pointer.
-  // Skipped on the very first effect run (which would re-save the hydrated
-  // initialDraft for no reason) via `firstAutosaveRunRef`. A failed save is
-  // logged but never blocks UI — autosave is best-effort.
+  // change moves: formation, slots, or subs. Skipped on the very first
+  // effect run (which would re-save the hydrated initialDraft for no
+  // reason) via `firstAutosaveRunRef`. A failed save is logged but never
+  // blocks UI — autosave is best-effort.
   const firstAutosaveRunRef = useRef(true);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -218,7 +206,7 @@ export function SquadPickerBuilder({
         formation,
         slots: slotPayload,
         subs,
-        screenshotPath,
+        screenshotPath: null,
       })
         .then((res) => {
           if (!res.ok) {
@@ -239,7 +227,6 @@ export function SquadPickerBuilder({
     formation,
     slots,
     subs,
-    screenshotPath,
     weekStartDate,
     matchDayId,
     saveDraftAction,
@@ -457,22 +444,21 @@ export function SquadPickerBuilder({
   /**
    * 2026-05-01 — bug 6. Clear-roster button. Confirms with the player,
    * resets every in-memory picker field (formation back to 4-3-3, every
-   * slot empty, every sub null, captain unset, screenshot pointer wiped),
-   * and best-effort calls `clearDraftAction` to soft-delete the persisted
-   * draft so a return visit doesn't rehydrate stale picks. The action is
-   * fire-and-forget — a failed network call never blocks the UI reset.
+   * slot empty, every sub null, captain unset), and best-effort calls
+   * `clearDraftAction` to soft-delete the persisted draft so a return
+   * visit doesn't rehydrate stale picks. The action is fire-and-forget —
+   * a failed network call never blocks the UI reset.
    */
   const onClearRoster = useCallback(() => {
     if (typeof window !== "undefined") {
       const ok = window.confirm(
-        "Clear all picks and restart? This will remove your formation, starting XI, subs, and screenshot for this match day.",
+        "Clear all picks and restart? This will remove your formation, starting XI, and subs for this match day.",
       );
       if (!ok) return;
     }
     setFormation("433");
     setSlots(emptySlots());
     setSubs(Array.from({ length: MAX_SUBS }, () => null));
-    setScreenshotPath(null);
     setError(null);
     setDialogOpen(false);
     setDialogTarget(null);
@@ -492,42 +478,9 @@ export function SquadPickerBuilder({
     }
   }, [clearDraftAction, weekStartDate, matchDayId]);
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setError(null);
-    setUploading(true);
-    try {
-      const extRaw = f.name.split(".").pop()?.toLowerCase() ?? "png";
-      const extension = (["png", "jpg", "jpeg", "webp"].includes(extRaw)
-        ? extRaw === "jpeg"
-          ? "jpg"
-          : extRaw
-        : "png") as "png" | "jpg" | "webp";
-      const signed = await requestUploadUrlAction({ extension });
-      const put = await fetch(signed.signedUrl, {
-        method: "PUT",
-        body: f,
-        headers: { "Content-Type": f.type || "application/octet-stream" },
-      });
-      if (!put.ok) {
-        throw new Error(`upload failed: ${put.status}`);
-      }
-      setScreenshotPath(signed.path);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setUploading(false);
-    }
-  }
-
   function onSubmit() {
     if (!allStartersFilled) {
       setError("Fill all 11 starting slots before submitting.");
-      return;
-    }
-    if (!screenshotPath) {
-      setError("Upload your Futbin screenshot before submitting.");
       return;
     }
     setError(null);
@@ -559,7 +512,6 @@ export function SquadPickerBuilder({
       try {
         await submitAction({
           weekStartDate,
-          futbinScreenshotPath: screenshotPath,
           slots: [...starterRows, ...subRows],
           matchDayId: matchDayId ?? undefined,
           // Bug 10 (2026-05-01) — pass picker formation through.
@@ -626,7 +578,7 @@ export function SquadPickerBuilder({
             <button
               type="button"
               onClick={onClearRoster}
-              disabled={isPending || uploading}
+              disabled={isPending}
               data-testid="picker-clear-roster-btn"
               className="rounded-sm border border-[var(--flare)] bg-transparent px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--flare)] transition-colors hover:bg-[rgba(255,91,59,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -690,30 +642,6 @@ export function SquadPickerBuilder({
           </div>
         </div>
 
-        <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-            Futbin screenshot (required for submission)
-          </label>
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onFileChange}
-            disabled={uploading || isPending}
-            className="mt-2 text-sm text-[var(--chalk-1)]"
-            data-testid="picker-file-input"
-          />
-          {uploading ? (
-            <p className="mt-1 text-xs text-[var(--chalk-3)]">Uploading…</p>
-          ) : null}
-          {screenshotPath ? (
-            <p
-              className="mt-1 text-xs text-[var(--signal)]"
-              data-testid="picker-upload-ok"
-            >
-              Screenshot uploaded.
-            </p>
-          ) : null}
-        </div>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -771,7 +699,7 @@ export function SquadPickerBuilder({
           <PrimaryButton
             type="button"
             onClick={onSubmit}
-            disabled={!allStartersFilled || !screenshotPath || isPending || uploading}
+            disabled={!allStartersFilled || isPending}
             data-testid="picker-submit-btn"
           >
             Submit squad
