@@ -467,9 +467,11 @@ export const OVERLAY_FORMATIONS: Record<FormationKey, SlotPosition[]> = {
     { slotIndex: 5, label: "CM", top: 56, left: 22 },
     { slotIndex: 6, label: "CM", top: 56, left: 50 },
     { slotIndex: 7, label: "CM", top: 56, left: 78 },
-    { slotIndex: 8, label: "LW", top: 12, left: 14 },
+    // Wide attackers pulled inward 14→20 / 86→80 so cards clear the
+    // top-left title-block + draft-photo zone (2026-05-03).
+    { slotIndex: 8, label: "LW", top: 12, left: 20 },
     { slotIndex: 9, label: "ST", top: 8, left: 50 },
-    { slotIndex: 10, label: "RW", top: 12, left: 86 },
+    { slotIndex: 10, label: "RW", top: 12, left: 80 },
   ],
   "442": [
     { slotIndex: 0, label: "GK", top: 92, left: 50 },
@@ -548,10 +550,10 @@ export const OVERLAY_FORMATIONS: Record<FormationKey, SlotPosition[]> = {
     { slotIndex: 4, label: "RB", top: 80, left: 92 },
     { slotIndex: 5, label: "CM", top: 56, left: 32 },
     { slotIndex: 6, label: "CM", top: 56, left: 68 },
-    { slotIndex: 7, label: "LW", top: 12, left: 12 },
-    { slotIndex: 8, label: "ST", top: 8, left: 38 },
-    { slotIndex: 9, label: "ST", top: 8, left: 62 },
-    { slotIndex: 10, label: "RW", top: 12, left: 88 },
+    { slotIndex: 7, label: "LW", top: 12, left: 20 },
+    { slotIndex: 8, label: "ST", top: 8, left: 40 },
+    { slotIndex: 9, label: "ST", top: 8, left: 60 },
+    { slotIndex: 10, label: "RW", top: 12, left: 80 },
   ],
   // 4-3-1-2 (flat 3 CMs, a CAM, two STs)
   "4312": [
@@ -637,9 +639,9 @@ export const OVERLAY_FORMATIONS: Record<FormationKey, SlotPosition[]> = {
     { slotIndex: 5, label: "CM", top: 44, left: 32 },
     { slotIndex: 6, label: "CM", top: 44, left: 68 },
     { slotIndex: 7, label: "RM", top: 44, left: 92 },
-    { slotIndex: 8, label: "LW", top: 12, left: 14 },
+    { slotIndex: 8, label: "LW", top: 12, left: 20 },
     { slotIndex: 9, label: "ST", top: 8, left: 50 },
-    { slotIndex: 10, label: "RW", top: 12, left: 86 },
+    { slotIndex: 10, label: "RW", top: 12, left: 80 },
   ],
   // 3-4-1-2 (wing-back 4-mid, CAM, two STs)
   "3412": [
@@ -756,9 +758,9 @@ export const OVERLAY_FORMATIONS: Record<FormationKey, SlotPosition[]> = {
     { slotIndex: 5, label: "RWB", top: 66, left: 92 },
     { slotIndex: 6, label: "CM", top: 44, left: 32 },
     { slotIndex: 7, label: "CM", top: 44, left: 68 },
-    { slotIndex: 8, label: "LW", top: 12, left: 14 },
+    { slotIndex: 8, label: "LW", top: 12, left: 20 },
     { slotIndex: 9, label: "ST", top: 8, left: 50 },
-    { slotIndex: 10, label: "RW", top: 12, left: 86 },
+    { slotIndex: 10, label: "RW", top: 12, left: 80 },
   ],
 };
 

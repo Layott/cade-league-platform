@@ -743,13 +743,21 @@
   }
 
   /* ── TITLE BLOCK (top-left): "MR OGA / DRAFT" ──────────── */
+  /* 2026-05-03 — title-block + photo shrunk so the entire top-left
+     panel fits inside the 360-px gutter to the left of the pitch.
+     Without this, formations with wide attackers (4-3-3 LW/RW,
+     3-4-3 LW/RW, 4-2-4 LW/RW, 5-2-3 LW/RW) had their cards
+     overlap the headshot frame in the top-left corner of the
+     pitch. Photo dimensions reduced 160x200 → 120x150; title
+     line font 110px → 78px so the combined width stays under
+     280px and never bleeds into the pitch zone. */
   .title-block {
     position: absolute;
     top: 60px;
-    left: 80px;
+    left: 60px;
     display: flex;
     align-items: flex-start;
-    gap: 24px;
+    gap: 18px;
     z-index: 12;
     animation: title-fade 0.9s 0.25s ease both;
   }
@@ -762,7 +770,7 @@
     font-family: var(--display);
     font-weight: 900;
     font-stretch: 75%;
-    font-size: 110px;
+    font-size: 78px;
     letter-spacing: -0.018em;
     color: var(--ink);
     text-transform: uppercase;
@@ -783,8 +791,8 @@
       0 0 38px var(--green-glow);
   }
   .draft-photo {
-    width: 160px;
-    height: 200px;
+    width: 120px;
+    height: 150px;
     object-fit: cover;
     object-position: center 22%;
     border-radius: 6px;
