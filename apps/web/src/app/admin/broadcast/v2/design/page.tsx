@@ -13,6 +13,7 @@ import OverlayDesignEditor, {
   type PartnerLogoOverrideRow,
   type AnimationRow,
 } from "@/components/admin/OverlayDesignEditor";
+import { PlayerPhotoPanel } from "@/components/admin/broadcast/PlayerPhotoPanel";
 import { resolveTokens } from "@/server/overlays/design/tokens";
 import { listTemplates } from "@/server/overlays/design/templates";
 import { listHistory } from "@/server/overlays/design/history";
@@ -418,6 +419,8 @@ export default async function OverlayDesignPage({
           </ol>
         )}
       </section>
+
+      <PlayerPhotoPanel />
     </div>
   );
 }
