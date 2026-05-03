@@ -3,9 +3,10 @@
  *
  * Both writes gate on the `overlay.design.manage` permission (admin / design /
  * production roles per the §15 Overlay Design System seed). The selection
- * table is `player_photo_selections` with a partial unique index on
- * `(player_id, overlay_key)` for upsert conflict resolution; `overlay_key`
- * NULL means "global default for this player across all overlays".
+ * table is `player_photo_selections` with a partial expression-based unique
+ * index `(player_id, coalesce(overlay_key, '__global__')) WHERE deleted_at IS
+ * NULL`. Postgres rejects `ON CONFLICT (player_id, overlay_key)` against an
+ * expression index, so we do an explicit lookup + branch instead of `upsert`.
  *
  * Clears are soft-delete only — never DELETE — so the audit trigger captures
  * the transition and admins can restore via /trash if needed.
@@ -26,19 +27,47 @@ export async function setPlayerPose(opts: {
 }): Promise<void> {
   const { sb, actor, playerId, overlayKey, poseIndex, source } = opts;
   await requirePermAsync(sb, actor, 'overlay.design.manage');
-  const { error } = await sb.from('player_photo_selections').upsert(
-    {
-      player_id: playerId,
-      overlay_key: overlayKey,
-      pose_index: poseIndex,
-      source,
-      active: true,
-      deleted_at: null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'player_id,overlay_key' },
-  );
-  if (error) throw new Error(`setPlayerPose failed: ${error.message}`);
+
+  const baseFind = sb
+    .from('player_photo_selections')
+    .select('id')
+    .eq('player_id', playerId)
+    .is('deleted_at', null);
+  const findQ =
+    overlayKey === null
+      ? baseFind.is('overlay_key', null)
+      : baseFind.eq('overlay_key', overlayKey);
+  const { data: existing, error: findErr } = await findQ.maybeSingle();
+  if (findErr) {
+    throw new Error(`setPlayerPose lookup failed: ${findErr.message}`);
+  }
+
+  if (existing) {
+    const { error } = await sb
+      .from('player_photo_selections')
+      .update({
+        pose_index: poseIndex,
+        source,
+        active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', (existing as { id: string }).id);
+    if (error) {
+      throw new Error(`setPlayerPose update failed: ${error.message}`);
+    }
+    return;
+  }
+
+  const { error } = await sb.from('player_photo_selections').insert({
+    player_id: playerId,
+    overlay_key: overlayKey,
+    pose_index: poseIndex,
+    source,
+    active: true,
+  });
+  if (error) {
+    throw new Error(`setPlayerPose insert failed: ${error.message}`);
+  }
 }
 
 export async function clearPlayerPose(opts: {
