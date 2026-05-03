@@ -12,14 +12,19 @@
  *   - Plain `<img>` (not `next/image`). `apps/web/next.config.ts` has no
  *     `remotePatterns` so the optimizer 500s on Supabase storage URLs;
  *     T11's launcher set the precedent.
- *   - `PlayerPhotoUploadWidget` is lazy-loaded. Until T13 lands the
- *     widget, the dynamic import resolves to a placeholder so the modal
- *     stays buildable (the upload button still opens that placeholder).
+ *   - `PlayerPhotoUploadWidget` (T13) is lazy-loaded so the heavy bg-removal
+ *     ONNX model + JSZip only ship when an admin actually starts an upload.
  *   - Mutation responses (`{ok:true}` or `{error}`) drive an inline
  *     `errorMsg` banner instead of crashing the modal on 401/403.
  */
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import type { PlayerPhotoCard } from "./PlayerPhotoModalLauncher.client";
+
+const UploadWidget = lazy(() =>
+  import("./PlayerPhotoUploadWidget").then((m) => ({
+    default: m.PlayerPhotoUploadWidget,
+  })),
+);
 
 type PoseSource = "manifest" | "upload";
 
@@ -67,36 +72,6 @@ const OVERLAY_KEYS = [
   "01-long-intro",
   "05-stinger-winner",
 ] as const;
-
-// T13 will replace this inline placeholder with a `lazy(() => import(
-// './PlayerPhotoUploadWidget'))` call. We can't lazy-import the missing
-// module today because TypeScript resolves the import path at type-check
-// time, so the module HAS to exist on disk. T12 is scoped to ship a
-// buildable modal — the upload pathway opens this stub instead.
-function UploadWidgetPlaceholder(props: {
-  playerId: string;
-  onComplete: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div
-      className="mt-4 rounded border border-white/10 bg-black/40 p-3 text-xs"
-      data-testid="upload-widget-placeholder"
-    >
-      <p className="opacity-80">
-        Upload widget pending — T13. Player id:{" "}
-        <code className="font-mono">{props.playerId}</code>.
-      </p>
-      <button
-        type="button"
-        onClick={props.onCancel}
-        className="mt-2 rounded border border-white/20 px-2 py-1 text-[11px] hover:border-[#6bcd06]"
-      >
-        Close
-      </button>
-    </div>
-  );
-}
 
 export function PlayerPhotoModal(props: {
   card: PlayerPhotoCard;
@@ -424,14 +399,20 @@ export function PlayerPhotoModal(props: {
         </section>
 
         {showUpload && (
-          <UploadWidgetPlaceholder
-            playerId={props.card.id}
-            onComplete={() => {
-              setShowUpload(false);
-              loadGallery();
-            }}
-            onCancel={() => setShowUpload(false)}
-          />
+          <Suspense
+            fallback={
+              <div className="mt-4 text-xs opacity-70">Loading uploader…</div>
+            }
+          >
+            <UploadWidget
+              playerId={props.card.id}
+              onComplete={() => {
+                setShowUpload(false);
+                loadGallery();
+              }}
+              onCancel={() => setShowUpload(false)}
+            />
+          </Suspense>
         )}
       </div>
     </div>
