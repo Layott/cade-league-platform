@@ -42,6 +42,13 @@ import type { FCItemType } from "@/server/fcdb/types";
 // `"use client"`) makes the named exports unreachable from the server.
 import type { FormationKey } from "@/components/squads/formations";
 import { getFormationSlots } from "@/components/squads/formations";
+// Authoritative Futbin Fut26ChemistryData rule table — refreshed by the
+// `_lib_chem_rules.js` fetcher at the end of every Futbin scraper run
+// (`_scrape_futbin_{headful,new,parallel}.js`). The JSON file is the
+// runtime source of truth; the inline `HARDCODED_DEFAULTS` below acts
+// as a safety net so chem.ts still computes correctly if the file is
+// missing entries for a freshly-shipped EA promo type.
+import chemRulesJson from "./chemistry-rules.json";
 
 /**
  * Optional per-card chem-bonus override. When set, replaces the
@@ -243,64 +250,78 @@ export function getLeagueFamily(league: string | null | undefined): string | nul
 
 /**
  * Authoritative FC26 rare-type → chem contribution map sourced directly
- * from Futbin's `Fut26ChemistryData.rareTypeRules` (extracted from any
- * saved community squad page, e.g.
- * `https://www.futbin.com/26/squad/<id>` — the JSON is embedded in a
- * <script> tag and is global, not per-squad). 20 rare types diverge from
- * the default `{club:1, league:1, nation:1}`; everything else falls back.
+ * from Futbin's `Fut26ChemistryData.rareTypeRules` JSON (embedded as an
+ * inline <script> on every saved community squad page, e.g.
+ * `https://www.futbin.com/26/squad/<id>` — the table is GLOBAL across
+ * Futbin, not per-squad).
+ *
+ * Runtime values come from `chemistry-rules.json` (committed to the
+ * repo, refreshed on every Futbin scraper run via `_lib_chem_rules.js`
+ * → `_scrape_futbin_{headful,new,parallel}.js`). When a freshly-shipped
+ * EA promo type is missing from the JSON file (e.g. EA ships TOTY-2027
+ * before the next scraper run), the inline `HARDCODED_DEFAULTS` below
+ * acts as a safety net so chem.ts still computes correctly.
  *
  * Variant slugs from Futbin (`150-cornerstones`, `11-team-of-the-season`,
  * `72-heroes`, `12-icon`, etc.) carry the rare type as the leading
  * integer prefix. `extractRareTypeId(variant)` parses this; rule lookup
- * is then a single Map.get.
- *
- * Last verified 2026-05-03 against Futbin community squads `460`, `369`,
- * `977076`. Re-verify when EA ships a major content cycle (TOTY,
- * end-of-cycle TOTS, etc.) — new promos may add rule entries.
+ * is then a single object access.
  */
-export const RARE_TYPE_RULES: Readonly<Record<number, ChemistryBonus>> = {
-  // Icon (canonical, e.g. variant `12-icon` falls into this rule via
-  // base-icon classifier even though prefix 12 is not in this map).
+const HARDCODED_DEFAULTS: Readonly<Record<number, ChemistryBonus>> = {
   4: { clubSymbols: 1, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true },
-  // TOTS — Team of the Season.
   11: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
-  // Answer The Call promo (variant `20-answer-the-call`).
   20: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 3 },
-  // Icon variant (also full-chem 1/wildcard/2).
   25: { clubSymbols: 1, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true },
-  // Festival of Football Captains.
   28: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 3 },
-  // Honourable Mentions (TOTS-family).
   65: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
-  // Hero (canonical) — full chem with 2 league + 2 nation.
   66: { clubSymbols: 1, leagueSymbols: 2, nationSymbols: 2, fullChemInPosition: true },
-  // Hero variant.
   67: { clubSymbols: 1, leagueSymbols: 2, nationSymbols: 2, fullChemInPosition: true },
-  // Full-chem promo with +1 nation bump.
   68: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 2, fullChemInPosition: true },
-  // Icon-like but no club contribution; +2 nation; full chem.
   69: { clubSymbols: 0, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 3, fullChemInPosition: true },
-  // Full-chem promo with +2 nation.
   70: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 3, fullChemInPosition: true },
-  // Squad Foundations — +1 league symbol (so 2 total).
   87: { clubSymbols: 1, leagueSymbols: 2, nationSymbols: 1 },
-  // World Tour — +1 nation symbol (so 2 total).
   91: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 2 },
-  // Full-chem normal-shape (no axis bumps, just auto-3 in position).
   108: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 1, fullChemInPosition: true },
-  // Icon-shape full-chem variant.
   116: { clubSymbols: 1, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true },
-  // TOTS Highlights.
   120: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
-  // TOTS-family.
   127: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
-  // Full-chem normal-shape.
   129: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 1, fullChemInPosition: true },
-  // TOTS-family.
   133: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
-  // Cornerstones — +1 club symbol (so 2 total).
   150: { clubSymbols: 2, leagueSymbols: 1, nationSymbols: 1 },
 };
+
+function loadRulesFromJson(): Record<number, ChemistryBonus> {
+  try {
+    const raw = (chemRulesJson as { rareTypeRules?: Record<string, ChemistryBonus> }).rareTypeRules;
+    if (!raw || typeof raw !== "object") return {};
+    const out: Record<number, ChemistryBonus> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const id = parseInt(k, 10);
+      if (Number.isFinite(id) && v && typeof v === "object") out[id] = v as ChemistryBonus;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export const RARE_TYPE_RULES: Readonly<Record<number, ChemistryBonus>> = {
+  ...HARDCODED_DEFAULTS,
+  ...loadRulesFromJson(),
+};
+
+/**
+ * Heroes contribute +1 club symbol toward this pseudo-club id (Futbin
+ * tracks heroes as members of a synthetic "FC HEROES" club). Icons
+ * likewise pool toward `ICON_CLUB_ID`. Both are exported so callers
+ * (e.g. squad validators) can recognize the synthetic-club rows.
+ */
+const CHEM_RULES_META = chemRulesJson as {
+  heroClubId?: number | null;
+  iconClubId?: number | null;
+};
+export const HERO_CLUB_ID: number = CHEM_RULES_META.heroClubId ?? 114605;
+export const ICON_CLUB_ID: number = CHEM_RULES_META.iconClubId ?? 112658;
 
 /**
  * Parse the leading integer prefix from a Futbin variant slug. Returns

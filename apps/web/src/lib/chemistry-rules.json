@@ -1,0 +1,29 @@
+{
+  "gameKey": "fut26",
+  "rareTypeRules": {
+    "4": { "clubSymbols": 1, "leagueSymbols": 0, "leagueSymbolsAllLeagues": true, "nationSymbols": 2, "fullChemInPosition": true },
+    "11": { "clubSymbols": 1, "leagueSymbols": 5, "nationSymbols": 1 },
+    "20": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 3 },
+    "25": { "clubSymbols": 1, "leagueSymbols": 0, "leagueSymbolsAllLeagues": true, "nationSymbols": 2, "fullChemInPosition": true },
+    "28": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 3 },
+    "65": { "clubSymbols": 1, "leagueSymbols": 5, "nationSymbols": 1 },
+    "66": { "clubSymbols": 1, "leagueSymbols": 2, "nationSymbols": 2, "fullChemInPosition": true },
+    "67": { "clubSymbols": 1, "leagueSymbols": 2, "nationSymbols": 2, "fullChemInPosition": true },
+    "68": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 2, "fullChemInPosition": true },
+    "69": { "clubSymbols": 0, "leagueSymbols": 0, "leagueSymbolsAllLeagues": true, "nationSymbols": 3, "fullChemInPosition": true },
+    "70": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 3, "fullChemInPosition": true },
+    "87": { "clubSymbols": 1, "leagueSymbols": 2, "nationSymbols": 1 },
+    "91": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 2 },
+    "108": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 1, "fullChemInPosition": true },
+    "116": { "clubSymbols": 1, "leagueSymbols": 0, "leagueSymbolsAllLeagues": true, "nationSymbols": 2, "fullChemInPosition": true },
+    "120": { "clubSymbols": 1, "leagueSymbols": 5, "nationSymbols": 1 },
+    "127": { "clubSymbols": 1, "leagueSymbols": 5, "nationSymbols": 1 },
+    "129": { "clubSymbols": 1, "leagueSymbols": 1, "nationSymbols": 1, "fullChemInPosition": true },
+    "133": { "clubSymbols": 1, "leagueSymbols": 5, "nationSymbols": 1 },
+    "150": { "clubSymbols": 2, "leagueSymbols": 1, "nationSymbols": 1 }
+  },
+  "heroClubId": 114605,
+  "iconClubId": 112658,
+  "sourceUrl": "https://www.futbin.com/26/squad/460",
+  "lastScrapedAt": "2026-05-03T13:35:00.000Z"
+}

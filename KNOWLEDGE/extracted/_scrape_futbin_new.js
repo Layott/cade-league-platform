@@ -354,6 +354,15 @@ async function main() {
   } catch (err) {
     console.error("[new] fcdb.refreshed publish failed:", err && err.message ? err.message : err);
   }
+  // 2026-05-03 — refresh the global Futbin chem rule table while we still
+  // have a warm browser context. Best-effort — failure must NOT abort.
+  try {
+    const { fetchAndPersistChemRules } = require("./_lib_chem_rules");
+    const result = await fetchAndPersistChemRules({ page, sb });
+    console.log("[new] chem-rules refresh:", JSON.stringify(result));
+  } catch (err) {
+    console.error("[new] chem-rules refresh failed:", err && err.message ? err.message : err);
+  }
   await ctx.close();
 }
 main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });

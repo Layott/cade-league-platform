@@ -312,5 +312,24 @@ async function main() {
   } catch (err) {
     console.error("[parallel] fcdb.refreshed publish failed:", err && err.message ? err.message : err);
   }
+  // 2026-05-03 — refresh the global Futbin chem rule table. Workers
+  // already closed their contexts, so spin up a one-off context using
+  // worker 1's profile (already CF-warmed).
+  try {
+    const { chromium } = require("playwright");
+    const profileDir = path.resolve(__dirname, ".futbin_chromium_profile_p1");
+    const ctx = await chromium.launchPersistentContext(profileDir, {
+      headless: false,
+      args: ["--disable-blink-features=AutomationControlled"],
+      viewport: { width: 1280, height: 720 },
+    });
+    const page = await ctx.newPage();
+    const { fetchAndPersistChemRules } = require("./_lib_chem_rules");
+    const result = await fetchAndPersistChemRules({ page, sb });
+    console.log("[parallel] chem-rules refresh:", JSON.stringify(result));
+    await ctx.close();
+  } catch (err) {
+    console.error("[parallel] chem-rules refresh failed:", err && err.message ? err.message : err);
+  }
 }
 main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });
