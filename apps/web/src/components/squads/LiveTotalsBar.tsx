@@ -68,6 +68,10 @@ function cardToChem(card: CardSearchResult): ChemistryCard {
     position: card.position,
     positionsAlt: card.positionsAlt,
     itemType: card.itemType,
+    // Pass the Futbin variant slug so deriveChemBonus() recognizes
+    // promo subclasses (Cornerstones, Festival Captains, Heroes, etc.)
+    // and applies their non-default chem-symbol contributions.
+    variant: card.variant,
     name: card.name,
   };
 }

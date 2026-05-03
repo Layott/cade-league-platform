@@ -21,6 +21,7 @@ const path = require("path");
 const readline = require("readline");
 const { chromium } = require("playwright");
 const { createClient } = require("@supabase/supabase-js");
+const { classifyVariantWithBonus } = require("./_classify_variant.js");
 
 const STATE_PATH = path.resolve(__dirname, "futbin_headful_state.json");
 const UNMATCHED_PATH = path.resolve(__dirname, "futbin_headful_unmatched.json");
@@ -287,16 +288,17 @@ async function upsertRows(sb, rows, stats, inserted, unmatched) {
       attrs.alt_positions = [...r.altPositions];
     }
 
-    // item_type bucket from variant string.
-    const vLower = (r.variant || "").toLowerCase();
-    let itemType = "normal";
-    if (/\bicon\b/.test(vLower)) itemType = "icon";
-    else if (/\btoty\b/.test(vLower)) itemType = "toty";
-    else if (/\btots\b|team-of-the-season/.test(vLower)) itemType = "tots";
-    else if (/\btotw\b|\bin-form\b|\bif\b/.test(vLower)) itemType = "totw";
-    else if (/\bhero(es)?\b/.test(vLower)) itemType = "hero";
-    else if (/\brttf\b|road-to/.test(vLower)) itemType = "rttf";
-    else if (!/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/.test(vLower)) itemType = "special";
+    // item_type bucket + granular promo subclass + EA chem-bonus shape from
+    // variant string. Shared classifier keeps headful + delta + parallel
+    // scrapers in lockstep — promo subclass tags (cornerstones, world-tour,
+    // festival-of-football-captains, etc) and chem-bonus payload (consumed
+    // by lib/chemistry.ts as an explicit override) flow into attributes
+    // alongside the existing item_type bucket.
+    const { itemType, promoClass, chemBonus } = classifyVariantWithBonus(r.variant || "");
+    if (promoClass) attrs.promo_class = promoClass;
+    else delete attrs.promo_class;
+    if (chemBonus) attrs.chem_bonus = chemBonus;
+    else delete attrs.chem_bonus;
 
     if (exist) {
       // Top-level chemistry columns — only write when scraper produced a

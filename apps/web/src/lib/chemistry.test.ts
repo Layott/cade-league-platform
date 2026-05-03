@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   calculateChemistry,
   computeChemistry,
+  deriveChemBonus,
   getLeagueFamily,
   isInPosition,
   LEAGUE_FAMILIES,
   slotsToSlotFills,
   TIER_THRESHOLDS,
   type ChemistryCard,
+  type ManagerLink,
   type SlotFill,
   type LegacyChemistryCard,
 } from "./chemistry";
@@ -22,6 +24,8 @@ function mk(over: Partial<ChemistryCard> = {}): ChemistryCard {
     position: over.position ?? "ST",
     positionsAlt: over.positionsAlt ?? [],
     itemType: over.itemType ?? "normal",
+    variant: over.variant ?? null,
+    chemBonus: over.chemBonus ?? null,
     name: over.name,
   };
 }
@@ -903,5 +907,835 @@ describe("slotsToSlotFills", () => {
     expect(fills[0].card?.name).toBe("Keeper");
     // Remaining slots null.
     for (let i = 1; i < 11; i++) expect(fills[i].card).toBeNull();
+  });
+});
+
+// ─── deriveChemBonus pure-function unit tests ─────────────────────────────
+
+describe("deriveChemBonus", () => {
+  // ─── Icons ────────────────────────────────────────────────────────────
+  it("itemType='icon' returns full icon bonus", () => {
+    expect(deriveChemBonus("icon", null)).toEqual({
+      clubSymbols: 0,
+      leagueSymbols: 0,
+      leagueSymbolsAllLeagues: true,
+      nationSymbols: 2,
+      fullChemInPosition: true,
+    });
+  });
+
+  it("variant '12-icon' matches as icon", () => {
+    expect(deriveChemBonus("normal", "12-icon")).toEqual({
+      clubSymbols: 0,
+      leagueSymbols: 0,
+      leagueSymbolsAllLeagues: true,
+      nationSymbols: 2,
+      fullChemInPosition: true,
+    });
+  });
+
+  it("compound icon variants all match (TOTY/Winter Wildcards/FUT Birthday/Champion/Thunderstruck)", () => {
+    const expected = {
+      clubSymbols: 0,
+      leagueSymbols: 0,
+      leagueSymbolsAllLeagues: true,
+      nationSymbols: 2,
+      fullChemInPosition: true,
+    };
+    expect(deriveChemBonus("special", "155-toty-icon")).toEqual(expected);
+    expect(deriveChemBonus("special", "35-winter-wilcard-icon")).toEqual(expected);
+    expect(deriveChemBonus("special", "149-fut-birthday-icon")).toEqual(expected);
+    expect(deriveChemBonus("special", "161-champion-icon")).toEqual(expected);
+    expect(deriveChemBonus("special", "157-thunderstruck-icon")).toEqual(expected);
+  });
+
+  // ─── Heroes ───────────────────────────────────────────────────────────
+  it("itemType='hero' returns full hero bonus", () => {
+    expect(deriveChemBonus("hero", null)).toEqual({
+      clubSymbols: 0,
+      leagueSymbols: 2,
+      nationSymbols: 1,
+      fullChemInPosition: true,
+    });
+  });
+
+  it("variant '72-heroes' matches as hero", () => {
+    expect(deriveChemBonus("normal", "72-heroes")).toEqual({
+      clubSymbols: 0,
+      leagueSymbols: 2,
+      nationSymbols: 1,
+      fullChemInPosition: true,
+    });
+  });
+
+  it("compound hero variants all match (Winter Wildcards/Joga Bonito/Fantasy FC/FUT Birthday)", () => {
+    const expected = {
+      clubSymbols: 0,
+      leagueSymbols: 2,
+      nationSymbols: 1,
+      fullChemInPosition: true,
+    };
+    expect(deriveChemBonus("special", "49-winter-wildcards-hero")).toEqual(expected);
+    expect(deriveChemBonus("special", "97-joga-bonito-hero")).toEqual(expected);
+    expect(deriveChemBonus("special", "135-fantasy-fc-hero")).toEqual(expected);
+    expect(deriveChemBonus("special", "148-fut-birthday-hero")).toEqual(expected);
+  });
+
+  // ─── Cornerstones ─────────────────────────────────────────────────────
+  it("'150-cornerstones' returns +1 club symbol bonus", () => {
+    expect(deriveChemBonus("special", "150-cornerstones")).toEqual({
+      clubSymbols: 2,
+    });
+  });
+
+  // ─── Festival of Football Captains ────────────────────────────────────
+  it("'28-festival-of-football-captains' returns +2 nation symbol bonus", () => {
+    expect(deriveChemBonus("special", "28-festival-of-football-captains")).toEqual({
+      nationSymbols: 3,
+    });
+  });
+
+  // ─── Squad Foundations (hypothetical) ─────────────────────────────────
+  it("'75-squad-foundations' returns +1 league symbol bonus", () => {
+    expect(deriveChemBonus("special", "75-squad-foundations")).toEqual({
+      leagueSymbols: 2,
+    });
+  });
+
+  // ─── World Tour (hypothetical) ────────────────────────────────────────
+  it("'99-world-tour' returns +1 nation symbol bonus", () => {
+    expect(deriveChemBonus("special", "99-world-tour")).toEqual({
+      nationSymbols: 2,
+    });
+  });
+
+  // ─── End of an Era (hypothetical) ─────────────────────────────────────
+  it("'200-end-of-an-era' returns icon-like bonus (all-leagues + 2 nation + auto-3)", () => {
+    expect(deriveChemBonus("special", "200-end-of-an-era")).toEqual({
+      clubSymbols: 0,
+      leagueSymbols: 0,
+      leagueSymbolsAllLeagues: true,
+      nationSymbols: 2,
+      fullChemInPosition: true,
+    });
+  });
+
+  // ─── Positional Excellence Evo (hypothetical) ─────────────────────────
+  it("'222-positional-excellence-evo' returns fullChemInPosition only", () => {
+    expect(deriveChemBonus("special", "222-positional-excellence-evo")).toEqual({
+      fullChemInPosition: true,
+    });
+  });
+
+  // ─── Null cases ───────────────────────────────────────────────────────
+  it("itemType='normal' + variant='3-gold' returns null (no bonus)", () => {
+    expect(deriveChemBonus("normal", "3-gold")).toBeNull();
+  });
+
+  it("itemType='tots' + variant='11-team-of-the-season' returns null (TOTS Plus chem not modelled)", () => {
+    expect(deriveChemBonus("tots", "11-team-of-the-season")).toBeNull();
+  });
+
+  it("null/undefined inputs return null", () => {
+    expect(deriveChemBonus(null, null)).toBeNull();
+    expect(deriveChemBonus(undefined, undefined)).toBeNull();
+    expect(deriveChemBonus(null, undefined)).toBeNull();
+    expect(deriveChemBonus(undefined, null)).toBeNull();
+    expect(deriveChemBonus("", "")).toBeNull();
+  });
+});
+
+// ─── Hero club fix (Heroes do NOT contribute club symbols) ────────────────
+
+describe("computeChemistry — hero club fix", () => {
+  it("hero with club='Real Madrid' does NOT push club counter to 5 (stays at 4)", () => {
+    // 4 Real Madrid normal players + 1 hero whose card.club is "Real Madrid".
+    // Without the fix: club counter = 4 + 1 = 5 → tier-2 → 2 club pts (wrong).
+    // With the fix: club counter = 4 (hero contributes 0 club) → tier-2 (≥4
+    // → 2 pts). Wait — both states give 2 pts at the boundary... let's
+    // verify the boundary precisely. Tier-2 starts at ≥4. So 4 = tier-2,
+    // 5 = tier-2, 7 = tier-3. To distinguish we need a count where the bug
+    // changes the tier. Use 6 normal Madrid + 1 hero (would be 7 = tier-3
+    // with bug, stays 6 = tier-2 without bug). But 6 + hero = 7 starters,
+    // need 4 more fillers → use distinct fillers.
+    const labels = LINEUP_433;
+    const madrid = (i: number, label: string) =>
+      mk({
+        club: "Real Madrid",
+        league: `MdLeague${i}`, // distinct leagues
+        nation: `MdNation${i}`, // distinct nations
+        position: label,
+      });
+    const hero = (label: string) =>
+      mk({
+        club: "Real Madrid", // hero claims Madrid but should NOT count
+        league: "Hero League",
+        nation: "Hero Nation",
+        position: label,
+        itemType: "hero",
+        name: "ClubHeroBug",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        club: `Filler${i}`,
+        league: `FL${i}`,
+        nation: `FN${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      madrid(0, labels[0]),
+      madrid(1, labels[1]),
+      madrid(2, labels[2]),
+      madrid(3, labels[3]),
+      madrid(4, labels[4]),
+      madrid(5, labels[5]),
+      hero(labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // With fix: Madrid count = 6 → tier-2 (≥4 but <7) → 2 club pts for
+    // the 6 Madrid players. Without fix (bug): Madrid count = 7 → tier-3
+    // → 3 club pts. We assert the FIXED behaviour.
+    for (let i = 0; i < 6; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    // Hero in-position → flat 3.
+    expect(r.perSlot[6]).toBe(3);
+    // Fillers → 0.
+    for (let i = 7; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+
+  it("4 Madrid + 1 hero whose club='Real Madrid' → Madrid stays at 4 (tier-2)", () => {
+    // Cleaner version: 4 Madrid normal + 1 hero with club="Real Madrid".
+    // Madrid counter (with fix) = 4 → tier-2 → 2 club pts for the 4 Madrid.
+    // Hero in-position = 3 (auto). 6 distinct fillers.
+    const labels = LINEUP_433;
+    const madrid = (i: number, label: string) =>
+      mk({
+        club: "Real Madrid",
+        league: `MdL${i}`,
+        nation: `MdN${i}`,
+        position: label,
+      });
+    const hero = (label: string) =>
+      mk({
+        club: "Real Madrid",
+        league: "Some Hero League",
+        nation: "Some Hero Nation",
+        position: label,
+        itemType: "hero",
+        name: "HeroNoClub",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        club: `FillerC${i}`,
+        league: `FillerL${i}`,
+        nation: `FillerN${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      madrid(0, labels[0]),
+      madrid(1, labels[1]),
+      madrid(2, labels[2]),
+      madrid(3, labels[3]),
+      hero(labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+    // Madrid count = 4 → tier-2 → 2 club pts each.
+    for (let i = 0; i < 4; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    // Hero in-position = 3 (auto).
+    expect(r.perSlot[4]).toBe(3);
+    // Fillers = 0.
+    for (let i = 5; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+});
+
+// ─── Icon nation symbols x2 ───────────────────────────────────────────────
+
+describe("computeChemistry — icon nation symbols x2", () => {
+  it("1 Italian Icon + 4 normal Italians → Italy counter = 6 (tier-2 → 2 nation pts)", () => {
+    // Icon contributes +2 to Italy nation counter (not +1). Italy total
+    // = 4 normal + 2 (icon) = 6 → tier-2 (≥5) → 2 nation pts for the 4
+    // Italians. Icon itself → flat 3 (auto in-pos).
+    const labels = LINEUP_433;
+    const italian = (i: number, label: string) =>
+      mk({
+        nation: "Italy",
+        league: `IL${i}`, // distinct leagues
+        club: `IC${i}`, // distinct clubs
+        position: label,
+      });
+    const icon = (label: string) =>
+      mk({
+        nation: "Italy",
+        league: "Icon League", // icon's own league (irrelevant due to itemType)
+        club: "Icons FC",
+        position: label,
+        itemType: "icon",
+        name: "ItalianIcon",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `Filler${i}`, // distinct nations
+        league: `FL${i}`,
+        club: `FC${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      italian(0, labels[0]),
+      italian(1, labels[1]),
+      italian(2, labels[2]),
+      italian(3, labels[3]),
+      icon(labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Italy nation count = 4 + 2 (icon) = 6 → tier-2 (≥5) → 2 nation pts
+    // for 4 Italians. They have no club/league links → slot chem = 2.
+    for (let i = 0; i < 4; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    // Icon = 3 (auto).
+    expect(r.perSlot[4]).toBe(3);
+    // Fillers = 0.
+    for (let i = 5; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+});
+
+// ─── Cornerstones bonus (+1 club symbol) ──────────────────────────────────
+
+describe("computeChemistry — Cornerstones bonus", () => {
+  it("5 Madrid normals + 1 Cornerstones Madrid → club counter = 7 (tier-3 → 3 club pts)", () => {
+    // 6 Real Madrid players: 5 normal + 1 Cornerstones (variant
+    // '150-cornerstones', itemType='special'). Cornerstones contributes
+    // 2 club symbols → Madrid counter = 5 + 2 = 7 → tier-3 → 3 club pts.
+    // All distinct leagues + nations to isolate club. Verify all 6
+    // (including the Cornerstones, which is NOT auto-3 — contributes via
+    // club like a normal card with bonus).
+    const labels = LINEUP_433;
+    const madrid = (i: number, label: string) =>
+      mk({
+        club: "Real Madrid",
+        league: `MdL${i}`,
+        nation: `MdN${i}`,
+        position: label,
+      });
+    const cornerstones = (label: string) =>
+      mk({
+        club: "Real Madrid",
+        league: "Cornerstones League",
+        nation: "Cornerstones Nation",
+        position: label,
+        itemType: "special",
+        variant: "150-cornerstones",
+        name: "MadridCornerstones",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        club: `FillerC${i}`,
+        league: `FillerL${i}`,
+        nation: `FillerN${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      madrid(0, labels[0]),
+      madrid(1, labels[1]),
+      madrid(2, labels[2]),
+      madrid(3, labels[3]),
+      madrid(4, labels[4]),
+      cornerstones(labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Madrid club count = 5 + 2 (cornerstones) = 7 → tier-3 → 3 club pts.
+    // No league/nation links → slot chem = 3 for all 6 Madrid (capped).
+    for (let i = 0; i < 6; i++) {
+      expect(r.perSlot[i]).toBe(3);
+    }
+    // Fillers = 0.
+    for (let i = 6; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+});
+
+// ─── Festival of Football Captains bonus (+2 nation symbols → 3 total) ────
+
+describe("computeChemistry — Festival Captains bonus", () => {
+  it("4 normal Brazilians + 1 Festival Captains Brazilian → Brazil counter = 7 (tier-2 → 2 nation pts)", () => {
+    // Captains contributes 3 nation symbols → Brazil counter = 4 + 3 = 7
+    // → tier-2 (≥5 but <8) → 2 nation pts. (Tier-3 needs ≥8.)
+    // Distinct clubs + leagues to isolate nation.
+    const labels = LINEUP_433;
+    const brazilian = (i: number, label: string) =>
+      mk({
+        nation: "Brazil",
+        league: `BL${i}`,
+        club: `BC${i}`,
+        position: label,
+      });
+    const captains = (label: string) =>
+      mk({
+        nation: "Brazil",
+        league: "Captains League",
+        club: "Captains FC",
+        position: label,
+        itemType: "special",
+        variant: "28-festival-of-football-captains",
+        name: "BrazilCaptains",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `FillerN${i}`,
+        league: `FillerL${i}`,
+        club: `FillerC${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      brazilian(0, labels[0]),
+      brazilian(1, labels[1]),
+      brazilian(2, labels[2]),
+      brazilian(3, labels[3]),
+      captains(labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Brazil count = 4 + 3 (captains) = 7 → tier-2 (≥5 but <8) → 2 nation
+    // pts for all 5 Brazilians. No club/league links → slot chem = 2.
+    for (let i = 0; i < 5; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    // Fillers = 0.
+    for (let i = 5; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+});
+
+// ─── Manager bonus ────────────────────────────────────────────────────────
+
+describe("computeChemistry — manager bonus", () => {
+  it("manager nation+league match adds +1 chem within the 3-cap (changes 2 → 3)", () => {
+    // 3 Spaniards in distinct La Liga clubs + 8 distinct fillers.
+    // Spain count = 3 → tier 1 (≥2 but <5) → 1 nation pt.
+    // La Liga count = 3 → tier 1 (≥3 but <5) → 1 league pt.
+    // Sum without manager = 2.
+    // Manager 'Spain' / 'LALIGA EA SPORTS' → +1 per Spaniard (matches
+    // both, but capped at +1 per card) → final = 3 each.
+    const labels = LINEUP_433;
+    const spaniard = (i: number, label: string) =>
+      mk({
+        nation: "Spain",
+        league: "LALIGA EA SPORTS",
+        club: `SpC${i}`, // distinct clubs (no club tier)
+        position: label,
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `FN${i}`,
+        league: `FL${i}`,
+        club: `FC${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      spaniard(0, labels[0]),
+      spaniard(1, labels[1]),
+      spaniard(2, labels[2]),
+      filler(3, labels[3]),
+      filler(4, labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    // Without manager.
+    const noMgr = computeChemistry(starting);
+    for (let i = 0; i < 3; i++) {
+      expect(noMgr.perSlot[i]).toBe(2);
+    }
+    // With manager.
+    const mgr: ManagerLink = {
+      nation: "Spain",
+      league: "LALIGA EA SPORTS",
+    };
+    const withMgr = computeChemistry(starting, undefined, undefined, mgr);
+    for (let i = 0; i < 3; i++) {
+      expect(withMgr.perSlot[i]).toBe(3);
+    }
+    // Fillers see no manager match → 0 either way.
+    for (let i = 3; i < 11; i++) {
+      expect(noMgr.perSlot[i]).toBe(0);
+      expect(withMgr.perSlot[i]).toBe(0);
+    }
+  });
+
+  it("manager league match alone (nation null) → +1 to that league's cards", () => {
+    // 3 La Liga players (distinct nations + clubs) + 8 fillers.
+    // Manager: { nation: null, league: 'LALIGA EA SPORTS' }.
+    // La Liga count = 3 → tier 1 (1 league pt). No club/nation links.
+    // Without manager: 1 each. With manager: 2 each.
+    const labels = LINEUP_433;
+    const liga = (i: number, label: string) =>
+      mk({
+        league: "LALIGA EA SPORTS",
+        nation: `LN${i}`,
+        club: `LC${i}`,
+        position: label,
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `FN${i}`,
+        league: `FL${i}`,
+        club: `FC${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      liga(0, labels[0]),
+      liga(1, labels[1]),
+      liga(2, labels[2]),
+      filler(3, labels[3]),
+      filler(4, labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+
+    const mgr: ManagerLink = { nation: null, league: "LALIGA EA SPORTS" };
+    const r = computeChemistry(starting, undefined, undefined, mgr);
+    for (let i = 0; i < 3; i++) {
+      expect(r.perSlot[i]).toBe(2); // 1 league + 1 manager
+    }
+    // Fillers don't share manager's league → 0.
+    for (let i = 3; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+
+  it("manager nation match alone (league null) → +1 to that nation's cards", () => {
+    // Manager 'France' / null. A French player in La Liga gets +1 from
+    // manager nation match even though league differs.
+    const labels = LINEUP_433;
+    const frenchInLaliga = (label: string) =>
+      mk({
+        nation: "France",
+        league: "LALIGA EA SPORTS",
+        club: "Frenchy FC",
+        position: label,
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `FN${i}`,
+        league: `FL${i}`,
+        club: `FC${i}`,
+        position: label,
+      });
+    const cards: ChemistryCard[] = [
+      frenchInLaliga(labels[0]),
+      ...Array.from({ length: 10 }, (_, i) => filler(i + 1, labels[i + 1])),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const mgr: ManagerLink = { nation: "France", league: null };
+    const r = computeChemistry(starting, undefined, undefined, mgr);
+    // French card alone → no club/league/nation tier (alone), but +1 from
+    // manager nation match → slot chem = 1.
+    expect(r.perSlot[0]).toBe(1);
+    for (let i = 1; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+
+  it("manager passed but null nation+league → no bonus to anyone", () => {
+    const labels = LINEUP_433;
+    const spanish = (i: number, label: string) =>
+      mk({
+        nation: "Spain",
+        league: "LALIGA EA SPORTS",
+        club: `SC${i}`,
+        position: label,
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `FN${i}`,
+        league: `FL${i}`,
+        club: `FC${i}`,
+        position: label,
+      });
+    const cards: ChemistryCard[] = [
+      spanish(0, labels[0]),
+      spanish(1, labels[1]),
+      spanish(2, labels[2]),
+      ...Array.from({ length: 8 }, (_, i) => filler(i + 3, labels[i + 3])),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const mgr: ManagerLink = { nation: null, league: null };
+    const r = computeChemistry(starting, undefined, undefined, mgr);
+    // Spaniards get 1 nation pt + 1 league pt = 2 (no manager bonus).
+    for (let i = 0; i < 3; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+  });
+
+  it("manager bonus respects 3-per-slot cap (already at 3 → no over-cap)", () => {
+    // 11 Real Madrid / La Liga / Spain — every slot already at cap 3.
+    // Manager 'Spain' / 'LALIGA EA SPORTS' shouldn't push above cap.
+    const labels = LINEUP_433;
+    const starting: SlotFill[] = labels.map((label) => ({
+      card: mk({
+        club: "Real Madrid",
+        league: "LALIGA EA SPORTS",
+        nation: "Spain",
+        position: label,
+      }),
+      positionInLineup: label,
+    }));
+    const mgr: ManagerLink = { nation: "Spain", league: "LALIGA EA SPORTS" };
+    const r = computeChemistry(starting, undefined, undefined, mgr);
+    // Every slot already 3 → manager can't push above cap.
+    expect(r.perSlot.every((p) => p === 3)).toBe(true);
+    expect(r.totalChem).toBe(33);
+  });
+
+  it("manager bonus also applies to subs", () => {
+    const labels = LINEUP_433;
+    const starting: SlotFill[] = labels.map((label) => ({
+      card: mk({
+        club: "Real Madrid",
+        league: "LALIGA EA SPORTS",
+        nation: "Spain",
+        position: label,
+      }),
+      positionInLineup: label,
+    }));
+    // Sub: French in PSG/Ligue 1. No tier links to starting pool.
+    const subs: SlotFill[] = [
+      {
+        card: mk({
+          club: "PSG",
+          league: "Ligue 1 McDonald's",
+          nation: "France",
+          position: "ST",
+          name: "FrenchSub",
+        }),
+        positionInLineup: "ST",
+      },
+    ];
+    const mgrFrance: ManagerLink = { nation: "France", league: null };
+    const r = computeChemistry(starting, undefined, subs, mgrFrance);
+    // Sub gets +1 from manager nation match. No tier match → 1 chem.
+    expect(r.subsTotalChem).toBe(1);
+  });
+});
+
+// ─── End of an Era bonus (icon-like — +1 to every league counter) ─────────
+
+describe("computeChemistry — End of an Era bonus", () => {
+  it("EoE adds +1 to every league counter (lifts a 2-card league to tier 1)", () => {
+    // 1 EoE card + 5 distinct fillers + 2 Eredivisie players + 3 more
+    // distinct fillers (total 11).
+    // EoE in-pos = auto 3.
+    // Eredivisie count = 2 + 1 (EoE iconCount) = 3 → tier 1 (≥3) → 1 league pt.
+    // Distinct fillers (no shared league with anyone) get 0 + 1 (EoE icon)
+    // = 1 league count → still below tier 1 (need ≥3) → 0 pts.
+    const labels = LINEUP_433;
+    const eoe = (label: string) =>
+      mk({
+        club: "EoE Club",
+        league: "Some EoE League",
+        nation: "Brazil",
+        position: label,
+        itemType: "special",
+        variant: "200-end-of-an-era",
+        name: "EoEPele",
+      });
+    const eredivisie = (i: number, label: string) =>
+      mk({
+        league: "Eredivisie",
+        club: `ErC${i}`, // distinct clubs
+        nation: `ErN${i}`, // distinct nations
+        position: label,
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        league: `Fl${i}`,
+        club: `Fc${i}`,
+        nation: `Fn${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      eoe(labels[0]),
+      eredivisie(1, labels[1]),
+      eredivisie(2, labels[2]),
+      filler(3, labels[3]),
+      filler(4, labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // EoE in-pos → flat 3.
+    expect(r.perSlot[0]).toBe(3);
+    // Eredivisie players: league count = 2 + 1 (EoE) = 3 → tier 1 → 1 pt.
+    // No other links → slot chem = 1.
+    expect(r.perSlot[1]).toBe(1);
+    expect(r.perSlot[2]).toBe(1);
+    // Fillers: their own unique league → 1 + 1 (EoE) = 2 → still <3 → 0 pts.
+    for (let i = 3; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+});
+
+// ─── chemBonus override wins over derive ──────────────────────────────────
+
+describe("computeChemistry — chemBonus override wins", () => {
+  it("explicit chemBonus on a normal card beats deriveChemBonus (which returns null)", () => {
+    // Normal card with explicit chemBonus { clubSymbols: 5 }. The override
+    // pushes the club counter up beyond what 'normal' would yield.
+    // Setup: 2 normal Madrid + 1 Madrid card with chemBonus{clubSymbols:5}.
+    // Madrid counter = 2 (normals) + 5 (override) = 7 → tier-3 → 3 club pts.
+    // Without override (or with deriveChemBonus only): counter = 3 → tier 1
+    // (≥2 but <4) → 1 club pt. Override clearly wins.
+    const labels = LINEUP_433;
+    const madrid = (i: number, label: string) =>
+      mk({
+        club: "Real Madrid",
+        league: `MdL${i}`,
+        nation: `MdN${i}`,
+        position: label,
+      });
+    const overrideCard: ChemistryCard = {
+      club: "Real Madrid",
+      league: "OvLeague",
+      nation: "OvNation",
+      position: labels[2],
+      positionsAlt: [],
+      itemType: "normal", // deriveChemBonus would return null
+      chemBonus: { clubSymbols: 5 },
+      name: "OverrideMadrid",
+    };
+    const filler = (i: number, label: string) =>
+      mk({
+        club: `Fc${i}`,
+        league: `Fl${i}`,
+        nation: `Fn${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      madrid(0, labels[0]),
+      madrid(1, labels[1]),
+      overrideCard,
+      filler(3, labels[3]),
+      filler(4, labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+    // Madrid counter = 2 + 5 (override) = 7 → tier-3 → 3 club pts.
+    for (let i = 0; i < 3; i++) {
+      expect(r.perSlot[i]).toBe(3);
+    }
+    // Fillers = 0.
+    for (let i = 3; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
   });
 });

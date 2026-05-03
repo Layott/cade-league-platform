@@ -475,6 +475,21 @@ export async function GET(
       .sort((a, b) => a.slotIndex - b.slotIndex)
       .map((item) => {
         const fc = lookup(item.name, item.rating);
+        // Pull the Futbin variant slug + optional admin-tuned chem_bonus
+        // override from the jsonb attributes blob so deriveChemBonus()
+        // can recognize promo subclasses (Cornerstones, Festival
+        // Captains, Heroes, etc.) without a future migration.
+        const fcAttrs = (fc?.attributes ?? {}) as Record<string, unknown>;
+        const variant =
+          typeof fcAttrs.futbin_variant === "string"
+            ? (fcAttrs.futbin_variant as string)
+            : null;
+        const explicitBonus =
+          fcAttrs.chem_bonus &&
+          typeof fcAttrs.chem_bonus === "object" &&
+          !Array.isArray(fcAttrs.chem_bonus)
+            ? (fcAttrs.chem_bonus as Record<string, unknown>)
+            : null;
         const card: ChemistryCard = {
           club: fc?.club ?? null,
           league: fc?.league ?? null,
@@ -484,6 +499,10 @@ export async function GET(
           position: fc?.position ?? item.position,
           positionsAlt: fc?.alt_positions ?? [],
           itemType: item.itemType,
+          variant,
+          // Typed loosely — chem.ts validates shape via property reads
+          // on ChemistryBonus and tolerates wrong-shape gracefully.
+          chemBonus: explicitBonus as ChemistryCard["chemBonus"],
           name: item.name,
         };
         return { card, positionInLineup: item.position };

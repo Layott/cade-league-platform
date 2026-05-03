@@ -12,7 +12,7 @@
 // Contract: caller has ALREADY parsed prices + computed item_type.
 // See _scrape_futbin_headful.js for the full scrape pipeline.
 
-const { classifyVariant } = require("./_classify_variant");
+const { classifyVariant, classifyVariantWithBonus } = require("./_classify_variant");
 
 function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
   const attrs = existingAttrs && typeof existingAttrs === "object" ? { ...existingAttrs } : {};
@@ -79,6 +79,17 @@ function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
   if (Array.isArray(r.altPositions) && r.altPositions.length > 0) {
     attrs.alt_positions = [...r.altPositions];
   }
+  // Granular promo subclass + EA chem-bonus shape — used by chemistry calc
+  // (lib/chemistry.ts) as an explicit override before falling back to
+  // deriveChemBonus(). Cornerstones / Squad Foundations / World Tour /
+  // Festival of Football Captains / End of an Era / Positional Excellence
+  // each confer non-default chem symbols; the scraper persists them here so
+  // the chem calc auto-picks them up without a manual tagging pass.
+  const bonus = classifyVariantWithBonus(r.variant || "");
+  if (bonus.promoClass) attrs.promo_class = bonus.promoClass;
+  else delete attrs.promo_class;
+  if (bonus.chemBonus) attrs.chem_bonus = bonus.chemBonus;
+  else delete attrs.chem_bonus;
   return attrs;
 }
 
@@ -159,6 +170,12 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs, newTop) {
   if (stripQS(oldAttrs.nation_flag_url) !== stripQS(newAttrs.nation_flag_url)) changes.push("nation_flag_url");
   if (stripQS(oldAttrs.league_logo_url) !== stripQS(newAttrs.league_logo_url)) changes.push("league_logo_url");
   if (stripQS(oldAttrs.club_logo_url) !== stripQS(newAttrs.club_logo_url)) changes.push("club_logo_url");
+  // Granular promo subclass + chem-bonus payload. A row that pre-dates the
+  // classifier upgrade will have promo_class=undefined; the post-upgrade
+  // re-scrape produces a classified value, so the diff fires once and the
+  // update writes the tag. Subsequent re-scrapes are no-ops.
+  if ((oldAttrs.promo_class ?? null) !== (newAttrs.promo_class ?? null)) changes.push("promo_class");
+  if (JSON.stringify(oldAttrs.chem_bonus ?? null) !== JSON.stringify(newAttrs.chem_bonus ?? null)) changes.push("chem_bonus");
   return changes;
 }
 
@@ -177,7 +194,13 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
   if (!coins) { stats.noPrice++; return { status: "skipped", diff: [] }; }
 
   const sourceRowId = `futbin_${r.resourceId}`;
-  const itemType = classifyVariant(r.variant);
+  // Use the granular classifier so item_type + promo subclass stay derived
+  // from a single source of truth. buildAttrs() also calls
+  // classifyVariantWithBonus internally to write promo_class / chem_bonus
+  // into the JSON payload — duplicate work but keeps the helper signatures
+  // simple. classifyVariant() (the legacy coarse classifier) is retained
+  // for non-scraper consumers (importers, etc).
+  const { itemType } = classifyVariantWithBonus(r.variant || "");
 
   // Pull the top-level columns the chemistry calc reads directly. Pre-May-
   // 2026 the loader only wrote to `attributes` jsonb — every upgraded
