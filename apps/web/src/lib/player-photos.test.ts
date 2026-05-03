@@ -72,10 +72,10 @@ describe("getPlayerHeadshotUrl", () => {
   });
 
   it("honours per-slug DEFAULT_POSE_BY_SLUG override when poseIndex is not specified", () => {
-    // Anife pose_01 = hands-covering-mouth (BANNED). Default falls
-    // through to pose 5.
+    // Anife pose_01 = hands-covering-mouth (BANNED). Default currently
+    // pose 3 (pose 5 not yet on prod — see DEFAULT_POSE_BY_SLUG comment).
     expect(getPlayerHeadshotUrl("Anife")).toBe(
-      "/overlays/v2/_assets/players/processed/anife/headshot_05_nobg.png",
+      "/overlays/v2/_assets/players/processed/anife/headshot_03_nobg.png",
     );
     // KingNonex pose_01 = back-of-jersey (BANNED). Default falls
     // through to pose 2.
@@ -101,7 +101,7 @@ describe("getPlayerAvatarUrl", () => {
 
   it("honours per-slug pose override (banned poses don't leak into row UIs)", () => {
     expect(getPlayerAvatarUrl("Anife")).toBe(
-      "/overlays/v2/_assets/players/processed/anife/headshot_05_nobg.png",
+      "/overlays/v2/_assets/players/processed/anife/headshot_03_nobg.png",
     );
     expect(getPlayerAvatarUrl("KINGNONEX")).toBe(
       "/overlays/v2/_assets/players/processed/kingnonex/headshot_02_nobg.png",
