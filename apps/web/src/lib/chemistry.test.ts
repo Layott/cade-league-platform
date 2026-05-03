@@ -914,9 +914,13 @@ describe("slotsToSlotFills", () => {
 
 describe("deriveChemBonus", () => {
   // ─── Icons ────────────────────────────────────────────────────────────
+  // Per Futbin's authoritative `Fut26ChemistryData.rareTypeRules` table
+  // (rare type 4 / 25), Icons contribute +1 club symbol (to a pseudo-club
+  // "ICONS" in Futbin's id space, club=112658) + leagueSymbolsAllLeagues
+  // (+1 to every league counter) + 2 nation symbols + full chem in position.
   it("itemType='icon' returns full icon bonus", () => {
     expect(deriveChemBonus("icon", null)).toEqual({
-      clubSymbols: 0,
+      clubSymbols: 1,
       leagueSymbols: 0,
       leagueSymbolsAllLeagues: true,
       nationSymbols: 2,
@@ -926,7 +930,7 @@ describe("deriveChemBonus", () => {
 
   it("variant '12-icon' matches as icon", () => {
     expect(deriveChemBonus("normal", "12-icon")).toEqual({
-      clubSymbols: 0,
+      clubSymbols: 1,
       leagueSymbols: 0,
       leagueSymbolsAllLeagues: true,
       nationSymbols: 2,
@@ -936,7 +940,7 @@ describe("deriveChemBonus", () => {
 
   it("compound icon variants all match (TOTY/Winter Wildcards/FUT Birthday/Champion/Thunderstruck)", () => {
     const expected = {
-      clubSymbols: 0,
+      clubSymbols: 1,
       leagueSymbols: 0,
       leagueSymbolsAllLeagues: true,
       nationSymbols: 2,
@@ -950,29 +954,32 @@ describe("deriveChemBonus", () => {
   });
 
   // ─── Heroes ───────────────────────────────────────────────────────────
+  // Per Futbin's authoritative table (rare types 66 / 67), Heroes contribute
+  // +1 club symbol (to pseudo-club "HEROES", club=114605) + 2 league symbols
+  // + 2 nation symbols + full chem in position.
   it("itemType='hero' returns full hero bonus", () => {
     expect(deriveChemBonus("hero", null)).toEqual({
-      clubSymbols: 0,
+      clubSymbols: 1,
       leagueSymbols: 2,
-      nationSymbols: 1,
+      nationSymbols: 2,
       fullChemInPosition: true,
     });
   });
 
   it("variant '72-heroes' matches as hero", () => {
     expect(deriveChemBonus("normal", "72-heroes")).toEqual({
-      clubSymbols: 0,
+      clubSymbols: 1,
       leagueSymbols: 2,
-      nationSymbols: 1,
+      nationSymbols: 2,
       fullChemInPosition: true,
     });
   });
 
   it("compound hero variants all match (Winter Wildcards/Joga Bonito/Fantasy FC/FUT Birthday)", () => {
     const expected = {
-      clubSymbols: 0,
+      clubSymbols: 1,
       leagueSymbols: 2,
-      nationSymbols: 1,
+      nationSymbols: 2,
       fullChemInPosition: true,
     };
     expect(deriveChemBonus("special", "49-winter-wildcards-hero")).toEqual(expected);
@@ -982,29 +989,43 @@ describe("deriveChemBonus", () => {
   });
 
   // ─── Cornerstones ─────────────────────────────────────────────────────
-  it("'150-cornerstones' returns +1 club symbol bonus", () => {
+  // Rare type 150 — Futbin's table returns full {2, 1, 1} shape, not just
+  // a club override. Match the authoritative shape.
+  it("'150-cornerstones' returns full {2 club, 1 league, 1 nation} shape", () => {
     expect(deriveChemBonus("special", "150-cornerstones")).toEqual({
       clubSymbols: 2,
+      leagueSymbols: 1,
+      nationSymbols: 1,
     });
   });
 
   // ─── Festival of Football Captains ────────────────────────────────────
-  it("'28-festival-of-football-captains' returns +2 nation symbol bonus", () => {
+  // Rare type 28 — Futbin's table returns full {1, 1, 3} shape.
+  it("'28-festival-of-football-captains' returns full {1 club, 1 league, 3 nation} shape", () => {
     expect(deriveChemBonus("special", "28-festival-of-football-captains")).toEqual({
+      clubSymbols: 1,
+      leagueSymbols: 1,
       nationSymbols: 3,
     });
   });
 
-  // ─── Squad Foundations (hypothetical) ─────────────────────────────────
-  it("'75-squad-foundations' returns +1 league symbol bonus", () => {
-    expect(deriveChemBonus("special", "75-squad-foundations")).toEqual({
+  // ─── Squad Foundations (rare type 87) ─────────────────────────────────
+  // Use the canonical Futbin prefix 87 so the lookup hits the authoritative
+  // rule {clubSymbols:1, leagueSymbols:2, nationSymbols:1}.
+  it("'87-squad-foundations' returns full {1 club, 2 league, 1 nation} shape", () => {
+    expect(deriveChemBonus("special", "87-squad-foundations")).toEqual({
+      clubSymbols: 1,
       leagueSymbols: 2,
+      nationSymbols: 1,
     });
   });
 
-  // ─── World Tour (hypothetical) ────────────────────────────────────────
-  it("'99-world-tour' returns +1 nation symbol bonus", () => {
-    expect(deriveChemBonus("special", "99-world-tour")).toEqual({
+  // ─── World Tour (rare type 91) ────────────────────────────────────────
+  // Canonical Futbin prefix 91 → authoritative rule {1, 1, 2}.
+  it("'91-world-tour' returns full {1 club, 1 league, 2 nation} shape", () => {
+    expect(deriveChemBonus("special", "91-world-tour")).toEqual({
+      clubSymbols: 1,
+      leagueSymbols: 1,
       nationSymbols: 2,
     });
   });
@@ -1032,8 +1053,17 @@ describe("deriveChemBonus", () => {
     expect(deriveChemBonus("normal", "3-gold")).toBeNull();
   });
 
-  it("itemType='tots' + variant='11-team-of-the-season' returns null (TOTS Plus chem not modelled)", () => {
-    expect(deriveChemBonus("tots", "11-team-of-the-season")).toBeNull();
+  it("itemType='tots' + variant='11-team-of-the-season' returns TOTS-family shape {1, 5, 1}", () => {
+    // Rare type 11 (Team of the Season) is in Futbin's authoritative
+    // rare-type table with leagueSymbols: 5 (the +5 league bump that
+    // distinguishes TOTS from regular promos). Same shape applies to rare
+    // types 65 / 120 / 127 / 133 (Honourable Mentions / TOTS Highlights /
+    // TOTS Plus / TOTS variants).
+    expect(deriveChemBonus("tots", "11-team-of-the-season")).toEqual({
+      clubSymbols: 1,
+      leagueSymbols: 5,
+      nationSymbols: 1,
+    });
   });
 
   it("null/undefined inputs return null", () => {
@@ -1045,19 +1075,22 @@ describe("deriveChemBonus", () => {
   });
 });
 
-// ─── Hero club fix (Heroes do NOT contribute club symbols) ────────────────
+// ─── Hero contributions (per Futbin's rare-type rules: club:1, league:2, nation:2) ──
 
-describe("computeChemistry — hero club fix", () => {
-  it("hero with club='Real Madrid' does NOT push club counter to 5 (stays at 4)", () => {
-    // 4 Real Madrid normal players + 1 hero whose card.club is "Real Madrid".
-    // Without the fix: club counter = 4 + 1 = 5 → tier-2 → 2 club pts (wrong).
-    // With the fix: club counter = 4 (hero contributes 0 club) → tier-2 (≥4
-    // → 2 pts). Wait — both states give 2 pts at the boundary... let's
-    // verify the boundary precisely. Tier-2 starts at ≥4. So 4 = tier-2,
-    // 5 = tier-2, 7 = tier-3. To distinguish we need a count where the bug
-    // changes the tier. Use 6 normal Madrid + 1 hero (would be 7 = tier-3
-    // with bug, stays 6 = tier-2 without bug). But 6 + hero = 7 starters,
-    // need 4 more fillers → use distinct fillers.
+describe("computeChemistry — hero contributions", () => {
+  it("hero with club='Real Madrid' DOES contribute +1 to Madrid club counter (Futbin rule)", () => {
+    // Updated 2026-05-03: per Futbin's authoritative `Fut26ChemistryData
+    // .rareTypeRules` (rare types 66 / 67), Heroes contribute +1 club
+    // symbol to a pseudo-club ("HEROES") in their data model — but in our
+    // chem calc the per-card `club` field IS the contribution target, so
+    // a hero card with `club: "Real Madrid"` contributes +1 to the
+    // "Real Madrid" counter (matching Futbin squad totals when they tag
+    // heroes with their real club affiliation).
+    //
+    // Setup: 6 Real Madrid normals + 1 hero w/ club="Real Madrid" + 4
+    // distinct fillers. Madrid count = 6 + 1 (hero club:1) = 7 → tier-3
+    // (≥7) → 3 club pts. Distinct leagues/nations on Madrid normals so
+    // ONLY club tier drives points for them.
     const labels = LINEUP_433;
     const madrid = (i: number, label: string) =>
       mk({
@@ -1068,12 +1101,12 @@ describe("computeChemistry — hero club fix", () => {
       });
     const hero = (label: string) =>
       mk({
-        club: "Real Madrid", // hero claims Madrid but should NOT count
+        club: "Real Madrid",
         league: "Hero League",
         nation: "Hero Nation",
         position: label,
         itemType: "hero",
-        name: "ClubHeroBug",
+        name: "ClubHero",
       });
     const filler = (i: number, label: string) =>
       mk({
@@ -1102,16 +1135,134 @@ describe("computeChemistry — hero club fix", () => {
     }));
     const r = computeChemistry(starting);
 
-    // With fix: Madrid count = 6 → tier-2 (≥4 but <7) → 2 club pts for
-    // the 6 Madrid players. Without fix (bug): Madrid count = 7 → tier-3
-    // → 3 club pts. We assert the FIXED behaviour.
+    // Madrid count = 6 normals + 1 hero (clubSymbols:1) = 7 → tier-3
+    // (≥7) → 3 club pts. No league/nation links (all distinct) → cap.
     for (let i = 0; i < 6; i++) {
-      expect(r.perSlot[i]).toBe(2);
+      expect(r.perSlot[i]).toBe(3);
     }
-    // Hero in-position → flat 3.
+    // Hero in-position with fullChemInPosition → flat 3.
     expect(r.perSlot[6]).toBe(3);
     // Fillers → 0.
     for (let i = 7; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+
+  it("hero contributes +2 league symbols to its declared league", () => {
+    // 3 La Liga normals + 1 hero w/ league="LALIGA EA SPORTS" + 7 distinct
+    // fillers. La Liga count = 3 normals + 2 (hero league:2) = 5 → tier-2
+    // (≥5 but <8) → 2 league pts for the 3 normals. Distinct clubs +
+    // nations isolate league as the only contributor.
+    const labels = LINEUP_433;
+    const liga = (i: number, label: string) =>
+      mk({
+        league: "LALIGA EA SPORTS",
+        club: `LC${i}`, // distinct
+        nation: `LN${i}`, // distinct
+        position: label,
+      });
+    const heroLiga = (label: string) =>
+      mk({
+        league: "LALIGA EA SPORTS",
+        club: "Hero Club",
+        nation: "Hero Nation",
+        position: label,
+        itemType: "hero",
+        name: "LigaHero",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        league: `Fl${i}`,
+        club: `Fc${i}`,
+        nation: `Fn${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      liga(0, labels[0]),
+      liga(1, labels[1]),
+      liga(2, labels[2]),
+      heroLiga(labels[3]),
+      filler(4, labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // La Liga count = 3 + 2 (hero) = 5 → tier-2 → 2 league pts.
+    for (let i = 0; i < 3; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    // Hero auto-3.
+    expect(r.perSlot[3]).toBe(3);
+    for (let i = 4; i < 11; i++) {
+      expect(r.perSlot[i]).toBe(0);
+    }
+  });
+
+  it("hero contributes +2 nation symbols to its declared nation", () => {
+    // 3 Brazilian normals + 1 hero w/ nation="Brazil" + 7 distinct
+    // fillers. Brazil count = 3 normals + 2 (hero nation:2) = 5 →
+    // tier-2 (≥5 but <8) → 2 nation pts for the 3 Brazilians. Distinct
+    // leagues + clubs isolate nation as the only contributor.
+    const labels = LINEUP_433;
+    const brazilian = (i: number, label: string) =>
+      mk({
+        nation: "Brazil",
+        league: `BL${i}`, // distinct
+        club: `BC${i}`, // distinct
+        position: label,
+      });
+    const heroBrazil = (label: string) =>
+      mk({
+        nation: "Brazil",
+        league: "Hero League",
+        club: "Hero Club",
+        position: label,
+        itemType: "hero",
+        name: "BrazilHero",
+      });
+    const filler = (i: number, label: string) =>
+      mk({
+        nation: `Fn${i}`,
+        league: `Fl${i}`,
+        club: `Fc${i}`,
+        position: label,
+      });
+
+    const cards: ChemistryCard[] = [
+      brazilian(0, labels[0]),
+      brazilian(1, labels[1]),
+      brazilian(2, labels[2]),
+      heroBrazil(labels[3]),
+      filler(4, labels[4]),
+      filler(5, labels[5]),
+      filler(6, labels[6]),
+      filler(7, labels[7]),
+      filler(8, labels[8]),
+      filler(9, labels[9]),
+      filler(10, labels[10]),
+    ];
+    const starting: SlotFill[] = labels.map((label, i) => ({
+      card: cards[i],
+      positionInLineup: label,
+    }));
+    const r = computeChemistry(starting);
+
+    // Brazil count = 3 + 2 (hero) = 5 → tier-2 → 2 nation pts.
+    for (let i = 0; i < 3; i++) {
+      expect(r.perSlot[i]).toBe(2);
+    }
+    expect(r.perSlot[3]).toBe(3);
+    for (let i = 4; i < 11; i++) {
       expect(r.perSlot[i]).toBe(0);
     }
   });

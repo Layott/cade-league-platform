@@ -242,6 +242,78 @@ export function getLeagueFamily(league: string | null | undefined): string | nul
 }
 
 /**
+ * Authoritative FC26 rare-type → chem contribution map sourced directly
+ * from Futbin's `Fut26ChemistryData.rareTypeRules` (extracted from any
+ * saved community squad page, e.g.
+ * `https://www.futbin.com/26/squad/<id>` — the JSON is embedded in a
+ * <script> tag and is global, not per-squad). 20 rare types diverge from
+ * the default `{club:1, league:1, nation:1}`; everything else falls back.
+ *
+ * Variant slugs from Futbin (`150-cornerstones`, `11-team-of-the-season`,
+ * `72-heroes`, `12-icon`, etc.) carry the rare type as the leading
+ * integer prefix. `extractRareTypeId(variant)` parses this; rule lookup
+ * is then a single Map.get.
+ *
+ * Last verified 2026-05-03 against Futbin community squads `460`, `369`,
+ * `977076`. Re-verify when EA ships a major content cycle (TOTY,
+ * end-of-cycle TOTS, etc.) — new promos may add rule entries.
+ */
+export const RARE_TYPE_RULES: Readonly<Record<number, ChemistryBonus>> = {
+  // Icon (canonical, e.g. variant `12-icon` falls into this rule via
+  // base-icon classifier even though prefix 12 is not in this map).
+  4: { clubSymbols: 1, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true },
+  // TOTS — Team of the Season.
+  11: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
+  // Answer The Call promo (variant `20-answer-the-call`).
+  20: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 3 },
+  // Icon variant (also full-chem 1/wildcard/2).
+  25: { clubSymbols: 1, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true },
+  // Festival of Football Captains.
+  28: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 3 },
+  // Honourable Mentions (TOTS-family).
+  65: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
+  // Hero (canonical) — full chem with 2 league + 2 nation.
+  66: { clubSymbols: 1, leagueSymbols: 2, nationSymbols: 2, fullChemInPosition: true },
+  // Hero variant.
+  67: { clubSymbols: 1, leagueSymbols: 2, nationSymbols: 2, fullChemInPosition: true },
+  // Full-chem promo with +1 nation bump.
+  68: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 2, fullChemInPosition: true },
+  // Icon-like but no club contribution; +2 nation; full chem.
+  69: { clubSymbols: 0, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 3, fullChemInPosition: true },
+  // Full-chem promo with +2 nation.
+  70: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 3, fullChemInPosition: true },
+  // Squad Foundations — +1 league symbol (so 2 total).
+  87: { clubSymbols: 1, leagueSymbols: 2, nationSymbols: 1 },
+  // World Tour — +1 nation symbol (so 2 total).
+  91: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 2 },
+  // Full-chem normal-shape (no axis bumps, just auto-3 in position).
+  108: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 1, fullChemInPosition: true },
+  // Icon-shape full-chem variant.
+  116: { clubSymbols: 1, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true },
+  // TOTS Highlights.
+  120: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
+  // TOTS-family.
+  127: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
+  // Full-chem normal-shape.
+  129: { clubSymbols: 1, leagueSymbols: 1, nationSymbols: 1, fullChemInPosition: true },
+  // TOTS-family.
+  133: { clubSymbols: 1, leagueSymbols: 5, nationSymbols: 1 },
+  // Cornerstones — +1 club symbol (so 2 total).
+  150: { clubSymbols: 2, leagueSymbols: 1, nationSymbols: 1 },
+};
+
+/**
+ * Parse the leading integer prefix from a Futbin variant slug. Returns
+ * null when the slug doesn't start with digits (defensive — every Futbin
+ * variant in our DB has a numeric prefix matching the rare type ID).
+ */
+export function extractRareTypeId(variant: string | null | undefined): number | null {
+  if (!variant) return null;
+  const m = String(variant).match(/^(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/**
  * Derive the chem-bonus shape from a card's `itemType` + Futbin variant
  * slug. Pure function — no DB I/O. Used by callers that build a
  * `ChemistryCard` from a `fc26_players` row to auto-fill `chemBonus`
@@ -250,12 +322,20 @@ export function getLeagueFamily(league: string | null | undefined): string | nul
  * Returns null when no override applies (the chem calc then uses default
  * 1-per-axis contribution).
  *
- * Promo recognition is regex-on-variant-slug. Variant strings come from
- * Futbin's CDN card-art path (`/cards/tiny/<id>_<slug>.png`) and look
- * like `150-cornerstones`, `28-festival-of-football-captains`,
- * `72-heroes`, `12-icon`, `155-toty-icon`, `49-winter-wildcards-hero`
- * etc. The regex catches both the bare slug ("cornerstones") AND
- * compound variants ("xyz-icon", "abc-hero").
+ * Resolution order:
+ *   1. Variant prefix → `RARE_TYPE_RULES` lookup (authoritative Futbin
+ *      table, 20 rare types covering Cornerstones / TOTS / Heroes /
+ *      Icons / Festival Captains / Squad Foundations / World Tour /
+ *      Answer-the-Call / Honourable Mentions / etc.).
+ *   2. Fallback regex on `itemType` / variant slug for compound variants
+ *      whose rare type isn't in the canonical Futbin map but EA spec
+ *      treats them like a base type — e.g. `155-toty-icon` (prefix 155
+ *      not in table) classifies as Icon via the `\bicon\b` regex.
+ *   3. End-of-an-Era / Positional-Excellence Evos that don't have a
+ *      Futbin rare type yet but EA spec defines explicitly.
+ *
+ * Returns null when nothing matches (chem calc treats as default
+ * `{club:1, league:1, nation:1}` non-full-chem card).
  */
 export function deriveChemBonus(
   itemType: string | null | undefined,
@@ -264,66 +344,41 @@ export function deriveChemBonus(
   const v = (variant ?? "").toLowerCase();
   const t = (itemType ?? "").toLowerCase();
 
-  // Icons (incl. all *-icon variants: TOTY Icon, FUT Birthday Icon,
-  // Trophy Titans Icon, Champion Icon, etc.).
+  // 1. Authoritative Futbin rare-type lookup via leading integer prefix.
+  const rareId = extractRareTypeId(v);
+  if (rareId != null && RARE_TYPE_RULES[rareId]) {
+    return RARE_TYPE_RULES[rareId];
+  }
+
+  // 2. Fallback: compound variants (e.g. `155-toty-icon`,
+  //    `49-winter-wildcards-hero`, `76-trophy-titans-icon`) whose rare
+  //    prefix isn't in Futbin's table but EA spec treats them as the
+  //    base type. Use the canonical Icon (rare 4) / Hero (rare 66) rule.
   if (t === "icon" || /\bicon\b/.test(v)) {
-    return {
-      clubSymbols: 0,
-      leagueSymbols: 0,
-      leagueSymbolsAllLeagues: true,
-      nationSymbols: 2,
-      fullChemInPosition: true,
-    };
+    return RARE_TYPE_RULES[4];
   }
-
-  // Heroes (incl. all *-hero(es) variants: Winter Wildcards Hero, Joga
-  // Bonito Hero, FUT Birthday Hero, Fantasy FC Hero, Trophy Titans Hero,
-  // Ultimate Scream Hero, Thunderstruck Hero, etc.).
   if (t === "hero" || /\bhero(es)?\b/.test(v)) {
-    return {
-      clubSymbols: 0,
-      leagueSymbols: 2,
-      nationSymbols: 1,
-      fullChemInPosition: true,
-    };
+    return RARE_TYPE_RULES[66];
   }
 
-  // End of an Era — Icon-like contribution but NOT itemType='icon'.
+  // 3. EA-spec promos not yet observed in Futbin's rule table — keep
+  //    explicit fallbacks so they apply if a future scrape produces a
+  //    variant prefix that isn't covered.
   if (/\bend-of-an-era\b/.test(v)) {
-    return {
-      clubSymbols: 0,
-      leagueSymbols: 0,
-      leagueSymbolsAllLeagues: true,
-      nationSymbols: 2,
-      fullChemInPosition: true,
-    };
+    return { clubSymbols: 0, leagueSymbols: 0, leagueSymbolsAllLeagues: true, nationSymbols: 2, fullChemInPosition: true };
   }
-
-  // Cornerstones — +1 club symbol (so 2 total). Live in DB as
-  // `150-cornerstones`.
   if (/\bcornerstones?\b/.test(v)) {
     return { clubSymbols: 2 };
   }
-
-  // Squad Foundations — +1 league symbol (so 2 total).
   if (/\bsquad-foundations?\b/.test(v)) {
     return { leagueSymbols: 2 };
   }
-
-  // World Tour — +1 nation symbol (so 2 total).
   if (/\bworld-tour\b/.test(v)) {
     return { nationSymbols: 2 };
   }
-
-  // Festival of Football Captains — +2 nation symbols (so 3 total). Live
-  // in DB as `28-festival-of-football-captains`.
   if (/\bfestival-of-football-captains?\b|\bfof-captains?\b/.test(v)) {
     return { nationSymbols: 3 };
   }
-
-  // Positional Excellence Evos — full chem when in unlocked position.
-  // Caller must pre-ensure the card's `position` / `positionsAlt`
-  // already reflect the unlocked slot from the Evo path.
   if (/\bpositional-excellence\b/.test(v)) {
     return { fullChemInPosition: true };
   }
