@@ -12,6 +12,13 @@
  *
  * Slug derivation: lowercased + spaces / hyphens replaced with underscores.
  * Matches the directory naming that Plan 22's image pipeline produced.
+ *
+ * Plan 53 update (2026-05-04): payload endpoints should call
+ * `resolvePlayerPose(sb, playerId, overlayKey)` from
+ * `@/server/overlays/player-photos/resolver.ts` BEFORE invoking
+ * `getPlayerHeadshotUrl`. The resolver returns the right pose_index +
+ * source; this function then builds the URL. `DEFAULT_POSE_BY_SLUG`
+ * remains as the legacy fallback when no DB row exists.
  */
 import manifest from "@/server/overlays/players-manifest.json";
 

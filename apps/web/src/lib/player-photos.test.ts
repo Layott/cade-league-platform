@@ -124,3 +124,21 @@ describe("knownPlayerSlugs", () => {
     expect(slugs.length).toBeGreaterThanOrEqual(13);
   });
 });
+
+describe("getPlayerHeadshotUrl with overlayKey (Plan 53)", () => {
+  // Plan 53 §9.1: full DB-driven resolution lives in resolver.ts. This
+  // module remains pure path-building; payload endpoints call
+  // resolvePlayerPose(sb, playerId, overlayKey) FIRST and pass the
+  // resolved pose_index into this function. The function signature is
+  // unchanged — explicit poseIndex callers still wins over any default.
+  it("honors explicit poseIndex over any DB resolution", () => {
+    // Note: spec example used pose 5 for Mr Oga, but mr_oga only has
+    // poses 1-3 in players-manifest.json. Switched to pose 3 (valid)
+    // to keep the assertion truthy and preserve the spec intent: an
+    // explicit poseIndex caller arg builds the matching URL regardless
+    // of any DEFAULT_POSE_BY_SLUG entry or future DB resolver layer.
+    expect(getPlayerHeadshotUrl("Mr Oga", "normal", 3)).toBe(
+      "/overlays/v2/_assets/players/processed/mr_oga/headshot_03_nobg.png",
+    );
+  });
+});
