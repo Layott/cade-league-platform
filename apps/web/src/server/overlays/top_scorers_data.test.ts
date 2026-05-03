@@ -41,10 +41,33 @@ function queueChain(queue: ChainResult[]) {
   return api;
 }
 
+/**
+ * Plan 53 (2026-05-04) — `fetchTopScorersData` calls
+ * `resolvePlayerPose` for each merged row, which reads
+ * `player_photo_selections`. Provide a default empty-result chain so
+ * existing fixtures don't need per-test wiring; the resolver then
+ * falls back through legacy DEFAULT_POSE_BY_SLUG / pose 1.
+ */
+function emptySelectionsChain() {
+  const thenable = Promise.resolve({ data: [], error: null });
+  const api: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "is", "or"]) {
+    api[m] = vi.fn(() => api);
+  }
+  (api as { then?: unknown }).then = (
+    onFulfilled: (v: { data: unknown; error: Error | null }) => unknown,
+  ) => thenable.then(onFulfilled);
+  return api;
+}
+
 function mkSb(handlers: Record<string, unknown>) {
+  const merged: Record<string, unknown> = {
+    player_photo_selections: emptySelectionsChain(),
+    ...handlers,
+  };
   return {
     from: vi.fn((t: string) => {
-      const h = handlers[t];
+      const h = merged[t];
       if (!h) throw new Error(`unexpected table in test: ${t}`);
       return h;
     }),

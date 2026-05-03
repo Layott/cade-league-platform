@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { REALTIME } from "./registry";
 import { topScorersSchema, type TopScorersPayload } from "./schemas";
-import { getPlayerHeadshotUrl } from "@/lib/player-photos";
+import { gamerTagToSlug } from "@/lib/player-photos";
+import { resolvePlayerPose } from "./player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "./player-photos/variant-map";
 
 /**
  * Audit Slice 1 (2026-04-24) — server reader for the `/overlay/top-scorers`
@@ -441,26 +446,53 @@ export async function fetchTopScorersData(
   }
 
   // Collapse to row + rank, filter 0-goal rows, sort, take top N.
-  const merged: Omit<TopScorerRow, "rank">[] = Array.from(acc.values())
-    .map((a) => {
-      const totalGoals = a.ge_goals + a.pms_goals;
-      const photoUrl = a.gamer_tag
-        ? getPlayerHeadshotUrl(a.gamer_tag, "transparent", 1)
-        : null;
-      return {
-        player_id: a.player_id,
-        player_name: a.player_name,
-        gamer_tag: a.gamer_tag,
-        goals: totalGoals,
-        photo_url: photoUrl,
-      };
-    })
+  //
+  // Plan 53 (2026-05-04) — photoUrl now flows through `resolvePlayerPose`
+  // (consults `player_photo_selections`) + `buildPhotoUrl` so admins can
+  // tune the displayed pose per (player, overlay) without code edits.
+  // Falls back through legacy DEFAULT_POSE_BY_SLUG / pose 1 inside the
+  // resolver when no DB row exists, preserving the prior wire shape.
+  const overlayKey = "14-top-scorers";
+  const variantKind = getVariantKindForOverlay(overlayKey);
+  const collapsedRaw = Array.from(acc.values())
+    .map((a) => ({
+      player_id: a.player_id,
+      player_name: a.player_name,
+      gamer_tag: a.gamer_tag,
+      goals: a.ge_goals + a.pms_goals,
+    }))
     .filter((r) => r.goals > 0)
     .sort((a, b) => {
       if (b.goals !== a.goals) return b.goals - a.goals;
       return a.player_name.localeCompare(b.player_name);
     })
     .slice(0, n);
+
+  const merged: Omit<TopScorerRow, "rank">[] = await Promise.all(
+    collapsedRaw.map(async (r) => {
+      let photoUrl: string | null = null;
+      const slug = r.gamer_tag ? gamerTagToSlug(r.gamer_tag) : "";
+      if (slug) {
+        const resolved = await resolvePlayerPose(sb, r.player_id, overlayKey, {
+          slug,
+        });
+        photoUrl = buildPhotoUrl({
+          slug,
+          playerId: r.player_id,
+          poseIndex: resolved.poseIndex,
+          variantKind,
+          source: resolved.source,
+        });
+      }
+      return {
+        player_id: r.player_id,
+        player_name: r.player_name,
+        gamer_tag: r.gamer_tag,
+        goals: r.goals,
+        photo_url: photoUrl,
+      };
+    }),
+  );
 
   const rows: TopScorerRow[] = merged.map((r, i) => ({ ...r, rank: i + 1 }));
 
