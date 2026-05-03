@@ -262,8 +262,13 @@ export async function GET(
   }
 
   const displayName = player.users?.display_name ?? player.gamer_tag ?? "Player";
+  // Pose index intentionally omitted so `DEFAULT_POSE_BY_SLUG` overrides
+  // (e.g. Anife → pose 5, KingNonex → pose 2) take effect. Hardcoding
+  // `1` previously bypassed those overrides + surfaced banned poses
+  // (Anife pose_01 = hands-covering-mouth, KingNonex pose_01 = back-of-
+  // jersey) on the 19-player-squads overlay.
   const headshotUrl =
-    getPlayerHeadshotUrl(player.gamer_tag, "transparent", 1) ?? null;
+    getPlayerHeadshotUrl(player.gamer_tag, "transparent") ?? null;
 
   // Live submission for this week. If the operator didn't pin a specific
   // `?week=`, fall back to the player's MOST RECENT submission so the
