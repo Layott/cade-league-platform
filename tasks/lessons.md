@@ -977,3 +977,26 @@ The duplicate match `63968865-7c26-4c23-a2ed-6bc6c20a314f` had `deleted_at = 202
 12. **Visual grouping in UI ≠ backend single-row submission.** When you collapse N entities into one row visually, you're hiding affordances — provide an "expand" or "apply to all in group" alternative so the underlying granularity isn't lost.
 13. **RLS write policies are explicit deny contracts. Service-role access doesn't excuse missing them.** Every mutable table gets `INSERT/UPDATE/DELETE` policies declared explicitly even if the API layer always uses service-role. The deny is documentation + future-proofing.
 
+
+
+---
+
+**Date:** 2026-05-04
+**Context:** Plan 53 — player photo overrides — shipped via 14 parallel subagent tasks (subagent-driven-development skill). Three recurring failure patterns surfaced across the run.
+1. **Parallel-agent commit clobber** (T5 reset T7). T5 agent did `git reset HEAD~1` to clean its staging area, dropping T7's `5e70fb3f` commit (`feat(plan-53): signed-PUT upload + finalize`). Files were still on disk as untracked; recovered via `git cherry-pick 5e70fb3f` after removing the disk copies (which conflicted with cherry-pick's overwrite check). Same broad-staging issue let T4 absorb T3's resolver files into its own commit (`8b00d8a6` titled "set/clear mutations" but contained both modules). Benign in T3+T4, destructive in T5+T7.
+2. **Mocked Supabase tests can't catch ON CONFLICT constraint mismatches** (T14 surfaced post-ship). `setPlayerPose` originally called `.upsert(row, { onConflict: 'player_id,overlay_key' })` against a partial expression-based unique index `(player_id, coalesce(overlay_key, '__global__')) WHERE deleted_at IS NULL`. Postgres rejects column-name `ON CONFLICT` against expression indexes with `42P10 — there is no unique or exclusion constraint matching the ON CONFLICT specification`. The unit-test mock factory swallowed the call (it doesn't enforce real DB constraints), so the test passed green; the real `.upsert()` 400'd against the cloud DB. T14's E2E (which hits the real DB) is what surfaced it. Fix `7e106cc4`: replace upsert with explicit `.select(...).maybeSingle()` lookup, branch to `.update().eq('id', existing.id)` or `.insert(row)`. Tests rewritten to mock the new flow (insert-when-absent + update-when-present + clear) — 4 tests pass, real DB happy.
+3. **Plan-vs-real-code drift wastes agent cycles.** Plan 53's draft used `createServerSupabase from '@/lib/supabase-server'` and `requireActor from '@/lib/auth-server'` — neither existed. Real path: `getServerSupabase from '@/lib/supabase/server'`. `requireActor` was a per-route inline pattern at `apps/web/src/app/admin/match-days/[id]/attendance/actions.ts:13-46`. T8 agent created the shared `apps/web/src/lib/auth-server.ts` (Option A) extracting that pattern into a single helper. Other plan-vs-real drift: plan tests passed `actor: { id: 'A', role: 'admin' }` but real `Actor` type from `@/perms` is `{ userId: string | null; roles: readonly string[] }`. Every test mock had to be corrected. Plan §7.3 had `uploaded_by: actor.id` which would have been `undefined` at runtime — fixed to `actor.userId`.
+
+**Mistake:** Trusted plan code as-written without first cross-checking against actual repo state. Multiple correction cycles per agent.
+
+**Correction:**
+1. Parallel agents must use file-level `git add <path>` not directory-level. Document this on EVERY agent prompt that may share a directory with concurrent agents.
+2. Plans that depend on shared helpers (auth, supabase clients, Actor types) must include a "Real-codebase notes" block in each task with verified import paths and type shapes — checked once before dispatch, copied verbatim into every agent prompt.
+3. E2E specs against the cloud DB are the only reliable guardrail for ON CONFLICT / RLS / trigger / constraint mismatches. Mocked tests prove logic; E2E proves wire-up.
+
+**Rule for future:**
+1. **Never let parallel agents `git add <directory>`.** Always pass explicit file paths. If an agent's first action shows broad staging, abort + tighten brief.
+2. **Plans must include a verified "import paths + types" block before dispatching execution.** Run grep on each named import + type before dispatch; inject corrections into every agent prompt. Saves N agent re-runs per drift instance.
+3. **Reflog rescue is the recovery path for parallel-agent commit loss.** Don't manually re-implement; the lost commit is in the reflog, cherry-pick is idempotent. Disk copies of the lost commit's files block cherry-pick — remove them first, then cherry-pick replays exactly.
+4. **`upsert(...)` with `onConflict` requires a column-name unique index, NOT an expression index.** If the migration uses `coalesce(...)` or any expression in the index, you must do explicit `.select().maybeSingle()` + branch. Lock this in CLAUDE.md so future Plan-NN doesn't repeat.
+5. **Every plan that adds payload endpoints touching player photos MUST follow the resolver pattern in CLAUDE.md §14** (added 2026-05-04): `resolvePlayerPose → getVariantKindForOverlay → buildPhotoUrl`. Direct calls to `getPlayerHeadshotUrl(slug, "normal", hardcodedPose)` are forbidden in payload endpoints.

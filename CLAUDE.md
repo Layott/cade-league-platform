@@ -85,6 +85,7 @@ Locked across all phases — do not deviate without user approval:
     - Brand fonts loaded via `@font-face` from `/overlays/v2/_assets/fonts/agharti-...woff2` + `/overlays/v2/_assets/fonts/quedora-...woff2`. Brand colors `#6bcd06` (green) + `#fe036d` (pink) + `#050505` (black) + `#ffffff` (ink).
     - All asset paths must use `/overlays/v2/_assets/<bucket>/...` prefix (NOT `../../../<bucket>/...`). Sync script rewrites source-relative paths during mirror copy.
     - Static photo references must fall back via `PLAYER_HEADSHOT[slug]` map when payload lacks `photoUrl`. Hardcoded `<img src="/overlays/v2/_assets/players/processed/<slug>/headshot_01_nobg.png">` is OK for default render but must be re-derived from `data.players[].slug` when postMessage updates.
+    - **Plan 53 (2026-05-04): payload `photoUrl` is resolver-driven, not hardcoded.** Every payload endpoint listed in the auto-update matrix below resolves the per-(player × overlay-key) pose via `resolvePlayerPose(sb, playerId, overlayKey)` from `apps/web/src/server/overlays/player-photos/resolver.ts` then builds the URL via `buildPhotoUrl(...)` in `apps/web/src/server/overlays/player-photos/variant-map.ts`. Resolution order: per-overlay override (DB row in `player_photo_selections` with matching `overlay_key`) → global default (`overlay_key IS NULL`) → legacy `DEFAULT_POSE_BY_SLUG` map → pose 1. The variant kind (headshot / card / fullbody) is auto-selected per overlay key via `OVERLAY_VARIANT_KIND` (e.g. `19-player-squads = card`, `01-long-intro / 05-stinger-winner = fullbody`, all others = headshot). Admins pick + upload poses at `/admin/broadcast/v2/design` → Player Photos panel. New overlay payload endpoints MUST follow this pattern — never call `getPlayerHeadshotUrl(slug, "normal", hardcodedPose)` directly.
     - Demo loop (the 13s preview cycle that auto-fires `show` then `hide`) MUST be guarded by `?demo=1` query string. No auto-show on default load.
     - Body width:1920px height:1080px overflow:hidden — canvas dimensions are locked to OBS browser source default.
 
@@ -340,3 +341,12 @@ Wave 2 extends the design system with three orthogonal channels — every channe
 
 If you skip step 1 the source HTMLs drift from the public mirror; if you skip step 2 the iframe loads stale JS; if you skip step 3 you risk shipping a regression invisible to unit tests.
 
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
