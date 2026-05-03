@@ -12,8 +12,13 @@ import {
 } from "@/lib/chemistry";
 // Bug fix 2026-05-02: import from non-`"use client"` formations module
 // so this server-only API route doesn't get client references.
+// User report 2026-05-03: switch to `getOverlayFormationSlots` so the
+// overlay's larger 140x196 cards don't collide on a 920x820 pitch the
+// way the picker's smaller cards never do. The picker still calls
+// `getFormationSlots` (FORMATIONS map) — the overlay-specific spacing
+// lives in OVERLAY_FORMATIONS and only this route reads it.
 import {
-  getFormationSlots,
+  getOverlayFormationSlots,
   type FormationKey,
   type SlotPosition,
 } from "@/components/squads/formations";
@@ -526,15 +531,18 @@ export async function GET(
 
   // User report 2026-05-02 — the overlay was rendering 11 starters in a
   // hard-coded 4-3-3 CSS grid regardless of the player's submitted
-  // formation. Resolve the slot map server-side from the picker's single
-  // source of truth (`getFormationSlots`) so the overlay can paint each
-  // card at the same `(top%, left%)` coordinate the player saw on
-  // /player/squad. When the formation label can't be mapped to a known
-  // FormationKey (legacy NULL rows, deriveFormation result that doesn't
-  // match the 21 catalog labels), fall back to '4-3-3' so the overlay
-  // never reverts to a baked-in arrangement.
+  // formation. Resolve the slot map server-side so the overlay can paint
+  // each card at a `(top%, left%)` tuned for the broadcast card size.
+  // User report 2026-05-03 — switched from `getFormationSlots` (picker
+  // map) to `getOverlayFormationSlots` (overlay-specific map) so the
+  // 140x196 cards don't collide on the 920x820 pitch. The picker map's
+  // tighter spacing works for its smaller cards but produces overlapping
+  // cards on the broadcast canvas. When the formation label can't be
+  // mapped to a known FormationKey (legacy NULL rows, deriveFormation
+  // result that doesn't match the 21 catalog labels), fall back to
+  // '4-3-3' so the overlay never reverts to a baked-in arrangement.
   const slotKey: FormationKey = formationKey ?? "433";
-  const slotDefs: SlotPosition[] = getFormationSlots(slotKey);
+  const slotDefs: SlotPosition[] = getOverlayFormationSlots(slotKey);
   const pitchSlots = slotDefs.map((s) => ({
     slotIndex: s.slotIndex,
     label: s.label,

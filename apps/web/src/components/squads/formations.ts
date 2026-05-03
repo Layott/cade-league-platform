@@ -421,6 +421,353 @@ export function getFormationSlots(formation: FormationKey): SlotPosition[] {
   return FORMATIONS[formation];
 }
 
+// ─── BROADCAST OVERLAY FORMATIONS (19-player-squads) ──────────────────
+//
+// `FORMATIONS` is tuned for the /player/squad picker, which renders
+// smaller cards inside an aspect-3/4 panel — its tight slot coordinates
+// (e.g. CAM at top:28 stacked under ST at top:12 in 4-4-1-1) work because
+// picker cards are visually small. The broadcast overlay
+// `/overlay/v2/19-player-squads` renders 140w x 196h cards on a 920x820
+// pitch (= 15.2% x 23.9% of pitch each), so any two slots whose centres
+// differ by less than 15.2% horizontally AND less than 23.9% vertically
+// produce visually overlapping cards.
+//
+// `OVERLAY_FORMATIONS` is a parallel slot map with widened gaps tuned
+// for the broadcast card size. Same shape (FormationKey → 11 slots
+// each `{slotIndex,label,top,left}` with identical slotIndex + label
+// assignments). Tests in `formations.overlay.test.ts` assert that every
+// pair of slots in every formation satisfies dx >= 15.2 OR dy >= 23.9.
+//
+// Spacing rules baked in:
+//   * GK at (92,50) — anchor.
+//   * Back-four: defenders at top:80 left:8/32/68/92 (no slot at 50).
+//   * Back-three: side CBs at top:78, central CB pulled FORWARD to
+//     top:68 left:50 so dy(GK 92, CB-mid 68) = 24 — preserves the
+//     "back-three" silhouette without overlapping the GK card.
+//   * Back-five: wing-backs at top:66 left:8/92, side CBs at top:78
+//     left:28/72, central CB at top:68 left:50 (same forward-pull trick
+//     as back-three).
+//   * Stacked rows on a shared column maintain dy >= 24 (one card-height
+//     plus margin).
+//   * Stacked slots on a shared row maintain dx >= 17 between centres.
+//   * 3-5-1-1 specifically must move CAM off column 50 (4 stacked tiers
+//     above the central CB don't fit even with the forward-pull) — CAM
+//     sits at left:34 to clear ST(50) horizontally.
+//   * 4-1-2-1-2 narrow uses a 1-2 base (CDM 54,50 + flanking CMs 54,
+//     24/76) instead of a tight diamond so the CAM can sit at top:30
+//     above CDM(54) with the required 24% gap.
+export const OVERLAY_FORMATIONS: Record<FormationKey, SlotPosition[]> = {
+  // ─── BACK-FOUR ─────────────────────────────────────────────────────
+  "433": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CM", top: 56, left: 22 },
+    { slotIndex: 6, label: "CM", top: 56, left: 50 },
+    { slotIndex: 7, label: "CM", top: 56, left: 78 },
+    { slotIndex: 8, label: "LW", top: 12, left: 14 },
+    { slotIndex: 9, label: "ST", top: 8, left: 50 },
+    { slotIndex: 10, label: "RW", top: 12, left: 86 },
+  ],
+  "442": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "LM", top: 56, left: 8 },
+    { slotIndex: 6, label: "CM", top: 56, left: 32 },
+    { slotIndex: 7, label: "CM", top: 56, left: 68 },
+    { slotIndex: 8, label: "RM", top: 56, left: 92 },
+    { slotIndex: 9, label: "ST", top: 8, left: 36 },
+    { slotIndex: 10, label: "ST", top: 8, left: 64 },
+  ],
+  "4231": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CDM", top: 56, left: 32 },
+    { slotIndex: 6, label: "CDM", top: 56, left: 68 },
+    { slotIndex: 7, label: "LM", top: 32, left: 8 },
+    { slotIndex: 8, label: "CAM", top: 32, left: 50 },
+    { slotIndex: 9, label: "RM", top: 32, left: 92 },
+    { slotIndex: 10, label: "ST", top: 8, left: 50 },
+  ],
+  // 4-1-4-1 (balanced, single CDM shield, 4-man mid, lone ST)
+  "4141": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CDM", top: 58, left: 50 },
+    { slotIndex: 6, label: "LM", top: 34, left: 8 },
+    { slotIndex: 7, label: "CM", top: 34, left: 32 },
+    { slotIndex: 8, label: "CM", top: 34, left: 68 },
+    { slotIndex: 9, label: "RM", top: 34, left: 92 },
+    { slotIndex: 10, label: "ST", top: 8, left: 50 },
+  ],
+  // 4-1-2-1-2 Narrow (1-2 base + CAM peak; flat-3 mid base)
+  "41212": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CDM", top: 54, left: 50 },
+    { slotIndex: 6, label: "CM", top: 54, left: 24 },
+    { slotIndex: 7, label: "CM", top: 54, left: 76 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 50 },
+    { slotIndex: 9, label: "ST", top: 6, left: 34 },
+    { slotIndex: 10, label: "ST", top: 6, left: 66 },
+  ],
+  // 4-2-2-2 (box midfield, two strikers)
+  "4222": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CDM", top: 56, left: 32 },
+    { slotIndex: 6, label: "CDM", top: 56, left: 68 },
+    { slotIndex: 7, label: "CAM", top: 30, left: 30 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 70 },
+    { slotIndex: 9, label: "ST", top: 6, left: 38 },
+    { slotIndex: 10, label: "ST", top: 6, left: 62 },
+  ],
+  // 4-2-4 (wide, attacking; two CMs behind four attackers)
+  "424": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CM", top: 56, left: 32 },
+    { slotIndex: 6, label: "CM", top: 56, left: 68 },
+    { slotIndex: 7, label: "LW", top: 12, left: 12 },
+    { slotIndex: 8, label: "ST", top: 8, left: 38 },
+    { slotIndex: 9, label: "ST", top: 8, left: 62 },
+    { slotIndex: 10, label: "RW", top: 12, left: 88 },
+  ],
+  // 4-3-1-2 (flat 3 CMs, a CAM, two STs)
+  "4312": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CM", top: 56, left: 22 },
+    { slotIndex: 6, label: "CM", top: 56, left: 50 },
+    { slotIndex: 7, label: "CM", top: 56, left: 78 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 50 },
+    { slotIndex: 9, label: "ST", top: 6, left: 32 },
+    { slotIndex: 10, label: "ST", top: 6, left: 68 },
+  ],
+  // 4-3-2-1 "Christmas tree" (3 CMs, 2 CAMs, lone ST)
+  "4321": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "CM", top: 56, left: 22 },
+    { slotIndex: 6, label: "CM", top: 56, left: 50 },
+    { slotIndex: 7, label: "CM", top: 56, left: 78 },
+    { slotIndex: 8, label: "CAM", top: 30, left: 32 },
+    { slotIndex: 9, label: "CAM", top: 30, left: 68 },
+    { slotIndex: 10, label: "ST", top: 6, left: 50 },
+  ],
+  // 4-4-1-1 (flat 4-mid with CAM sitting off the ST)
+  "4411": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "LM", top: 56, left: 8 },
+    { slotIndex: 6, label: "CM", top: 56, left: 32 },
+    { slotIndex: 7, label: "CM", top: 56, left: 68 },
+    { slotIndex: 8, label: "RM", top: 56, left: 92 },
+    { slotIndex: 9, label: "CAM", top: 32, left: 50 },
+    { slotIndex: 10, label: "ST", top: 8, left: 50 },
+  ],
+  // 4-5-1 (true 5-man midfield, no CAM)
+  "451": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LB", top: 80, left: 8 },
+    { slotIndex: 2, label: "CB", top: 80, left: 32 },
+    { slotIndex: 3, label: "CB", top: 80, left: 68 },
+    { slotIndex: 4, label: "RB", top: 80, left: 92 },
+    { slotIndex: 5, label: "LM", top: 50, left: 8 },
+    { slotIndex: 6, label: "CM", top: 56, left: 28 },
+    { slotIndex: 7, label: "CM", top: 56, left: 50 },
+    { slotIndex: 8, label: "CM", top: 56, left: 72 },
+    { slotIndex: 9, label: "RM", top: 50, left: 92 },
+    { slotIndex: 10, label: "ST", top: 8, left: 50 },
+  ],
+
+  // ─── BACK-THREE ────────────────────────────────────────────────────
+  // Central CB is dropped FORWARD to top:68 (vs side CBs at top:78) so
+  // dy(GK 92, CB-mid 68) = 24 — without this trick, the central CB at
+  // top:78 would overlap the GK card at top:92 (dy=14 < 23.9, dx=0).
+  "352": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 78, left: 22 },
+    { slotIndex: 2, label: "CB", top: 68, left: 50 },
+    { slotIndex: 3, label: "CB", top: 78, left: 78 },
+    { slotIndex: 4, label: "LM", top: 44, left: 8 },
+    { slotIndex: 5, label: "CM", top: 44, left: 28 },
+    { slotIndex: 6, label: "CM", top: 44, left: 50 },
+    { slotIndex: 7, label: "CM", top: 44, left: 72 },
+    { slotIndex: 8, label: "RM", top: 44, left: 92 },
+    { slotIndex: 9, label: "ST", top: 8, left: 36 },
+    { slotIndex: 10, label: "ST", top: 8, left: 64 },
+  ],
+  // 3-4-3 (wing-backs + front three)
+  "343": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 78, left: 22 },
+    { slotIndex: 2, label: "CB", top: 68, left: 50 },
+    { slotIndex: 3, label: "CB", top: 78, left: 78 },
+    { slotIndex: 4, label: "LM", top: 44, left: 8 },
+    { slotIndex: 5, label: "CM", top: 44, left: 32 },
+    { slotIndex: 6, label: "CM", top: 44, left: 68 },
+    { slotIndex: 7, label: "RM", top: 44, left: 92 },
+    { slotIndex: 8, label: "LW", top: 12, left: 14 },
+    { slotIndex: 9, label: "ST", top: 8, left: 50 },
+    { slotIndex: 10, label: "RW", top: 12, left: 86 },
+  ],
+  // 3-4-1-2 (wing-back 4-mid, CAM, two STs)
+  "3412": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 78, left: 22 },
+    { slotIndex: 2, label: "CB", top: 68, left: 50 },
+    { slotIndex: 3, label: "CB", top: 78, left: 78 },
+    { slotIndex: 4, label: "LM", top: 50, left: 8 },
+    { slotIndex: 5, label: "CM", top: 50, left: 32 },
+    { slotIndex: 6, label: "CM", top: 50, left: 68 },
+    { slotIndex: 7, label: "RM", top: 50, left: 92 },
+    { slotIndex: 8, label: "CAM", top: 26, left: 50 },
+    { slotIndex: 9, label: "ST", top: 6, left: 30 },
+    { slotIndex: 10, label: "ST", top: 6, left: 70 },
+  ],
+  // 3-5-1-1 (5-mid with elevated central CM, CAM offset off-50)
+  // CAM is shifted to left:34 because 5 stacked tiers on column 50
+  // (ST + CAM + central-CM + central-CB + GK) needs gaps totalling
+  // 4 x 24 = 96% of the pitch, but the available top span is 92%.
+  "3511": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 78, left: 22 },
+    { slotIndex: 2, label: "CB", top: 68, left: 50 },
+    { slotIndex: 3, label: "CB", top: 78, left: 78 },
+    { slotIndex: 4, label: "LM", top: 50, left: 8 },
+    { slotIndex: 5, label: "CM", top: 50, left: 28 },
+    { slotIndex: 6, label: "CM", top: 44, left: 50 },
+    { slotIndex: 7, label: "CM", top: 50, left: 72 },
+    { slotIndex: 8, label: "RM", top: 50, left: 92 },
+    { slotIndex: 9, label: "CAM", top: 24, left: 34 },
+    { slotIndex: 10, label: "ST", top: 8, left: 50 },
+  ],
+  // 3-4-2-1 (wing-back 4-mid, two CAMs, lone ST)
+  "3421": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 78, left: 22 },
+    { slotIndex: 2, label: "CB", top: 68, left: 50 },
+    { slotIndex: 3, label: "CB", top: 78, left: 78 },
+    { slotIndex: 4, label: "LM", top: 50, left: 8 },
+    { slotIndex: 5, label: "CM", top: 50, left: 32 },
+    { slotIndex: 6, label: "CM", top: 50, left: 68 },
+    { slotIndex: 7, label: "RM", top: 50, left: 92 },
+    { slotIndex: 8, label: "CAM", top: 26, left: 32 },
+    { slotIndex: 9, label: "CAM", top: 26, left: 68 },
+    { slotIndex: 10, label: "ST", top: 6, left: 50 },
+  ],
+  // 3-1-4-2 (CDM anchor, 4 wide mids, two STs)
+  "3142": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "CB", top: 78, left: 22 },
+    { slotIndex: 2, label: "CB", top: 68, left: 50 },
+    { slotIndex: 3, label: "CB", top: 78, left: 78 },
+    { slotIndex: 4, label: "CDM", top: 44, left: 50 },
+    { slotIndex: 5, label: "LM", top: 30, left: 8 },
+    { slotIndex: 6, label: "CM", top: 30, left: 32 },
+    { slotIndex: 7, label: "CM", top: 30, left: 68 },
+    { slotIndex: 8, label: "RM", top: 30, left: 92 },
+    { slotIndex: 9, label: "ST", top: 6, left: 36 },
+    { slotIndex: 10, label: "ST", top: 6, left: 64 },
+  ],
+
+  // ─── BACK-FIVE ─────────────────────────────────────────────────────
+  // Wing-backs at top:66 (well above side CBs at 78). Central CB
+  // dropped FORWARD to top:68 (same trick as back-three) so it clears
+  // the GK card at top:92 by 24%.
+  "532": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 78, left: 28 },
+    { slotIndex: 3, label: "CB", top: 68, left: 50 },
+    { slotIndex: 4, label: "CB", top: 78, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "CM", top: 44, left: 28 },
+    { slotIndex: 7, label: "CM", top: 44, left: 50 },
+    { slotIndex: 8, label: "CM", top: 44, left: 72 },
+    { slotIndex: 9, label: "ST", top: 8, left: 36 },
+    { slotIndex: 10, label: "ST", top: 8, left: 64 },
+  ],
+  // 5-2-1-2 (double-pivot, CAM, two STs)
+  "5212": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 78, left: 28 },
+    { slotIndex: 3, label: "CB", top: 68, left: 50 },
+    { slotIndex: 4, label: "CB", top: 78, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "CDM", top: 44, left: 32 },
+    { slotIndex: 7, label: "CDM", top: 44, left: 68 },
+    { slotIndex: 8, label: "CAM", top: 24, left: 50 },
+    { slotIndex: 9, label: "ST", top: 8, left: 30 },
+    { slotIndex: 10, label: "ST", top: 8, left: 70 },
+  ],
+  // 5-4-1
+  "541": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 78, left: 28 },
+    { slotIndex: 3, label: "CB", top: 68, left: 50 },
+    { slotIndex: 4, label: "CB", top: 78, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "LM", top: 40, left: 8 },
+    { slotIndex: 7, label: "CM", top: 44, left: 32 },
+    { slotIndex: 8, label: "CM", top: 44, left: 68 },
+    { slotIndex: 9, label: "RM", top: 40, left: 92 },
+    { slotIndex: 10, label: "ST", top: 8, left: 50 },
+  ],
+  // 5-2-3 (wing-back + double-pivot + front three)
+  "523": [
+    { slotIndex: 0, label: "GK", top: 92, left: 50 },
+    { slotIndex: 1, label: "LWB", top: 66, left: 8 },
+    { slotIndex: 2, label: "CB", top: 78, left: 28 },
+    { slotIndex: 3, label: "CB", top: 68, left: 50 },
+    { slotIndex: 4, label: "CB", top: 78, left: 72 },
+    { slotIndex: 5, label: "RWB", top: 66, left: 92 },
+    { slotIndex: 6, label: "CM", top: 44, left: 32 },
+    { slotIndex: 7, label: "CM", top: 44, left: 68 },
+    { slotIndex: 8, label: "LW", top: 12, left: 14 },
+    { slotIndex: 9, label: "ST", top: 8, left: 50 },
+    { slotIndex: 10, label: "RW", top: 12, left: 86 },
+  ],
+};
+
+export function getOverlayFormationSlots(
+  formation: FormationKey,
+): SlotPosition[] {
+  return OVERLAY_FORMATIONS[formation];
+}
+
 const LABELS: Record<FormationKey, string> = {
   "433": "4-3-3",
   "442": "4-4-2",
