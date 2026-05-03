@@ -238,10 +238,14 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
     // Wire-shape contract: integer percent in [0..100] (NOT a fraction).
     expect(body.cards[0].winProbPct).toBe(65);
     expect(body.cards[0].drawProbPct).toBe(18);
-    expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
-      PLAYER_A,
-      PLAYER_B,
-    ]);
+    // Plan 53 (2026-05-04) — endpoint passes `{ overlayKey }` (null when
+    // no `?key=` param) so the resolver sees the right scope.
+    expect(buildH2HCardsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      SEASON_ID,
+      [PLAYER_A, PLAYER_B],
+      { overlayKey: null },
+    );
   });
 
   it("returns 400 on invalid UUID in ids", async () => {
@@ -380,10 +384,13 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
     expect(body.cards).toHaveLength(2);
     expect(body.cards[0].winProbPct).toBe(65);
     expect(body.cards[1].winProbPct).toBe(35);
-    expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
-      PLAYER_A,
-      PLAYER_B,
-    ]);
+    // Plan 53 (2026-05-04) — `?key=04-h2h-2` flows through to resolver.
+    expect(buildH2HCardsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      SEASON_ID,
+      [PLAYER_A, PLAYER_B],
+      { overlayKey: "04-h2h-2" },
+    );
   });
 
   it("Bug-1 regression — normalizes spaced displayName ('BAJI JNR') to underscored gamer_tag ('BAJI_JNR')", async () => {
@@ -427,10 +434,13 @@ describe("GET /api/broadcast/sessions/[id]/h2h", () => {
       params: Promise.resolve({ id: SESSION_ID }),
     });
     expect(res.status).toBe(200);
-    expect(buildH2HCardsMock).toHaveBeenCalledWith(expect.anything(), SEASON_ID, [
-      PLAYER_A,
-      PLAYER_B,
-    ]);
+    // Plan 53 (2026-05-04) — `?key=04-h2h-2` flows through to resolver.
+    expect(buildH2HCardsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      SEASON_ID,
+      [PLAYER_A, PLAYER_B],
+      { overlayKey: "04-h2h-2" },
+    );
   });
 
   it("Bug-14 regression — multiplies fraction winProbPct by 100 + rounds to integer percent", async () => {

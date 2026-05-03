@@ -5,6 +5,11 @@ import {
   type PlayerSeasonStats,
   type H2HRecord,
 } from "./win_probability";
+import { resolvePlayerPose } from "@/server/overlays/player-photos/resolver";
+import {
+  buildPhotoUrl,
+  getVariantKindForOverlay,
+} from "@/server/overlays/player-photos/variant-map";
 
 /**
  * Plan 51 — H2H comparison data builder.
@@ -64,6 +69,7 @@ export async function buildH2HCards(
   sb: SupabaseClient,
   seasonId: string,
   playerIds: string[],
+  opts: { overlayKey?: string | null } = {},
 ): Promise<H2HCard[]> {
   if (playerIds.length === 0) return [];
 
@@ -94,12 +100,22 @@ export async function buildH2HCards(
   // H2H records between every selected pair, season-scoped.
   const h2hMap = await loadPairwiseH2H(sb, seasonId, playerIds);
 
-  // Bug fix 2026-05-02 — pull org logo + headshot for every selected
-  // player so the H2H overlays don't fall back to the static
-  // `PLAYER_ORG[slug]` map (which pins FARUK to OAS PLAIN even when the
-  // admin has uploaded a new colored variant via /admin/people/orgs/).
-  // The admin-supplied `organizations.logo_url` is the source of truth.
-  const profileMap = await loadPlayerProfiles(sb, playerIds);
+  // Bug fix 2026-05-02 — pull org logo for every selected player so the
+  // H2H overlays don't fall back to the static `PLAYER_ORG[slug]` map
+  // (which pins FARUK to OAS PLAIN even when the admin has uploaded a
+  // new colored variant via /admin/people/orgs/). The admin-supplied
+  // `organizations.logo_url` is the source of truth.
+  //
+  // Plan 53 (2026-05-04): photoUrl now flows through `resolvePlayerPose`
+  // + `buildPhotoUrl` so per-overlay / per-player selection rows in
+  // `player_photo_selections` win over the legacy `players.photo_url`
+  // column. The resolver falls back to legacy DEFAULT_POSE_BY_SLUG +
+  // pose 1 when no DB row exists, preserving prior behaviour.
+  const profileMap = await loadPlayerProfiles(
+    sb,
+    playerIds,
+    opts.overlayKey ?? null,
+  );
 
   const out: H2HCard[] = [];
   for (const pid of playerIds) {
@@ -165,10 +181,17 @@ export async function buildH2HCards(
 /**
  * Bug fix 2026-05-02 — resolve per-player org logo + headshot from the
  * DB so the H2H broadcast overlays render the admin-managed visuals
- * instead of the baked-in static slug map. Source of truth chain:
+ * instead of the baked-in static slug map.
  *
+ * Source of truth chain:
  *   `players.organization_id`  →  `organizations.logo_url`
- *   `players.photo_url`        →  direct
+ *   resolver(player_id, overlayKey) → `buildPhotoUrl(...)`        (Plan 53)
+ *
+ * Plan 53 (2026-05-04) — photoUrl is now derived via `resolvePlayerPose`
+ * (per-overlay override → global default → legacy DEFAULT_POSE_BY_SLUG →
+ * pose 1) and `buildPhotoUrl`, NOT the legacy `players.photo_url`
+ * column. The resolver consults `player_photo_selections` so admins can
+ * tune the displayed pose per (player, overlay) without code edits.
  *
  * Returns a Map keyed by player id. Missing rows / null FKs simply
  * collapse to null on each field; the overlay HTML falls back to the
@@ -179,6 +202,7 @@ type PlayerProfile = { orgLogoUrl: string | null; photoUrl: string | null };
 async function loadPlayerProfiles(
   sb: SupabaseClient,
   playerIds: string[],
+  overlayKey: string | null,
 ): Promise<Map<string, PlayerProfile>> {
   const out = new Map<string, PlayerProfile>();
   if (playerIds.length === 0) return out;
@@ -188,7 +212,7 @@ async function loadPlayerProfiles(
     .select(
       `
       id,
-      photo_url,
+      gamer_tag,
       organization:organization_id ( logo_url )
       `,
     )
@@ -203,12 +227,14 @@ async function loadPlayerProfiles(
 
   type Row = {
     id: string;
-    photo_url: string | null;
+    gamer_tag: string | null;
     organization:
       | { logo_url: string | null }
       | { logo_url: string | null }[]
       | null;
   };
+
+  const variantKind = getVariantKindForOverlay(overlayKey ?? "");
 
   for (const r of (data ?? []) as unknown as Row[]) {
     const org = r.organization;
@@ -220,9 +246,21 @@ async function loadPlayerProfiles(
         orgLogoUrl = org.logo_url ?? null;
       }
     }
+    const slug = tagToSlug(r.gamer_tag ?? "");
+    let photoUrl: string | null = null;
+    if (slug) {
+      const resolved = await resolvePlayerPose(sb, r.id, overlayKey, { slug });
+      photoUrl = buildPhotoUrl({
+        slug,
+        playerId: r.id,
+        poseIndex: resolved.poseIndex,
+        variantKind,
+        source: resolved.source,
+      });
+    }
     out.set(r.id, {
       orgLogoUrl,
-      photoUrl: r.photo_url ?? null,
+      photoUrl,
     });
   }
   return out;

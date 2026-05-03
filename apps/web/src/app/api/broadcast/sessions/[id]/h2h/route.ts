@@ -128,7 +128,15 @@ export async function GET(
   }
 
   try {
-    const rawCards = await buildH2HCards(sb, md.season_id, ids);
+    // Plan 53 (2026-05-04) — pass overlayKey so `buildH2HCards` →
+    // `loadPlayerProfiles` → `resolvePlayerPose` honours per-overlay
+    // pose overrides from `player_photo_selections`. When the caller
+    // didn't include `?key=` (legacy `?ids=` only), the resolver falls
+    // through to the GLOBAL default + legacy DEFAULT_POSE_BY_SLUG +
+    // pose 1.
+    const rawCards = await buildH2HCards(sb, md.season_id, ids, {
+      overlayKey,
+    });
     // 2026-04-28 fix (Bug #14): `buildH2HCards` returns `winProbPct` as a
     // FRACTION in [0..1] (e.g. 0.456). The browser-source overlay HTML
     // (`/overlay/v2/04-h2h-2`, `/05`, `/06`) does `Math.round(value) + '%'`
