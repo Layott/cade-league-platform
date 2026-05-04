@@ -26,14 +26,20 @@ export function PreviewIframe({
   templateKey,
   size,
   sessionId,
+  viewToken,
 }: {
   templateKey: TemplateKey;
   size: SocialSize;
   sessionId: string | null;
+  viewToken?: string | null;
 }) {
   const preset = SIZE_PRESETS[size];
   const aspectStr = `${preset.width} / ${preset.height}`;
-  const sessionParam = sessionId ? `?session=${encodeURIComponent(sessionId)}` : "";
+  const tokenParam =
+    sessionId && viewToken ? `&t=${encodeURIComponent(viewToken)}` : "";
+  const sessionParam = sessionId
+    ? `?session=${encodeURIComponent(sessionId)}${tokenParam}`
+    : "";
   const src = `/api/social/og/${templateKey}/${size}${sessionParam}`;
 
   return (

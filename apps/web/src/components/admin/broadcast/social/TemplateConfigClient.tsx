@@ -24,11 +24,13 @@ export function TemplateConfigClient({
   supportedSizes,
   initialSize,
   sessionId,
+  viewToken,
 }: {
   templateKey: TemplateKey;
   supportedSizes: ReadonlyArray<SocialSize>;
   initialSize: SocialSize;
   sessionId: string | null;
+  viewToken?: string | null;
 }) {
   const [size, setSize] = useState<SocialSize>(initialSize);
 
@@ -46,6 +48,7 @@ export function TemplateConfigClient({
           templateKey={templateKey}
           size={size}
           sessionId={sessionId}
+          viewToken={viewToken ?? null}
         />
         <div className="space-y-4">
           <h2 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">

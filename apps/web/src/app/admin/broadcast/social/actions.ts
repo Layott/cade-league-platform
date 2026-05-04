@@ -163,10 +163,11 @@ export async function triggerStaticRender(
   type SessionRow = {
     id: string;
     match_day_id: string;
+    view_token: string | null;
   };
   const { data: sess, error: sessErr } = await sb
     .from("stream_sessions")
-    .select("id, match_day_id")
+    .select("id, match_day_id, view_token")
     .eq("id", parsed.data.sessionId)
     .is("deleted_at", null)
     .maybeSingle<SessionRow>();
@@ -199,7 +200,11 @@ export async function triggerStaticRender(
     hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
   const origin = `${protocol}://${host}`;
 
-  const ogPath = `/api/social/og/${parsed.data.templateKey}/${parsed.data.size}?session=${encodeURIComponent(parsed.data.sessionId)}`;
+  // OG endpoints are Edge-runtime + view_token gated. Server-action
+  // cannot forward auth cookies (Edge can't read them). Append the
+  // session's view_token to the URL.
+  const tokenQs = sess.view_token ? `&t=${encodeURIComponent(sess.view_token)}` : "";
+  const ogPath = `/api/social/og/${parsed.data.templateKey}/${parsed.data.size}?session=${encodeURIComponent(parsed.data.sessionId)}${tokenQs}`;
   const ogUrl = `${origin}${ogPath}`;
 
   // 1. Fetch the OG endpoint.

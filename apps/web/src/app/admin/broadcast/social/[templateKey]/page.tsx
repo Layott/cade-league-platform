@@ -69,26 +69,34 @@ async function resolveAdmin() {
  */
 async function findActiveSession(
   sb: SupabaseClient,
-): Promise<{ id: string; matchDate: string | null; venueName: string | null } | null> {
+): Promise<{ id: string; viewToken: string | null; matchDate: string | null; venueName: string | null } | null> {
   type Row = {
     id: string;
     match_day_id: string;
     started_at: string;
+    view_token: string | null;
   };
-  const { data, error } = await sb
+  // Prefer an active (un-ended) session; if none, fall back to the most
+  // recent session so the social page still has render data on a fresh
+  // admin visit (most useful right after a match-day ends).
+  const { data: active, error } = await sb
     .from("stream_sessions")
-    .select("id, match_day_id, started_at")
+    .select("id, match_day_id, started_at, view_token")
     .is("ended_at", null)
     .is("deleted_at", null)
     .order("started_at", { ascending: false })
     .limit(1);
-  if (error) {
-    // Surface DB errors as "no active session" rather than a 500 — the
-    // social page is non-critical and a transient DB blip shouldn't
-    // hard-fail the admin shell.
-    return null;
+  if (error) return null;
+  let sess = (active?.[0] ?? null) as Row | null;
+  if (!sess) {
+    const { data: recent } = await sb
+      .from("stream_sessions")
+      .select("id, match_day_id, started_at, view_token")
+      .is("deleted_at", null)
+      .order("started_at", { ascending: false })
+      .limit(1);
+    sess = (recent?.[0] ?? null) as Row | null;
   }
-  const sess = (data?.[0] ?? null) as Row | null;
   if (!sess) return null;
   type MatchDayRow = {
     match_date: string | null;
@@ -102,6 +110,7 @@ async function findActiveSession(
     .maybeSingle<MatchDayRow>();
   return {
     id: sess.id,
+    viewToken: sess.view_token ?? null,
     matchDate: md?.match_date ?? null,
     venueName: md?.venue_name ?? null,
   };
@@ -204,6 +213,7 @@ export default async function SocialTemplatePage({
         supportedSizes={template.supportedSizes}
         initialSize={initialSize}
         sessionId={activeSession?.id ?? null}
+        viewToken={activeSession?.viewToken ?? null}
       />
 
       <section className="space-y-3" data-testid="render-jobs-section">
