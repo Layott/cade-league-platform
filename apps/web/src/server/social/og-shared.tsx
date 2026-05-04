@@ -411,8 +411,9 @@ export function BrandHeader({ size, origin }: BrandHeaderProps): ReactElement {
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "flex-start",
+        justifyContent: "center",
         gap: "32px",
+        width: "100%",
       }}
     >
       <img
@@ -487,9 +488,9 @@ export function SponsorRow({ size, origin }: SponsorRowProps): ReactElement {
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "center",
         width: "100%",
-        gap: "24px",
+        gap: size === "1080x1920" ? "32px" : "20px",
         opacity: 0.95,
       }}
     >
