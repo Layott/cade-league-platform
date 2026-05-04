@@ -351,34 +351,27 @@ export function PlayerHeadshot({
   const idx = poseIndex ?? 1;
   const padded = String(idx).padStart(2, "0");
   const url = `${base}/overlays/v2/_assets/players/processed/${slug}/headshot_${padded}_nobg.png`;
+  const ring = Math.max(2, Math.round(avatarSize * 0.045));
+  // Satori clips `border-radius` on `<img>` directly when objectFit is set —
+  // skip the wrapping div + overflow trick entirely.
   return (
-    <div
+    <img
+      src={url}
+      alt=""
+      width={avatarSize}
+      height={avatarSize}
       style={{
         width: `${avatarSize}px`,
         height: `${avatarSize}px`,
         borderRadius: "9999px",
-        overflow: "hidden",
-        background: "rgba(0,0,0,0.4)",
+        border: `${ring}px solid ${ringColor ?? BRAND.greenBright}`,
+        objectFit: "cover",
+        objectPosition: "center 25%",
+        backgroundColor: "rgba(0,0,0,0.4)",
         display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        border: `${Math.max(2, Math.round(avatarSize * 0.045))}px solid ${ringColor ?? BRAND.greenBright}`,
+        flexShrink: 0,
       }}
-    >
-      <img
-        src={url}
-        alt=""
-        width={avatarSize * 1.2}
-        height={avatarSize * 1.2}
-        style={{
-          width: `${avatarSize * 1.2}px`,
-          height: `${avatarSize * 1.2}px`,
-          objectFit: "cover",
-          objectPosition: "center 30%",
-          display: "flex",
-        }}
-      />
-    </div>
+    />
   );
 }
 
