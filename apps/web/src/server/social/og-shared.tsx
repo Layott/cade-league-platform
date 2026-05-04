@@ -141,19 +141,23 @@ function paddingFor(size: SocialSize): { top: number; side: number; bottom: numb
 
 export type WrapperProps = {
   size: SocialSize;
+  origin?: string;
   children: React.ReactNode;
 };
 
 /**
- * Root frame. Brand bg gradient + size-aware padding. Locks dimensions so the
- * outer flex container always matches the `ImageResponse` viewport.
+ * Root frame. Halftone-stadium bg image + size-aware padding. Brand-locked.
+ * `<img>` layer is required because Satori does NOT honor CSS
+ * `background-image` URLs.
  *
- * Note: `next/og` requires every `display: flex` container to have a sane
- * `flex-direction` set (defaults differ from CSS spec) — keep that explicit.
+ * The bg image at `/social/bg.png` is the green halftone-stadium asset
+ * (ELITE S2 BG.png) — same source as the stream overlays so all surfaces
+ * read as one brand. Pass `origin` for absolute URL prefixing.
  */
-export function Wrapper({ size, children }: WrapperProps): ReactElement {
+export function Wrapper({ size, origin, children }: WrapperProps): ReactElement {
   const pad = paddingFor(size);
   const { width, height } = parseDims(size);
+  const base = (origin ?? "").replace(/\/+$/, "");
   return (
     <div
       style={{
@@ -163,14 +167,43 @@ export function Wrapper({ size, children }: WrapperProps): ReactElement {
         flexDirection: "column",
         justifyContent: "space-between",
         padding: `${pad.top}px ${pad.side}px ${pad.bottom}px`,
-        background: `linear-gradient(180deg, ${BRAND.black} 0%, #0a0a0a 35%, #050505 100%)`,
+        background: BRAND.black,
         color: BRAND.white,
         fontFamily: "Quedora, sans-serif",
         position: "relative",
         overflow: "hidden",
       }}
     >
-      {/* Pink-to-green diagonal accent bar, 4px tall, top-left → bottom-right */}
+      {/* BG image layer — halftone-stadium green */}
+      <img
+        src={`${base}/social/bg.png`}
+        alt=""
+        width={width}
+        height={height}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: `${width}px`,
+          height: `${height}px`,
+          objectFit: "cover",
+          zIndex: 0,
+        }}
+      />
+      {/* Vignette darken — helps content legibility on busy halftone */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: `${width}px`,
+          height: `${height}px`,
+          background: `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.20) 35%, rgba(0,0,0,0.55) 100%)`,
+          zIndex: 1,
+          display: "flex",
+        }}
+      />
+      {/* Pink-to-green diagonal accent bar, top edge */}
       <div
         style={{
           position: "absolute",
@@ -179,10 +212,172 @@ export function Wrapper({ size, children }: WrapperProps): ReactElement {
           width: `${width}px`,
           height: "4px",
           background: `linear-gradient(90deg, ${BRAND.pink}, ${BRAND.green})`,
+          zIndex: 3,
           display: "flex",
         }}
       />
-      {children}
+      {/* Content stack — z above bg + vignette */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ----- <SideBrackets> ---------------------------------------------------------
+
+/**
+ * Decorative chevron-bracket marks down both side edges. Mirrors the
+ * brand poster style (see KaykayPlayerOfWeek + ParticipatingPlayers
+ * reference). 3 stacked chevrons per side, mid-height, 0.5 opacity.
+ *
+ * Pure CSS triangles via stacked rectangles — no SVG (Satori's mask
+ * pipeline is fragile + the chevrons are simple geometry).
+ */
+export function SideBrackets({ size }: { size: SocialSize }): ReactElement | null {
+  const { width, height } = parseDims(size);
+  // Skip on the X landscape layout — sides are too narrow to read.
+  if (size === "1200x675") return null;
+  const top = Math.round(height * 0.45);
+  const gap = 36;
+  const w = 38;
+  const stroke = 4;
+  const slash = (
+    <div
+      style={{
+        width: `${w}px`,
+        height: "26px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0px",
+      }}
+    >
+      <div
+        style={{
+          width: `${w}px`,
+          height: `${stroke}px`,
+          background: BRAND.white,
+          display: "flex",
+        }}
+      />
+      <div
+        style={{
+          width: `${w}px`,
+          height: `${stroke}px`,
+          background: BRAND.white,
+          marginTop: `${22 - stroke}px`,
+          transform: "skewX(-22deg)",
+          display: "flex",
+        }}
+      />
+    </div>
+  );
+  const stack = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: `${gap}px`,
+        opacity: 0.55,
+      }}
+    >
+      {slash}
+      {slash}
+      {slash}
+    </div>
+  );
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute",
+          top: `${top}px`,
+          left: "12px",
+          zIndex: 2,
+          display: "flex",
+        }}
+      >
+        {stack}
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: `${top}px`,
+          right: "12px",
+          zIndex: 2,
+          transform: "scaleX(-1)",
+          display: "flex",
+        }}
+      >
+        {stack}
+      </div>
+    </>
+  );
+}
+
+// ----- <PlayerHeadshot> -------------------------------------------------------
+
+/**
+ * Small player headshot rendered as a circular avatar. Used in row-style
+ * templates (top-scorers, gd-leaders, etc.) so they don't look bare.
+ *
+ * Slug is the player's processed-folder slug (e.g. "baji_jnr"). Default
+ * pose 1; pass `poseIndex` to override.
+ */
+export function PlayerHeadshot({
+  slug,
+  size: avatarSize,
+  origin,
+  poseIndex,
+  ringColor,
+}: {
+  slug: string;
+  size: number;
+  origin?: string;
+  poseIndex?: number;
+  ringColor?: string;
+}): ReactElement {
+  const base = (origin ?? "").replace(/\/+$/, "");
+  const idx = poseIndex ?? 1;
+  const padded = String(idx).padStart(2, "0");
+  const url = `${base}/overlays/v2/_assets/players/processed/${slug}/headshot_${padded}_nobg.png`;
+  return (
+    <div
+      style={{
+        width: `${avatarSize}px`,
+        height: `${avatarSize}px`,
+        borderRadius: "9999px",
+        overflow: "hidden",
+        background: "rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        border: `${Math.max(2, Math.round(avatarSize * 0.045))}px solid ${ringColor ?? BRAND.greenBright}`,
+      }}
+    >
+      <img
+        src={url}
+        alt=""
+        width={avatarSize * 1.2}
+        height={avatarSize * 1.2}
+        style={{
+          width: `${avatarSize * 1.2}px`,
+          height: `${avatarSize * 1.2}px`,
+          objectFit: "cover",
+          objectPosition: "center 30%",
+          display: "flex",
+        }}
+      />
     </div>
   );
 }
@@ -366,7 +561,7 @@ export function TitleBlock({
             fontWeight: 500,
             fontSize: "32px",
             letterSpacing: "8px",
-            color: BRAND.pink,
+            color: BRAND.white,
             textTransform: "uppercase",
             marginBottom: "12px",
             display: "flex",
@@ -381,16 +576,19 @@ export function TitleBlock({
           fontWeight: 900,
           fontSize: "148px",
           lineHeight: 0.85,
-          letterSpacing: "6px",
+          letterSpacing: "4px",
           textTransform: "uppercase",
-          color: BRAND.greenBright,
+          // Approximated green→cyan gradient. Satori can't background-clip
+          // text; we fake it via cyan fill + green ground-shadow + halo.
+          color: "#4ee0c4",
           textShadow: [
             // bottom green ground-shadow → fakes the gradient's bottom stop
-            `0 6px 0 ${BRAND.greenDeep}`,
-            // outer green halo → fakes the mid-stop glow
-            `0 0 40px rgba(107,205,6,0.55)`,
-            // hard black drop → keeps text readable on lighter bg patches
-            `0 4px 0 rgba(0,0,0,0.65)`,
+            `0 6px 0 ${BRAND.green}`,
+            `0 8px 0 ${BRAND.greenDeep}`,
+            // outer green halo
+            `0 0 32px rgba(107,205,6,0.55)`,
+            // hard black drop for readability
+            `0 4px 0 rgba(0,0,0,0.55)`,
           ].join(", "),
           display: "flex",
         }}

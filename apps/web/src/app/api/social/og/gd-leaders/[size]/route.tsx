@@ -17,6 +17,8 @@ import {
   Wrapper,
   BrandHeader,
   TitleBlock,
+  SideBrackets,
+  PlayerHeadshot,
   loadFonts,
   BRAND,
 } from "@/server/social/og-shared";
@@ -37,7 +39,7 @@ export const dynamic = "force-dynamic";
  * Single GD-leader card — name + (huge) GD number + GF/GA breakdown.
  * GD colour: green when positive, pink when negative, white when zero.
  */
-function GdLeaderCard({ row }: { row: GdLeaderRow }) {
+function GdLeaderCard({ row, origin }: { row: GdLeaderRow; origin: string }) {
   const gdColor =
     row.gd > 0
       ? BRAND.greenBright
@@ -65,8 +67,8 @@ function GdLeaderCard({ row }: { row: GdLeaderRow }) {
       {/* Rank badge */}
       <div
         style={{
-          width: "60px",
-          height: "60px",
+          width: "48px",
+          height: "48px",
           borderRadius: "999px",
           background:
             row.pos === 1
@@ -75,7 +77,7 @@ function GdLeaderCard({ row }: { row: GdLeaderRow }) {
           color: row.pos === 1 ? BRAND.black : BRAND.white,
           fontFamily: "Agharti, sans-serif",
           fontWeight: 900,
-          fontSize: "36px",
+          fontSize: "30px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -83,6 +85,16 @@ function GdLeaderCard({ row }: { row: GdLeaderRow }) {
         }}
       >
         {row.pos}
+      </div>
+
+      {/* Player headshot */}
+      <div style={{ display: "flex", flexShrink: 0 }}>
+        <PlayerHeadshot
+          slug={row.slug}
+          size={84}
+          origin={origin}
+          ringColor={row.pos === 1 ? BRAND.greenBright : "rgba(255,255,255,0.45)"}
+        />
       </div>
 
       {/* Name + GF/GA breakdown */}
@@ -188,7 +200,7 @@ function GdLeaderCard({ row }: { row: GdLeaderRow }) {
   );
 }
 
-function GdBody({ payload }: { payload: GdLeadersPayload }) {
+function GdBody({ payload, origin }: { payload: GdLeadersPayload; origin: string }) {
   if (payload.rows.length === 0) {
     return (
       <div
@@ -224,7 +236,7 @@ function GdBody({ payload }: { payload: GdLeadersPayload }) {
       }}
     >
       {payload.rows.map((r) => (
-        <GdLeaderCard key={`${r.pos}-${r.slug}`} row={r} />
+        <GdLeaderCard key={`${r.pos}-${r.slug}`} row={r} origin={origin} />
       ))}
     </div>
   );
@@ -254,14 +266,15 @@ export async function GET(
 
     return new ImageResponse(
       (
-        <Wrapper size={renderSize}>
+        <Wrapper size={renderSize} origin={origin}>
+          <SideBrackets size={renderSize} />
           <BrandHeader size={renderSize} origin={origin} />
           <TitleBlock
             subtitle="ELITE LEAGUE SEASON 2"
             title="GD LEADERS"
             dateText={payload.weekLabel.toUpperCase()}
           />
-          <GdBody payload={payload} />
+          <GdBody payload={payload} origin={origin} />
         </Wrapper>
       ),
       {

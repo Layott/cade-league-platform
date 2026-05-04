@@ -20,6 +20,8 @@ import {
   BrandHeader,
   SponsorRow,
   TitleBlock,
+  SideBrackets,
+  PlayerHeadshot,
   loadFonts,
   BRAND,
 } from "@/server/social/og-shared";
@@ -47,14 +49,17 @@ function TopScorerCard({
   row,
   leaderGoals,
   size,
+  origin,
 }: {
   row: TopScorerRow;
   leaderGoals: number;
   size: SocialSize;
+  origin: string;
 }) {
   const isReel = size === "1080x1920";
-  const rowH = isReel ? 92 : 64;
-  const rankSize = isReel ? 64 : 48;
+  const rowH = isReel ? 110 : 80;
+  const rankSize = isReel ? 56 : 42;
+  const headSize = isReel ? 96 : 70;
   const fsName = isReel ? 36 : 26;
   const fsGoals = isReel ? 64 : 44;
   const isLeader = row.pos === 1;
@@ -95,6 +100,16 @@ function TopScorerCard({
         }}
       >
         {row.pos}
+      </div>
+
+      {/* Player headshot — keeps the row from looking text-only. */}
+      <div style={{ display: "flex", flexShrink: 0 }}>
+        <PlayerHeadshot
+          slug={row.slug}
+          size={headSize}
+          origin={origin}
+          ringColor={isLeader ? BRAND.greenBright : "rgba(255,255,255,0.5)"}
+        />
       </div>
 
       {/* Body — name on top, dominance bar underneath. */}
@@ -197,9 +212,11 @@ function TopScorerCard({
 function TopScorersBody({
   payload,
   size,
+  origin,
 }: {
   payload: TopScorersPayload;
   size: SocialSize;
+  origin: string;
 }) {
   // 1080x1920 → top 5 (room for big rows). 1080x1080 → top 5 (compact).
   const rows = payload.rows.slice(0, size === "1080x1920" ? 5 : 5);
@@ -245,6 +262,7 @@ function TopScorersBody({
           row={r}
           leaderGoals={leaderGoals}
           size={size}
+          origin={origin}
         />
       ))}
     </div>
@@ -276,14 +294,15 @@ export async function GET(
 
     return new ImageResponse(
       (
-        <Wrapper size={renderSize}>
+        <Wrapper size={renderSize} origin={origin}>
+          <SideBrackets size={renderSize} />
           <BrandHeader size={renderSize} origin={origin} />
           <TitleBlock
             subtitle="ELITE LEAGUE SEASON 2"
             title="GOLDEN BOOT"
             dateText={payload.weekLabel.toUpperCase()}
           />
-          <TopScorersBody payload={payload} size={renderSize} />
+          <TopScorersBody payload={payload} size={renderSize} origin={origin} />
           {renderSize === "1080x1920" ? <SponsorRow size={renderSize} origin={origin} /> : null}
         </Wrapper>
       ),

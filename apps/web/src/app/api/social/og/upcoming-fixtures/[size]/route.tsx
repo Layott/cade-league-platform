@@ -18,6 +18,7 @@ import {
   BrandHeader,
   SponsorRow,
   TitleBlock,
+  SideBrackets,
   loadFonts,
   BRAND,
 } from "@/server/social/og-shared";
@@ -306,7 +307,8 @@ export async function GET(
 
     return new ImageResponse(
       (
-        <Wrapper size={renderSize}>
+        <Wrapper size={renderSize} origin={origin}>
+          <SideBrackets size={renderSize} />
           <BrandHeader size={renderSize} origin={origin} />
           <TitleBlock
             subtitle="ELITE LEAGUE SEASON 2"

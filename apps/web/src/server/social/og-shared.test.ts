@@ -263,8 +263,8 @@ describe("<TitleBlock>", () => {
     expect(html).not.toContain("-webkit-background-clip");
     // Confirm we DID use stacked text-shadows
     expect(html).toContain("text-shadow");
-    // Bright green fill + deep green ground-shadow = the gradient fake
-    expect(html.toLowerCase()).toContain("#a4ff1a");
+    // Cyan fill + green ground-shadow = the green→cyan gradient fake
+    expect(html.toLowerCase()).toContain("#4ee0c4");
     expect(html.toLowerCase()).toContain("#357500");
   });
 });
