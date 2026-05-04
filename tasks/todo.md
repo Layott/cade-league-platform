@@ -1267,3 +1267,38 @@ All slices verified live. Build pipeline auto-deploys docs commit on completion.
 - **Coach + admin player-image upload UI** — Slice H laid the foundation (lib/image-processing.ts) with recipes for both, but the admin upload UI doesn't yet exist. Add when needed.
 - **22 legacy squad submissions with NULL formation** — endpoint falls back to `deriveFormation()` for those rows. Will be replaced naturally as players resubmit through the new edit/clear flow (Slice C).
 - **4 unresolved nationalities (Korean/Chinese rows)** — logged to `KNOWLEDGE/extracted/_unresolved_nationalities.csv`. Manual triple-check by user via Wikipedia + override via `_backfill_nationality.js` runs next-pass.
+
+---
+
+## Plan 54 — Broadcast Social-Media Asset Generation (SPEC, not started)
+
+**Status:** SPEC drafted 2026-05-05. Implementation pending user execution decision.
+**Spec:** `docs/superpowers/specs/2026-05-05-broadcast-social-media.md`
+**Effort:** 14 dev-days across 4 phases (~3.5 weeks for 1 dev).
+
+### Why
+- User asked (2026-05-04) for a broadcast section that generates IG/TikTok/X/Reel-sized assets auto-populated with live league data — leaderboards, stats designs, animated and static.
+- Constraint: **video output = 1080×1920 only** (IG Reel format). Static images can be per-platform sized.
+
+### What ships
+- `social_render_jobs` + `social_render_templates` tables + `social-renders` Storage bucket + 4 new perms (`social.read|render|approve|delete`).
+- Admin UI at `/admin/broadcast/social` — template grid, preview iframe, size picker, download, recent jobs.
+- **Phase 1 (week 1):** static-only via `next/og` Edge route. 5 templates (leaderboard, top-scorers, upcoming-fixtures, gd-leaders, league-avg) at 1080×1920 / 1080×1080 / 1200×675.
+- **Phase 2 (week 2):** +4 templates (player-of-week, biggest-movers, perfect-week, squad-reveal). Resend email + copy-IG-link.
+- **Phase 3 (week 3):** external Fly.io worker (Playwright + ffmpeg-static) for video. 3 video templates (leaderboard-reel, match-day-recap, golden-boot-race), all 1080×1920 MP4.
+- **Phase 4 (week 4):** Supabase webhook → event-driven triggers + approval gate. 3 event templates (milestone-goal, win-streak, dispute-public-note).
+
+### Hard skips (not Day 1)
+- Auto-posting to IG/TikTok/X (approval gate non-negotiable).
+- GIF format (MP4 only).
+- Remotion + AWS Lambda.
+- Vercel Sandbox.
+- 4K rendering.
+- 1080×1080 video.
+
+### Proof-of-concept already done
+- `C:\Users\Sweez\Downloads\leaderboard-reel-week2-redesign.mp4` — 1080×1920 H.264, 17s, animated leaderboard with avatars + sequential row movement + per-row green/pink highlight + count-up scores. Hand-rolled via Playwright headless screencast → `ffmpeg-static` (from `imageio-ffmpeg` Python pkg). Confirms Phase 3 worker pipeline is viable.
+
+### Next action
+User picks: (a) start Phase 1 implementation now, or (b) more spec edits first.
+

@@ -48,6 +48,11 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     "tournament.export",
     "broadcast.v2.read",
     "broadcast.v2.trigger",
+    // Plan 54 — broadcast social media render pipeline.
+    "social.read",
+    "social.render",
+    "social.approve",
+    "social.delete",
   ],
   loc: [
     "squads.validate",
@@ -95,10 +100,18 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     // Plan 51 — broadcast v2 overlay control room.
     "broadcast.v2.read",
     "broadcast.v2.trigger",
+    // Plan 54 — broadcast social media render pipeline.
+    "social.read",
+    "social.render",
+    "social.approve",
   ],
   design: [
     // Plan 51 — read-only access to broadcast v2 for review/QA.
     "broadcast.v2.read",
+    // Plan 54 — broadcast social media render pipeline.
+    "social.read",
+    "social.render",
+    "social.approve",
   ],
   moderator: [
     "announcements.*",
@@ -121,6 +134,8 @@ export const PERMS: Record<RoleName, readonly string[]> = {
     // Plan 14 — stats OCR review (delete + re-run stay admin-only).
     "stats.screenshot.upload",
     "stats.screenshot.review",
+    // Plan 54 — broadcast social media (read-only review).
+    "social.read",
   ],
   coach: [],
   team_manager: [],

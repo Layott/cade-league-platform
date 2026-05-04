@@ -271,6 +271,17 @@ export const ADMIN_HUBS: readonly AdminHub[] = [
         href: "/admin/broadcast/v2/youtube",
         perm: "broadcast.v2.read",
       },
+      {
+        // Plan 54 Wave 2B — broadcast social-media asset generation.
+        // Lives under /admin/broadcast/social (NOT under v2/) so the
+        // page can stand on its own auth gate. The hub-resolution path
+        // honours sub-tab hrefs as a fallback so this still resolves
+        // back to the Broadcast hub for breadcrumbs + active-state.
+        key: "social",
+        label: "Social",
+        href: "/admin/broadcast/social",
+        perm: "social.read",
+      },
     ],
   },
   {
@@ -320,6 +331,20 @@ export function findHubByPath(pathname: string): AdminHub | null {
   for (const hub of hubs) {
     if (pathname === hub.href || pathname.startsWith(hub.href + "/")) {
       return hub;
+    }
+  }
+  // Plan 54 Wave 2B fallback — match against subtab hrefs so a hub can
+  // own URL trees outside its primary `href` (e.g. broadcast hub owns
+  // `/admin/broadcast/social` even though `hub.href` is `/admin/broadcast/v2`).
+  // The primary-href loop above still wins for hubs with overlapping
+  // canonical URLs; this only fires when no primary href matches.
+  for (const hub of hubs) {
+    if (!hub.subtabs) continue;
+    for (const tab of hub.subtabs) {
+      const cleanHref = tab.href.split("?")[0];
+      if (pathname === cleanHref || pathname.startsWith(cleanHref + "/")) {
+        return hub;
+      }
     }
   }
   return null;

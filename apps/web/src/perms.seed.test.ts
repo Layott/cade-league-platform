@@ -110,13 +110,16 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
     expect(PERMS.player).toContain("squads.submit.own");
   });
 
-  it("production seed holds broadcast.trigger + match_clock.manage + broadcast.match_control (Plan 12 + 37 + 42) plus broadcast.v2 (Plan 51)", () => {
+  it("production seed holds broadcast.trigger + match_clock.manage + broadcast.match_control (Plan 12 + 37 + 42) plus broadcast.v2 (Plan 51) plus social.* (Plan 54)", () => {
     expect(PERMS.production).toEqual([
       "broadcast.trigger",
       "match_clock.manage",
       "broadcast.match_control",
       "broadcast.v2.read",
       "broadcast.v2.trigger",
+      "social.read",
+      "social.render",
+      "social.approve",
     ]);
   });
 
@@ -328,6 +331,99 @@ describe("seed contract (Phase 1B 12-role matrix)", () => {
       for (const p of dropped) {
         expect(PERMS[r]).not.toContain(p);
       }
+    }
+  });
+
+  // Plan 54 — Broadcast social media perms.
+  // Matches supabase/migrations/20260801000006_seed_social_perms.sql exactly:
+  //   admin: 4 (read, render, approve, delete)
+  //   design: 3 (read, render, approve)
+  //   production: 3 (read, render, approve)
+  //   moderator: 1 (read)
+  //   total: 11 INSERT rows.
+  it("Plan 54: admin seeds all four social.* perms explicitly", () => {
+    for (const p of [
+      "social.read",
+      "social.render",
+      "social.approve",
+      "social.delete",
+    ]) {
+      expect(PERMS.admin).toContain(p);
+    }
+  });
+
+  it("Plan 54: design seeds social.read + render + approve (no delete)", () => {
+    expect(PERMS.design).toContain("social.read");
+    expect(PERMS.design).toContain("social.render");
+    expect(PERMS.design).toContain("social.approve");
+    expect(PERMS.design).not.toContain("social.delete");
+  });
+
+  it("Plan 54: production seeds social.read + render + approve (no delete)", () => {
+    expect(PERMS.production).toContain("social.read");
+    expect(PERMS.production).toContain("social.render");
+    expect(PERMS.production).toContain("social.approve");
+    expect(PERMS.production).not.toContain("social.delete");
+  });
+
+  it("Plan 54: moderator seeds social.read only (no render/approve/delete)", () => {
+    expect(PERMS.moderator).toContain("social.read");
+    expect(PERMS.moderator).not.toContain("social.render");
+    expect(PERMS.moderator).not.toContain("social.approve");
+    expect(PERMS.moderator).not.toContain("social.delete");
+  });
+
+  it("Plan 54: admin matches every social.* perm via wildcard", () => {
+    for (const p of [
+      "social.read",
+      "social.render",
+      "social.approve",
+      "social.delete",
+    ]) {
+      expect(hasPerm({ userId: null, roles: ["admin"] }, p)).toBe(true);
+    }
+  });
+
+  it("Plan 54: roles outside admin/design/production/moderator hold no social.* perms", () => {
+    const excluded = [
+      "loc",
+      "idc",
+      "referee",
+      "technical",
+      "coach",
+      "team_manager",
+      "player",
+      "viewer",
+    ] as const;
+    for (const r of excluded) {
+      for (const p of [
+        "social.read",
+        "social.render",
+        "social.approve",
+        "social.delete",
+      ]) {
+        expect(PERMS[r]).not.toContain(p);
+        expect(hasPerm({ userId: null, roles: [r] }, p)).toBe(false);
+      }
+    }
+  });
+
+  it("Plan 54: only admin holds social.delete", () => {
+    expect(hasPerm({ userId: null, roles: ["admin"] }, "social.delete")).toBe(true);
+    for (const r of [
+      "loc",
+      "idc",
+      "referee",
+      "technical",
+      "production",
+      "design",
+      "moderator",
+      "coach",
+      "team_manager",
+      "player",
+      "viewer",
+    ] as const) {
+      expect(hasPerm({ userId: null, roles: [r] }, "social.delete")).toBe(false);
     }
   });
 
