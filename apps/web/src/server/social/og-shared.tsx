@@ -352,26 +352,37 @@ export function PlayerHeadshot({
   const padded = String(idx).padStart(2, "0");
   const url = `${base}/overlays/v2/_assets/players/processed/${slug}/headshot_${padded}_nobg.png`;
   const ring = Math.max(2, Math.round(avatarSize * 0.045));
-  // Satori clips `border-radius` on `<img>` directly when objectFit is set —
-  // skip the wrapping div + overflow trick entirely.
+  // Render img inside a flex frame; Satori clips border-radius on the
+  // PARENT when the img is positioned absolutely + the parent is flex.
   return (
-    <img
-      src={url}
-      alt=""
-      width={avatarSize}
-      height={avatarSize}
+    <div
       style={{
         width: `${avatarSize}px`,
         height: `${avatarSize}px`,
         borderRadius: "9999px",
         border: `${ring}px solid ${ringColor ?? BRAND.greenBright}`,
-        objectFit: "cover",
-        objectPosition: "center 25%",
         backgroundColor: "rgba(0,0,0,0.4)",
         display: "flex",
+        position: "relative",
+        overflow: "hidden",
         flexShrink: 0,
       }}
-    />
+    >
+      <img
+        src={url}
+        alt=""
+        width={avatarSize}
+        height={avatarSize}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: `${avatarSize}px`,
+          height: `${avatarSize}px`,
+          objectFit: "cover",
+        }}
+      />
+    </div>
   );
 }
 
