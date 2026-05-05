@@ -4,6 +4,7 @@ import type { StandingsRow } from "./read";
 export type Cutoff =
   | { type: "matchday"; matchDayId: string }
   | { type: "matchday-only"; matchDayId: string }
+  | { type: "week-only"; matchDayId: string }
   | { type: "match"; matchId: string };
 
 export type MatchDayInfo = {
@@ -98,6 +99,18 @@ export function selectMatchesThroughCutoff(
   }
   if (cutoff.type === "matchday-only") {
     return ordered.filter((m) => m.match_day_id === cutoff.matchDayId);
+  }
+  if (cutoff.type === "week-only") {
+    const target = ordered.find((m) => m.match_day_id === cutoff.matchDayId);
+    if (!target) return [];
+    const includedMdIds = new Set<string>([cutoff.matchDayId]);
+    const targetTs = Date.parse(target.match_date);
+    for (const m of ordered) {
+      if (m.match_day_id === cutoff.matchDayId) continue;
+      const diff = Math.abs(Date.parse(m.match_date) - targetTs) / 86_400_000;
+      if (diff === 1) includedMdIds.add(m.match_day_id);
+    }
+    return ordered.filter((m) => includedMdIds.has(m.match_day_id));
   }
   const idx = ordered.findIndex((m) => m.id === cutoff.matchId);
   if (idx < 0) return [];

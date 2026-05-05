@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export type StandingsScope = "cumulative" | "matchday-only";
+export type StandingsScope = "cumulative" | "week-only" | "matchday-only";
 
 export function StandingsScopeToggle({
   matchDayNumber,
@@ -10,6 +10,7 @@ export function StandingsScopeToggle({
   active: StandingsScope;
 }) {
   const cumulativeHref = `/standings/matchday/${matchDayNumber}`;
+  const weekHref = `/standings/matchday/${matchDayNumber}?view=week-only`;
   const onlyHref = `/standings/matchday/${matchDayNumber}?view=md-only`;
   return (
     <div
@@ -24,6 +25,13 @@ export function StandingsScopeToggle({
         sublabel={`Through MD ${matchDayNumber}`}
         active={active === "cumulative"}
         testId="scope-cumulative"
+      />
+      <ScopeChip
+        href={weekHref}
+        label="Week Only"
+        sublabel="Sat + Sun pair"
+        active={active === "week-only"}
+        testId="scope-week-only"
       />
       <ScopeChip
         href={onlyHref}

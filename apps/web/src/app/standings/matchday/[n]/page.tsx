@@ -43,7 +43,9 @@ function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
 
 function parseScope(value: string | string[] | undefined): StandingsScope {
   const raw = Array.isArray(value) ? value[0] : value;
-  return raw === "md-only" ? "matchday-only" : "cumulative";
+  if (raw === "md-only") return "matchday-only";
+  if (raw === "week-only") return "week-only";
+  return "cumulative";
 }
 
 export default async function MatchdayStandingsPage({
@@ -92,7 +94,9 @@ export default async function MatchdayStandingsPage({
     season.id,
     scope === "matchday-only"
       ? { type: "matchday-only", matchDayId: targetMd.id }
-      : { type: "matchday", matchDayId: targetMd.id },
+      : scope === "week-only"
+        ? { type: "week-only", matchDayId: targetMd.id }
+        : { type: "matchday", matchDayId: targetMd.id },
   );
 
   const { data: matchData, error: matchErr } = await sb
@@ -125,10 +129,16 @@ export default async function MatchdayStandingsPage({
   const description =
     scope === "matchday-only"
       ? "Points, wins, and goals scored only in this matchday."
-      : "Cumulative standings as of the end of this matchday.";
+      : scope === "week-only"
+        ? "Points, wins, and goals scored across the Saturday + Sunday pair."
+        : "Cumulative standings as of the end of this matchday.";
 
   const breadcrumbScopeLabel =
-    scope === "matchday-only" ? `MD ${n} · MD only` : `MD ${n}`;
+    scope === "matchday-only"
+      ? `MD ${n} · MD only`
+      : scope === "week-only"
+        ? `MD ${n} · Week only`
+        : `MD ${n}`;
 
   return (
     <div>

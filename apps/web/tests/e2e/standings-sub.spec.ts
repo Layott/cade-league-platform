@@ -106,6 +106,25 @@ test.describe("public sub-standings routes", () => {
     await expect(page.getByTestId("standings-table")).toBeVisible();
   });
 
+  test("scope toggle exposes Week Only pill that navigates to ?view=week-only", async ({
+    page,
+  }) => {
+    await page.goto("/standings/matchday/1");
+    const weekTab = page.getByTestId("scope-week-only");
+    await expect(weekTab).toBeVisible();
+    await expect(weekTab).toHaveAttribute("aria-selected", "false");
+
+    await weekTab.click();
+    await expect(page).toHaveURL(/\/standings\/matchday\/1\?view=week-only$/);
+    await expect(page.getByTestId("scope-week-only")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // Match-picker hidden on week-only too (only meaningful in cumulative scope).
+    await expect(page.getByTestId("match-picker")).toHaveCount(0);
+    await expect(page.getByTestId("standings-table")).toBeVisible();
+  });
+
   test("invalid matchday number 404s", async ({ page }) => {
     const res = await page.goto("/standings/matchday/999");
     // Either Next returns a 404 status OR the default not-found body.

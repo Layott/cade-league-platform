@@ -81,6 +81,51 @@ describe("selectMatchesThroughCutoff — matchday-only cutoff", () => {
   });
 });
 
+describe("selectMatchesThroughCutoff — week-only cutoff (Sat-Sun pair)", () => {
+  // Realistic shape: MD 1 orphan Sun, MD 2 Sat + MD 3 Sun = weekend pair, MD 4 Sat + MD 5 Sun = weekend pair
+  const ordered: MatchInOrder[] = [
+    M("m1", "md1", "2026-04-26", 1), // Sun, orphan
+    M("m2", "md2", "2026-05-02", 1), // Sat
+    M("m3", "md2", "2026-05-02", 2),
+    M("m4", "md3", "2026-05-03", 1), // Sun (pair with md2)
+    M("m5", "md3", "2026-05-03", 2),
+    M("m6", "md4", "2026-05-09", 1), // Sat
+    M("m7", "md5", "2026-05-10", 1), // Sun (pair with md4)
+  ];
+
+  it("returns matches from Sat MD + paired Sun MD when week-only on Sat", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "week-only",
+      matchDayId: "md2",
+    });
+    expect(got.map((m) => m.id).sort()).toEqual(["m2", "m3", "m4", "m5"]);
+  });
+
+  it("returns matches from Sun MD + paired Sat MD when week-only on Sun", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "week-only",
+      matchDayId: "md3",
+    });
+    expect(got.map((m) => m.id).sort()).toEqual(["m2", "m3", "m4", "m5"]);
+  });
+
+  it("orphan MD with no neighboring day degrades to MD-only behavior", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "week-only",
+      matchDayId: "md1",
+    });
+    expect(got.map((m) => m.id)).toEqual(["m1"]);
+  });
+
+  it("returns empty when matchday id is unknown", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "week-only",
+      matchDayId: "nope",
+    });
+    expect(got).toEqual([]);
+  });
+});
+
 describe("selectMatchesThroughCutoff — match cutoff", () => {
   const ordered: MatchInOrder[] = [
     M("m1", "md1", "2026-05-01", 1),
