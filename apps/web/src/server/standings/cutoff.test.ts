@@ -47,6 +47,40 @@ describe("selectMatchesThroughCutoff — matchday cutoff", () => {
   });
 });
 
+describe("selectMatchesThroughCutoff — matchday-only cutoff", () => {
+  const ordered: MatchInOrder[] = [
+    M("m1", "md1", "2026-05-01", 1),
+    M("m2", "md1", "2026-05-01", 2),
+    M("m3", "md2", "2026-05-08", 1),
+    M("m4", "md2", "2026-05-08", 2),
+    M("m5", "md3", "2026-05-15", 1),
+  ];
+
+  it("returns only matches in target matchday (middle MD)", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "matchday-only",
+      matchDayId: "md2",
+    });
+    expect(got.map((m) => m.id)).toEqual(["m3", "m4"]);
+  });
+
+  it("returns only target MD's matches when target is first MD", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "matchday-only",
+      matchDayId: "md1",
+    });
+    expect(got.map((m) => m.id)).toEqual(["m1", "m2"]);
+  });
+
+  it("returns empty array when matchday id is unknown", () => {
+    const got = selectMatchesThroughCutoff(ordered, {
+      type: "matchday-only",
+      matchDayId: "nope",
+    });
+    expect(got).toEqual([]);
+  });
+});
+
 describe("selectMatchesThroughCutoff — match cutoff", () => {
   const ordered: MatchInOrder[] = [
     M("m1", "md1", "2026-05-01", 1),

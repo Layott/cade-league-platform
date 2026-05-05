@@ -3,6 +3,7 @@ import type { StandingsRow } from "./read";
 
 export type Cutoff =
   | { type: "matchday"; matchDayId: string }
+  | { type: "matchday-only"; matchDayId: string }
   | { type: "match"; matchId: string };
 
 export type MatchDayInfo = {
@@ -94,6 +95,9 @@ export function selectMatchesThroughCutoff(
     const target = ordered.find((m) => m.match_day_id === cutoff.matchDayId);
     if (!target) return [];
     return ordered.filter((m) => m.match_date <= target.match_date);
+  }
+  if (cutoff.type === "matchday-only") {
+    return ordered.filter((m) => m.match_day_id === cutoff.matchDayId);
   }
   const idx = ordered.findIndex((m) => m.id === cutoff.matchId);
   if (idx < 0) return [];

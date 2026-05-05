@@ -14,6 +14,10 @@ import {
   MatchPicker,
   type MatchPickerItem,
 } from "@/components/public/MatchPicker";
+import {
+  StandingsScopeToggle,
+  type StandingsScope,
+} from "@/components/public/StandingsScopeToggle";
 
 export const revalidate = 60;
 
@@ -37,12 +41,21 @@ function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
+function parseScope(value: string | string[] | undefined): StandingsScope {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === "md-only" ? "matchday-only" : "cumulative";
+}
+
 export default async function MatchdayStandingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ n: string }>;
+  searchParams: Promise<{ view?: string | string[] }>;
 }) {
   const { n: nRaw } = await params;
+  const { view } = await searchParams;
+  const scope = parseScope(view);
   const n = Number.parseInt(nRaw, 10);
   if (!Number.isFinite(n) || n < 1) notFound();
 
@@ -54,12 +67,16 @@ export default async function MatchdayStandingsPage({
         <PageHeader
           eyebrow="Standings"
           title={`Standings · MD ${n}`}
-          description="Cumulative standings as of the end of this matchday."
+          description={
+            scope === "matchday-only"
+              ? "Points scored only in this matchday."
+              : "Cumulative standings as of the end of this matchday."
+          }
         />
         <div className="mx-auto max-w-6xl px-5 py-10">
           <EmptyState
             title="Season not active"
-            hint="Cumulative standings open once the active season begins."
+            hint="Standings open once the active season begins."
           />
         </div>
       </div>
@@ -70,10 +87,13 @@ export default async function MatchdayStandingsPage({
   const targetMd = mdItems.find((md) => md.match_number === n);
   if (!targetMd) notFound();
 
-  const rows = await listStandingsAsOf(sb, season.id, {
-    type: "matchday",
-    matchDayId: targetMd.id,
-  });
+  const rows = await listStandingsAsOf(
+    sb,
+    season.id,
+    scope === "matchday-only"
+      ? { type: "matchday-only", matchDayId: targetMd.id }
+      : { type: "matchday", matchDayId: targetMd.id },
+  );
 
   const { data: matchData, error: matchErr } = await sb
     .from("matches")
@@ -102,12 +122,20 @@ export default async function MatchdayStandingsPage({
     },
   );
 
+  const description =
+    scope === "matchday-only"
+      ? "Points, wins, and goals scored only in this matchday."
+      : "Cumulative standings as of the end of this matchday.";
+
+  const breadcrumbScopeLabel =
+    scope === "matchday-only" ? `MD ${n} · MD only` : `MD ${n}`;
+
   return (
     <div>
       <PageHeader
         eyebrow={`${season.division_name} · ${season.year_range}`}
         title={`Standings · MD ${n}`}
-        description="Cumulative standings as of the end of this matchday."
+        description={description}
       />
 
       <div className="mx-auto max-w-6xl px-5 py-10">
@@ -122,15 +150,23 @@ export default async function MatchdayStandingsPage({
             Overall
           </Link>
           <span className="mx-2 text-[var(--ink-5)]">·</span>
-          <span className="text-[var(--chalk-1)]">MD {n}</span>
+          <span className="text-[var(--chalk-1)]">{breadcrumbScopeLabel}</span>
         </nav>
 
         <MatchDayPicker items={mdItems} activeMatchDayId={targetMd.id} />
-        <MatchPicker
+
+        <StandingsScopeToggle
           matchDayNumber={n}
-          matches={mdMatches}
-          activeMatchId={null}
+          active={scope}
         />
+
+        {scope === "cumulative" ? (
+          <MatchPicker
+            matchDayNumber={n}
+            matches={mdMatches}
+            activeMatchId={null}
+          />
+        ) : null}
 
         {rows.length === 0 ? (
           <EmptyState
