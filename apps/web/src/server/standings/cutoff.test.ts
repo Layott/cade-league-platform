@@ -8,6 +8,7 @@ const M = (
   match_order: number,
   home_player_id = "p-h",
   away_player_id = "p-a",
+  result_confirmed_at: string | null = null,
 ): MatchInOrder => ({
   id,
   match_day_id,
@@ -15,6 +16,7 @@ const M = (
   match_order,
   home_player_id,
   away_player_id,
+  result_confirmed_at,
 });
 
 describe("selectMatchesThroughCutoff — matchday cutoff", () => {

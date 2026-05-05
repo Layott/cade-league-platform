@@ -20,6 +20,14 @@ export type MatchInOrder = {
   match_date: string;
   home_player_id: string;
   away_player_id: string;
+  /**
+   * Earliest confirmed_at across non-deleted, non-void match_results
+   * for this match. Null when no confirmed result exists yet (unplayed
+   * or pending). Used to sort matches in "result-entry order" so
+   * /standings/matchday/[n]/match/[matchId] cutoff reflects the order
+   * in which results were entered.
+   */
+  result_confirmed_at: string | null;
 };
 
 function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
@@ -54,13 +62,19 @@ export async function listSeasonMatchesOrdered(
     .select(
       `
       id, match_day_id, match_order, home_player_id, away_player_id,
-      match_day:match_days ( match_date )
+      match_day:match_days ( match_date ),
+      results:match_results ( confirmed_at, result_type, deleted_at )
       `,
     )
     .eq("season_id", seasonId)
     .is("deleted_at", null);
   if (error) throw new Error(`listSeasonMatchesOrdered failed: ${error.message}`);
 
+  type ResultRow = {
+    confirmed_at: string | null;
+    result_type: string;
+    deleted_at: string | null;
+  };
   type Row = {
     id: string;
     match_day_id: string;
@@ -68,9 +82,29 @@ export async function listSeasonMatchesOrdered(
     home_player_id: string;
     away_player_id: string;
     match_day: { match_date: string } | { match_date: string }[] | null;
+    results: ResultRow[] | ResultRow | null;
   };
   const rows = ((data ?? []) as unknown as Row[]).map((m) => {
     const md = firstOrNull(m.match_day);
+    const allResults: ResultRow[] = Array.isArray(m.results)
+      ? m.results
+      : m.results
+        ? [m.results]
+        : [];
+    const eligible = allResults.filter(
+      (r) =>
+        !r.deleted_at &&
+        !!r.confirmed_at &&
+        (r.result_type === "normal" || r.result_type === "forfeit"),
+    );
+    const earliestConfirmed =
+      eligible.length === 0
+        ? null
+        : eligible.reduce<string | null>((acc, r) => {
+            if (!r.confirmed_at) return acc;
+            if (!acc) return r.confirmed_at;
+            return r.confirmed_at < acc ? r.confirmed_at : acc;
+          }, null);
     return {
       id: m.id,
       match_day_id: m.match_day_id,
@@ -78,9 +112,22 @@ export async function listSeasonMatchesOrdered(
       match_date: md?.match_date ?? "",
       home_player_id: m.home_player_id,
       away_player_id: m.away_player_id,
+      result_confirmed_at: earliestConfirmed,
     };
   });
   rows.sort((a, b) => {
+    // Confirmed matches first (in chronological result-entry order).
+    // Unplayed matches (null confirmed_at) sort after, by canonical
+    // schedule order (date, then announced match_order).
+    const aHas = a.result_confirmed_at != null;
+    const bHas = b.result_confirmed_at != null;
+    if (aHas && bHas) {
+      if (a.result_confirmed_at! !== b.result_confirmed_at!) {
+        return a.result_confirmed_at! < b.result_confirmed_at! ? -1 : 1;
+      }
+    } else if (aHas !== bHas) {
+      return aHas ? -1 : 1;
+    }
     if (a.match_date !== b.match_date) return a.match_date.localeCompare(b.match_date);
     if (a.match_order !== b.match_order) return a.match_order - b.match_order;
     return a.id.localeCompare(b.id);

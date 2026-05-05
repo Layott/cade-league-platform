@@ -34,6 +34,10 @@ type MatchRow = {
     | { gamer_tag: string }
     | { gamer_tag: string }[]
     | null;
+  result:
+    | { confirmed_at: string | null; result_type: string; deleted_at: string | null }
+    | { confirmed_at: string | null; result_type: string; deleted_at: string | null }[]
+    | null;
 };
 
 function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
@@ -105,26 +109,43 @@ export default async function MatchdayStandingsPage({
       `
       id, match_order,
       home_player:home_player_id ( gamer_tag ),
-      away_player:away_player_id ( gamer_tag )
+      away_player:away_player_id ( gamer_tag ),
+      result:match_results ( confirmed_at, result_type, deleted_at )
       `,
     )
     .eq("match_day_id", targetMd.id)
-    .is("deleted_at", null)
-    .order("match_order", { ascending: true });
+    .is("deleted_at", null);
   if (matchErr) throw new Error(`load matches failed: ${matchErr.message}`);
 
-  const mdMatches: MatchPickerItem[] = ((matchData ?? []) as unknown as MatchRow[]).map(
-    (m) => {
-      const home = firstOrNull(m.home_player);
-      const away = firstOrNull(m.away_player);
-      return {
-        id: m.id,
-        match_order: m.match_order ?? 0,
-        home_tag: home?.gamer_tag ?? "?",
-        away_tag: away?.gamer_tag ?? "?",
-      };
-    },
-  );
+  // Filter to played matches with confirmed normal/forfeit result, then sort
+  // by the order results were entered (confirmed_at ascending) so the chip
+  // sequence matches the live entry order, not the announced match_order.
+  type PlayedRow = {
+    row: MatchRow;
+    confirmed_at: string;
+  };
+  const played: PlayedRow[] = [];
+  for (const row of (matchData ?? []) as unknown as MatchRow[]) {
+    const r = firstOrNull(row.result);
+    if (!r || r.deleted_at) continue;
+    if (!r.confirmed_at) continue;
+    if (r.result_type !== "normal" && r.result_type !== "forfeit") continue;
+    played.push({ row, confirmed_at: r.confirmed_at });
+  }
+  played.sort((a, b) => a.confirmed_at.localeCompare(b.confirmed_at));
+
+  const mdMatches: MatchPickerItem[] = played.map(({ row }, idx) => {
+    const home = firstOrNull(row.home_player);
+    const away = firstOrNull(row.away_player);
+    return {
+      id: row.id,
+      // Re-number chips 1..N in result-entry order (NOT announced match_order)
+      // so users see "M1, M2, M3..." reflecting which result was entered first.
+      match_order: idx + 1,
+      home_tag: home?.gamer_tag ?? "?",
+      away_tag: away?.gamer_tag ?? "?",
+    };
+  });
 
   const description =
     scope === "matchday-only"
@@ -170,7 +191,7 @@ export default async function MatchdayStandingsPage({
           active={scope}
         />
 
-        {scope === "cumulative" ? (
+        {scope === "cumulative" && mdMatches.length > 0 ? (
           <MatchPicker
             matchDayNumber={n}
             matches={mdMatches}
