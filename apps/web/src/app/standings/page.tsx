@@ -1,9 +1,11 @@
 import { getServerSupabase } from "@/lib/supabase/server";
 import { listStandings } from "@/server/standings/read";
+import { listSeasonMatchDays } from "@/server/standings/cutoff";
 import { getActiveSeason } from "@/server/seasons";
 import { PageHeader } from "@/components/public/PageHeader";
 import { StandingsTable } from "@/components/public/StandingsTable";
 import { EmptyState } from "@/components/public/EmptyState";
+import { MatchDayPicker } from "@/components/public/MatchDayPicker";
 import { StandingsLiveRefresh } from "@/components/public/StandingsLiveRefresh";
 
 export const revalidate = 60;
@@ -14,6 +16,7 @@ export default async function StandingsPage() {
   const sb = await getServerSupabase();
   const season = await getActiveSeason(sb);
   const rows = season ? await listStandings(sb, season.id) : [];
+  const mdItems = season ? await listSeasonMatchDays(sb, season.id) : [];
 
   const played = rows.reduce((sum, r) => sum + r.matches_played, 0) / 2;
   const totalGoals = rows.reduce((sum, r) => sum + r.goals_for, 0);
@@ -43,6 +46,7 @@ export default async function StandingsPage() {
       />
 
       <div className="mx-auto max-w-6xl px-5 py-10">
+        <MatchDayPicker items={mdItems} activeMatchDayId={null} />
         {rows.length === 0 ? (
           <EmptyState
             title="No matches confirmed yet"
