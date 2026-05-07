@@ -589,6 +589,20 @@ export default async function PlayerSquadPage({
       }
       continue;
     }
+    // 2026-05-07 — also keep rows separate when submission states differ
+    // across the weekend (one submitted + one open / one upcoming, etc.).
+    // Pre-fix the collapse merged Sat+Sun and the precedence rule
+    // ("any open wins") swallowed the submitted state, leaving the player
+    // looking at "Submit squad" for a weekend they had already filed
+    // their Saturday squad for. Each day gets its own row so View/Edit
+    // CTAs map to the day they describe.
+    const distinctStatuses = new Set(sorted.map((s) => s.status));
+    if (distinctStatuses.size > 1) {
+      for (const row of sorted) {
+        items.push(row);
+      }
+      continue;
+    }
     // Otherwise collapse. Status precedence: any open row wins, then any
     // submitted row, then any upcoming, fallback to head.
     const pickStatus = (): SquadMatchDayPickerItem["status"] => {
