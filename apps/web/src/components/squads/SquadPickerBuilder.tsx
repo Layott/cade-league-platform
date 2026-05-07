@@ -563,7 +563,14 @@ export function SquadPickerBuilder({
           formation,
         });
       } catch (e) {
-        setError((e as Error).message);
+        const msg = e instanceof Error ? e.message : "Submit failed";
+        // 2026-05-07 — Next.js Server Action redirects throw a special
+        // NEXT_REDIRECT-typed error. Rethrow so the framework can perform
+        // the navigation; if we swallow it we'd display "NEXT_REDIRECT"
+        // in the picker error chip + the URL query-param error path
+        // (?error=closed&matchDay=X&edit=1) won't fire correctly.
+        if (msg.toLowerCase().includes("next_redirect")) throw e;
+        setError(msg);
       }
     });
   }
