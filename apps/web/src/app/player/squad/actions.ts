@@ -82,7 +82,7 @@ export type SubmitPickerActionPayload = {
 export async function submitPickerAction(
   payload: SubmitPickerActionPayload,
 ): Promise<void> {
-  const { sb, userId, playerId, seasonId } = await loadPlayerContext();
+  const { userId, playerId, seasonId } = await loadPlayerContext();
   const limited = await enforceAuthedWrite(userId);
   if (limited) throw new Error("rate_limited");
 
@@ -92,6 +92,18 @@ export async function submitPickerAction(
   if (!Array.isArray(payload.slots) || payload.slots.length < 11) {
     throw new Error("at least 11 starting slots required");
   }
+
+  // 2026-05-07 — submit pipeline must run under service-role. The window
+  // resolver inside submitPickerSquad → createSubmission → resolveSquadWindowForMatchDay
+  // reads squad_match_day_overrides + match_day_schedule_overrides + squad_window_overrides,
+  // all of which are RLS-locked to `false` for anon/authed (per migrations
+  // 20260514000100 + 20260530000100 + 20260701000003). The user-scoped client
+  // sees those rows as non-existent + the resolver falls through to
+  // `weekly_default_closed` even when an admin has force_open'd the match-
+  // day. Service-role bypasses RLS, matching the admin-side resolver call
+  // in /admin/squads/page.tsx. Auth + perm check already happened inside
+  // loadPlayerContext + enforceAuthedWrite above.
+  const sb = getServiceRoleSupabase();
 
   // Bug fix 2026-05-02: catch business-rule rejections (duplicate card,
   // budget, validation) and redirect with a user-readable error param so
@@ -201,7 +213,11 @@ export async function applySquadToMultipleMatchDaysAction(input: {
   sourceMatchDayId: string;
   targetMatchDayIds: string[];
 }): Promise<ApplySquadResult> {
-  const { sb, userId, playerId, seasonId } = await loadPlayerContext();
+  // 2026-05-07 — same RLS rationale as submitPickerAction: drop user-scoped
+  // sb in favour of service-role (`svc` below) for every read/write that
+  // touches override tables. Auth happens inside loadPlayerContext via
+  // its `sb.auth.getUser()` call.
+  const { userId, playerId, seasonId } = await loadPlayerContext();
   const limited = await enforceAuthedWrite(userId);
   if (limited) throw new Error("rate_limited");
 
@@ -351,7 +367,12 @@ export async function applySquadToMultipleMatchDaysAction(input: {
       const formationKey = formation
         ? FORMATION_LABEL_TO_KEY[formation as keyof typeof FORMATION_LABEL_TO_KEY]
         : undefined;
-      const result = await submitPickerSquad(sb, {
+      // 2026-05-07 — pass service-role `svc` (NOT user-scoped `sb`) so the
+      // window resolver inside submitPickerSquad → createSubmission can read
+      // squad_match_day_overrides (RLS-locked to false for anon/authed).
+      // User-scoped sb sees no force-toggle row + the resolver falls
+      // through to weekly_default_closed.
+      const result = await submitPickerSquad(svc, {
         seasonId,
         playerId,
         weekStartDate: targetWeek,
@@ -363,7 +384,7 @@ export async function applySquadToMultipleMatchDaysAction(input: {
 
       // Best-effort realtime ping per applied target.
       try {
-        await publishSquadSubmitted(sb, {
+        await publishSquadSubmitted(svc, {
           weekStartDate: targetWeek,
           playerId,
           submissionId: result.id,
@@ -375,7 +396,7 @@ export async function applySquadToMultipleMatchDaysAction(input: {
       // channel. Per applied target so admins watching mid-broadcast
       // see each clone land in sequence.
       try {
-        await publishSquadChanged(sb, {
+        await publishSquadChanged(svc, {
           seasonId,
           playerId,
           matchDayId: targetId,
