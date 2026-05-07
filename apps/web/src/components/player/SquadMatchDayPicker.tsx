@@ -61,6 +61,26 @@ export type SquadMatchDayPickerItem = {
    * pending submissions get the Edit CTA.
    */
   forceOpen?: boolean;
+  /**
+   * 2026-05-07 — fix for "10am Thursday is still there". Carries the
+   * resolver's effective deadline (with `match_day_schedule_overrides`
+   * applied) so each row can render the admin-shifted close time inline
+   * rather than the hardcoded Thursday 10:00 WAT default.
+   */
+  effectiveDeadlineAt?: string;
+  /**
+   * 2026-05-07 — `SquadWindowResolution.reason` mirror so the row can
+   * differentiate "force-opened" vs "default open" vs "force-closed" vs
+   * "default closed" when rendering the deadline subtitle.
+   */
+  windowReason?:
+    | "match_day_force_open"
+    | "match_day_force_close"
+    | "weekly_force_open"
+    | "weekly_force_close"
+    | "weekly_default_open"
+    | "weekly_default_closed";
+  adminNote?: string | null;
   bucket: "past" | "this_week" | "upcoming";
   // 2026-04-30 — weekend grouping. When a weekend has BOTH Sat + Sun match
   // days, the page aggregates them into ONE row pointing at the Sat
@@ -211,6 +231,24 @@ function Row({
             ? ` · Submitted ${formatWat(item.submittedAt, "yyyy-MM-dd HH:mm")} WAT`
             : null}
         </div>
+        {/* 2026-05-07 — surface the effective deadline + admin override
+            reason so the player sees the actual close time per match day
+            (no more global "Thursday 10:00 WAT" copy that ignored
+            schedule overrides). */}
+        {item.effectiveDeadlineAt ? (
+          <div
+            className="text-[10px] text-[var(--chalk-3)]"
+            data-testid={`md-deadline-${item.matchDayId}`}
+          >
+            {item.windowReason === "match_day_force_open" ||
+            item.windowReason === "weekly_force_open"
+              ? `Force-opened by admin${item.adminNote ? ` — "${item.adminNote}"` : ""}`
+              : item.windowReason === "match_day_force_close" ||
+                  item.windowReason === "weekly_force_close"
+                ? `Closed by admin${item.adminNote ? ` — "${item.adminNote}"` : ""}`
+                : `${item.status === "closed" ? "Closed at " : "Closes "}${formatWat(item.effectiveDeadlineAt, "EEEE MMM d, HH:mm")} WAT`}
+          </div>
+        ) : null}
       </div>
       {ctaFor(item)}
     </li>

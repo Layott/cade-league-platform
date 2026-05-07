@@ -5,12 +5,12 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import {
   getRuleForSeason,
   weekStartThursday,
-  thursdayDeadline,
   resolveSquadWindowForMatchDay,
   listSubmissionsForPlayerInSeason,
   getSubmissionForPlayerAndMatchDay,
   getDraft,
   type PlayerSubmissionSummary,
+  type SquadWindowResolution,
 } from "@/server/squads";
 import { listMatchDays } from "@/server/matches/match-days";
 import { formatWat, weekendStartSaturday, weekendLabel } from "@/lib/time";
@@ -74,7 +74,7 @@ type ResolvedRow = {
   matchDayId: string;
   matchDate: string;
   venueName: string;
-  reason: string;
+  reason: SquadWindowResolution["reason"];
   isOpen: boolean;
   // 2026-05-02 — surfaced from `resolveSquadWindowForMatchDay` so the
   // picker CTA + the detail-view edit gate can distinguish admin
@@ -82,6 +82,13 @@ type ResolvedRow = {
   // "only-pending-can-edit" rule so a player whose squad was rejected
   // can fix it without first asking for a manual reopen.
   forceOpen: boolean;
+  // 2026-05-07 — admin's actual deadline (with `match_day_schedule_overrides`
+  // applied) + override note. UI copy uses these so admins who shift the
+  // Thursday 10:00 default see the new time rendered, not the hardcoded
+  // fallback. Without this, "10am Thursday" stayed in copy even after the
+  // admin pushed deadlines via the schedule override panel.
+  effectiveDeadlineAt: string;
+  adminNote: string | null;
   submission: PlayerSubmissionSummary | null;
 };
 
@@ -184,6 +191,10 @@ export default async function PlayerSquadPage({
         // per-week). Lets the picker CTA + detail-view show "Edit squad"
         // even on rejected/approved submissions when admin intent is clear.
         forceOpen: r.forceOpen,
+        // 2026-05-07 — bug "10am Thursday is still there". Carry the
+        // resolver's effective deadline + admin note through to the UI.
+        effectiveDeadlineAt: r.effectiveDeadlineAt,
+        adminNote: r.adminNote,
         submission: direct ?? legacy ?? null,
       };
     }),
@@ -309,7 +320,25 @@ export default async function PlayerSquadPage({
         <SectionHeader
           eyebrow={`Match day · ${selected.matchDate}`}
           title={`Squad for ${selected.matchDate}`}
-          description={`Venue: ${selected.venueName}. Deadline: Thursday ${formatWat(thursdayDeadline(matchDayWeekStart), "HH:mm")} WAT (${matchDayWeekStart}).`}
+          description={`Venue: ${selected.venueName}. ${
+            selected.reason === "match_day_force_open" ||
+            selected.reason === "weekly_force_open"
+              ? `Window force-opened by admin${
+                  selected.adminNote ? ` — "${selected.adminNote}"` : ""
+                }. Default deadline ${formatWat(
+                  selected.effectiveDeadlineAt,
+                  "EEEE MMM d, HH:mm",
+                )} WAT.`
+              : selected.reason === "match_day_force_close" ||
+                  selected.reason === "weekly_force_close"
+                ? `Window closed by admin${
+                    selected.adminNote ? ` — "${selected.adminNote}"` : ""
+                  }.`
+                : `Deadline: ${formatWat(
+                    selected.effectiveDeadlineAt,
+                    "EEEE MMM d, HH:mm",
+                  )} WAT.`
+          }`}
         />
         <div>
           <Link
@@ -412,24 +441,31 @@ export default async function PlayerSquadPage({
               Not open yet
             </div>
             <p className="text-sm text-[var(--chalk-2)]">
-              Submissions for this match day open by Thursday{" "}
-              {formatWat(thursdayDeadline(matchDayWeekStart), "HH:mm")} WAT on{" "}
-              <span className="font-mono">{matchDayWeekStart}</span>. Check back
-              once an admin opens the window or once the regular weekly cycle
-              reaches this match day.
+              Submissions for this match day close{" "}
+              {formatWat(selected.effectiveDeadlineAt, "EEEE MMM d, HH:mm")}{" "}
+              WAT. Check back once an admin opens the window or once the
+              regular weekly cycle reaches this match day.
             </p>
           </section>
         ) : (
           <section
             className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
             data-testid="squad-window-closed"
+            data-reason={selected.reason}
           >
             <div className="mb-2 font-display text-lg font-bold text-[var(--chalk-0)]">
               Squad window closed
             </div>
             <p className="text-sm text-[var(--chalk-2)]">
-              The submission deadline for this match day has passed. If you
-              missed it, contact an admin to reopen submissions for you.
+              {selected.reason === "match_day_force_close" ||
+              selected.reason === "weekly_force_close"
+                ? `Closed by admin${
+                    selected.adminNote ? ` — "${selected.adminNote}"` : ""
+                  }. Contact an admin to reopen submissions for you.`
+                : `The submission deadline for this match day passed at ${formatWat(
+                    selected.effectiveDeadlineAt,
+                    "EEEE MMM d, HH:mm",
+                  )} WAT. If you missed it, contact an admin to reopen submissions for you.`}
             </p>
           </section>
         )}
@@ -477,6 +513,12 @@ export default async function PlayerSquadPage({
       // (pending / approved / rejected) get an Edit CTA so the player
       // can revise without needing a manual reopen.
       forceOpen: r.forceOpen,
+      // 2026-05-07 — bug "10am Thursday is still there". Surface the
+      // effective deadline + admin reason so each row shows the actual
+      // close-time admin set (or default), not the global hardcoded copy.
+      effectiveDeadlineAt: r.effectiveDeadlineAt,
+      windowReason: r.reason,
+      adminNote: r.adminNote,
       bucket,
     };
   });
@@ -602,7 +644,7 @@ export default async function PlayerSquadPage({
       <SectionHeader
         eyebrow="Squad"
         title="My squads"
-        description={`Pick a match day to view your submission or file a new squad. Deadline each match day: Thursday ${formatWat(thursdayDeadline(todayWeekStart), "HH:mm")} WAT.`}
+        description="Pick a match day to view your submission or file a new squad. Each match day shows its own deadline below — admins can shift it from the default Thursday 10:00 WAT."
       />
       {weekendPrompt ? (
         <WeekendApplyPrompt

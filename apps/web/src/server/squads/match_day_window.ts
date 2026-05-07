@@ -125,6 +125,17 @@ export async function clearMatchDayWindow(
  * intent" from "still within Thursday window" — chiefly the re-submit
  * gate in `submit.ts` and the player-side picker CTA — read this flag
  * to decide whether to allow editing rejected/approved squads.
+ *
+ * `effectiveDeadlineAt` (2026-05-07 — fix for "10am Thursday is still
+ * there") is the time-based deadline the resolver actually uses,
+ * including any `match_day_schedule_overrides.submission_deadline_at`
+ * shift. Surfaces in player UI copy so admins who push the deadline see
+ * the new time rendered, not the hardcoded Thursday 10:00 default.
+ *
+ * `adminNote` carries the override row's note when the open/closed
+ * decision came from an admin override (per-MD or weekly). Player UI
+ * surfaces it in the closed-panel + force-open banner so the player
+ * understands why the window flipped from default.
  */
 export type SquadWindowResolution = {
   open: boolean;
@@ -136,6 +147,8 @@ export type SquadWindowResolution = {
     | "weekly_force_close"
     | "weekly_default_open"
     | "weekly_default_closed";
+  effectiveDeadlineAt: string;
+  adminNote: string | null;
 };
 
 /**
@@ -160,43 +173,99 @@ export async function resolveSquadWindowForMatchDay(
 ): Promise<SquadWindowResolution> {
   const now = opts.now ?? new Date();
 
-  // 1. Per-match-day override fast-path.
-  const mdOverride = await getMatchDayWindow(sb, matchDayId);
-  if (mdOverride?.state === "force_open") {
-    return { open: true, forceOpen: true, reason: "match_day_force_open" };
-  }
-  if (mdOverride?.state === "force_close") {
-    return { open: false, forceOpen: false, reason: "match_day_force_close" };
+  // 1. Pull every dependency up-front so the result can carry the effective
+  //    deadline (including any schedule override) regardless of whether the
+  //    force-toggle short-circuits the time check below. Player UI copy
+  //    needs the deadline string in BOTH force-open + default paths.
+  const [mdOverride, mdRow] = await Promise.all([
+    getMatchDayWindow(sb, matchDayId),
+    sb
+      .from("match_days")
+      .select("match_date")
+      .eq("id", matchDayId)
+      .is("deleted_at", null)
+      .maybeSingle()
+      .then((r) => r.data as { match_date: string } | null),
+  ]);
+
+  // Match-day row missing → treat as closed; we have no week anchor to
+  // compute a deadline so use `now` as a sentinel. Callers that hit this
+  // branch normally render a 404 — the deadline value is purely cosmetic.
+  if (!mdRow) {
+    return {
+      open: false,
+      forceOpen: false,
+      reason: "weekly_default_closed",
+      effectiveDeadlineAt: now.toISOString(),
+      adminNote: null,
+    };
   }
 
-  // 2. Fall through to weekly. Need the match day's date to derive the
-  //    Thursday anchor. If the match day row is missing/deleted we treat
-  //    the window as closed.
-  const { data: md, error: mdErr } = await sb
-    .from("match_days")
-    .select("match_date")
-    .eq("id", matchDayId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (mdErr || !md) {
-    return { open: false, forceOpen: false, reason: "weekly_default_closed" };
-  }
-  const weekStart = weekStartThursday(md.match_date);
-  const weekly = await getSquadWindowOverride(sb, weekStart);
-  if (weekly?.state === "force_close") {
-    return { open: false, forceOpen: false, reason: "weekly_force_close" };
-  }
-  if (weekly?.state === "force_open") {
-    return { open: true, forceOpen: true, reason: "weekly_force_open" };
-  }
-  // Default time-based: open iff now < submission deadline. The default
-  // is Thursday 10:00 WAT; admin can shift via match_day_schedule_overrides.
+  const weekStart = weekStartThursday(mdRow.match_date);
   const schedule = await getMatchDayScheduleOverride(sb, matchDayId);
-  const deadline = schedule?.submissionDeadlineAt
+  const effectiveDeadline = schedule?.submissionDeadlineAt
     ? new Date(schedule.submissionDeadlineAt)
     : new Date(`${weekStart}T10:00:00+01:00`);
-  if (now.getTime() < deadline.getTime()) {
-    return { open: true, forceOpen: false, reason: "weekly_default_open" };
+  const effectiveDeadlineAt = effectiveDeadline.toISOString();
+
+  // 2. Per-match-day force toggle wins outright. Carry the admin note
+  //    + the resolved time-based deadline so the UI can still show
+  //    "force-opened until <default deadline>".
+  if (mdOverride?.state === "force_open") {
+    return {
+      open: true,
+      forceOpen: true,
+      reason: "match_day_force_open",
+      effectiveDeadlineAt,
+      adminNote: mdOverride.note,
+    };
   }
-  return { open: false, forceOpen: false, reason: "weekly_default_closed" };
+  if (mdOverride?.state === "force_close") {
+    return {
+      open: false,
+      forceOpen: false,
+      reason: "match_day_force_close",
+      effectiveDeadlineAt,
+      adminNote: mdOverride.note,
+    };
+  }
+
+  // 3. Weekly override is next.
+  const weekly = await getSquadWindowOverride(sb, weekStart);
+  if (weekly?.state === "force_close") {
+    return {
+      open: false,
+      forceOpen: false,
+      reason: "weekly_force_close",
+      effectiveDeadlineAt,
+      adminNote: weekly.note,
+    };
+  }
+  if (weekly?.state === "force_open") {
+    return {
+      open: true,
+      forceOpen: true,
+      reason: "weekly_force_open",
+      effectiveDeadlineAt,
+      adminNote: weekly.note,
+    };
+  }
+
+  // 4. Default time-based: open iff now < effective deadline.
+  if (now.getTime() < effectiveDeadline.getTime()) {
+    return {
+      open: true,
+      forceOpen: false,
+      reason: "weekly_default_open",
+      effectiveDeadlineAt,
+      adminNote: null,
+    };
+  }
+  return {
+    open: false,
+    forceOpen: false,
+    reason: "weekly_default_closed",
+    effectiveDeadlineAt,
+    adminNote: null,
+  };
 }

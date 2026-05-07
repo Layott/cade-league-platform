@@ -239,11 +239,12 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-30T12:00:00+01:00"), // way past deadline
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: true,
       forceOpen: true,
       reason: "match_day_force_open",
     });
+    expect(out.effectiveDeadlineAt).toBeDefined();
   });
 
   it("match-day force_close wins regardless of weekly", async () => {
@@ -254,7 +255,7 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-15T08:00:00+01:00"), // pre-deadline
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: false,
       forceOpen: false,
       reason: "match_day_force_close",
@@ -268,7 +269,7 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-15T08:00:00+01:00"),
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: false,
       forceOpen: false,
       reason: "weekly_force_close",
@@ -282,7 +283,7 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-30T12:00:00+01:00"), // past deadline
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: true,
       forceOpen: true,
       reason: "weekly_force_open",
@@ -296,7 +297,7 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"), // 2h before deadline
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: true,
       forceOpen: false,
       reason: "weekly_default_open",
@@ -310,7 +311,7 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-17T12:00:00+01:00"), // day after
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: false,
       forceOpen: false,
       reason: "weekly_default_closed",
@@ -322,7 +323,7 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"),
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: false,
       forceOpen: false,
       reason: "weekly_default_closed",
@@ -341,11 +342,12 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T13:00:00+01:00"), // 1pm WAT — past default
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: true,
       forceOpen: false,
       reason: "weekly_default_open",
     });
+    expect(out.effectiveDeadlineAt).toBe("2026-04-16T13:00:00.000Z");
   });
 
   it("schedule override shortens the deadline before Thursday 10:00", async () => {
@@ -359,10 +361,26 @@ describe("resolveSquadWindowForMatchDay", () => {
     const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
       now: new Date("2026-04-16T08:00:00+01:00"), // past 06:00 override
     });
-    expect(out).toEqual({
+    expect(out).toMatchObject({
       open: false,
       forceOpen: false,
       reason: "weekly_default_closed",
     });
+    expect(out.effectiveDeadlineAt).toBe("2026-04-16T05:00:00.000Z");
+  });
+
+  it("force_open carries the admin note + effective deadline", async () => {
+    const sb = mkResolverSb({
+      matchDayDate: "2026-04-16",
+      matchDayOverride: { state: "force_open" },
+      scheduleOverride: { submissionDeadlineAt: "2026-04-17T18:00:00+01:00" },
+    });
+    const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
+      now: new Date("2026-04-16T11:00:00+01:00"),
+    });
+    expect(out.open).toBe(true);
+    expect(out.forceOpen).toBe(true);
+    expect(out.reason).toBe("match_day_force_open");
+    expect(out.effectiveDeadlineAt).toBe("2026-04-17T17:00:00.000Z");
   });
 });
