@@ -25,6 +25,7 @@ import type { Actor } from "@/perms";
 export type MatchDayScheduleOverride = {
   id: string;
   matchDayId: string;
+  submissionOpenAt: string | null;
   submissionDeadlineAt: string | null;
   changeWindowOpenAt: string | null;
   changeWindowCloseAt: string | null;
@@ -34,6 +35,7 @@ export type MatchDayScheduleOverride = {
 };
 
 export type MatchDayScheduleOverrideInput = {
+  submissionOpenAt: string | null;
   submissionDeadlineAt: string | null;
   changeWindowOpenAt: string | null;
   changeWindowCloseAt: string | null;
@@ -43,6 +45,7 @@ export type MatchDayScheduleOverrideInput = {
 type Row = {
   id: string;
   match_day_id: string;
+  submission_open_at: string | null;
   submission_deadline_at: string | null;
   change_window_open_at: string | null;
   change_window_close_at: string | null;
@@ -52,12 +55,13 @@ type Row = {
 };
 
 const SELECT_COLS =
-  "id, match_day_id, submission_deadline_at, change_window_open_at, change_window_close_at, notes, set_by, set_at";
+  "id, match_day_id, submission_open_at, submission_deadline_at, change_window_open_at, change_window_close_at, notes, set_by, set_at";
 
 function toOverride(r: Row): MatchDayScheduleOverride {
   return {
     id: r.id,
     matchDayId: r.match_day_id,
+    submissionOpenAt: r.submission_open_at,
     submissionDeadlineAt: r.submission_deadline_at,
     changeWindowOpenAt: r.change_window_open_at,
     changeWindowCloseAt: r.change_window_close_at,
@@ -94,6 +98,7 @@ export async function setMatchDayScheduleOverride(
   // Reject all-null payloads — saving an override with no time boundaries
   // is meaningless; admin should clear() instead.
   const noneSet =
+    input.submissionOpenAt == null &&
     input.submissionDeadlineAt == null &&
     input.changeWindowOpenAt == null &&
     input.changeWindowCloseAt == null;
@@ -103,8 +108,24 @@ export async function setMatchDayScheduleOverride(
     );
   }
 
-  // Sanity-check window ordering. Open MUST precede close (>= would
-  // collapse the window to zero seconds).
+  // Submission open MUST precede submission deadline when both set.
+  if (input.submissionOpenAt && input.submissionDeadlineAt) {
+    const openMs = new Date(input.submissionOpenAt).getTime();
+    const closeMs = new Date(input.submissionDeadlineAt).getTime();
+    if (!Number.isFinite(openMs) || !Number.isFinite(closeMs)) {
+      throw new Error(
+        "setMatchDayScheduleOverride: submission_open_at + deadline must be valid ISO timestamps",
+      );
+    }
+    if (openMs >= closeMs) {
+      throw new Error(
+        "setMatchDayScheduleOverride: submission_open_at must be earlier than submission_deadline_at",
+      );
+    }
+  }
+
+  // Sanity-check change-window ordering. Open MUST precede close (>=
+  // would collapse the window to zero seconds).
   if (input.changeWindowOpenAt && input.changeWindowCloseAt) {
     const openMs = new Date(input.changeWindowOpenAt).getTime();
     const closeMs = new Date(input.changeWindowCloseAt).getTime();
@@ -123,6 +144,7 @@ export async function setMatchDayScheduleOverride(
   const nowIso = new Date().toISOString();
   const row = {
     match_day_id: matchDayId,
+    submission_open_at: input.submissionOpenAt,
     submission_deadline_at: input.submissionDeadlineAt,
     change_window_open_at: input.changeWindowOpenAt,
     change_window_close_at: input.changeWindowCloseAt,

@@ -171,6 +171,7 @@ export default async function AdminSquadsListPage({
             matchCount: d.match_count,
             weekStart: ws,
             override: scheduleOverride,
+            defaultSubmissionOpenAt: null,
             defaultSubmissionDeadlineAt: thursdayDeadline(ws).toISOString(),
             defaultChangeWindowOpenAt: friday.openAt.toISOString(),
             defaultChangeWindowCloseAt: friday.closeAt.toISOString(),

@@ -64,6 +64,10 @@ function readNotes(formData: FormData): string | null {
 export async function setScheduleOverrideAction(formData: FormData) {
   const { sb, userId, roles } = await gate("squads.window.manage");
   const matchDayId = readMatchDayId(formData);
+  const submissionOpenAt = readNullableTimestamp(
+    formData,
+    "submissionOpenAt",
+  );
   const submissionDeadlineAt = readNullableTimestamp(
     formData,
     "submissionDeadlineAt",
@@ -82,6 +86,7 @@ export async function setScheduleOverrideAction(formData: FormData) {
     { userId, roles },
     matchDayId,
     {
+      submissionOpenAt,
       submissionDeadlineAt,
       changeWindowOpenAt,
       changeWindowCloseAt,

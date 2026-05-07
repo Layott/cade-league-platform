@@ -69,6 +69,12 @@ export type SquadMatchDayPickerItem = {
    */
   effectiveDeadlineAt?: string;
   /**
+   * 2026-05-07 — admin OPEN-AT gate. Renders "Opens <X>; closes <Y>"
+   * when set; otherwise just the close time. Rendered as the deadline
+   * subtitle on each match-day row so the player sees both bookends.
+   */
+  effectiveOpenAt?: string | null;
+  /**
    * 2026-05-07 — `SquadWindowResolution.reason` mirror so the row can
    * differentiate "force-opened" vs "default open" vs "force-closed" vs
    * "default closed" when rendering the deadline subtitle.
@@ -79,7 +85,8 @@ export type SquadMatchDayPickerItem = {
     | "weekly_force_open"
     | "weekly_force_close"
     | "weekly_default_open"
-    | "weekly_default_closed";
+    | "weekly_default_closed"
+    | "schedule_not_open_yet";
   adminNote?: string | null;
   bucket: "past" | "this_week" | "upcoming";
   // 2026-04-30 — weekend grouping. When a weekend has BOTH Sat + Sun match
@@ -246,7 +253,12 @@ function Row({
               : item.windowReason === "match_day_force_close" ||
                   item.windowReason === "weekly_force_close"
                 ? `Closed by admin${item.adminNote ? ` — "${item.adminNote}"` : ""}`
-                : `${item.status === "closed" ? "Closed at " : "Closes "}${formatWat(item.effectiveDeadlineAt, "EEEE MMM d, HH:mm")} WAT`}
+                : item.windowReason === "schedule_not_open_yet" &&
+                    item.effectiveOpenAt
+                  ? `Opens ${formatWat(item.effectiveOpenAt, "EEEE MMM d, HH:mm")} WAT · closes ${formatWat(item.effectiveDeadlineAt, "EEEE MMM d, HH:mm")} WAT`
+                  : item.effectiveOpenAt
+                    ? `Opens ${formatWat(item.effectiveOpenAt, "EEEE MMM d, HH:mm")} WAT · ${item.status === "closed" ? "closed at " : "closes "}${formatWat(item.effectiveDeadlineAt, "EEEE MMM d, HH:mm")} WAT`
+                    : `${item.status === "closed" ? "Closed at " : "Closes "}${formatWat(item.effectiveDeadlineAt, "EEEE MMM d, HH:mm")} WAT`}
           </div>
         ) : null}
       </div>

@@ -131,6 +131,7 @@ type ResolverState = {
   matchDayDate?: string | null; // null means match_day row missing
   weeklyOverride?: { state: "force_open" | "force_close" } | null;
   scheduleOverride?: {
+    submissionOpenAt?: string | null;
     submissionDeadlineAt: string | null;
   } | null;
 };
@@ -209,6 +210,8 @@ function mkResolverSb(state: ResolverState) {
                     ? {
                         id: "00000000-0000-4000-8000-00000000aaaa",
                         match_day_id: MATCH_DAY,
+                        submission_open_at:
+                          state.scheduleOverride.submissionOpenAt ?? null,
                         submission_deadline_at:
                           state.scheduleOverride.submissionDeadlineAt,
                         change_window_open_at: null,
@@ -367,6 +370,37 @@ describe("resolveSquadWindowForMatchDay", () => {
       reason: "weekly_default_closed",
     });
     expect(out.effectiveDeadlineAt).toBe("2026-04-16T05:00:00.000Z");
+  });
+
+  it("schedule_not_open_yet when before submission_open_at", async () => {
+    const sb = mkResolverSb({
+      matchDayDate: "2026-04-16",
+      scheduleOverride: {
+        submissionOpenAt: "2026-04-15T18:00:00+01:00",
+        submissionDeadlineAt: "2026-04-16T10:00:00+01:00",
+      },
+    });
+    const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
+      now: new Date("2026-04-15T17:00:00+01:00"), // 1h before openAt
+    });
+    expect(out.open).toBe(false);
+    expect(out.reason).toBe("schedule_not_open_yet");
+    expect(out.effectiveOpenAt).toBe("2026-04-15T18:00:00+01:00");
+  });
+
+  it("opens once now >= submission_open_at", async () => {
+    const sb = mkResolverSb({
+      matchDayDate: "2026-04-16",
+      scheduleOverride: {
+        submissionOpenAt: "2026-04-15T18:00:00+01:00",
+        submissionDeadlineAt: "2026-04-16T10:00:00+01:00",
+      },
+    });
+    const out = await resolveSquadWindowForMatchDay(sb as never, MATCH_DAY, {
+      now: new Date("2026-04-15T19:00:00+01:00"), // 1h after openAt
+    });
+    expect(out.open).toBe(true);
+    expect(out.reason).toBe("weekly_default_open");
   });
 
   it("force_open carries the admin note + effective deadline", async () => {

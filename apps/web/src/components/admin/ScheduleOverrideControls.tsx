@@ -25,6 +25,9 @@ export type ScheduleOverrideRow = {
   weekStart: string; // yyyy-MM-dd Thursday anchor for fallback display
   override: MatchDayScheduleOverride | null;
   // Hardcoded fallback values for placeholder display when override is null.
+  // 2026-05-07 — submission_open_at has no time-based default (window
+  // opens "from forever"); show empty placeholder for the open-at input.
+  defaultSubmissionOpenAt: string | null;
   defaultSubmissionDeadlineAt: string; // ISO
   defaultChangeWindowOpenAt: string; // ISO
   defaultChangeWindowCloseAt: string; // ISO
@@ -42,6 +45,7 @@ type Props = {
 const TESTID = {
   root: "schedule-override-controls",
   row: (id: string) => `schedule-override-row-${id}`,
+  open: (id: string) => `schedule-override-open-${id}`,
   deadline: (id: string) => `schedule-override-deadline-${id}`,
   changeOpen: (id: string) => `schedule-override-change-open-${id}`,
   changeClose: (id: string) => `schedule-override-change-close-${id}`,
@@ -70,6 +74,7 @@ function toWatLocalInput(iso: string | null): string {
 function isOverrideActive(o: MatchDayScheduleOverride | null): boolean {
   if (!o) return false;
   return (
+    o.submissionOpenAt != null ||
     o.submissionDeadlineAt != null ||
     o.changeWindowOpenAt != null ||
     o.changeWindowCloseAt != null
@@ -87,6 +92,9 @@ function ScheduleOverrideRowEditor({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [openAt, setOpenAt] = useState(
+    toWatLocalInput(row.override?.submissionOpenAt ?? null),
+  );
   const [deadline, setDeadline] = useState(
     toWatLocalInput(row.override?.submissionDeadlineAt ?? null),
   );
@@ -105,6 +113,7 @@ function ScheduleOverrideRowEditor({
       try {
         const fd = new FormData();
         fd.set("matchDayId", row.id);
+        if (openAt) fd.set("submissionOpenAt", openAt);
         if (deadline) fd.set("submissionDeadlineAt", deadline);
         if (changeOpen) fd.set("changeWindowOpenAt", changeOpen);
         if (changeClose) fd.set("changeWindowCloseAt", changeClose);
@@ -125,6 +134,7 @@ function ScheduleOverrideRowEditor({
         const fd = new FormData();
         fd.set("matchDayId", row.id);
         await clearAction(fd);
+        setOpenAt("");
         setDeadline("");
         setChangeOpen("");
         setChangeClose("");
@@ -165,7 +175,24 @@ function ScheduleOverrideRowEditor({
       <td className="py-3 pr-3">
         <label className="block">
           <span className="mb-1 block text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-            Submission deadline (WAT)
+            Submission opens (WAT)
+          </span>
+          <input
+            type="datetime-local"
+            value={openAt}
+            onChange={(e) => setOpenAt(e.target.value)}
+            className="w-full rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 text-xs text-[var(--chalk-0)] focus:border-[var(--signal)] focus:outline-none"
+            data-testid={TESTID.open(row.id)}
+          />
+          <span className="mt-1 block font-mono text-[9px] text-[var(--chalk-3)]">
+            Default: open from forever
+          </span>
+        </label>
+      </td>
+      <td className="py-3 pr-3">
+        <label className="block">
+          <span className="mb-1 block text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+            Submission closes (deadline, WAT)
           </span>
           <input
             type="datetime-local"
@@ -238,7 +265,10 @@ function ScheduleOverrideRowEditor({
           <button
             type="button"
             onClick={save}
-            disabled={pending || (!deadline && !changeOpen && !changeClose)}
+            disabled={
+              pending ||
+              (!openAt && !deadline && !changeOpen && !changeClose)
+            }
             data-testid={TESTID.saveBtn(row.id)}
             className="inline-flex items-center justify-center rounded-sm border border-[var(--primary)] bg-[var(--primary)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--primary-ink)] transition-colors hover:bg-[#82e21a] disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -276,17 +306,20 @@ export function ScheduleOverrideControls({
     <details
       className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-4"
       data-testid={TESTID.root}
+      open
     >
       <summary className="cursor-pointer list-none">
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--chalk-3)]">
-              Per-match-day schedule override
+              Per-match-day submission schedule
             </div>
             <p className="mt-1 text-xs text-[var(--chalk-2)]">
-              Shift the Thursday submission deadline + Friday change-window
-              times for a specific match day. Friday 21:00-22:00 default
-              stays automatic when blank. Click to expand.
+              Set when submissions OPEN + CLOSE for each match day. Players
+              can only submit between those times. Leave open blank for
+              &ldquo;from forever&rdquo;; leave close blank for the default
+              Thursday 10:00 WAT deadline. Friday change-window times stay
+              automatic (21:00-22:00 WAT) when blank.
             </p>
           </div>
           <span className="text-[11px] text-[var(--chalk-3)]">
@@ -306,7 +339,8 @@ export function ScheduleOverrideControls({
             <thead>
               <tr className="border-b border-[var(--ink-4)] text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
                 <th className="py-2 pr-3">Match day</th>
-                <th className="py-2 pr-3">Submission deadline</th>
+                <th className="py-2 pr-3">Submission opens</th>
+                <th className="py-2 pr-3">Submission closes</th>
                 <th className="py-2 pr-3">Change window open</th>
                 <th className="py-2 pr-3">Change window close</th>
                 <th className="py-2 pr-3">Notes</th>

@@ -146,8 +146,14 @@ export type SquadWindowResolution = {
     | "weekly_force_open"
     | "weekly_force_close"
     | "weekly_default_open"
-    | "weekly_default_closed";
+    | "weekly_default_closed"
+    | "schedule_not_open_yet";
   effectiveDeadlineAt: string;
+  // 2026-05-07 — admin-set OPEN time from match_day_schedule_overrides.
+  // null = open from forever; non-null + now < openAt → reason
+  // 'schedule_not_open_yet'. Player UI shows "Submissions open <X>"
+  // until openAt elapses.
+  effectiveOpenAt: string | null;
   adminNote: string | null;
 };
 
@@ -197,6 +203,7 @@ export async function resolveSquadWindowForMatchDay(
       forceOpen: false,
       reason: "weekly_default_closed",
       effectiveDeadlineAt: now.toISOString(),
+      effectiveOpenAt: null,
       adminNote: null,
     };
   }
@@ -207,6 +214,10 @@ export async function resolveSquadWindowForMatchDay(
     ? new Date(schedule.submissionDeadlineAt)
     : new Date(`${weekStart}T10:00:00+01:00`);
   const effectiveDeadlineAt = effectiveDeadline.toISOString();
+  // 2026-05-07 — admin OPEN-AT gate. NULL preserves prior behaviour
+  // (open from forever); non-null gates `now < openAt` as closed in
+  // the time-based branch with reason `schedule_not_open_yet`.
+  const effectiveOpenAt = schedule?.submissionOpenAt ?? null;
 
   // 2. Per-match-day force toggle wins outright. Carry the admin note
   //    + the resolved time-based deadline so the UI can still show
@@ -217,6 +228,7 @@ export async function resolveSquadWindowForMatchDay(
       forceOpen: true,
       reason: "match_day_force_open",
       effectiveDeadlineAt,
+      effectiveOpenAt,
       adminNote: mdOverride.note,
     };
   }
@@ -226,6 +238,7 @@ export async function resolveSquadWindowForMatchDay(
       forceOpen: false,
       reason: "match_day_force_close",
       effectiveDeadlineAt,
+      effectiveOpenAt,
       adminNote: mdOverride.note,
     };
   }
@@ -238,6 +251,7 @@ export async function resolveSquadWindowForMatchDay(
       forceOpen: false,
       reason: "weekly_force_close",
       effectiveDeadlineAt,
+      effectiveOpenAt,
       adminNote: weekly.note,
     };
   }
@@ -247,17 +261,33 @@ export async function resolveSquadWindowForMatchDay(
       forceOpen: true,
       reason: "weekly_force_open",
       effectiveDeadlineAt,
+      effectiveOpenAt,
       adminNote: weekly.note,
     };
   }
 
-  // 4. Default time-based: open iff now < effective deadline.
+  // 4. Schedule-driven OPEN-AT gate. If admin set submission_open_at
+  //    and we're before it, the window is closed for time-based reason
+  //    'schedule_not_open_yet' (distinct from past-deadline closed).
+  if (effectiveOpenAt && now.getTime() < new Date(effectiveOpenAt).getTime()) {
+    return {
+      open: false,
+      forceOpen: false,
+      reason: "schedule_not_open_yet",
+      effectiveDeadlineAt,
+      effectiveOpenAt,
+      adminNote: schedule?.notes ?? null,
+    };
+  }
+
+  // 5. Default time-based: open iff now < effective deadline.
   if (now.getTime() < effectiveDeadline.getTime()) {
     return {
       open: true,
       forceOpen: false,
       reason: "weekly_default_open",
       effectiveDeadlineAt,
+      effectiveOpenAt,
       adminNote: null,
     };
   }
@@ -266,6 +296,7 @@ export async function resolveSquadWindowForMatchDay(
     forceOpen: false,
     reason: "weekly_default_closed",
     effectiveDeadlineAt,
+    effectiveOpenAt,
     adminNote: null,
   };
 }

@@ -14,6 +14,7 @@ import {
 type Row = {
   id: string;
   match_day_id: string;
+  submission_open_at: string | null;
   submission_deadline_at: string | null;
   change_window_open_at: string | null;
   change_window_close_at: string | null;
@@ -79,6 +80,7 @@ const MATCH_DAY = "00000000-0000-4000-8000-000000000001";
 const ROW: Row = {
   id: "00000000-0000-4000-8000-00000000aaaa",
   match_day_id: MATCH_DAY,
+  submission_open_at: null,
   submission_deadline_at: "2026-04-23T13:00:00+01:00",
   change_window_open_at: "2026-04-24T20:00:00+01:00",
   change_window_close_at: "2026-04-24T21:00:00+01:00",
@@ -102,6 +104,7 @@ describe("getMatchDayScheduleOverride", () => {
     expect(out).toEqual({
       id: ROW.id,
       matchDayId: MATCH_DAY,
+      submissionOpenAt: null,
       submissionDeadlineAt: "2026-04-23T13:00:00+01:00",
       changeWindowOpenAt: "2026-04-24T20:00:00+01:00",
       changeWindowCloseAt: "2026-04-24T21:00:00+01:00",
@@ -122,6 +125,7 @@ describe("setMatchDayScheduleOverride", () => {
       ACTOR,
       MATCH_DAY,
       {
+        submissionOpenAt: null,
         submissionDeadlineAt: "2026-04-23T13:00:00+01:00",
         changeWindowOpenAt: "2026-04-24T20:00:00+01:00",
         changeWindowCloseAt: "2026-04-24T21:00:00+01:00",
@@ -141,6 +145,7 @@ describe("setMatchDayScheduleOverride", () => {
       ACTOR,
       MATCH_DAY,
       {
+        submissionOpenAt: null,
         submissionDeadlineAt: "2026-04-23T13:00:00+01:00",
         changeWindowOpenAt: null,
         changeWindowCloseAt: null,
@@ -156,6 +161,7 @@ describe("setMatchDayScheduleOverride", () => {
     const sb = mkSb({ existing: null });
     await expect(
       setMatchDayScheduleOverride(sb as never, ACTOR, MATCH_DAY, {
+        submissionOpenAt: null,
         submissionDeadlineAt: null,
         changeWindowOpenAt: null,
         changeWindowCloseAt: null,
@@ -172,6 +178,7 @@ describe("setMatchDayScheduleOverride", () => {
         { userId: null, roles: ["admin"] },
         MATCH_DAY,
         {
+          submissionOpenAt: null,
           submissionDeadlineAt: "2026-04-23T13:00:00+01:00",
           changeWindowOpenAt: null,
           changeWindowCloseAt: null,
@@ -185,12 +192,26 @@ describe("setMatchDayScheduleOverride", () => {
     const sb = mkSb({ existing: null });
     await expect(
       setMatchDayScheduleOverride(sb as never, ACTOR, MATCH_DAY, {
+        submissionOpenAt: null,
         submissionDeadlineAt: null,
         changeWindowOpenAt: "2026-04-24T22:00:00+01:00",
         changeWindowCloseAt: "2026-04-24T20:00:00+01:00",
         notes: null,
       }),
     ).rejects.toThrow(/earlier than/);
+  });
+
+  it("rejects when submission_open_at >= submission_deadline_at", async () => {
+    const sb = mkSb({ existing: null });
+    await expect(
+      setMatchDayScheduleOverride(sb as never, ACTOR, MATCH_DAY, {
+        submissionOpenAt: "2026-04-23T14:00:00+01:00",
+        submissionDeadlineAt: "2026-04-23T13:00:00+01:00",
+        changeWindowOpenAt: null,
+        changeWindowCloseAt: null,
+        notes: null,
+      }),
+    ).rejects.toThrow(/submission_open_at must be earlier/);
   });
 });
 

@@ -88,6 +88,10 @@ type ResolvedRow = {
   // fallback. Without this, "10am Thursday" stayed in copy even after the
   // admin pushed deadlines via the schedule override panel.
   effectiveDeadlineAt: string;
+  // 2026-05-07 — admin OPEN-AT time. NULL = open from forever; non-null
+  // gates "now < openAt → closed (reason: schedule_not_open_yet)" so the
+  // admin can pre-schedule the open + close per match day.
+  effectiveOpenAt: string | null;
   adminNote: string | null;
   submission: PlayerSubmissionSummary | null;
 };
@@ -194,6 +198,7 @@ export default async function PlayerSquadPage({
         // 2026-05-07 — bug "10am Thursday is still there". Carry the
         // resolver's effective deadline + admin note through to the UI.
         effectiveDeadlineAt: r.effectiveDeadlineAt,
+        effectiveOpenAt: r.effectiveOpenAt,
         adminNote: r.adminNote,
         submission: direct ?? legacy ?? null,
       };
@@ -432,6 +437,24 @@ export default async function PlayerSquadPage({
               clearDraftAction={clearSquadDraftAction}
             />
           </section>
+        ) : selected.reason === "schedule_not_open_yet" &&
+          selected.effectiveOpenAt ? (
+          <section
+            className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
+            data-testid="squad-window-not-open-yet"
+            data-reason="schedule_not_open_yet"
+          >
+            <div className="mb-2 font-display text-lg font-bold text-[var(--chalk-0)]">
+              Not open yet
+            </div>
+            <p className="text-sm text-[var(--chalk-2)]">
+              Submissions open{" "}
+              {formatWat(selected.effectiveOpenAt, "EEEE MMM d, HH:mm")} WAT
+              and close{" "}
+              {formatWat(selected.effectiveDeadlineAt, "EEEE MMM d, HH:mm")}{" "}
+              WAT.
+            </p>
+          </section>
         ) : selected.matchDate > todayWeekStart ? (
           <section
             className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-6 text-center"
@@ -489,6 +512,11 @@ export default async function PlayerSquadPage({
       status = "submitted";
     } else if (r.isOpen) {
       status = "open";
+    } else if (r.reason === "schedule_not_open_yet") {
+      // Admin set a submission_open_at in the future. Surface as
+      // "Coming up" (not "Closed") so the player sees the open time
+      // they need to wait for, not a hard-closed pill.
+      status = "upcoming";
     } else if (bucket === "upcoming") {
       // Future match day with no live submission and no open window — the
       // weekly cycle will roll round to it eventually.
@@ -517,6 +545,7 @@ export default async function PlayerSquadPage({
       // effective deadline + admin reason so each row shows the actual
       // close-time admin set (or default), not the global hardcoded copy.
       effectiveDeadlineAt: r.effectiveDeadlineAt,
+      effectiveOpenAt: r.effectiveOpenAt,
       windowReason: r.reason,
       adminNote: r.adminNote,
       bucket,
