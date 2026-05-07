@@ -238,6 +238,43 @@ export function SquadPickerBuilder({
   );
   const allStartersFilled = filledCount === 11;
 
+  /**
+   * 2026-05-07 — Nigerian-in-XI client gate. Mirrors the server-side
+   * `validate.ts::isNigerian` predicate so the submit button blocks
+   * locally rather than waiting for a server round-trip. Counts ONLY
+   * non-GK starters (slot 1..10) — GK + bench cards do not satisfy
+   * the rule, matching the server's behaviour. Without this gate the
+   * picker happily POSTs an all-non-Nigerian XI and surfaces the
+   * 400/422 error after the round-trip; with it, the rule is visible
+   * at submit-time + the button is disabled until satisfied.
+   */
+  const NG_FUTBIN_NATION_ID_CLIENT = 133; // matches server default; admin can override via env on server
+  const isNigerianCard = useCallback((c: CardSearchResult): boolean => {
+    if (
+      c.futbinNationId != null &&
+      c.futbinNationId === NG_FUTBIN_NATION_ID_CLIENT
+    ) {
+      return true;
+    }
+    const iso = (c.nationIso ?? "").toUpperCase();
+    if (iso === "NG" || iso === "NGA") return true;
+    return (c.nation ?? "").trim().toLowerCase() === "nigeria";
+  }, []);
+
+  const nigerianStarterCount = useMemo(() => {
+    let n = 0;
+    for (const [k, c] of Object.entries(slots)) {
+      const slot = Number(k);
+      if (!c) continue;
+      if (slot === 0) continue; // GK excluded — same carve-out as server.
+      if (isNigerianCard(c)) n += 1;
+    }
+    return n;
+  }, [slots, isNigerianCard]);
+
+  const minNigerian = rule?.minNigerianItems ?? 0;
+  const shortNigerian = nigerianStarterCount < minNigerian;
+
   const openSlot = useCallback((slot: SlotPosition) => {
     setDialogTarget({ kind: "slot", slot });
     setDialogOpen(true);
@@ -483,6 +520,14 @@ export function SquadPickerBuilder({
       setError("Fill all 11 starting slots before submitting.");
       return;
     }
+    if (shortNigerian) {
+      setError(
+        `Starting XI needs ${minNigerian} Nigerian player${
+          minNigerian === 1 ? "" : "s"
+        } (currently ${nigerianStarterCount}). Bench Nigerians do not count — move at least one to the pitch.`,
+      );
+      return;
+    }
     setError(null);
 
     // Build the picker payload. Use the formation's per-slot label as the
@@ -696,10 +741,21 @@ export function SquadPickerBuilder({
         ) : null}
 
         <div className="flex flex-col gap-2">
+          {shortNigerian && allStartersFilled ? (
+            <div
+              data-testid="picker-nigerian-warning"
+              className="rounded-sm border border-[var(--flare)] bg-[rgba(255,91,59,0.08)] p-2 text-xs text-[var(--flare)]"
+            >
+              Starting XI needs {minNigerian} Nigerian player
+              {minNigerian === 1 ? "" : "s"} (currently {nigerianStarterCount}).
+              Bench Nigerians do not satisfy this rule — move one onto the
+              pitch.
+            </div>
+          ) : null}
           <PrimaryButton
             type="button"
             onClick={onSubmit}
-            disabled={!allStartersFilled || isPending}
+            disabled={!allStartersFilled || shortNigerian || isPending}
             data-testid="picker-submit-btn"
           >
             Submit squad
