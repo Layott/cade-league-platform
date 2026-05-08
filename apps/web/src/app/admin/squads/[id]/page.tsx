@@ -56,15 +56,34 @@ export default async function AdminSquadDetailPage({
       }
     : { maxBudgetCoins: 0, minNigerianItems: 0, bannedItemTypes: [] as string[] };
 
-  const itemsForEval: ItemForValidation[] = items.map((it) => ({
-    name: it.name,
-    rating: it.rating,
-    position: it.position,
-    value: it.value,
-    itemType: it.item_type as ItemForValidation["itemType"],
-    nationalityFlag: it.nationality_flag,
-    slotIndex: it.slot_index,
-  }));
+  const itemsForEval: ItemForValidation[] = items.map((it) => {
+    // 2026-05-08 — also pass through futbin_nation_id from the joined
+    // FCDB row so the Nigerian-in-XI rule still counts cards whose
+    // stored `nationality_flag` is null (Chibuike Nwaiwu, Paul Onuachu
+    // pre-backfill). Submit-time validator already does this; admin
+    // review must mirror so the RULE CHECK panel agrees.
+    const attrs = it.fc_player?.attributes;
+    const fnRaw =
+      attrs && typeof attrs === "object" && "futbin_nation_id" in attrs
+        ? (attrs as Record<string, unknown>).futbin_nation_id
+        : null;
+    const futbinNationId =
+      typeof fnRaw === "number" && Number.isFinite(fnRaw) ? fnRaw : null;
+    return {
+      name: it.name,
+      rating: it.rating,
+      position: it.position,
+      value: it.value,
+      itemType: it.item_type as ItemForValidation["itemType"],
+      nationalityFlag:
+        it.nationality_flag ??
+        it.fc_player?.nation_iso ??
+        it.fc_player?.nation ??
+        null,
+      futbinNationId,
+      slotIndex: it.slot_index,
+    };
+  });
   const { ok, violations } = evaluateRules(itemsForEval, ruleForEval);
 
   // Plan 23 — FCDB enrichment. Tolerates empty FCDB (every item flagged

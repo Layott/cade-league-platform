@@ -13,6 +13,7 @@
 // See _scrape_futbin_headful.js for the full scrape pipeline.
 
 const { classifyVariant, classifyVariantWithBonus } = require("./_classify_variant");
+const { resolveFutbinNation } = require("./_futbin_nation_map");
 
 function buildAttrs(r, coinsPs, coinsPc, existingAttrs) {
   const attrs = existingAttrs && typeof existingAttrs === "object" ? { ...existingAttrs } : {};
@@ -209,7 +210,9 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
   // consumers) AND top-level columns (for chemistry).
   const { data: exist } = await sb
     .from("fc26_players")
-    .select("id, value_coins_estimate, item_type, attributes, club, league, alt_positions, position")
+    .select(
+      "id, value_coins_estimate, item_type, attributes, club, league, alt_positions, position, nation_iso, nation",
+    )
     .eq("source_dataset", "futbin.com")
     .eq("source_row_id", sourceRowId)
     .is("deleted_at", null)
@@ -229,6 +232,19 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
     newTop.alt_positions = [...r.altPositions];
   }
   if (r.position) newTop.position = r.position;
+  // 2026-05-08 — resolve futbin_nation_id → ISO + nation name and write
+  // to top-level columns on insert/update. Pre-fix the scraper only
+  // captured the integer ID into attributes.futbin_nation_id, leaving
+  // top-level nation_iso/nation NULL for ~100 rows. Admin /squads/[id]
+  // RULE CHECK reads nation_iso, so a Nigerian player (Chibuike Nwaiwu,
+  // Paul Onuachu) with futbin_nation_id=133 but null nation_iso showed
+  // up as "NIGERIAN ITEMS: 0/1" violation — server validate.ts kept
+  // counting via the ID but the admin review missed.
+  const resolvedNation = resolveFutbinNation(r.nationId);
+  if (resolvedNation) {
+    newTop.nation_iso = resolvedNation.iso;
+    newTop.nation = resolvedNation.name;
+  }
 
   if (!exist) {
     await sb.from("fc26_players").insert({
@@ -248,6 +264,10 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
       ...(r.league ? { league: r.league } : {}),
       ...(Array.isArray(r.altPositions) && r.altPositions.length > 0
         ? { alt_positions: r.altPositions }
+        : {}),
+      // 2026-05-08 — write nation_iso + nation top-level on first insert.
+      ...(resolvedNation
+        ? { nation_iso: resolvedNation.iso, nation: resolvedNation.name }
         : {}),
     });
     stats.inserted++;
@@ -278,6 +298,13 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
     update.alt_positions = newTop.alt_positions;
   }
   if (changes.includes("position") && newTop.position) update.position = newTop.position;
+  // 2026-05-08 — backfill top-level nation_iso/nation when the existing
+  // row has a NULL value but the scraped row resolves to a known nation.
+  // Never null-overwrite a populated column.
+  if (resolvedNation) {
+    if (!exist.nation_iso) update.nation_iso = resolvedNation.iso;
+    if (!exist.nation) update.nation = resolvedNation.name;
+  }
 
   await sb.from("fc26_players").update(update).eq("id", exist.id);
   stats.updated++;
