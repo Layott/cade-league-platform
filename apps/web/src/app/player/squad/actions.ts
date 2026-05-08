@@ -164,6 +164,149 @@ export async function submitPickerAction(
     // best-effort
   }
 
+  // 2026-05-08 — auto-apply Saturday squad to the Sunday sibling (and
+  // vice versa) when both belong to the same weekend pair. One CADE
+  // weekend = one squad in the player's mental model; previously the
+  // picker treated Sat + Sun independently, so submitting Sun alone
+  // left Sat showing "Submit squad" + the player thought their pick
+  // had not registered. Auto-clone covers the common case + the
+  // WeekendApplyPrompt downstream still surfaces when the sibling is
+  // closed / mid-window so the player can intervene.
+  //
+  // Skip silently when:
+  //   - submission has no matchDayId (legacy weekly mode).
+  //   - sibling MD is missing or already has a non-deleted submission
+  //     for this player (don't overwrite an explicit different pick).
+  //   - sibling MD's window is closed (auto-clone only when truly free).
+  //
+  // Re-uses the same hydrate-by-resolved_fc_player_id path as
+  // applySquadToMultipleMatchDaysAction to keep slot fidelity. Errors
+  // are best-effort — the primary submission is already durable.
+  if (payload.matchDayId) {
+    try {
+      const svc = getServiceRoleSupabase();
+      const { data: sourceMd } = await svc
+        .from("match_days")
+        .select("id, match_date, season_id")
+        .eq("id", payload.matchDayId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (sourceMd) {
+        const { match_date: srcDate } = sourceMd as { match_date: string };
+        const dayMs = 24 * 60 * 60 * 1000;
+        const srcMs = new Date(`${srcDate}T12:00:00Z`).getTime();
+        const { data: candidates } = await svc
+          .from("match_days")
+          .select("id, match_date, season_id")
+          .eq("season_id", seasonId)
+          .neq("id", payload.matchDayId)
+          .is("deleted_at", null);
+        const sibling = ((candidates ?? []) as Array<{
+          id: string;
+          match_date: string;
+        }>).find((m) => {
+          const ms = new Date(`${m.match_date}T12:00:00Z`).getTime();
+          return Math.abs(ms - srcMs) === dayMs;
+        });
+        if (sibling) {
+          const siblingWeek = weekStartThursday(sibling.match_date);
+          const siblingResolution = await resolveSquadWindowForMatchDay(
+            svc,
+            sibling.id,
+          );
+          if (siblingResolution.open) {
+            const siblingExisting = await getSubmissionForPlayerAndMatchDay(
+              svc,
+              playerId,
+              sibling.id,
+              siblingWeek,
+            );
+            if (!siblingExisting) {
+              const { data: items } = await svc
+                .from("squad_player_items")
+                .select("slot_index, position, resolved_fc_player_id")
+                .eq("submission_id", submission.id)
+                .is("deleted_at", null);
+              const cloneSlots = (
+                (items ?? []) as Array<{
+                  slot_index: number;
+                  position: string;
+                  resolved_fc_player_id: string | null;
+                }>
+              )
+                .filter((it) => it.resolved_fc_player_id)
+                .map((it) => ({
+                  slotIndex: it.slot_index,
+                  fcdbPlayerId: it.resolved_fc_player_id!,
+                  positionInLineup: it.position,
+                }));
+              if (cloneSlots.length >= 11) {
+                const { data: srcRow } = await svc
+                  .from("squad_submissions")
+                  .select("formation, futbin_screenshot_path")
+                  .eq("id", submission.id)
+                  .maybeSingle();
+                const srcFormation = (srcRow as {
+                  formation: string | null;
+                } | null)?.formation ?? null;
+                const formationKey = srcFormation
+                  ? FORMATION_LABEL_TO_KEY[
+                      srcFormation as keyof typeof FORMATION_LABEL_TO_KEY
+                    ]
+                  : undefined;
+                const srcScreenshot = (srcRow as {
+                  futbin_screenshot_path: string | null;
+                } | null)?.futbin_screenshot_path ?? null;
+                try {
+                  const cloneResult = await submitPickerSquad(svc, {
+                    seasonId,
+                    playerId,
+                    weekStartDate: siblingWeek,
+                    matchDayId: sibling.id,
+                    futbinScreenshotPath: srcScreenshot,
+                    formation: formationKey,
+                    slots: cloneSlots,
+                  });
+                  try {
+                    await publishSquadSubmitted(svc, {
+                      weekStartDate: siblingWeek,
+                      playerId,
+                      submissionId: cloneResult.id,
+                    });
+                  } catch {
+                    // best-effort
+                  }
+                  try {
+                    await publishSquadChanged(svc, {
+                      seasonId,
+                      playerId,
+                      matchDayId: sibling.id,
+                      weekStartDate: siblingWeek,
+                      submissionId: cloneResult.id,
+                    });
+                  } catch {
+                    // best-effort
+                  }
+                  revalidateSquadSurfaces({
+                    playerId,
+                    matchDayId: sibling.id,
+                    submissionId: cloneResult.id,
+                  });
+                } catch {
+                  // Auto-apply is opportunistic — don't fail the original
+                  // submit if the sibling clone path throws (e.g. the
+                  // sibling was force_close'd between resolver + submit).
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // best-effort: auto-apply must not bubble back into the redirect.
+    }
+  }
+
   // 2026-05-02 — bust every surface that consumes squad data: player's
   // own page, admin queue + detail, admin broadcast hub + design preview,
   // public player profile.
@@ -175,7 +318,9 @@ export async function submitPickerAction(
   // 2026-05-02 — pass the just-submitted matchDayId through the redirect
   // so /player/squad can render the WeekendApplyPrompt banner asking
   // whether to apply the same roster to the sibling weekend MD. The page
-  // resolves the sibling itself; we only need the source id here.
+  // resolves the sibling itself; we only need the source id here. After
+  // the 2026-05-08 auto-apply, the prompt only fires when the sibling
+  // wasn't auto-cloned (closed window, finalised conflict, etc.).
   if (payload.matchDayId) {
     redirect(
       `/player/squad?submitted=${encodeURIComponent(payload.matchDayId)}`,
