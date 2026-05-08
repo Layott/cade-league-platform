@@ -297,29 +297,11 @@ export async function listSubmissionsForPlayerInSeason(
     // page-level resolver then maps each match day to either its direct
     // match_day_id key OR (if the row is legacy weekly) the week-anchor key
     // derived from the match day's date.
-    const matchKey = r.match_day_id ?? `week:${r.week_start_date}`;
+    const key = r.match_day_id ?? `week:${r.week_start_date}`;
     // First write wins (rows are ordered submitted_at DESC, so the newest
     // submission for the key takes precedence when multiple soft-deletes
     // shake out in unexpected ways).
-    if (!out.has(matchKey)) out.set(matchKey, summary);
-    // 2026-05-08 — ALSO publish the row under its synthetic week key
-    // even when match_day_id is set. The DB enforces one live submission
-    // per (player_id, week_start_date) — Sat + Sun share a Thursday-anchor
-    // week, so a single submission already covers both days. Pre-fix the
-    // page resolver only saw the row on the explicit MD it was filed
-    // against and the sibling weekend day fell through to "Submit squad"
-    // CTA, confusing players (Kingnonex on 2026-05-08 saw "Submit" on
-    // May 9 after submitting May 10). Publishing the same summary under
-    // `week:<weekStart>` lets the page-level resolver's
-    // `direct ?? legacy ?? null` fallback hit it for every MD whose
-    // weekStartThursday matches. Direct (match_day_id) lookup still
-    // wins, so a future per-MD-distinct submissions model can adopt
-    // this map by removing the second set() without breaking the
-    // direct path.
-    const weekKey = `week:${r.week_start_date}`;
-    if (weekKey !== matchKey && !out.has(weekKey)) {
-      out.set(weekKey, summary);
-    }
+    if (!out.has(key)) out.set(key, summary);
   }
   return out;
 }

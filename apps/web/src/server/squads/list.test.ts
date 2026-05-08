@@ -109,19 +109,10 @@ describe("listSubmissionsForPlayerInSeason", () => {
       })),
     };
     const map = await listSubmissionsForPlayerInSeason(sb as never, "p1", "se");
-    // 2026-05-08 — every submission is now also indexed under its
-    // synthetic week key so the page-level resolver can surface the
-    // same submission on Sat + Sun rows of a weekend pair (one live
-    // submission per (player, week) per the partial unique index in
-    // 20260428000102_squad_submissions.sql). Total keys: md-1 +
-    // week:2026-04-16 (s1) + week:2026-04-09 (s2) = 3.
-    expect(map.size).toBe(3);
+    expect(map.size).toBe(2);
     // match_day_id key takes the freshest summary.
     expect(map.get("md-1")?.submissionId).toBe("s1");
     expect(map.get("md-1")?.validationStatus).toBe("approved");
-    // Same submission also appears under the week key so the sibling
-    // weekend MD's lookup falls through to it.
-    expect(map.get("week:2026-04-16")?.submissionId).toBe("s1");
     // legacy row keyed by week-anchor synthetic key.
     expect(map.get("week:2026-04-09")?.submissionId).toBe("s2");
   });
