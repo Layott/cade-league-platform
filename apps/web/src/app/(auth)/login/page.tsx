@@ -1,9 +1,9 @@
 import Image from "next/image";
 import { login } from "./actions";
 import { FormField, inputClass } from "@/components/admin/FormField";
-import { PrimaryButton } from "@/components/admin/buttons";
 import { PRIMARY_LOGOS } from "@/lib/brand";
 import { PasswordInput } from "./PasswordInput";
+import { LoginSubmitButton } from "./LoginSubmitButton";
 
 /**
  * Map machine-readable error codes (set by `actions.ts`) to user-facing
@@ -177,14 +177,12 @@ export default async function LoginPage({
               Stage 4 e2e specs (`name: /sign in/i`) match the same
               accessible name. Visible text stays "Continue →" for
               consistency with the rest of the console.
+              2026-05-08 — wrapped via LoginSubmitButton client component
+              so useFormStatus pending-state can drive a spinner +
+              "Signing in…" copy while the server action establishes
+              the session.
             */}
-            <PrimaryButton
-              type="submit"
-              className="w-full"
-              aria-label="Continue Sign in"
-            >
-              Continue →
-            </PrimaryButton>
+            <LoginSubmitButton />
 
             <p
               className="text-center"
