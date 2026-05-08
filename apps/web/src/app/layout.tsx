@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import { Suspense } from "react";
 import "./globals.css";
 import { SiteChrome } from "@/components/public/SiteChrome";
+import { RouteProgress } from "@/components/layout/RouteProgress";
 import { PRIMARY_LOGOS } from "@/lib/brand";
 
 // Plan 16 — primary broadcast display face (Agharti, self-hosted woff2).
@@ -87,6 +89,12 @@ export default async function RootLayout({
       className={`${display.variable} ${body.variable} ${mono.variable} ${agharti.variable} ${quedora.variable}`}
     >
       <body className="antialiased">
+        {/* 2026-05-08 — global top-bar nav-progress indicator. Suspense
+            wrapper required because RouteProgress reads useSearchParams,
+            which Next.js 15 treats as a dynamic boundary. */}
+        <Suspense fallback={null}>
+          <RouteProgress />
+        </Suspense>
         <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
