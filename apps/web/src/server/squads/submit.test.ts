@@ -29,18 +29,30 @@ function mkSb(opts: {
     deleteFromSubmissions,
     from: vi.fn((table: string) => {
       if (table === "squad_submissions") {
+        // 2026-05-08 — self-chaining query builder. Pre-Plan-56 the
+        // existing-submission lookup was (.eq player).(.eq week).(.is
+        // deleted_at) — three calls in fixed order. Plan 56+ now varies
+        // the chain: with matchDayId the path is (.eq player).(.is
+        // deleted_at).(.eq match_day_id); legacy path adds a second
+        // .is(match_day_id, null). Self-chain so every shape lands at
+        // the terminal maybeSingle.
+        type Chain = {
+          eq: (...args: unknown[]) => Chain;
+          is: (...args: unknown[]) => Chain;
+          maybeSingle: () => Promise<{
+            data: typeof existing;
+            error: null;
+          }>;
+        };
+        const chain: Chain = {
+          eq: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          maybeSingle: vi
+            .fn()
+            .mockResolvedValue({ data: existing, error: null }),
+        };
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi
-                    .fn()
-                    .mockResolvedValue({ data: existing, error: null }),
-                })),
-              })),
-            })),
-          })),
+          select: vi.fn(() => chain),
           insert: vi.fn(() => ({
             select: vi.fn(() => ({
               single: vi.fn().mockResolvedValue({

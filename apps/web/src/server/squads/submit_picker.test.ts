@@ -66,18 +66,26 @@ function mkSb(opts: {
               validation_status: opts.existing.validation_status ?? "pending",
             }
           : null;
+        // 2026-05-08 — self-chaining query builder: see submit.test.ts
+        // for the rationale. Plan 56+ submit.ts varies the chain shape
+        // depending on whether matchDayId is set.
+        type Chain = {
+          eq: (...args: unknown[]) => Chain;
+          is: (...args: unknown[]) => Chain;
+          maybeSingle: () => Promise<{
+            data: typeof existing;
+            error: null;
+          }>;
+        };
+        const chain: Chain = {
+          eq: vi.fn(() => chain),
+          is: vi.fn(() => chain),
+          maybeSingle: vi
+            .fn()
+            .mockResolvedValue({ data: existing, error: null }),
+        };
         return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                is: () => ({
-                  maybeSingle: vi
-                    .fn()
-                    .mockResolvedValue({ data: existing, error: null }),
-                }),
-              }),
-            }),
-          }),
+          select: () => chain,
           insert: () => ({
             select: () => ({
               single: vi

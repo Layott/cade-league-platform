@@ -123,14 +123,26 @@ export async function createSubmission(
       leagueOverride?.state === "force_open";
   }
 
-  // Check for an existing live submission.
-  const { data: existing } = await sb
+  // 2026-05-08 — existing-submission lookup. Plan 56+ writes one row
+  // per (player_id, match_day_id) when matchDayId is set; the schema
+  // unique index `squad_submissions_player_md_live_uidx` enforces that
+  // pair. Per-MD submissions in the SAME Thursday-anchor week (Sat +
+  // Sun of one weekend) are independent rows now. Pre-Plan-56 rows
+  // (match_day_id IS NULL) still collide on (player_id, week_start_date)
+  // via the legacy partial unique index.
+  let existingQ = sb
     .from("squad_submissions")
     .select("id, validation_status")
     .eq("player_id", v.playerId)
-    .eq("week_start_date", v.weekStartDate)
-    .is("deleted_at", null)
-    .maybeSingle();
+    .is("deleted_at", null);
+  if (v.matchDayId) {
+    existingQ = existingQ.eq("match_day_id", v.matchDayId);
+  } else {
+    existingQ = existingQ
+      .eq("week_start_date", v.weekStartDate)
+      .is("match_day_id", null);
+  }
+  const { data: existing } = await existingQ.maybeSingle();
 
   if (existing) {
     // Pre-deadline (or force-open) re-submissions: soft-delete the old
