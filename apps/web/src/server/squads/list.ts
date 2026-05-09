@@ -55,6 +55,14 @@ export type SquadItemRow = {
     item_type: string;
     nation_iso: string | null;
     nation: string | null;
+    // 2026-05-09 — club, league, alt_positions are required for the picker's
+    // edit-mode hydration to feed full chemistry inputs into LiveTotalsBar's
+    // computeChemistry. Without them, edit-mode chem drops to nation-only
+    // (~11/33 instead of full ~28-33). Pre-fix, itemToCard hard-coded these
+    // to null + [], silently regressing chem on every edit/clone flow.
+    club: string | null;
+    league: string | null;
+    alt_positions: string[] | null;
     attributes: Record<string, unknown> | null;
   } | null;
 };
@@ -129,7 +137,7 @@ export async function getSubmissionWithItems(
       `id, submission_id, name, rating, position, value, item_type,
        nationality_flag, slot_index, resolved_fc_player_id,
        fc_player:resolved_fc_player_id (
-         id, name, rating, position, item_type, nation_iso, nation, attributes
+         id, name, rating, position, item_type, nation_iso, nation, club, league, alt_positions, attributes
        )`,
     )
     .eq("submission_id", submissionId)
@@ -216,7 +224,7 @@ export async function getApprovedSubmissionForPlayer(
       `id, submission_id, name, rating, position, value, item_type,
        nationality_flag, slot_index, resolved_fc_player_id,
        fc_player:resolved_fc_player_id (
-         id, name, rating, position, item_type, nation_iso, nation, attributes
+         id, name, rating, position, item_type, nation_iso, nation, club, league, alt_positions, attributes
        )`,
     )
     .eq("submission_id", sub.id)
@@ -370,7 +378,7 @@ export async function getSubmissionForPlayerAndMatchDay(
       `id, submission_id, name, rating, position, value, item_type,
        nationality_flag, slot_index, resolved_fc_player_id,
        fc_player:resolved_fc_player_id (
-         id, name, rating, position, item_type, nation_iso, nation, attributes
+         id, name, rating, position, item_type, nation_iso, nation, club, league, alt_positions, attributes
        )`,
     )
     .eq("submission_id", sub.id)
@@ -413,7 +421,7 @@ export async function getCurrentWeekSubmissionForPlayer(
       `id, submission_id, name, rating, position, value, item_type,
        nationality_flag, slot_index, resolved_fc_player_id,
        fc_player:resolved_fc_player_id (
-         id, name, rating, position, item_type, nation_iso, nation, attributes
+         id, name, rating, position, item_type, nation_iso, nation, club, league, alt_positions, attributes
        )`,
     )
     .eq("submission_id", sub.id)

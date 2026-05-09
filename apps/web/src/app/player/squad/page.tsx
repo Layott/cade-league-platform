@@ -817,16 +817,30 @@ function itemToCard(it: SquadItemRow): CardSearchResult {
   const nationIso = fc?.nation_iso ?? it.nationality_flag;
   const nation = fc?.nation ?? null;
   const name = fc?.name ?? it.name;
+  // 2026-05-09 — pull club/league/alt_positions from the FCDB join so
+  // edit-mode picker hydration carries full chemistry inputs into
+  // LiveTotalsBar's computeChemistry. Pre-fix, all three were hard-coded
+  // null/[] which silently regressed chem on every edit/clone path
+  // (Wolevation's TOTS-heavy XI scored 11/33 instead of ~28/33).
+  const club = fc?.club ?? null;
+  const league = fc?.league ?? null;
+  const positionsAlt: string[] = Array.isArray(fc?.alt_positions)
+    ? (fc.alt_positions as string[])
+    : [];
+  // Use the card's primary position (from FCDB) so the chem in-position
+  // gate compares against the canonical position list (primary + alts),
+  // not the LINEUP slot label.
+  const cardPosition = fc?.position ?? it.position;
 
   return {
     id,
     slug: id, // sufficient for one-per-player dedup on re-submit
     name,
     rating,
-    position: it.position,
-    positionsAlt: [],
-    club: null,
-    league: null,
+    position: cardPosition,
+    positionsAlt,
+    club,
+    league,
     nation,
     nationIso,
     itemType,
