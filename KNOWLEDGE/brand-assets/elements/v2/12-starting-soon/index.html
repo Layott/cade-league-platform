@@ -907,12 +907,11 @@
     50%      { transform: scaleX(1.18); opacity: 1.00; }
   }
 
-  /* subtitle row: "PLEASE STAND BY" + animated dots + spinner */
+  /* subtitle row: "PLEASE STAND BY" */
   .subtitle-row {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 22px;
     margin-top: 4px;
   }
 
@@ -930,46 +929,6 @@
   @keyframes subtitle-breathe {
     0%, 100% { opacity: 0.72; letter-spacing: 0.32em; }
     50%      { opacity: 1.00; letter-spacing: 0.36em; }
-  }
-
-  /* three animated dots after subtitle */
-  .dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    margin-left: 4px;
-  }
-  .dots .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 12px var(--green-glow);
-    animation: dot-bounce 1.4s ease-in-out infinite;
-  }
-  .dots .dot:nth-child(1) { animation-delay: 0.00s; }
-  .dots .dot:nth-child(2) { animation-delay: 0.20s; }
-  .dots .dot:nth-child(3) { animation-delay: 0.40s; }
-
-  @keyframes dot-bounce {
-    0%, 100% { transform: translateY(0)    scale(1.00); opacity: 0.55; }
-    50%      { transform: translateY(-8px) scale(1.20); opacity: 1.00; }
-  }
-
-  /* small spinning ring loader on the right of the subtitle row */
-  .spinner {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: 3px solid rgba(255,255,255,0.12);
-    border-top-color: var(--green);
-    border-right-color: var(--green);
-    box-shadow: 0 0 12px rgba(107,205,6,0.35);
-    animation: spin 1.6s linear infinite;
-  }
-  @keyframes spin {
-    0%   { transform: rotate(0deg);   }
-    100% { transform: rotate(360deg); }
   }
 
   /* season watermark beneath the subtitle row */
@@ -1192,12 +1151,6 @@
 
       <div class="subtitle-row">
         <p data-element-id="subtitle" class="subtitle">Please Stand By</p>
-        <span class="dots" aria-hidden="true">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
-        </span>
-        <span class="spinner" aria-hidden="true"></span>
       </div>
 
       <p class="season-watermark">
