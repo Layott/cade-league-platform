@@ -596,8 +596,27 @@ export default async function PlayerSquadPage({
     // looking at "Submit squad" for a weekend they had already filed
     // their Saturday squad for. Each day gets its own row so View/Edit
     // CTAs map to the day they describe.
+    //
+    // 2026-05-09 — extended split conditions. Wolevation reported being
+    // unable to reach MD 10 from the list when MD 9 was approved (locked)
+    // and MD 10 was pending (still editable). Both rows mapped to
+    // `status='submitted'` so `distinctStatuses.size === 1` collapsed the
+    // weekend, and the head row (MD 9, approved + force-closed) hid
+    // MD 10's pending + force-open state. Split also when:
+    //   - `validationStatus` differs (approved vs pending vs rejected)
+    //   - `windowOpen` differs (one window closed, the other admin-
+    //      force-opened — admin clearly wants those two days handled
+    //      independently).
     const distinctStatuses = new Set(sorted.map((s) => s.status));
-    if (distinctStatuses.size > 1) {
+    const distinctValidation = new Set(
+      sorted.map((s) => s.validationStatus ?? null),
+    );
+    const distinctWindowOpen = new Set(sorted.map((s) => s.windowOpen ?? false));
+    if (
+      distinctStatuses.size > 1 ||
+      distinctValidation.size > 1 ||
+      distinctWindowOpen.size > 1
+    ) {
       for (const row of sorted) {
         items.push(row);
       }
