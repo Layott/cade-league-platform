@@ -50,15 +50,24 @@ async function fetchCurrentSubmission(
   playerId: string,
   weekStart: string,
 ): Promise<SubmissionMinimalRow | null> {
+  // Migration 20260801000020 split the legacy weekly unique index into
+  // per-(player, match_day_id) rows + a legacy (player, week) row, so a
+  // single Thursday-anchor week can carry both Saturday and Sunday
+  // submissions. `.maybeSingle()` errors on >1 row, which crashes every
+  // `/player/*` page via the layout-level dashboard banner. Pick the
+  // most-recent live submission so the banner reflects the player's
+  // latest action across the weekend pair.
   const { data, error } = await sb
     .from("squad_submissions")
     .select("id, validation_status, rejection_reason, week_start_date")
     .eq("player_id", playerId)
     .eq("week_start_date", weekStart)
     .is("deleted_at", null)
-    .maybeSingle();
+    .order("submitted_at", { ascending: false })
+    .limit(1);
   if (error) throw new Error(`fetchCurrentSubmission: ${error.message}`);
-  return (data as SubmissionMinimalRow | null) ?? null;
+  const rows = (data as SubmissionMinimalRow[] | null) ?? [];
+  return rows[0] ?? null;
 }
 
 async function countLiveChangeRequests(

@@ -20,6 +20,11 @@ type MaybeSubmission = {
  */
 function mkSb(opts: {
   submission?: MaybeSubmission;
+  // 2026-05-09 — supports the `fetchCurrentSubmission` multi-row return
+  // case introduced after migration `20260801000020`. When populated,
+  // the mock returns the full array (in order) so the production code's
+  // `.order('submitted_at', desc).limit(1)` semantics are exercised.
+  submissions?: NonNullable<MaybeSubmission>[];
   changeRequestCount?: number;
   auditReopen?: {
     actor_user_id: string | null;
@@ -37,15 +42,22 @@ function mkSb(opts: {
   return {
     from: vi.fn((table: string) => {
       if (table === "squad_submissions") {
+        const rows: NonNullable<MaybeSubmission>[] = opts.submissions
+          ? opts.submissions
+          : opts.submission
+            ? [opts.submission]
+            : [];
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
                 is: vi.fn(() => ({
-                  maybeSingle: vi.fn().mockResolvedValue({
-                    data: opts.submission ?? null,
-                    error: null,
-                  }),
+                  order: vi.fn(() => ({
+                    limit: vi.fn().mockResolvedValue({
+                      data: rows,
+                      error: null,
+                    }),
+                  })),
                 })),
               })),
             })),
@@ -231,6 +243,33 @@ describe("getCurrentSquadStatus", () => {
       expect(status.reopenedBy).toBe(ADMIN_ID);
       expect(status.reopenedAt.toISOString()).toBe(new Date(reopenAt).toISOString());
     }
+  });
+
+  it("handles multiple per-MD submissions in the same week without crashing (picks latest)", async () => {
+    // Regression for 2026-05-09 production crash: post `squad_submissions_per_md_unique`
+    // migration, weekend Sat+Sun pair carries 2 rows with the same week_start_date.
+    // Pre-fix `.maybeSingle()` raised "JSON object requested, multiple rows returned"
+    // from EVERY /player/* page via the layout-level dashboard banner.
+    const sb = mkSb({
+      submissions: [
+        {
+          id: SUB_ID,
+          validation_status: "pending",
+          rejection_reason: null,
+          week_start_date: "2026-04-16",
+        },
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          validation_status: "approved",
+          rejection_reason: null,
+          week_start_date: "2026-04-16",
+        },
+      ],
+    });
+    const now = new Date("2026-04-16T08:30:00+01:00");
+    const status = await getCurrentSquadStatus(sb as never, PLAYER_ID, now);
+    // Latest row (mock order = production `submitted_at desc` order) wins.
+    expect(status.kind).toBe("submitted_pending");
   });
 
   it("ignores audit_events without the reopened marker and returns submitted_pending", async () => {
