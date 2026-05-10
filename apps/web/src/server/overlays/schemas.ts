@@ -394,10 +394,19 @@ export const matchScoresDaySchema = z.object({
         homeScore: z.coerce.number().int().min(0).max(99).nullable(),
         awayScore: z.coerce.number().int().min(0).max(99).nullable(),
         status: z.enum(["scheduled", "in_progress", "completed"]),
+        // 2026-05-10 — broadcast slot + lane assignment. Producers set
+        // these via /admin/match-days/[id] so the overlay groups matches
+        // by slot (primary livestreamed + optional secondary offstream).
+        // Both null when the match isn't assigned to any slot yet.
+        matchSlot: z.number().int().min(1).max(50).nullable().optional(),
+        matchLane: z.enum(["primary", "secondary"]).nullable().optional(),
       }),
     )
     .max(40)
     .default([]),
+  // 2026-05-10 — current focused slot for auto-advance overlays. Highlight
+  // the slot that is "live now"; null when no slot is in-progress.
+  currentSlot: z.number().int().min(1).max(50).nullable().optional(),
   soundSlot: soundSlotSchema,
   slot: matchSlotSchema,
 });

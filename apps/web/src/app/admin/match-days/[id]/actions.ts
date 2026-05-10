@@ -8,7 +8,9 @@ import {
   createMatch,
   editMatch,
   reorderMatches,
+  setMatchSlotLanes,
   softDeleteMatch,
+  type SlotLaneAssignment,
 } from "@/server/matches/matches";
 import {
   publishMatchDay,
@@ -360,6 +362,50 @@ export async function reorderMatchAction(formData: FormData) {
   const next = ids.slice();
   [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
   await reorderMatches(sb, { userId, roles }, matchDayId, next);
+  await pingFixtures(sb, matchDayId, "match_reordered");
+  revalidateFixtureSurfaces(matchDayId);
+}
+
+/**
+ * 2026-05-10 — assign slot + lane to every fixture on a match day in one
+ * server action. Form data is encoded as repeated triples:
+ *   `assignment[<matchId>][slot]` = number-or-empty
+ *   `assignment[<matchId>][lane]` = "primary" | "secondary" | "" (cleared)
+ *
+ * Empty slot AND empty lane = clear assignment (fixture becomes
+ * unscheduled). Mixed (one set, one empty) is treated as cleared too —
+ * UI prevents this but server defends against direct posts.
+ */
+export async function setMatchSlotLanesAction(formData: FormData) {
+  const matchDayId = String(formData.get("matchDayId") ?? "");
+  if (!matchDayId) throw new Error("setMatchSlotLanesAction: missing matchDayId");
+  const { userId, roles } = await requirePermInline("matches.edit");
+  const limited = await enforceAuthedWrite(userId);
+  if (limited) throw new Error("rate_limited");
+
+  const ids = new Set<string>();
+  for (const key of formData.keys()) {
+    const m = key.match(/^assignment\[([0-9a-f-]{36})\]\[(slot|lane)\]$/i);
+    if (m) ids.add(m[1]);
+  }
+  const assignments: SlotLaneAssignment[] = Array.from(ids).map((id) => {
+    const slotRaw = String(formData.get(`assignment[${id}][slot]`) ?? "").trim();
+    const laneRaw = String(formData.get(`assignment[${id}][lane]`) ?? "").trim();
+    const slot = slotRaw ? parseInt(slotRaw, 10) : null;
+    const lane =
+      laneRaw === "primary" || laneRaw === "secondary" ? laneRaw : null;
+    if (slot != null && (!Number.isFinite(slot) || slot < 1)) {
+      throw new Error(`setMatchSlotLanesAction: invalid slot for ${id}`);
+    }
+    // Treat half-set rows as cleared — UI shouldn't allow but server defends.
+    if (slot == null || lane == null) {
+      return { matchId: id, slot: null, lane: null };
+    }
+    return { matchId: id, slot, lane };
+  });
+
+  const sb = getServiceRoleSupabase();
+  await setMatchSlotLanes(sb, { userId, roles }, matchDayId, assignments);
   await pingFixtures(sb, matchDayId, "match_reordered");
   revalidateFixtureSurfaces(matchDayId);
 }

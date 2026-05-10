@@ -66,6 +66,9 @@ export type MatchScoreRow = {
   away_score: number | null;
   status: "scheduled" | "in_progress" | "completed";
   scheduled_time: string | null;
+  // 2026-05-10 — broadcast slot + lane (null when unassigned).
+  match_slot: number | null;
+  match_lane: "primary" | "secondary" | null;
 };
 
 export type MatchScoresDayData = {
@@ -141,6 +144,9 @@ type MatchRowDb = {
   id: string;
   scheduled_time: string | null;
   status: string;
+  // 2026-05-10 — broadcast slot + lane.
+  match_slot: number | null;
+  match_lane: string | null;
   /**
    * Plan 53 (2026-05-04) — added so the resolver can key off
    * `players.id` directly. The embedded `home_player` / `away_player`
@@ -303,6 +309,8 @@ export async function fetchMatchScoresDayData(
       id,
       scheduled_time,
       status,
+      match_slot,
+      match_lane,
       home_player_id,
       away_player_id,
       home_player:home_player_id (
@@ -320,6 +328,11 @@ export async function fetchMatchScoresDayData(
     )
     .eq("match_day_id", matchDayId)
     .is("deleted_at", null)
+    // 2026-05-10 — sort by broadcast slot first so the overlay renders
+    // the producer's running order. Primary lane before secondary within
+    // a slot. Falls back to scheduled_time for unassigned fixtures.
+    .order("match_slot", { ascending: true, nullsFirst: false })
+    .order("match_lane", { ascending: true, nullsFirst: false })
     .order("scheduled_time", { ascending: true, nullsFirst: false });
 
   if (matchErr) {
@@ -378,6 +391,10 @@ export async function fetchMatchScoresDayData(
         resolveSidePhotoUrl(m.home_player_id, homeSlug),
         resolveSidePhotoUrl(m.away_player_id, awaySlug),
       ]);
+      const slotRaw = (m as unknown as { match_slot?: number | null }).match_slot;
+      const laneRaw = (m as unknown as { match_lane?: string | null }).match_lane;
+      const matchLane =
+        laneRaw === "primary" || laneRaw === "secondary" ? laneRaw : null;
       return {
         match_id: m.id,
         home: pickName(m.home_player),
@@ -390,6 +407,8 @@ export async function fetchMatchScoresDayData(
         away_score: r ? r.away_score : null,
         status,
         scheduled_time: m.scheduled_time,
+        match_slot: typeof slotRaw === "number" ? slotRaw : null,
+        match_lane: matchLane,
       };
     }),
   );
@@ -455,8 +474,39 @@ export function toMatchScoresDayPayload(
   const titleLabel = data.sequenceNumber
     ? `MATCH DAY ${data.sequenceNumber} RESULTS`
     : data.label;
+  // 2026-05-10 — auto-advance: derive `currentSlot` as the lowest slot
+  // that has at least one in-progress OR scheduled match where some
+  // sibling lane in a LOWER slot is already completed. Equivalent: pick
+  // the smallest slot that isn't fully complete. Null when every slot
+  // is complete (whole day done) or nothing is assigned.
+  const slotsState = new Map<number, "complete" | "in_progress" | "scheduled">();
+  for (const r of data.rows) {
+    if (r.match_slot == null) continue;
+    const cur = slotsState.get(r.match_slot);
+    if (r.status === "in_progress") {
+      slotsState.set(r.match_slot, "in_progress");
+    } else if (r.status === "scheduled") {
+      if (cur !== "in_progress") slotsState.set(r.match_slot, "scheduled");
+    } else if (r.status === "completed") {
+      if (cur === undefined) slotsState.set(r.match_slot, "complete");
+    }
+  }
+  let currentSlot: number | null = null;
+  const sortedSlots = Array.from(slotsState.keys()).sort((a, b) => a - b);
+  for (const s of sortedSlots) {
+    const st = slotsState.get(s);
+    if (st === "in_progress") {
+      currentSlot = s;
+      break;
+    }
+    if (st === "scheduled" && currentSlot == null) {
+      currentSlot = s;
+      // Don't break — a later in_progress overrides the first scheduled.
+    }
+  }
   return matchScoresDaySchema.parse({
     matchDayLabel: titleLabel,
+    currentSlot: currentSlot ?? undefined,
     rows: data.rows.map((r) => ({
       home: r.home,
       away: r.away,
@@ -470,6 +520,8 @@ export function toMatchScoresDayPayload(
       homeScore: r.home_score,
       awayScore: r.away_score,
       status: r.status,
+      matchSlot: r.match_slot ?? undefined,
+      matchLane: r.match_lane ?? undefined,
     })),
   });
 }
