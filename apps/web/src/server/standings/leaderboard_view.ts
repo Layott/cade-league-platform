@@ -172,13 +172,19 @@ async function readFormResults(
   return rows.filter((r) => r.match && r.match.season_id === seasonId);
 }
 
+// 2026-05-10 — form window expanded from 5 to 10 matches per user request.
+// Single-source-of-truth constant so both the trim cap + downstream
+// consumers (UI tooltips, tests) read the same value.
+export const FORM_WINDOW_LENGTH = 10;
+
 /**
- * Build a per-player W/D/L form string from the most recent 5 confirmed
- * results. Skips voids AND walkover_pending rows (a pending walkover
- * carries scores but isn't yet counter-confirmed, so it must not bias the
- * form column). Rows arrive most-recent-first from `readFormResults`; we
- * build letters newest-first then reverse so the rendered string reads
- * "WDLWW" with the leftmost char being the oldest of the five.
+ * Build a per-player W/D/L form string from the most recent N confirmed
+ * results (N = `FORM_WINDOW_LENGTH`). Skips voids AND walkover_pending
+ * rows (a pending walkover carries scores but isn't yet counter-
+ * confirmed, so it must not bias the form column). Rows arrive most-
+ * recent-first from `readFormResults`; we build letters newest-first
+ * then reverse so the rendered string reads "WDLWWDDLWW" with the
+ * leftmost char being the oldest of the window.
  */
 export function buildFormMap(results: ResultRow[]): Map<string, string> {
   const out = new Map<string, string[]>();
@@ -214,7 +220,7 @@ export function buildFormMap(results: ResultRow[]): Map<string, string> {
 
 function pushTrim(map: Map<string, string[]>, pid: string, letter: string) {
   const arr = map.get(pid) ?? [];
-  if (arr.length >= 5) return;
+  if (arr.length >= FORM_WINDOW_LENGTH) return;
   arr.push(letter);
   map.set(pid, arr);
 }

@@ -67,8 +67,13 @@ export function seasonStrength(stats: PlayerSeasonStats): number {
 export function formStrength(stats: PlayerSeasonStats): number {
   const arr = stats.last5Form ?? [];
   if (arr.length === 0) return 0.5;
+  // 2026-05-10 — divisor = arr.length * 3 (max points per match) so the
+  // result is a 0-1 ratio regardless of window size. Pre-fix used a
+  // hardcoded 15 (= 5 matches × 3 points), which broke when the form
+  // window was expanded to 10 — sum could reach 30, dividing by 15
+  // exceeded 1.0 and clamped, washing out the gradient.
   const sum = arr.reduce((acc, v) => acc + clampForm(v), 0);
-  return clamp01(sum / 15);
+  return clamp01(sum / (arr.length * 3));
 }
 
 /**

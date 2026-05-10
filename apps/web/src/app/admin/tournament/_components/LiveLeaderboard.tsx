@@ -31,7 +31,7 @@ export type LeaderboardRow = {
   ga: number;
   gd: number;
   pts: number;
-  form: string; // up-to-5-char string of W/D/L
+  form: string; // up-to-10-char string of W/D/L (2026-05-10: expanded from 5 to 10)
   pointsAdj: number; // -3pts style abbreviation feeder
   gdAdj: number;
 };
@@ -232,7 +232,10 @@ function PlayerCell({
 
 function FormPills({ form }: { form: string }) {
   if (!form) return <span className="text-[10px] text-[var(--chalk-3)]">—</span>;
-  const chars = form.toUpperCase().split("").slice(-5);
+  // 2026-05-10 — slice(-10) to render the full 10-match form window. The
+  // server `buildFormMap` already caps at FORM_WINDOW_LENGTH=10; this
+  // mirror keeps the UI safe if a longer string ever arrives.
+  const chars = form.toUpperCase().split("").slice(-10);
   return (
     <div className="inline-flex gap-0.5" aria-label={`Form ${chars.join(",")}`}>
       {chars.map((c, i) => {

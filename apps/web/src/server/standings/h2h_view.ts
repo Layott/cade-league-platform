@@ -370,9 +370,15 @@ function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
+// 2026-05-10 — form window expanded from 5 to 10 matches per user request.
+// Mirrors `FORM_WINDOW_LENGTH` in leaderboard_view.ts. Function name kept
+// as `buildLast5Map` for backward compat — internal cap is now 10.
+const FORM_WINDOW_LENGTH = 10;
+
 /**
  * Pull recent confirmed results for every player in the season, return
- * a 0-3 form array (most recent first) per player. Stops at length 5.
+ * a 0-3 form array (most recent first) per player. Stops at length
+ * `FORM_WINDOW_LENGTH` (10 as of 2026-05-10).
  */
 async function buildLast5Map(
   sb: SupabaseClient,
@@ -437,7 +443,7 @@ async function buildLast5Map(
 
 function pushIfRoom(map: Map<string, number[]>, pid: string, pts: number) {
   const arr = map.get(pid) ?? [];
-  if (arr.length >= 5) return;
+  if (arr.length >= FORM_WINDOW_LENGTH) return;
   arr.push(pts);
   map.set(pid, arr);
 }
