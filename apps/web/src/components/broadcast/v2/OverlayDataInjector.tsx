@@ -111,6 +111,10 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   "24-biggest-margins": ["standings.changed", "match.ended", "score.changed"],
   "25-did-you-know": ["standings.changed", "match.ended"],
   "29-goalfests": ["standings.changed", "match.ended", "score.changed"],
+  // 26-card-meta — most-picked FUT cards from squad_submissions.
+  // squad.updated proxies through standingsChannel per server/squads/
+  // realtime.ts so admin approvals + Friday changes propagate.
+  "26-card-meta": ["squad.updated", "standings.changed"],
 };
 
 /**
@@ -162,6 +166,9 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   "24-biggest-margins": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
   "25-did-you-know": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
   "29-goalfests": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  // 26-card-meta — distinct endpoint joining squad_player_items to
+  // fc26_players for card art + pick percentages.
+  "26-card-meta": (s) => `/api/broadcast/sessions/${s}/card-meta`,
 };
 
 /**

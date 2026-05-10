@@ -254,10 +254,42 @@ body.cade-exiting .canvas { opacity: 0; }
     document.body.classList.remove('cade-visible');
     document.body.classList.add('cade-exiting');
   }
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var payload = data.payload || data;
+    var cards = Array.isArray(payload.cards) ? payload.cards : [];
+    // cm-subhead is admin-managed (Phase 2/3) so we only refresh the
+    // grid + (optionally) the totalSubmissions count if a future
+    // subhead variant references it.
+    var grid = document.querySelectorAll('.cm-grid .cm-card');
+    for (var i = 0; i < grid.length; i++) {
+      var card = grid[i];
+      var c = cards[i];
+      if (!c) { card.style.display = 'none'; continue; }
+      card.style.display = '';
+      var pill = card.querySelector('.rank-pill'); if (pill) pill.textContent = '#' + (i + 1) + ' META';
+      var bg = card.querySelector('.card-bg');
+      if (bg && c.cardBgUrl) bg.src = c.cardBgUrl;
+      var face = card.querySelector('.card-face');
+      if (face) {
+        if (c.cardFaceUrl) face.src = c.cardFaceUrl;
+        else face.style.visibility = 'hidden';
+      }
+      var name = card.querySelector('.name');
+      if (name) name.textContent = (c.name || '').toUpperCase();
+      var rating = card.querySelector('.meta-row .rating');
+      if (rating && c.rating != null) rating.textContent = String(c.rating);
+      var pick = card.querySelector('.meta-row .pick');
+      if (pick) pick.textContent = String(c.pickCount);
+      var pickLbl = card.querySelector('.meta-row .pick-lbl');
+      if (pickLbl) pickLbl.textContent = 'SQUADS · ' + c.pickPct + '%';
+    }
+  }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();
