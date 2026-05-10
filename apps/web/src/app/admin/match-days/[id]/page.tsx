@@ -32,6 +32,10 @@ import {
   SecondaryButton,
   DangerButton,
 } from "@/components/admin/buttons";
+import {
+  SlotLaneDragBoard,
+  type FixtureChip,
+} from "@/components/admin/SlotLaneDragBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -228,33 +232,35 @@ export default async function MatchDayDetailPage({
           </span>
         </div>
 
-        {/* 2026-05-10 — broadcast slot/lane bulk-save bar. Sits above the
-            fixture list + posts every fixture's (slot, lane) at once via
-            setMatchSlotLanesAction. Empty slot AND lane = unassigned. */}
+        {/* 2026-05-10 — drag-and-drop slot/lane assigner. Replaces the
+            inline number/select inputs with a visual board so producers
+            can drag fixtures into the cell where they belong. The
+            component serialises its state into FormData and posts via
+            setMatchSlotLanesAction (same server action as before). */}
         {matches.length > 0 ? (
-          <form
-            action={setMatchSlotLanesAction}
-            id={`slot-lane-form-${matchDay.id}`}
-            className="rounded-sm border border-[rgba(107,205,6,0.45)] bg-[rgba(107,205,6,0.06)] p-3"
-            data-testid="slot-lane-form"
-          >
-            <input type="hidden" name="matchDayId" value={matchDay.id} />
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)]">
-                Broadcast slot order
-                <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-[var(--chalk-3)]">
-                  Set per-fixture slot # + lane below, then save the whole day.
-                </span>
-              </div>
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 rounded-sm border border-[var(--primary)] bg-[var(--primary)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary-ink)] hover:bg-[#82e21a]"
-                data-testid="slot-lane-save-btn"
-              >
-                Save slot order
-              </button>
-            </div>
-          </form>
+          <SlotLaneDragBoard
+            matchDayId={matchDay.id}
+            fixtures={matches.map((m): FixtureChip => {
+              const homePlayer = firstOrNull(
+                (m as unknown as { home_player: PlayerJoined | PlayerJoined[] | null }).home_player,
+              );
+              const awayPlayer = firstOrNull(
+                (m as unknown as { away_player: PlayerJoined | PlayerJoined[] | null }).away_player,
+              );
+              const slotRaw = (m as { match_slot?: number | null }).match_slot ?? null;
+              const laneRaw = (m as { match_lane?: string | null }).match_lane ?? null;
+              const lane =
+                laneRaw === "primary" || laneRaw === "secondary" ? laneRaw : null;
+              return {
+                matchId: m.id,
+                homeLabel: playerLabel(homePlayer),
+                awayLabel: playerLabel(awayPlayer),
+                initialSlot: typeof slotRaw === "number" ? slotRaw : null,
+                initialLane: lane,
+              };
+            })}
+            saveAction={setMatchSlotLanesAction}
+          />
         ) : null}
 
         {matches.length === 0 ? (
@@ -343,44 +349,6 @@ export default async function MatchDayDetailPage({
                       ) : null}
                       <StatusPill status={statusLabel} />
                     </div>
-                  </div>
-
-                  {/* 2026-05-10 — broadcast slot + lane inputs. Inputs are
-                      tied to the bulk-save form above via the `form=`
-                      attribute so a single Save commits every row. */}
-                  <div
-                    className="mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--chalk-3)]"
-                    data-testid={`slot-lane-row-${m.id}`}
-                  >
-                    <span className="font-mono tabular text-[var(--chalk-3)]">
-                      Slot
-                    </span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      step={1}
-                      name={`assignment[${m.id}][slot]`}
-                      defaultValue={(m as { match_slot: number | null }).match_slot ?? ""}
-                      placeholder="—"
-                      form={`slot-lane-form-${matchDay.id}`}
-                      className="w-14 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 text-center font-mono text-[12px] text-[var(--chalk-0)] tabular focus:border-[var(--primary)] focus:outline-none"
-                      data-testid={`slot-input-${m.id}`}
-                    />
-                    <span className="font-mono tabular text-[var(--chalk-3)]">
-                      Lane
-                    </span>
-                    <select
-                      name={`assignment[${m.id}][lane]`}
-                      defaultValue={(m as { match_lane: string | null }).match_lane ?? ""}
-                      form={`slot-lane-form-${matchDay.id}`}
-                      className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--chalk-0)] focus:border-[var(--primary)] focus:outline-none"
-                      data-testid={`lane-select-${m.id}`}
-                    >
-                      <option value="">—</option>
-                      <option value="primary">Primary (live)</option>
-                      <option value="secondary">Secondary (off)</option>
-                    </select>
                   </div>
 
                   {/* Plan 27 — reorder chevrons (a11y-friendly buttons; no drag-drop) */}
