@@ -277,10 +277,40 @@ body.cade-exiting .canvas { opacity: 0; }
     document.body.classList.remove('cade-visible');
     document.body.classList.add('cade-exiting');
   }
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var payload = data.payload || data;
+    var orgs = Array.isArray(payload.orgs) ? payload.orgs : [];
+    var rows = document.querySelectorAll('.org-table .org-row');
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var r = orgs[i];
+      if (!r) { row.style.display = 'none'; continue; }
+      row.style.display = '';
+      var pos = row.querySelector('.pos'); if (pos) pos.textContent = String(i + 1);
+      var logo = row.querySelector('.logo-cell img');
+      if (logo && r.logoUrl) logo.src = r.logoUrl;
+      var nm = row.querySelector('.nm'); if (nm) nm.textContent = (r.name || '').toUpperCase();
+      var roster = row.querySelector('.roster');
+      if (roster) roster.textContent = (Array.isArray(r.roster) ? r.roster.join(' · ') : '').toUpperCase();
+      var stats = row.querySelectorAll('.stat');
+      // Order: W, D, L, GD, PTS (5 stats per row)
+      if (stats[0]) stats[0].textContent = String(r.totalWins != null ? r.totalWins : '—');
+      if (stats[1]) stats[1].textContent = String(r.totalDraws != null ? r.totalDraws : '—');
+      if (stats[2]) stats[2].textContent = String(r.totalLosses != null ? r.totalLosses : '—');
+      if (stats[3]) {
+        var gd = r.totalGd != null ? r.totalGd : 0;
+        stats[3].textContent = (gd > 0 ? '+' : '') + String(gd);
+        stats[3].style.color = gd > 0 ? 'var(--green)' : gd < 0 ? 'var(--pink)' : 'var(--chalk)';
+      }
+      if (stats[4]) stats[4].textContent = String(r.totalPoints != null ? r.totalPoints : '—');
+    }
+  }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();

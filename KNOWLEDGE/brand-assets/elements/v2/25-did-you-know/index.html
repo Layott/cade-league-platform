@@ -150,6 +150,32 @@ body.cade-exiting .canvas { opacity: 0; }
 <script>
 (function cadeGate() {
   'use strict';
+  function slugify(name) {
+    return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var payload = data.payload || data;
+    var dyk = payload.didYouKnow;
+    if (!dyk) return;
+    var nameEl = document.querySelector('.dyk-name');
+    if (nameEl && dyk.player) nameEl.textContent = (dyk.player.displayName || '').toUpperCase();
+    else if (nameEl && !dyk.player) nameEl.textContent = '';
+    var headlineEl = document.querySelector('.dyk-headline');
+    if (headlineEl && dyk.headline) {
+      // Highlight numeric prefix in pink (e.g. "5 STRAIGHT WINS" → pink "5").
+      var m = dyk.headline.match(/^(\S+)\s+(.+)$/);
+      if (m) headlineEl.innerHTML = '<span class="pink">' + m[1] + '</span> ' + m[2];
+      else headlineEl.textContent = dyk.headline;
+    }
+    // Detail line is admin-managed via overlay_text_elements (Phase 2/3 AI).
+    // We DO NOT overwrite — the SSR resolver injects content separately.
+    var playerImg = document.querySelector('.dyk-photo-wrap img.player');
+    if (playerImg && dyk.player) {
+      if (dyk.player.photoUrl) playerImg.src = dyk.player.photoUrl;
+      else playerImg.src = '/overlays/v2/_assets/players/processed/' + (dyk.player.slug || slugify(dyk.player.displayName)) + '/fullbody_01_nobg.png';
+    }
+  }
   function show() {
     document.body.classList.remove('cade-exiting');
     document.body.classList.add('cade-visible');
@@ -161,7 +187,8 @@ body.cade-exiting .canvas { opacity: 0; }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();

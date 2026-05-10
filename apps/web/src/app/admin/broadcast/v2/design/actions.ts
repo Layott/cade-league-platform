@@ -753,11 +753,73 @@ export async function regenerateOverlayCopyAction(formData: FormData) {
     );
   }
 
+  // Pull live league stats so the AI writes copy with real player names
+  // + numbers instead of inventing placeholders. Best-effort — a failure
+  // falls through to a context-less regen rather than blocking the
+  // admin's click.
+  let liveStats: string | undefined;
+  try {
+    const { data: anySession } = await sb
+      .from("stream_sessions")
+      .select("id, match_day_id")
+      .is("ended_at", null)
+      .is("deleted_at", null)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const sessionRow = anySession as { id: string; match_day_id: string } | null;
+    if (sessionRow) {
+      const { data: mdRow } = await sb
+        .from("match_days")
+        .select("season_id")
+        .eq("id", sessionRow.match_day_id)
+        .maybeSingle();
+      const md = mdRow as { season_id: string } | null;
+      if (md?.season_id) {
+        const { fetchCoverUpStats } = await import(
+          "@/server/overlays/cover_up_stats"
+        );
+        const stats = await fetchCoverUpStats(sb, md.season_id);
+        const p = stats.payload;
+        const lines: string[] = [];
+        if (p.streaks.length > 0) {
+          lines.push(
+            `Longest active win streak: ${p.streaks[0].displayName} (${p.streaks[0].streak} wins).`,
+          );
+        }
+        if (p.biggestMargins[0]) {
+          const m = p.biggestMargins[0];
+          lines.push(
+            `Biggest margin: ${m.homeScore > m.awayScore ? m.home : m.away} beat ${m.homeScore > m.awayScore ? m.away : m.home} ${m.homeScore}-${m.awayScore}.`,
+          );
+        }
+        if (p.goalfests[0]) {
+          const g = p.goalfests[0];
+          lines.push(
+            `Highest-scoring fixture: ${g.home} vs ${g.away} (${g.total} goals combined).`,
+          );
+        }
+        if (p.orgs[0]) {
+          lines.push(
+            `Top org: ${p.orgs[0].name} (${p.orgs[0].totalPoints} pts, roster: ${p.orgs[0].roster.join(", ")}).`,
+          );
+        }
+        if (p.didYouKnow) {
+          lines.push(`Headline stat: ${p.didYouKnow.detail}`);
+        }
+        liveStats = lines.slice(0, 6).join(" ");
+      }
+    }
+  } catch {
+    liveStats = undefined;
+  }
+
   const client = getAnthropicClient() as unknown as AnthropicLikeT;
   const fresh = await regenerateCopy(client, {
     elementId: parsed.data.elementId,
     currentContent: existing.content,
     overlayKey: parsed.data.overlayKey,
+    liveStats,
   });
 
   await upsertTextElement(sb, actor, {

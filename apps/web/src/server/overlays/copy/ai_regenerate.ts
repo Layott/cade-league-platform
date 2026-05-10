@@ -81,6 +81,15 @@ export type RegenerateInput = {
   currentContent: string;
   /** Overlay key for telemetry; not used by the prompt. */
   overlayKey: string;
+  /**
+   * Optional live-stats context block. The action layer fetches the
+   * combined cover-up-stats feed and prose-formats it (top-scorer name +
+   * pts, longest streak, biggest margin, etc.) so the AI can write copy
+   * that names the real player at the right number rather than inventing
+   * generic placeholder names. Keep ≤ 600 chars to stay inside the
+   * Haiku context budget.
+   */
+  liveStats?: string;
 };
 
 export interface AnthropicLike {
@@ -124,12 +133,15 @@ export async function regenerateCopy(
 
   const userMessage = [
     brief,
+    input.liveStats
+      ? `\nLive league context (use real numbers + names; do NOT invent):\n${input.liveStats}`
+      : "",
     "",
     `Reference (current copy, do NOT copy verbatim — write something fresh):`,
     input.currentContent || "(none)",
     "",
     "Return ONE line only. Begin with the first character of the copy.",
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   const resp = await client.messages.create({
     model: COPY_AI_MODEL,

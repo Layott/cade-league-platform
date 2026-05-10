@@ -190,10 +190,34 @@ body.cade-exiting .canvas { opacity: 0; }
     document.body.classList.remove('cade-visible');
     document.body.classList.add('cade-exiting');
   }
+  function slugify(name) {
+    return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var payload = data.payload || data;
+    var streaks = Array.isArray(payload.streaks) ? payload.streaks : [];
+    var rows = document.querySelectorAll('.streak-list .streak-row');
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var r = streaks[i];
+      if (!r) { row.style.display = 'none'; continue; }
+      row.style.display = '';
+      var rank = row.querySelector('.rank'); if (rank) rank.textContent = '#' + (i + 1);
+      var img = row.querySelector('img.photo');
+      if (img) img.src = r.photoUrl || '/overlays/v2/_assets/players/processed/' + (r.slug || slugify(r.displayName)) + '/headshot_01_nobg.png';
+      var nameEl = row.querySelector('.who .name'); if (nameEl) nameEl.textContent = (r.displayName || '').toUpperCase();
+      var orgEl = row.querySelector('.who .org'); if (orgEl) orgEl.textContent = (r.orgName || '').toUpperCase();
+      var orgImg = row.querySelector('.org-logo-wrap img');
+      if (orgImg && r.orgLogoUrl) orgImg.src = r.orgLogoUrl;
+      var num = row.querySelector('.stat .num'); if (num) num.textContent = String(r.streak);
+    }
+  }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();

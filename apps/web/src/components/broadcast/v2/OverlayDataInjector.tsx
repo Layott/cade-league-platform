@@ -103,6 +103,14 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   // 27-schedule — current match-day fixture grid; repaints when fixtures
   // are added, scored, or marked complete.
   "27-schedule": ["score.changed", "match.ended", "standings.changed"],
+  // 21/23/24/25/29 — combined cover-up-stats feed. All four refresh on
+  // any league-state change (standings, score, match-end) since the
+  // payload aggregates fixtures + streaks + org points.
+  "21-streaks": ["standings.changed", "match.ended"],
+  "23-org-standings": ["standings.changed", "match.ended"],
+  "24-biggest-margins": ["standings.changed", "match.ended", "score.changed"],
+  "25-did-you-know": ["standings.changed", "match.ended"],
+  "29-goalfests": ["standings.changed", "match.ended", "score.changed"],
 };
 
 /**
@@ -145,6 +153,15 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   // day's fixture roster. The HTML strips scores + status so it reads as
   // "THIS WEEK" upcoming fixtures even when results are partially in.
   "27-schedule": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
+  // 21/23/24/25/29 — shared combined cover-up-stats feed. One DB
+  // roundtrip per overlay refresh; each HTML's update() handler reads
+  // its own slice (streaks / orgs / biggestMargins / didYouKnow /
+  // goalfests).
+  "21-streaks": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  "23-org-standings": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  "24-biggest-margins": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  "25-did-you-know": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  "29-goalfests": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
 };
 
 /**

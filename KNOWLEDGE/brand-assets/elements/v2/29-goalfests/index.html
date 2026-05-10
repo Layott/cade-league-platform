@@ -226,6 +226,33 @@ body.cade-exiting .canvas { opacity: 0; }
 <script>
 (function cadeGate() {
   'use strict';
+  function slugify(name) {
+    return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  }
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var payload = data.payload || data;
+    var fests = Array.isArray(payload.goalfests) ? payload.goalfests : [];
+    var rows = document.querySelectorAll('.gf-list .gf-row');
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var r = fests[i];
+      if (!r) { row.style.display = 'none'; continue; }
+      row.style.display = '';
+      var sides = row.querySelectorAll('.side');
+      if (sides[0]) {
+        var hi = sides[0].querySelector('img.photo'); if (hi) hi.src = '/overlays/v2/_assets/players/processed/' + (r.homeSlug || slugify(r.home)) + '/headshot_01_nobg.png';
+        var hn = sides[0].querySelector('.name'); if (hn) hn.textContent = (r.home || '').toUpperCase();
+      }
+      if (sides[1]) {
+        var ai = sides[1].querySelector('img.photo'); if (ai) ai.src = '/overlays/v2/_assets/players/processed/' + (r.awaySlug || slugify(r.away)) + '/headshot_01_nobg.png';
+        var an = sides[1].querySelector('.name'); if (an) an.textContent = (r.away || '').toUpperCase();
+      }
+      var sc = row.querySelector('.score'); if (sc) sc.textContent = r.homeScore + ' – ' + r.awayScore;
+      var tn = row.querySelector('.total .num'); if (tn) tn.textContent = String(r.total);
+      var dt = row.querySelector('.date'); if (dt) dt.textContent = r.date || '';
+    }
+  }
   function show() {
     document.body.classList.remove('cade-exiting');
     document.body.classList.add('cade-visible');
@@ -237,7 +264,8 @@ body.cade-exiting .canvas { opacity: 0; }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();
