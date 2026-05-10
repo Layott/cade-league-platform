@@ -158,11 +158,14 @@ export function SquadPitchView({
         })}
       </div>
 
-      {subs.length > 0 ? (
-        <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
-            Subs
-          </div>
+      <div
+        className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3"
+        data-testid="squad-pitch-subs-container"
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+          Subs
+        </div>
+        {subs.length > 0 ? (
           <div
             className="mt-2 flex flex-wrap gap-3"
             data-testid="squad-pitch-subs"
@@ -180,8 +183,20 @@ export function SquadPitchView({
               </div>
             ))}
           </div>
-        </div>
-      ) : null}
+        ) : (
+          // 2026-05-10 — Killer Freak's MD 10 submission landed with 11
+          // starters and zero bench rows; ref misread the absent strip as
+          // a UI bug. Render an explicit empty-state chip so the missing
+          // bench is the data state, not a missing UI block.
+          <div
+            className="mt-2 inline-flex items-center gap-2 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-3)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--flare)]"
+            data-testid="squad-pitch-subs-empty"
+          >
+            <span aria-hidden>⚠</span>
+            No subs submitted
+          </div>
+        )}
+      </div>
     </div>
   );
 }
