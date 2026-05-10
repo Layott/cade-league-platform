@@ -168,7 +168,21 @@ async function upsertRows(sb, rows, stats, newCards) {
     else if (/\brttf\b|road-to/.test(vLower)) itemType = "rttf";
     else if (!/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/.test(vLower)) itemType = "special";
     if (exist) {
-      await sb.from("fc26_players").update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
+      // 2026-05-10 — RTTF / TOTW / SBC / live-promo cards have MUTABLE
+      // ratings + positions on Futbin. RTTF cards advance as the team
+      // progresses (Eberechi Eze RTTF bumped 91 → 93 after Arsenal's
+      // UCL run; pre-fix update only wrote price+attributes so the
+      // bumped rating never landed in DB). Forward rating + position
+      // on the update path so live-mutating cards stay in sync.
+      const updatePayload = {
+        rating: r.rating,
+        position: r.position || "ST",
+        value_coins_estimate: coins,
+        item_type: itemType,
+        attributes: attrs,
+        updated_at: new Date().toISOString(),
+      };
+      await sb.from("fc26_players").update(updatePayload).eq("id", exist.id);
       stats.updated++;
     } else {
       // Always insert as its own futbin.com row. No Kaggle merge.

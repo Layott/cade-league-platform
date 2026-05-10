@@ -187,7 +187,9 @@ async function upsertRows(sb, rows, stats, inserted) {
     else if (/\brttf\b|road-to/.test(vLower)) itemType = "rttf";
     else if (!/^(\d+-)?(gold|silver|bronze|rare|common|normal)$/.test(vLower)) itemType = "special";
     if (exist) {
-      await sb.from("fc26_players").update({ value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
+      // 2026-05-10 — forward rating + position so RTTF / TOTW / SBC live
+      // mutations propagate (mirror fix applied to _scrape_futbin_auto.js).
+      await sb.from("fc26_players").update({ rating: r.rating, position: r.position || "ST", value_coins_estimate: coins, item_type: itemType, attributes: attrs, updated_at: new Date().toISOString() }).eq("id", exist.id);
       stats.updated++;
     } else {
       // Always insert as its own futbin.com row. No Kaggle merge.

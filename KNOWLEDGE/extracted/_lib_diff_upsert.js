@@ -120,6 +120,14 @@ function diffFields(oldRow, newCoins, newItemType, newAttrs, newTop) {
   if (top.position !== undefined && top.position && (oldRow.position ?? null) !== top.position) {
     changes.push("position");
   }
+  // 2026-05-10 — rating diff. RTTF / TOTW / SBC cards advance over the
+  // promo lifecycle (Eberechi Eze RTTF: 91 → 93 after Arsenal's UCL
+  // run). Pre-fix the diff function never compared rating, so the
+  // upsert short-circuited on "unchanged" and the bumped rating never
+  // landed in DB.
+  if (top.rating !== undefined && top.rating != null && (oldRow.rating ?? null) !== top.rating) {
+    changes.push("rating");
+  }
   // Card portrait + frame URLs are imgix-signed
   // (`?fm=png&ixlib=...&w=51&s=<HMAC>`). The HMAC `s=` rotates when
   // Futbin re-signs the asset, even when the underlying path is
@@ -211,7 +219,9 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
   const { data: exist } = await sb
     .from("fc26_players")
     .select(
-      "id, value_coins_estimate, item_type, attributes, club, league, alt_positions, position, nation_iso, nation",
+      // 2026-05-10 — include `rating` so the diff fires when Futbin
+      // bumps a live-mutating card (RTTF / TOTW / SBC).
+      "id, rating, value_coins_estimate, item_type, attributes, club, league, alt_positions, position, nation_iso, nation",
     )
     .eq("source_dataset", "futbin.com")
     .eq("source_row_id", sourceRowId)
@@ -232,6 +242,9 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
     newTop.alt_positions = [...r.altPositions];
   }
   if (r.position) newTop.position = r.position;
+  // 2026-05-10 — propagate rating into the top-level diff so RTTF /
+  // TOTW / SBC live mutations land on the existing row.
+  if (typeof r.rating === "number") newTop.rating = r.rating;
   // 2026-05-08 — resolve futbin_nation_id → ISO + nation name and write
   // to top-level columns on insert/update. Pre-fix the scraper only
   // captured the integer ID into attributes.futbin_nation_id, leaving
@@ -298,6 +311,11 @@ async function diffUpsertFutbinRow(sb, r, coinsPs, coinsPc, slug, stats) {
     update.alt_positions = newTop.alt_positions;
   }
   if (changes.includes("position") && newTop.position) update.position = newTop.position;
+  // 2026-05-10 — propagate rating change into the UPDATE so live-
+  // mutating card ratings (RTTF / TOTW / SBC) actually land in DB.
+  if (changes.includes("rating") && typeof newTop.rating === "number") {
+    update.rating = newTop.rating;
+  }
   // 2026-05-08 — backfill top-level nation_iso/nation when the existing
   // row has a NULL value but the scraped row resolves to a known nation.
   // Never null-overwrite a populated column.
