@@ -211,10 +211,51 @@ body.cade-exiting .canvas { opacity: 0; }
     document.body.classList.remove('cade-visible');
     document.body.classList.add('cade-exiting');
   }
+  function slugify(name) {
+    return (name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+  // CLAUDE.md §14 — accept BOTH postMessage shape and the match-scores-day
+  // server endpoint shape ({payload:{matchDayLabel,rows:[...]}} as well as
+  // {rows:[...]} direct).
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var payload = data.payload || data;
+    var rows = Array.isArray(payload.rows) ? payload.rows : [];
+    var label = payload.matchDayLabel || payload.label || '';
+    var dateEl = document.querySelector('.sch-head .date');
+    if (dateEl && label) dateEl.textContent = label;
+    var schRows = document.querySelectorAll('.sch-rows .sch-row');
+    for (var i = 0; i < schRows.length; i++) {
+      var srow = schRows[i];
+      var r = rows[i];
+      if (!r) { srow.style.display = 'none'; continue; }
+      srow.style.display = '';
+      var homeName = srow.querySelector('.side:not(.away) .name');
+      var awayName = srow.querySelector('.side.away .name');
+      var homePhoto = srow.querySelector('.side:not(.away) .photo');
+      var awayPhoto = srow.querySelector('.side.away .photo');
+      if (homeName) homeName.textContent = (r.home || '').toUpperCase();
+      if (awayName) awayName.textContent = (r.away || '').toUpperCase();
+      var hSlug = r.homeSlug || slugify(r.home);
+      var aSlug = r.awaySlug || slugify(r.away);
+      if (homePhoto) {
+        if (r.homePhotoUrl) homePhoto.src = r.homePhotoUrl;
+        else homePhoto.src = '/overlays/v2/_assets/players/processed/' + hSlug + '/headshot_01_nobg.png';
+      }
+      if (awayPhoto) {
+        if (r.awayPhotoUrl) awayPhoto.src = r.awayPhotoUrl;
+        else awayPhoto.src = '/overlays/v2/_assets/players/processed/' + aSlug + '/headshot_01_nobg.png';
+      }
+    }
+  }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();

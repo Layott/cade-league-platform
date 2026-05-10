@@ -202,10 +202,47 @@ body.cade-exiting .canvas { opacity: 0; }
     document.body.classList.remove('cade-visible');
     document.body.classList.add('cade-exiting');
   }
+  function slugify(name) {
+    return (name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+  }
+  // CLAUDE.md §14 — single update() accepts BOTH postMessage shape and
+  // server endpoint shapes ({payload:{rows:[...]}} from leaderboard).
+  function update(data) {
+    if (!data || typeof data !== 'object') return;
+    var rows =
+      (data.payload && Array.isArray(data.payload.rows)) ? data.payload.rows :
+      Array.isArray(data.rows) ? data.rows :
+      Array.isArray(data.players) ? data.players : [];
+    if (!rows.length) return;
+    var top5 = rows.slice(0, 5);
+    var cards = document.querySelectorAll('.pr-grid .pr-card');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      var r = top5[i];
+      if (!r) { card.style.display = 'none'; continue; }
+      card.style.display = '';
+      var slug = r.slug || slugify(r.displayName || r.name);
+      var img = card.querySelector('img.photo');
+      if (img) {
+        if (r.photoUrl) img.src = r.photoUrl;
+        else img.src = '/overlays/v2/_assets/players/processed/' + slug + '/fullbody_01_nobg.png';
+      }
+      var nameEl = card.querySelector('.name');
+      if (nameEl) nameEl.textContent = (r.displayName || r.name || '').toUpperCase();
+      var ptsEl = card.querySelector('.pts-row .num');
+      if (ptsEl && r.pts != null) ptsEl.textContent = String(r.pts);
+      // .blurb is admin-managed via overlay_text_elements + Phase 3 AI;
+      // do NOT overwrite — the SSR resolver injects content separately.
+    }
+  }
   window.addEventListener('message', function (ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
-    if (msg.type === 'show' || msg.type === 'update') show();
+    if (msg.type === 'show') { show(); if (msg.data) update(msg.data); }
+    else if (msg.type === 'update') update(msg.data || msg);
     else if (msg.type === 'hide') hide();
   }, false);
 })();

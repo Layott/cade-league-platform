@@ -98,6 +98,11 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   // 20-highlight — same as match-scores-day; bottom strip shows recent
   // fixtures so we resubscribe to score + match-end events.
   "20-highlight": ["score.changed", "match.ended", "standings.changed"],
+  // 22-power-rankings — top-5 standings cards repaint on standings recompute.
+  "22-power-rankings": ["standings.changed"],
+  // 27-schedule — current match-day fixture grid; repaints when fixtures
+  // are added, scored, or marked complete.
+  "27-schedule": ["score.changed", "match.ended", "standings.changed"],
 };
 
 /**
@@ -132,6 +137,14 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   // 20-highlight reuses the existing match-scores-day endpoint — same
   // shape (week + fixtures), different overlay layout.
   "20-highlight": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
+  // 22-power-rankings reuses the leaderboard endpoint with topN=5 so the
+  // 5-card grid binds to the same standings rows the 07-leaderboard uses,
+  // just trimmed to the podium.
+  "22-power-rankings": (s) => `/api/broadcast/sessions/${s}/leaderboard?topN=5`,
+  // 27-schedule reuses match-scores-day — both render the current match
+  // day's fixture roster. The HTML strips scores + status so it reads as
+  // "THIS WEEK" upcoming fixtures even when results are partially in.
+  "27-schedule": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
 };
 
 /**
