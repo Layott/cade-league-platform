@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<meta name="viewport" content="width=1920, initial-scale=1" />
+<title>CADE — WIN STREAKS</title>
+<style>
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-display: block;
+}
+:root {
+  --green: #6bcd06;
+  --green-glow: rgba(107,205,6,0.55);
+  --pink:  #fe036d;
+  --pink-glow: rgba(254,3,109,0.55);
+  --ink:   #050505;
+  --ink-2: #0d0d0d;
+  --ink-3: #1a1a1a;
+  --chalk: rgba(255,255,255,0.92);
+  --chalk-2: rgba(255,255,255,0.62);
+  --chalk-3: rgba(255,255,255,0.30);
+  --display: 'Agharti', 'Impact', sans-serif;
+  --body: 'Quedora', 'Inter', system-ui, sans-serif;
+  /* Reserved space for partner strip — content must stay above this. */
+  --partner-zone-h: 180px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent !important; color-scheme: dark; color: #fff; font-family: var(--body); }
+body { opacity: 1 !important; background: transparent !important; }
+
+/* === Opacity gate: stage hidden until cade-visible === */
+.canvas { opacity: 0; transition: opacity 360ms ease-out; }
+body.cade-visible .canvas { opacity: 1; }
+body.cade-exiting .canvas { opacity: 0; }
+
+.canvas { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+/* ── Standard ELITE S2 BG (matches production v2 overlays) ── */
+.bg-fill { position: absolute; inset: 0; background-image: url('../../../designsample/ELITE%20S2%20BG.png'); background-size: cover; background-position: center; z-index: 0; }
+.bg-vignette { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.55) 100%); z-index: 1; pointer-events: none; }
+
+/* ── Top brand strip ── */
+.brand-strip { position: absolute; top: 30px; left: 36px; display: flex; align-items: center; gap: 14px; z-index: 12; }
+.brand-strip img { height: 56px; width: auto; object-fit: contain; }
+.brand-strip .sep { width: 1px; height: 38px; background: rgba(255,255,255,0.30); }
+
+/* ── Live pill ── */
+.live-pill { position: absolute; top: 38px; right: 40px; display: flex; align-items: center; gap: 8px; padding: 8px 18px; background: var(--pink); border-radius: 4px; z-index: 12; }
+.live-pill::before { content: ""; width: 8px; height: 8px; background: #fff; border-radius: 50%; box-shadow: 0 0 8px #fff; }
+.live-pill span { font-family: var(--display); letter-spacing: 0.30em; font-size: 14px; font-weight: 700; }
+
+/* ── Season/Match-day corner watermarks ── */
+.season-mark { position: absolute; bottom: 14px; right: 36px; font-family: var(--display); font-size: 12px; letter-spacing: 0.40em; color: rgba(255,255,255,0.78); text-transform: uppercase; z-index: 13; }
+.matchday-mark { position: absolute; bottom: 14px; left: 36px; font-family: var(--display); font-size: 12px; letter-spacing: 0.40em; color: rgba(255,255,255,0.78); text-transform: uppercase; z-index: 13; }
+
+/* ── Partner strip (bottom-center, NEVER overlapped) ── */
+.partners { position: absolute; left: 0; right: 0; bottom: 36px; height: 70px; display: flex; justify-content: center; align-items: center; gap: 64px; z-index: 14; padding: 0 40px; }
+.partners .partner { height: 50px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
+
+/* Hard-boundary stage: content NEVER enters partner zone */
+.stage { position: absolute; left: 0; right: 0; top: 0; bottom: var(--partner-zone-h); z-index: 5; padding: 0 80px; box-sizing: border-box; overflow: hidden; }
+
+/* Heading helpers */
+.kicker { font-family: var(--display); font-size: 18px; letter-spacing: 0.42em; color: var(--chalk-2); text-transform: uppercase; }
+.title-h1 { font-family: var(--display); font-size: 110px; line-height: 1; letter-spacing: 0.04em; }
+.title-h1 .accent-g { color: var(--green); }
+.title-h1 .accent-p { color: var(--pink); }
+.sub-h1 { font-family: var(--display); font-size: 24px; letter-spacing: 0.36em; color: var(--chalk-2); margin-top: 6px; text-transform: uppercase; }
+
+.streak-stage { padding-top: 90px; display: flex; flex-direction: column; }
+.streak-head { margin-bottom: 24px; flex-shrink: 0; }
+.streak-list { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
+.streak-row { display: grid; grid-template-columns: 70px 78px 1fr 120px 180px; align-items: center; gap: 24px; padding: 10px 26px; background: linear-gradient(90deg, rgba(107,205,6,0.10) 0%, rgba(0,0,0,0.40) 60%); border-left: 5px solid var(--green); }
+.streak-row.featured { padding: 14px 30px; background: linear-gradient(90deg, rgba(107,205,6,0.22) 0%, rgba(0,0,0,0.55) 60%); border-left-width: 8px; box-shadow: 0 0 24px rgba(107,205,6,0.18); }
+.streak-row .rank { font-family: var(--display); font-size: 44px; color: var(--chalk-3); }
+.streak-row.featured .rank { font-size: 64px; color: var(--green); }
+.streak-row .photo { width: 78px; height: 78px; border-radius: 50%; object-fit: cover; object-position: center 22%; border: 3px solid var(--green); background: rgba(255,255,255,0.05); }
+.streak-row.featured .photo { width: 96px; height: 96px; }
+.streak-row .who .name { font-family: var(--display); font-size: 30px; letter-spacing: 0.04em; line-height: 1; }
+.streak-row.featured .who .name { font-size: 40px; }
+.streak-row .who .org { font-family: var(--body); font-weight: 600; font-size: 12px; letter-spacing: 0.18em; color: var(--chalk-2); margin-top: 3px; text-transform: uppercase; }
+.streak-row .org-logo-wrap { width: 120px; height: 70px; display: flex; align-items: center; justify-content: center; }
+.streak-row .org-logo-wrap img { max-height: 60px; max-width: 120px; width: auto; height: auto; object-fit: contain; opacity: 0.92; }
+.streak-row .stat { text-align: right; }
+.streak-row .stat .num { font-family: var(--display); font-size: 58px; line-height: 1; color: var(--green); text-shadow: 0 0 20px var(--green-glow); }
+.streak-row.featured .stat .num { font-size: 80px; }
+.streak-row .stat .label { font-family: var(--display); letter-spacing: 0.30em; font-size: 13px; color: var(--chalk-2); }
+</style>
+</head><body>
+<div class="canvas">
+  <div class="bg-fill"></div>
+  <div class="bg-vignette"></div>
+  <div class="brand-strip">
+    <img src="../../../logos/1cade%20esport.png" alt="CADE">
+    <span class="sep"></span>
+    <img src="../../../logos/pro%20league%20.png" alt="Pro League">
+  </div>
+  <div class="live-pill"><span>RED HOT</span></div>
+  <div class="stage streak-stage">
+    <div class="streak-head"><h1 class="title-h1">WIN <span class="accent-g">STREAKS</span></h1><div class="sub-h1">CONSECUTIVE WINS · CURRENT FORM</div></div>
+    <div class="streak-list"><div class="streak-row featured">
+      <div class="rank">#1</div>
+      <img class="photo" src="../../../players/processed/guru/headshot_01_nobg.png">
+      <div class="who"><div class="name">GURU</div><div class="org">YAKABU GLOBAL</div></div>
+      <div class="org-logo-wrap"><img src="../../../Orgs/monochrome/YAKABU_WHITE.png"></div>
+      <div class="stat"><div class="num">4</div><div class="label">WIN STREAK</div></div>
+    </div>
+<div class="streak-row ">
+      <div class="rank">#2</div>
+      <img class="photo" src="../../../players/processed/killer_freak/headshot_01_nobg.png">
+      <div class="who"><div class="name">KILLER FREAK</div><div class="org">GAMEEVO ESPORTS</div></div>
+      <div class="org-logo-wrap"><img src="../../../Orgs/monochrome/GAMEEVO_WHITE.png"></div>
+      <div class="stat"><div class="num">2</div><div class="label">WIN STREAK</div></div>
+    </div>
+<div class="streak-row ">
+      <div class="rank">#3</div>
+      <img class="photo" src="../../../players/processed/faruk/headshot_01_nobg.png">
+      <div class="who"><div class="name">FARUK</div><div class="org">OAS ESPORTS</div></div>
+      <div class="org-logo-wrap"><img src="../../../Orgs/monochrome/OAS_PLAIN_WHITE.png"></div>
+      <div class="stat"><div class="num">2</div><div class="label">WIN STREAK</div></div>
+    </div>
+<div class="streak-row ">
+      <div class="rank">#4</div>
+      <img class="photo" src="../../../players/processed/kingnonex/headshot_02_nobg.png">
+      <div class="who"><div class="name">KINGNONEX</div><div class="org">SOLAR FLARE</div></div>
+      <div class="org-logo-wrap"><img src="../../../Orgs/monochrome/SOLAR_FLARE_WHITE.png"></div>
+      <div class="stat"><div class="num">1</div><div class="label">WIN STREAK</div></div>
+    </div>
+<div class="streak-row ">
+      <div class="rank">#5</div>
+      <img class="photo" src="../../../players/processed/dadaboi/headshot_01_nobg.png">
+      <div class="who"><div class="name">DADABOI</div><div class="org">OUTLAWS</div></div>
+      <div class="org-logo-wrap"><img src="../../../Orgs/monochrome/OUTLAWS_WHITE.png"></div>
+      <div class="stat"><div class="num">1</div><div class="label">WIN STREAK</div></div>
+    </div></div>
+  </div>
+  <div class="matchday-mark">CADE STUDIO LAGOS</div>
+  <div class="season-mark">ELITE LEAGUE · SEASON 2 · 2026</div>
+  <footer class="partners" data-element-id="partners-strip"><img class="partner" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports"><img class="partner" src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride"><img class="partner" src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News"><img class="partner" src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace"><img class="partner" src="../../../logos/processed/OAS_colored_org.png" alt="OAS Esport"></footer>
+</div>
+<script>
+(function cadeGate() {
+  'use strict';
+  function show() {
+    document.body.classList.remove('cade-exiting');
+    document.body.classList.add('cade-visible');
+  }
+  function hide() {
+    document.body.classList.remove('cade-visible');
+    document.body.classList.add('cade-exiting');
+  }
+  window.addEventListener('message', function (ev) {
+    var msg = ev && ev.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'show' || msg.type === 'update') show();
+    else if (msg.type === 'hide') hide();
+  }, false);
+})();
+</script>
+<script data-tag="cade-visible-gate-observer-v2">
+(function(){
+  var SEL = '.canvas';
+  function apply() {
+    var b = document.body;
+    if (!b) return;
+    var vis = b.classList.contains('cade-visible');
+    document.querySelectorAll(SEL).forEach(function(el){
+      if (!el.dataset.cadeTransition) {
+        el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+        el.dataset.cadeTransition = '1';
+      }
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+      } else {
+        el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+  }
+  apply();
+  new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+})();
+</script>
+<script data-tag="cade-demo-mode">
+(function(){
+  if (new URLSearchParams(location.search).get('demo') !== '1') return;
+  function fire(type){ window.dispatchEvent(new MessageEvent('message', { data: { type: type } })); }
+  setTimeout(function(){ fire('show'); }, 200);
+})();
+</script>
+</body></html>

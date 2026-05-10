@@ -49,7 +49,7 @@ const BRAND_ROOT = resolve(REPO_ROOT, "KNOWLEDGE", "brand-assets");
 const TARGET_HTML_ROOT = resolve(APP_WEB_ROOT, "public", "overlays", "v2");
 const TARGET_ASSETS_ROOT = resolve(TARGET_HTML_ROOT, "_assets");
 
-// 17 overlay keys per spec section 9. Animated-bg variants + 18-partners-strip
+// Overlay keys per spec section 9. Animated-bg variants + 18-partners-strip
 // are NOT in the live route list (meta-only / subsumed).
 export const KEYS = Object.freeze([
   "01-brb",
@@ -70,6 +70,15 @@ export const KEYS = Object.freeze([
   "17-penalties",
   "19-player-squads",
   "20-highlight",
+  "21-streaks",
+  "22-power-rankings",
+  "23-org-standings",
+  "24-biggest-margins",
+  "25-did-you-know",
+  "26-card-meta",
+  "27-schedule",
+  "28-punditry",
+  "29-goalfests",
 ]);
 
 // Buckets the v2 HTMLs reference via `../../../<bucket>/...`. Keep this list

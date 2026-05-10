@@ -96,12 +96,14 @@ describe("sync-v2-overlays", () => {
   });
 
   describe("KEYS", () => {
-    it("exports the 18 routable v2 overlay keys (16 Plan 51 + 19/20 added 2026-04-30)", () => {
-      expect(KEYS).toHaveLength(18);
+    it("exports the 27 routable v2 overlay keys (16 Plan 51 + 19/20 + 21..29 cover-up)", () => {
+      expect(KEYS).toHaveLength(27);
       expect(KEYS).toContain("01-brb");
       expect(KEYS).toContain("17-penalties");
       expect(KEYS).toContain("19-player-squads");
       expect(KEYS).toContain("20-highlight");
+      expect(KEYS).toContain("21-streaks");
+      expect(KEYS).toContain("29-goalfests");
     });
 
     it("excludes meta-only animated-bg + 18-partners-strip", () => {

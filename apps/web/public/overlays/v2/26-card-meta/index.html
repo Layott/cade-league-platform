@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<meta name="viewport" content="width=1920, initial-scale=1" />
+<title>CADE — CARD META</title>
+<style>
+@font-face {
+  font-family: 'Agharti';
+  src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('/overlays/v2/_assets/fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('/overlays/v2/_assets/fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-display: block;
+}
+:root {
+  --green: #6bcd06;
+  --green-glow: rgba(107,205,6,0.55);
+  --pink:  #fe036d;
+  --pink-glow: rgba(254,3,109,0.55);
+  --ink:   #050505;
+  --ink-2: #0d0d0d;
+  --ink-3: #1a1a1a;
+  --chalk: rgba(255,255,255,0.92);
+  --chalk-2: rgba(255,255,255,0.62);
+  --chalk-3: rgba(255,255,255,0.30);
+  --display: 'Agharti', 'Impact', sans-serif;
+  --body: 'Quedora', 'Inter', system-ui, sans-serif;
+  /* Reserved space for partner strip — content must stay above this. */
+  --partner-zone-h: 180px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent !important; color-scheme: dark; color: #fff; font-family: var(--body); }
+body { opacity: 1 !important; background: transparent !important; }
+
+/* === Opacity gate: stage hidden until cade-visible === */
+.canvas { opacity: 0; transition: opacity 360ms ease-out; }
+body.cade-visible .canvas { opacity: 1; }
+body.cade-exiting .canvas { opacity: 0; }
+
+.canvas { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+/* ── Standard ELITE S2 BG (matches production v2 overlays) ── */
+.bg-fill { position: absolute; inset: 0; background-image: url('/overlays/v2/_assets/designsample/ELITE%20S2%20BG.png'); background-size: cover; background-position: center; z-index: 0; }
+.bg-vignette { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.55) 100%); z-index: 1; pointer-events: none; }
+
+/* ── Top brand strip ── */
+.brand-strip { position: absolute; top: 30px; left: 36px; display: flex; align-items: center; gap: 14px; z-index: 12; }
+.brand-strip img { height: 56px; width: auto; object-fit: contain; }
+.brand-strip .sep { width: 1px; height: 38px; background: rgba(255,255,255,0.30); }
+
+/* ── Live pill ── */
+.live-pill { position: absolute; top: 38px; right: 40px; display: flex; align-items: center; gap: 8px; padding: 8px 18px; background: var(--pink); border-radius: 4px; z-index: 12; }
+.live-pill::before { content: ""; width: 8px; height: 8px; background: #fff; border-radius: 50%; box-shadow: 0 0 8px #fff; }
+.live-pill span { font-family: var(--display); letter-spacing: 0.30em; font-size: 14px; font-weight: 700; }
+
+/* ── Season/Match-day corner watermarks ── */
+.season-mark { position: absolute; bottom: 14px; right: 36px; font-family: var(--display); font-size: 12px; letter-spacing: 0.40em; color: rgba(255,255,255,0.78); text-transform: uppercase; z-index: 13; }
+.matchday-mark { position: absolute; bottom: 14px; left: 36px; font-family: var(--display); font-size: 12px; letter-spacing: 0.40em; color: rgba(255,255,255,0.78); text-transform: uppercase; z-index: 13; }
+
+/* ── Partner strip (bottom-center, NEVER overlapped) ── */
+.partners { position: absolute; left: 0; right: 0; bottom: 36px; height: 70px; display: flex; justify-content: center; align-items: center; gap: 64px; z-index: 14; padding: 0 40px; }
+.partners .partner { height: 50px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
+
+/* Hard-boundary stage: content NEVER enters partner zone */
+.stage { position: absolute; left: 0; right: 0; top: 0; bottom: var(--partner-zone-h); z-index: 5; padding: 0 80px; box-sizing: border-box; overflow: hidden; }
+
+/* Heading helpers */
+.kicker { font-family: var(--display); font-size: 18px; letter-spacing: 0.42em; color: var(--chalk-2); text-transform: uppercase; }
+.title-h1 { font-family: var(--display); font-size: 110px; line-height: 1; letter-spacing: 0.04em; }
+.title-h1 .accent-g { color: var(--green); }
+.title-h1 .accent-p { color: var(--pink); }
+.sub-h1 { font-family: var(--display); font-size: 24px; letter-spacing: 0.36em; color: var(--chalk-2); margin-top: 6px; text-transform: uppercase; }
+
+.cm-stage { padding-top: 90px; display: flex; flex-direction: column; }
+.cm-head { margin-bottom: 20px; flex-shrink: 0; }
+.cm-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 16px; flex: 1; min-height: 0; overflow: hidden; }
+.cm-card { position: relative; padding: 16px 18px 16px; background: linear-gradient(180deg, rgba(107,205,6,0.16) 0%, rgba(0,0,0,0.65) 100%); border: 1px solid var(--green); overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
+.cm-card .rank-pill { display: inline-block; padding: 3px 12px; background: var(--green); color: var(--ink); font-family: var(--display); letter-spacing: 0.20em; font-size: 16px; align-self: flex-start; }
+.cm-card .card-stack { position: relative; width: 100%; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.cm-card .card-bg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 180px; height: 180px; object-fit: contain; }
+.cm-card .card-face { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -42%) scale(0.55); width: 180px; height: 180px; object-fit: contain; mix-blend-mode: normal; }
+.cm-card .name { font-family: var(--display); font-size: 22px; line-height: 1.05; letter-spacing: 0.02em; }
+.cm-card .meta-row { display: flex; align-items: baseline; gap: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.20); }
+.cm-card .meta-row .rating { font-family: var(--display); font-size: 38px; line-height: 1; color: #ffd400; text-shadow: 0 0 12px rgba(255,212,0,0.40); }
+.cm-card .meta-row .pick { font-family: var(--display); font-size: 36px; line-height: 1; color: var(--pink); margin-left: auto; }
+.cm-card .meta-row .pick-lbl { font-family: var(--display); letter-spacing: 0.24em; font-size: 11px; color: var(--chalk-2); margin-left: 4px; }
+</style>
+</head><body>
+<div class="canvas">
+  <div class="bg-fill"></div>
+  <div class="bg-vignette"></div>
+  <div class="brand-strip">
+    <img src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE">
+    <span class="sep"></span>
+    <img src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="Pro League">
+  </div>
+
+  <div class="stage cm-stage">
+    <div class="cm-head"><h1 class="title-h1">CARD <span class="accent-g">META</span></h1><div class="sub-h1">MOST-PICKED CARDS · WEEK 3 SUBMISSIONS</div></div>
+    <div class="cm-grid"><div class="cm-card">
+      <div class="rank-pill">#1 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/11_team_of_the_season.png?fm=png&ixlib=java-2.1.0&w=512&s=1c4b798e56edec3953d1dc0370e43aff" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p117677750.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=092a18d50d16db47707a802ccff94672" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">SCOTT MCTOMINAY</div>
+      <div class="meta-row">
+        <span class="rating">94</span>
+        <span class="pick">13</span>
+        <span class="pick-lbl">SQUADS · 100%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#2 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/55_knockout_royalty.png?fm=png&ixlib=java-2.1.0&w=512&s=6d520eb9a906038f60bc8bcd89ff901d" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50578278.png?fm=png&ixlib=java-2.1.0&verzion=2&w=256&s=9c9a34a5346e3ee795f99b8e7b93edd9" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">AJIBADE</div>
+      <div class="meta-row">
+        <span class="rating">89</span>
+        <span class="pick">11</span>
+        <span class="pick-lbl">SQUADS · 85%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#3 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/11_team_of_the_season.png?fm=png&ixlib=java-2.1.0&w=512&s=1c4b798e56edec3953d1dc0370e43aff" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p67387203.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=1e5944076a90a0bf024f12c5fa23b8d7" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">MARCO PALESTRA</div>
+      <div class="meta-row">
+        <span class="rating">93</span>
+        <span class="pick">11</span>
+        <span class="pick-lbl">SQUADS · 85%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#4 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/120_tots_highlights.png?fm=png&ixlib=java-2.1.0&w=512&s=331ca6aad89427129e8017219368584b" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p100940723.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=9da551cc5ce91f2d866c51a3b4ed1749" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">NICO O'REILLY</div>
+      <div class="meta-row">
+        <span class="rating">92</span>
+        <span class="pick">10</span>
+        <span class="pick-lbl">SQUADS · 77%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#5 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/11_team_of_the_season.png?fm=png&ixlib=java-2.1.0&w=512&s=1c4b798e56edec3953d1dc0370e43aff" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50402614.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=d8ec5e3c327e0f751a7a7a74d5013e7c" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">JACOBO RAMÓN NAVEROS</div>
+      <div class="meta-row">
+        <span class="rating">94</span>
+        <span class="pick">10</span>
+        <span class="pick-lbl">SQUADS · 77%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#6 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/76_trophy_titans_icon.png?fm=png&ixlib=java-2.1.0&w=512&s=38a44828ab0ccdb3b8cb3b299f2d7465" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50470097.png?fm=png&ixlib=java-2.1.0&verzion=2&w=256&s=3ee864252d8a6096c1410c2858e6e934" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">DOS SANTOS LEITE</div>
+      <div class="meta-row">
+        <span class="rating">92</span>
+        <span class="pick">6</span>
+        <span class="pick-lbl">SQUADS · 46%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#7 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/11_team_of_the_season.png?fm=png&ixlib=java-2.1.0&w=512&s=1c4b798e56edec3953d1dc0370e43aff" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p67324562.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=a549388237ba941c056ed9f609050069" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">MIKE MAIGNAN</div>
+      <div class="meta-row">
+        <span class="rating">93</span>
+        <span class="pick">6</span>
+        <span class="pick-lbl">SQUADS · 46%</span>
+      </div>
+    </div>
+<div class="cm-card">
+      <div class="rank-pill">#8 META</div>
+      <div class="card-stack">
+        <img class="card-bg" src="https://cdn3.futbin.com/content/fifa26/img/cards/tiny/157_thunderstruck_icon.png?fm=png&ixlib=java-2.1.0&w=512&s=3f8c20e7920c2b0255e472aa0da5ca9f" referrerpolicy="no-referrer">
+        <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50558017.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=c6edfaca5d3135dbcdc27245dc82e8c3" referrerpolicy="no-referrer">
+      </div>
+      <div class="name">SCHELIN</div>
+      <div class="meta-row">
+        <span class="rating">91</span>
+        <span class="pick">6</span>
+        <span class="pick-lbl">SQUADS · 46%</span>
+      </div>
+    </div></div>
+  </div>
+  <div class="matchday-mark">CADE STUDIO LAGOS</div>
+  <div class="season-mark">ELITE LEAGUE · SEASON 2 · 2026</div>
+  <footer class="partners" data-element-id="partners-strip"><img class="partner" src="/overlays/v2/_assets/logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports"><img class="partner" src="/overlays/v2/_assets/logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride"><img class="partner" src="/overlays/v2/_assets/logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News"><img class="partner" src="/overlays/v2/_assets/logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace"><img class="partner" src="/overlays/v2/_assets/logos/processed/OAS_colored_org.png" alt="OAS Esport"></footer>
+</div>
+<script>
+(function cadeGate() {
+  'use strict';
+  function show() {
+    document.body.classList.remove('cade-exiting');
+    document.body.classList.add('cade-visible');
+  }
+  function hide() {
+    document.body.classList.remove('cade-visible');
+    document.body.classList.add('cade-exiting');
+  }
+  window.addEventListener('message', function (ev) {
+    var msg = ev && ev.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'show' || msg.type === 'update') show();
+    else if (msg.type === 'hide') hide();
+  }, false);
+})();
+</script>
+<script data-tag="cade-visible-gate-observer-v2">
+(function(){
+  var SEL = '.canvas';
+  function apply() {
+    var b = document.body;
+    if (!b) return;
+    var vis = b.classList.contains('cade-visible');
+    document.querySelectorAll(SEL).forEach(function(el){
+      if (!el.dataset.cadeTransition) {
+        el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+        el.dataset.cadeTransition = '1';
+      }
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+      } else {
+        el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+  }
+  apply();
+  new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+})();
+</script>
+<script data-tag="cade-demo-mode">
+(function(){
+  if (new URLSearchParams(location.search).get('demo') !== '1') return;
+  function fire(type){ window.dispatchEvent(new MessageEvent('message', { data: { type: type } })); }
+  setTimeout(function(){ fire('show'); }, 200);
+})();
+</script>
+</body></html>

@@ -94,6 +94,15 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "17-penalties",
   "19-player-squads",
   "20-highlight",
+  "21-streaks",
+  "22-power-rankings",
+  "23-org-standings",
+  "24-biggest-margins",
+  "25-did-you-know",
+  "26-card-meta",
+  "27-schedule",
+  "28-punditry",
+  "29-goalfests",
 ]);
 
 /**

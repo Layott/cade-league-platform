@@ -31,6 +31,15 @@ export const V2_OVERLAY_KEYS = [
   "17-penalties",
   "19-player-squads",
   "20-highlight",
+  "21-streaks",
+  "22-power-rankings",
+  "23-org-standings",
+  "24-biggest-margins",
+  "25-did-you-know",
+  "26-card-meta",
+  "27-schedule",
+  "28-punditry",
+  "29-goalfests",
 ] as const;
 
 export type V2OverlayKey = (typeof V2_OVERLAY_KEYS)[number];
@@ -62,6 +71,15 @@ export const V2_OVERLAY_LABELS: Record<V2OverlayKey, string> = {
   "17-penalties": "Player Penalties",
   "19-player-squads": "Player Squads",
   "20-highlight": "Highlight",
+  "21-streaks": "Win Streaks",
+  "22-power-rankings": "Power Rankings",
+  "23-org-standings": "Org Standings",
+  "24-biggest-margins": "Biggest Wins",
+  "25-did-you-know": "Did You Know",
+  "26-card-meta": "Card Meta",
+  "27-schedule": "Schedule Strip",
+  "28-punditry": "Punditry Quote",
+  "29-goalfests": "Goalfest Threshold",
 };
 
 /**

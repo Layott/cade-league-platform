@@ -38,6 +38,18 @@ export const V2_TO_LEGACY_TEMPLATE: Record<V2OverlayKey, TemplateKey> = {
   // recent fixture results, just in different visual layouts. Cleanest
   // option until we add a dedicated `highlight` enum value.
   "20-highlight": "match_scores_day",
+  // 21..29 cover-up overlays: reuse closest legacy template_key. Same
+  // precedent as 20-highlight — visual layouts differ but the publish
+  // contract + Zod validation share with the closest semantic match.
+  "21-streaks": "leaderboard_animated",
+  "22-power-rankings": "leaderboard_animated",
+  "23-org-standings": "orgs_roster",
+  "24-biggest-margins": "match_scores_day",
+  "25-did-you-know": "lower_third",
+  "26-card-meta": "top_scorers",
+  "27-schedule": "match_scores_day",
+  "28-punditry": "lower_third",
+  "29-goalfests": "match_scores_day",
 };
 
 export function v2ToLegacy(key: V2OverlayKey): TemplateKey {

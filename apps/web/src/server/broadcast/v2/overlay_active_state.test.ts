@@ -118,8 +118,8 @@ describe("probeAllActiveStates", () => {
       },
     ]);
     const r = await probeAllActiveStates(sb, "s1");
-    // 18 keys probed (16 Plan 51 + 19-player-squads + 20-highlight)
-    expect(Object.keys(r.single).length).toBe(18);
+    // 27 keys probed (16 Plan 51 + 19/20 + 21..29 cover-up overlays)
+    expect(Object.keys(r.single).length).toBe(27);
     // lower-third shows slot 1 + 3 active
     expect(r.multi["08-lower-third"]).toEqual([true, false, true]);
     // single mirror is true (any slot)

@@ -126,6 +126,15 @@ describe("supportsBgImage", () => {
     "14-top-scorers",
     "19-player-squads",
     "20-highlight",
+    "21-streaks",
+    "22-power-rankings",
+    "23-org-standings",
+    "24-biggest-margins",
+    "25-did-you-know",
+    "26-card-meta",
+    "27-schedule",
+    "28-punditry",
+    "29-goalfests",
   ] as const;
   const FLOATING_UI = [
     "02-timer",
@@ -137,7 +146,7 @@ describe("supportsBgImage", () => {
     "17-penalties",
   ] as const;
 
-  it("returns true for the nine full-canvas overlay keys", () => {
+  it("returns true for the full-canvas overlay keys", () => {
     for (const k of FULL_CANVAS) {
       expect(supportsBgImage(k), `expected ${k} to support bg-image`).toBe(true);
     }

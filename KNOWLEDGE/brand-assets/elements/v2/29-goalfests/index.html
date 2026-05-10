@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<meta name="viewport" content="width=1920, initial-scale=1" />
+<title>CADE — GOALFESTS</title>
+<style>
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BoldCondensed.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-stretch: 75%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Black.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-BlackCondensed.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-stretch: 75%; font-display: block;
+}
+@font-face {
+  font-family: 'Agharti';
+  src: url('../../../fonts/agharti-family-2026-03-23-03-20-06-utc%20MAINPRIMARY%20FONT/Family%20Deliverables/Agharti-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-stretch: 100%; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: block;
+}
+@font-face {
+  font-family: 'Quedora';
+  src: url('../../../fonts/quedora-boxy-modern-minimalist-futuristic-font-2026-03-23-03-41-30-utc%20SECONDARY%20FONT/Quedora%20Main%20Files/woff%202/Quedora-Black.woff2') format('woff2');
+  font-weight: 900; font-style: normal; font-display: block;
+}
+:root {
+  --green: #6bcd06;
+  --green-glow: rgba(107,205,6,0.55);
+  --pink:  #fe036d;
+  --pink-glow: rgba(254,3,109,0.55);
+  --ink:   #050505;
+  --ink-2: #0d0d0d;
+  --ink-3: #1a1a1a;
+  --chalk: rgba(255,255,255,0.92);
+  --chalk-2: rgba(255,255,255,0.62);
+  --chalk-3: rgba(255,255,255,0.30);
+  --display: 'Agharti', 'Impact', sans-serif;
+  --body: 'Quedora', 'Inter', system-ui, sans-serif;
+  /* Reserved space for partner strip — content must stay above this. */
+  --partner-zone-h: 180px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent !important; color-scheme: dark; color: #fff; font-family: var(--body); }
+body { opacity: 1 !important; background: transparent !important; }
+
+/* === Opacity gate: stage hidden until cade-visible === */
+.canvas { opacity: 0; transition: opacity 360ms ease-out; }
+body.cade-visible .canvas { opacity: 1; }
+body.cade-exiting .canvas { opacity: 0; }
+
+.canvas { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+/* ── Standard ELITE S2 BG (matches production v2 overlays) ── */
+.bg-fill { position: absolute; inset: 0; background-image: url('../../../designsample/ELITE%20S2%20BG.png'); background-size: cover; background-position: center; z-index: 0; }
+.bg-vignette { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.55) 100%); z-index: 1; pointer-events: none; }
+
+/* ── Top brand strip ── */
+.brand-strip { position: absolute; top: 30px; left: 36px; display: flex; align-items: center; gap: 14px; z-index: 12; }
+.brand-strip img { height: 56px; width: auto; object-fit: contain; }
+.brand-strip .sep { width: 1px; height: 38px; background: rgba(255,255,255,0.30); }
+
+/* ── Live pill ── */
+.live-pill { position: absolute; top: 38px; right: 40px; display: flex; align-items: center; gap: 8px; padding: 8px 18px; background: var(--pink); border-radius: 4px; z-index: 12; }
+.live-pill::before { content: ""; width: 8px; height: 8px; background: #fff; border-radius: 50%; box-shadow: 0 0 8px #fff; }
+.live-pill span { font-family: var(--display); letter-spacing: 0.30em; font-size: 14px; font-weight: 700; }
+
+/* ── Season/Match-day corner watermarks ── */
+.season-mark { position: absolute; bottom: 14px; right: 36px; font-family: var(--display); font-size: 12px; letter-spacing: 0.40em; color: rgba(255,255,255,0.78); text-transform: uppercase; z-index: 13; }
+.matchday-mark { position: absolute; bottom: 14px; left: 36px; font-family: var(--display); font-size: 12px; letter-spacing: 0.40em; color: rgba(255,255,255,0.78); text-transform: uppercase; z-index: 13; }
+
+/* ── Partner strip (bottom-center, NEVER overlapped) ── */
+.partners { position: absolute; left: 0; right: 0; bottom: 36px; height: 70px; display: flex; justify-content: center; align-items: center; gap: 64px; z-index: 14; padding: 0 40px; }
+.partners .partner { height: 50px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
+
+/* Hard-boundary stage: content NEVER enters partner zone */
+.stage { position: absolute; left: 0; right: 0; top: 0; bottom: var(--partner-zone-h); z-index: 5; padding: 0 80px; box-sizing: border-box; overflow: hidden; }
+
+/* Heading helpers */
+.kicker { font-family: var(--display); font-size: 18px; letter-spacing: 0.42em; color: var(--chalk-2); text-transform: uppercase; }
+.title-h1 { font-family: var(--display); font-size: 110px; line-height: 1; letter-spacing: 0.04em; }
+.title-h1 .accent-g { color: var(--green); }
+.title-h1 .accent-p { color: var(--pink); }
+.sub-h1 { font-family: var(--display); font-size: 24px; letter-spacing: 0.36em; color: var(--chalk-2); margin-top: 6px; text-transform: uppercase; }
+
+.gf-stage { padding-top: 60px; display: flex; flex-direction: column; }
+.gf-head { margin-bottom: 14px; flex-shrink: 0; }
+.gf-stage .title-h1 { font-size: 80px; }
+.gf-stage .sub-h1 { font-size: 18px; margin-top: 4px; }
+.gf-list { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow: hidden; }
+.gf-row { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 260px 1fr; align-items: center; gap: 20px; padding: 8px 26px; background: linear-gradient(90deg, rgba(107,205,6,0.18) 0%, rgba(0,0,0,0.55) 50%, rgba(254,3,109,0.18) 100%); border: 1px solid rgba(255,255,255,0.18); position: relative; }
+.gf-row.featured { background: linear-gradient(90deg, rgba(107,205,6,0.30) 0%, rgba(0,0,0,0.65) 50%, rgba(254,3,109,0.30) 100%); border-color: var(--green); box-shadow: 0 0 24px rgba(107,205,6,0.18); }
+.gf-row .side { display: flex; align-items: center; gap: 14px; }
+.gf-row .side.away { flex-direction: row-reverse; }
+.gf-row .side .photo { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; object-position: center 22%; border: 2px solid var(--chalk-3); flex-shrink: 0; }
+.gf-row .side .name { font-family: var(--display); font-size: 24px; letter-spacing: 0.04em; line-height: 1; }
+.gf-row .core { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.gf-row .core .score { font-family: var(--display); font-size: 44px; line-height: 1; }
+.gf-row .core .total { font-family: var(--display); letter-spacing: 0.30em; font-size: 12px; color: var(--green); }
+.gf-row .core .total .num { color: var(--green); margin: 0 4px; font-size: 17px; }
+.gf-row .core .date { font-family: var(--body); font-size: 10px; letter-spacing: 0.20em; color: var(--chalk-2); margin-top: 1px; text-transform: uppercase; }
+.gf-row .badge { position: absolute; top: -8px; left: -6px; background: var(--green); color: var(--ink); font-family: var(--display); padding: 3px 12px; letter-spacing: 0.20em; font-size: 12px; }
+</style>
+</head><body>
+<div class="canvas">
+  <div class="bg-fill"></div>
+  <div class="bg-vignette"></div>
+  <div class="brand-strip">
+    <img src="../../../logos/1cade%20esport.png" alt="CADE">
+    <span class="sep"></span>
+    <img src="../../../logos/pro%20league%20.png" alt="Pro League">
+  </div>
+
+  <div class="stage gf-stage">
+    <div class="gf-head"><h1 class="title-h1">GOAL <span class="accent-g">FESTS</span></h1><div class="sub-h1">7+ GOALS COMBINED · MOST EXPLOSIVE FIXTURES</div></div>
+    <div class="gf-list"><div class="gf-row featured">
+      <div class="badge">GOALFEST</div>
+      <div class="side home">
+        <img class="photo" src="../../../players/processed/kaykay/headshot_01_nobg.png">
+        <div class="name">KAYKAY</div>
+      </div>
+      <div class="core">
+        <div class="score">8 – 13</div>
+        <div class="total"><span class="num">21</span> GOALS COMBINED</div>
+        <div class="date">2026-05-02</div>
+      </div>
+      <div class="side away">
+        <img class="photo" src="../../../players/processed/killer_freak/headshot_01_nobg.png">
+        <div class="name">KILLER FREAK</div>
+      </div>
+    </div>
+<div class="gf-row ">
+
+      <div class="side home">
+        <img class="photo" src="../../../players/processed/dadaboi/headshot_01_nobg.png">
+        <div class="name">DADABOI</div>
+      </div>
+      <div class="core">
+        <div class="score">1 – 13</div>
+        <div class="total"><span class="num">14</span> GOALS COMBINED</div>
+        <div class="date">2026-04-26</div>
+      </div>
+      <div class="side away">
+        <img class="photo" src="../../../players/processed/kaykay/headshot_01_nobg.png">
+        <div class="name">KAYKAY</div>
+      </div>
+    </div>
+<div class="gf-row ">
+
+      <div class="side home">
+        <img class="photo" src="../../../players/processed/anife/headshot_03_nobg.png">
+        <div class="name">ANIFE</div>
+      </div>
+      <div class="core">
+        <div class="score">5 – 9</div>
+        <div class="total"><span class="num">14</span> GOALS COMBINED</div>
+        <div class="date">2026-05-09</div>
+      </div>
+      <div class="side away">
+        <img class="photo" src="../../../players/processed/tactical/headshot_01_nobg.png">
+        <div class="name">TACTICAL</div>
+      </div>
+    </div>
+<div class="gf-row ">
+
+      <div class="side home">
+        <img class="photo" src="../../../players/processed/dadaboi/headshot_01_nobg.png">
+        <div class="name">DADABOI</div>
+      </div>
+      <div class="core">
+        <div class="score">6 – 7</div>
+        <div class="total"><span class="num">13</span> GOALS COMBINED</div>
+        <div class="date">2026-05-02</div>
+      </div>
+      <div class="side away">
+        <img class="photo" src="../../../players/processed/wolevation/headshot_01_nobg.png">
+        <div class="name">WOLEVATION</div>
+      </div>
+    </div>
+<div class="gf-row ">
+
+      <div class="side home">
+        <img class="photo" src="../../../players/processed/anife/headshot_03_nobg.png">
+        <div class="name">ANIFE</div>
+      </div>
+      <div class="core">
+        <div class="score">5 – 8</div>
+        <div class="total"><span class="num">13</span> GOALS COMBINED</div>
+        <div class="date">2026-05-02</div>
+      </div>
+      <div class="side away">
+        <img class="photo" src="../../../players/processed/kaykay/headshot_01_nobg.png">
+        <div class="name">KAYKAY</div>
+      </div>
+    </div></div>
+  </div>
+  <div class="matchday-mark">CADE STUDIO LAGOS</div>
+  <div class="season-mark">ELITE LEAGUE · SEASON 2 · 2026</div>
+  <footer class="partners" data-element-id="partners-strip"><img class="partner" src="../../../logos/processed/GameEvo%20Esports%20White_strip.png" alt="GameEvo Esports"><img class="partner" src="../../../logos/processed/Gamepride%20Green-01_strip.png" alt="Gamepride"><img class="partner" src="../../../logos/processed/ESPORTS%20AFRICA%20NEWS%20WHITE_strip.png" alt="Esports Africa News"><img class="partner" src="../../../logos/processed/TRACE_2010_logo.svg_strip.png" alt="Trace"><img class="partner" src="../../../logos/processed/OAS_colored_org.png" alt="OAS Esport"></footer>
+</div>
+<script>
+(function cadeGate() {
+  'use strict';
+  function show() {
+    document.body.classList.remove('cade-exiting');
+    document.body.classList.add('cade-visible');
+  }
+  function hide() {
+    document.body.classList.remove('cade-visible');
+    document.body.classList.add('cade-exiting');
+  }
+  window.addEventListener('message', function (ev) {
+    var msg = ev && ev.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'show' || msg.type === 'update') show();
+    else if (msg.type === 'hide') hide();
+  }, false);
+})();
+</script>
+<script data-tag="cade-visible-gate-observer-v2">
+(function(){
+  var SEL = '.canvas';
+  function apply() {
+    var b = document.body;
+    if (!b) return;
+    var vis = b.classList.contains('cade-visible');
+    document.querySelectorAll(SEL).forEach(function(el){
+      if (!el.dataset.cadeTransition) {
+        el.style.transition = (el.style.transition ? el.style.transition + ', ' : '') + 'opacity 360ms ease-out';
+        el.dataset.cadeTransition = '1';
+      }
+      if (vis) {
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+      } else {
+        el.style.setProperty('opacity', '0', 'important');
+      }
+    });
+  }
+  apply();
+  new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
+})();
+</script>
+<script data-tag="cade-demo-mode">
+(function(){
+  if (new URLSearchParams(location.search).get('demo') !== '1') return;
+  function fire(type){ window.dispatchEvent(new MessageEvent('message', { data: { type: type } })); }
+  setTimeout(function(){ fire('show'); }, 200);
+})();
+</script>
+</body></html>

@@ -149,6 +149,15 @@ export const OVERLAY_KEYS = [
   "17-penalties",
   "19-player-squads",
   "20-highlight",
+  "21-streaks",
+  "22-power-rankings",
+  "23-org-standings",
+  "24-biggest-margins",
+  "25-did-you-know",
+  "26-card-meta",
+  "27-schedule",
+  "28-punditry",
+  "29-goalfests",
 ] as const;
 export type OverlayKey = (typeof OVERLAY_KEYS)[number];
 
@@ -248,6 +257,60 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
     "bg-image": "",
     "partner-strip-show": "false",
   },
+  "21-streaks": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "22-power-rankings": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "23-org-standings": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "24-biggest-margins": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "25-did-you-know": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "26-card-meta": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "27-schedule": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "28-punditry": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
+  "29-goalfests": {
+    pattern: "halftone",
+    "bg-image": "",
+    "partner-strip-show": "true",
+    "partner-strip-scroll": "true",
+  },
 };
 
 /**
@@ -278,6 +341,15 @@ export const BG_IMAGE_SUPPORTED_KEYS: readonly OverlayKey[] = [
   "14-top-scorers",
   "19-player-squads",
   "20-highlight",
+  "21-streaks",
+  "22-power-rankings",
+  "23-org-standings",
+  "24-biggest-margins",
+  "25-did-you-know",
+  "26-card-meta",
+  "27-schedule",
+  "28-punditry",
+  "29-goalfests",
 ] as const;
 
 /**
