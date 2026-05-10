@@ -202,7 +202,13 @@ export async function getApprovedSubmissionForPlayer(
   playerId: string,
   weekStart: string,
 ): Promise<{ submission: SubmissionRow; items: SquadItemRow[] } | null> {
-  const { data: sub, error } = await sb
+  // Migration 20260801000020 split the legacy weekly unique index, so a
+  // single Thursday-anchor week can carry multiple approved submissions
+  // (Sat + Sun each with their own match_day_id). Pre-fix `.maybeSingle()`
+  // crashed every public `/players/<id>` page that ran this lookup once
+  // both weekend submissions were approved. Pick the most recent so the
+  // public profile reflects the latest approved squad.
+  const { data: rows, error } = await sb
     .from("squad_submissions")
     .select(
       `id, season_id, player_id, week_start_date, match_day_id,
@@ -214,8 +220,10 @@ export async function getApprovedSubmissionForPlayer(
     .eq("week_start_date", weekStart)
     .eq("validation_status", "approved")
     .is("deleted_at", null)
-    .maybeSingle();
+    .order("submitted_at", { ascending: false })
+    .limit(1);
   if (error) throw new Error(`getApprovedSubmissionForPlayer: ${error.message}`);
+  const sub = (rows as unknown as Array<Record<string, unknown>>)?.[0] ?? null;
   if (!sub) return null;
 
   const { data: items, error: iErr } = await sb

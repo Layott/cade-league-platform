@@ -52,7 +52,8 @@ describe("getApprovedSubmissionForPlayer", () => {
     const chain = {
       eq: vi.fn().mockReturnThis(),
       is: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
     const sb = {
       from: vi.fn(() => ({
@@ -61,6 +62,54 @@ describe("getApprovedSubmissionForPlayer", () => {
     };
     const row = await getApprovedSubmissionForPlayer(sb as never, "p1", "2026-04-16");
     expect(row).toBeNull();
+  });
+
+  it("picks the most recent of multiple per-MD approved submissions in the same week", async () => {
+    // Regression for 2026-05-10 production crash: post `squad_submissions_per_md_unique`
+    // migration, weekend Sat+Sun pair can carry 2 approved rows with the same
+    // week_start_date. Pre-fix `.maybeSingle()` raised "JSON object requested,
+    // multiple rows returned" from every public `/players/<id>` page that ran
+    // this lookup once both weekend submissions were approved.
+    const sub1 = {
+      id: "s-latest",
+      season_id: "se",
+      player_id: "p1",
+      week_start_date: "2026-04-16",
+      match_day_id: "md-sun",
+      futbin_screenshot_path: "k",
+      submitted_at: "2026-04-17T08:00:00Z",
+      validation_status: "approved" as const,
+      validated_by: null,
+      validated_at: null,
+      rejection_reason: null,
+      notes: null,
+    };
+    let fromCalls = 0;
+    const subChain = {
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue({ data: [sub1], error: null }),
+    };
+    const itemsChain = {
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    };
+    const sb = {
+      from: vi.fn(() => {
+        fromCalls += 1;
+        return {
+          select: vi.fn(() => (fromCalls === 1 ? subChain : itemsChain)),
+        };
+      }),
+    };
+    const result = await getApprovedSubmissionForPlayer(
+      sb as never,
+      "p1",
+      "2026-04-16",
+    );
+    expect(result?.submission.id).toBe("s-latest");
   });
 });
 
