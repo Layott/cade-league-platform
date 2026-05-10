@@ -188,9 +188,9 @@ export function SlotLaneDragBoard({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)]">
-          Broadcast slot order
+          Match-day set order
           <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-[var(--chalk-3)]">
-            Drag fixtures into slots. Primary = livestreamed; Secondary = offstream simul.
+            Drag fixtures into sets. Each set = two matches running simultaneously. Both get full overlay treatment.
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export function SlotLaneDragBoard({
             className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
             data-testid="slot-add-btn"
           >
-            + Add slot
+            + Add set
           </button>
           <button
             type="button"
@@ -352,6 +352,9 @@ function SlotCell({
   onClear: (matchId: string) => void;
   isDragging: string | null;
 }) {
+  // Lane colour = visual distinction between the two simultaneous matches
+  // in the same set. Both matches get full broadcast / overlay treatment;
+  // this is purely a "which of the two" marker for admin readability.
   const laneColor =
     lane === "primary"
       ? "border-[rgba(107,205,6,0.5)] bg-[rgba(107,205,6,0.06)]"
@@ -371,7 +374,7 @@ function SlotCell({
           (lane === "primary" ? "text-[var(--primary)]" : "text-[var(--flare)]")
         }
       >
-        {lane === "primary" ? "Primary · live" : "Secondary · off"}
+        {lane === "primary" ? "Match A" : "Match B"}
       </div>
       {fixture ? (
         <FixtureCard
