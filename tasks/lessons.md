@@ -14,6 +14,30 @@ Append patterns after any correction from the user. Keep each entry short: what 
 
 ## Entries
 
+**Date:** 2026-05-10
+**Context:** User reported that triggering any of the 9 cover-up overlays (21..29 — streaks, power-rankings, org-standings, biggest-margins, did-you-know, card-meta, schedule, punditry, goalfests) from the v2 broadcast control room crashed the page. The trigger + hide buttons were wired by commit `02abb7ab` (SimpleOverlayControl + ControlGrid entries) but a click on any "Trigger ON" 500'd the server action.
+**Mistake:** `SimpleOverlayControl` defaulted `payload="{}"` for every cover-up control. The `toggleOverlayAction` server action calls `triggerOverlay(...)` which runs `TEMPLATE_REGISTRY[legacyKey].schema.parse(payload)`. The 9 v2 keys mapped to 4 legacy template_keys with REQUIRED Zod fields:
+- `21/22` → `leaderboard_animated` requires `topN` + `rows`
+- `23` → `orgs_roster` requires `org.name`
+- `24/27/29` → `match_scores_day` requires `matchDayLabel`
+- `25/28` → `lower_third` requires `playerId` (UUID) + `displayName` + `gamerTag` + `jerseyNumber`
+- `26` → `top_scorers` accepts `{}` (only key that worked)
+
+`schema.parse({})` threw ZodError → Server Action propagated the throw → Next.js rendered the Application-Error overlay = the "page crash" the user saw.
+**Correction:** Commit `<next>`:
+1. `apps/web/src/components/broadcast/v2/template-mapping.ts` — added `COVER_UP_PAYLOADS` map with per-key minimum-viable JSON (`{topN:1,rows:[]}`, `{org:{name:'COVER UP'}}`, `{matchDayLabel:'COVER UP'}`, `{}`) + `getCoverUpPayload(key)` helper. Re-mapped `25-did-you-know` + `28-punditry` from `lower_third` → `top_scorers` because `lower_third`'s required `playerId` UUID is impossible to satisfy with a placeholder for a static info-graphic overlay.
+2. `apps/web/src/components/broadcast/v2/controls/SimpleOverlayControl.tsx` — defaults `payload` prop from `getCoverUpPayload(overlayKey)` when caller omits it.
+3. `apps/web/src/components/broadcast/v2/template-mapping.test.ts` — added 3 tests that assert each cover-up key has a payload, payload is valid JSON, AND `TEMPLATE_REGISTRY[legacy].schema.parse(...)` succeeds. CI gate against future schema drift.
+
+Live-verified in Chrome: all 9 toggle ON → OFF without crash. Server action returns 200 each time.
+**Rule for future:**
+1. **Before wiring a new v2 overlay through `toggleOverlayAction` / `triggerOverlayEnterAction`, audit `TEMPLATE_REGISTRY[v2ToLegacy(key)].schema` for required fields.** If any required field has no `.default()` / `.optional()` / `.nullable()`, `schema.parse({})` will throw → server action 500 → Next.js error page. The schema is the gatekeeper, not just a payload doc.
+2. **Three legacy template_keys are permissive** (`top_scorers`, `starting_soon_basic`, `stream_ended` all accept `{}`). Prefer one of those when mapping a static / cover-up / info-graphic v2 overlay that carries no runtime payload. `lower_third` is the worst fit (`playerId` is a hard UUID + every stat field is required) — never map a payload-less overlay to it.
+3. **When a Zod-validated payload is unavoidable, define the minimum-viable payload in `COVER_UP_PAYLOADS` (or sibling map) co-located with the v2→legacy template mapping**, and unit-test it against the schema. The map keeps the "payload satisfies schema" contract in one file, so a future schema tightening fails CI immediately instead of producing a runtime crash.
+4. **`payload="{}"` is a smell on any non-trivial trigger.** If a control card has zero edit fields and ships `{}`, double-check the schema acceptance — most legacy schemas do NOT accept it.
+
+---
+
 **Date:** 2026-05-02
 **Context:** User reviewed 04-h2h-2 overlay on prod and reported (a) KingNonex's photo `kingnonex/fullbody_03_nobg.png` shows him facing partly backwards/away (face barely visible); (b) Anife's photo `anife/fullbody_02_nobg.png` has the face cut/cropped awkwardly; (c) KayKay's "Lumo Hubs" org logo (file: `LUMO LABS (WHITE) - KAYKAY.png`) displays oversized because its aspect ratio is much wider than the other org logos at the global `.player-org { height: 96px; width: auto }` rule.
 **Mistake:** Default photo picks for 04-h2h-2 (and the player-photo fallback map at the bottom of the HTML) used poses that the user finds unflattering. Also, `.player-org` only constrained height — wide-aspect logos blew past width=180px+ and dominated the player column visually.

@@ -1,7 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { V2_TO_LEGACY_TEMPLATE, v2ToLegacy } from "./template-mapping";
+import {
+  V2_TO_LEGACY_TEMPLATE,
+  v2ToLegacy,
+  COVER_UP_PAYLOADS,
+  getCoverUpPayload,
+} from "./template-mapping";
 import { V2_OVERLAY_KEYS } from "./overlay-keys";
-import { TEMPLATE_KEYS } from "@/server/overlays/registry";
+import { TEMPLATE_KEYS, TEMPLATE_REGISTRY } from "@/server/overlays/registry";
+
+const COVER_UP_KEYS = [
+  "21-streaks",
+  "22-power-rankings",
+  "23-org-standings",
+  "24-biggest-margins",
+  "25-did-you-know",
+  "26-card-meta",
+  "27-schedule",
+  "28-punditry",
+  "29-goalfests",
+] as const;
 
 describe("V2_TO_LEGACY_TEMPLATE", () => {
   it("covers every v2 overlay key", () => {
@@ -32,5 +49,29 @@ describe("V2_TO_LEGACY_TEMPLATE", () => {
 
   it("12-starting-soon maps to starting_soon_basic", () => {
     expect(v2ToLegacy("12-starting-soon")).toBe("starting_soon_basic");
+  });
+});
+
+describe("COVER_UP_PAYLOADS — Zod gates", () => {
+  it("defines a payload for every cover-up overlay key", () => {
+    for (const k of COVER_UP_KEYS) {
+      expect(COVER_UP_PAYLOADS[k]).toBeTruthy();
+    }
+  });
+
+  it("getCoverUpPayload returns valid JSON for every cover-up key", () => {
+    for (const k of COVER_UP_KEYS) {
+      const raw = getCoverUpPayload(k);
+      expect(() => JSON.parse(raw)).not.toThrow();
+    }
+  });
+
+  it("each cover-up payload satisfies its mapped legacy Zod schema", () => {
+    for (const k of COVER_UP_KEYS) {
+      const legacy = v2ToLegacy(k);
+      const schema = TEMPLATE_REGISTRY[legacy].schema;
+      const parsed = JSON.parse(getCoverUpPayload(k));
+      expect(() => schema.parse(parsed)).not.toThrow();
+    }
   });
 });

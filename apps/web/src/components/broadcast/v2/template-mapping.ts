@@ -41,17 +41,52 @@ export const V2_TO_LEGACY_TEMPLATE: Record<V2OverlayKey, TemplateKey> = {
   // 21..29 cover-up overlays: reuse closest legacy template_key. Same
   // precedent as 20-highlight — visual layouts differ but the publish
   // contract + Zod validation share with the closest semantic match.
+  // `lower_third` was tried for 25/28 but its Zod schema requires a real
+  // `playerId` UUID + display fields; cover-up overlays carry no payload
+  // data so we route them through `top_scorers` instead (its schema
+  // accepts `{}` — `rows` defaults to []).
   "21-streaks": "leaderboard_animated",
   "22-power-rankings": "leaderboard_animated",
   "23-org-standings": "orgs_roster",
   "24-biggest-margins": "match_scores_day",
-  "25-did-you-know": "lower_third",
+  "25-did-you-know": "top_scorers",
   "26-card-meta": "top_scorers",
   "27-schedule": "match_scores_day",
-  "28-punditry": "lower_third",
+  "28-punditry": "top_scorers",
   "29-goalfests": "match_scores_day",
 };
 
 export function v2ToLegacy(key: V2OverlayKey): TemplateKey {
   return V2_TO_LEGACY_TEMPLATE[key];
+}
+
+/**
+ * Per-overlay minimum-viable payload for the static "cover-up" overlays
+ * (21..29). The mapped legacy Zod schemas (`leaderboard_animated`,
+ * `orgs_roster`, `match_scores_day`, `top_scorers`) all carry required
+ * fields the cover-up HTML never reads — the overlays are static info
+ * graphics whose content lives in the HTML itself, not the payload.
+ * Without these placeholders, `triggerOverlay()`'s `schema.parse({})`
+ * throws ZodError and the server action 500s, rendering the Next.js
+ * error page — the "page crash" users see when triggering 21..29.
+ *
+ * Each value must:
+ *  - be valid JSON
+ *  - satisfy the corresponding legacy schema's required fields
+ *  - carry zero meaningful runtime data (these overlays don't consume it)
+ */
+export const COVER_UP_PAYLOADS: Record<string, string> = {
+  "21-streaks": JSON.stringify({ topN: 1, rows: [] }),
+  "22-power-rankings": JSON.stringify({ topN: 1, rows: [] }),
+  "23-org-standings": JSON.stringify({ org: { name: "COVER UP" } }),
+  "24-biggest-margins": JSON.stringify({ matchDayLabel: "COVER UP" }),
+  "25-did-you-know": JSON.stringify({}),
+  "26-card-meta": JSON.stringify({}),
+  "27-schedule": JSON.stringify({ matchDayLabel: "COVER UP" }),
+  "28-punditry": JSON.stringify({}),
+  "29-goalfests": JSON.stringify({ matchDayLabel: "COVER UP" }),
+};
+
+export function getCoverUpPayload(key: V2OverlayKey): string {
+  return COVER_UP_PAYLOADS[key] ?? "{}";
 }

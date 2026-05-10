@@ -4,13 +4,21 @@ import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ToggleTriggerButton } from "../ToggleTriggerButton";
 import type { V2OverlayKey } from "../overlay-keys";
+import { getCoverUpPayload } from "../template-mapping";
 
 export type SimpleOverlayControlProps = {
   overlayKey: V2OverlayKey;
   sessionId: string;
   viewToken: string | null;
   active?: boolean;
-  /** Optional JSON-stringified payload sent on trigger. Defaults to `{}`. */
+  /**
+   * Optional JSON-stringified payload sent on trigger. When omitted, the
+   * per-overlay minimum-viable payload from `getCoverUpPayload(overlayKey)`
+   * is used so the trigger satisfies the mapped legacy Zod schema. The
+   * cover-up overlays (21..29) carry no runtime data — the HTML itself
+   * holds the content — but the legacy schemas still require certain
+   * fields (e.g. `topN`, `matchDayLabel`, `org.name`).
+   */
   payload?: string;
 };
 
@@ -26,8 +34,9 @@ export function SimpleOverlayControl({
   sessionId,
   viewToken,
   active = false,
-  payload = "{}",
+  payload,
 }: SimpleOverlayControlProps) {
+  const resolvedPayload = payload ?? getCoverUpPayload(overlayKey);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const onIframeReady = useCallback((el: HTMLIFrameElement | null) => {
@@ -56,7 +65,7 @@ export function SimpleOverlayControl({
           active={active}
           onOptimisticToggle={optimisticToggle}
           payloadFields={
-            <input type="hidden" name="payload" value={payload} />
+            <input type="hidden" name="payload" value={resolvedPayload} />
           }
         />
       }
