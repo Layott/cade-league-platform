@@ -691,6 +691,102 @@ export async function clearTextElementAction(formData: FormData) {
   revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
 }
 
+const RegenerateCopySchema = z.object({
+  overlayKey: OverlayKeyEnum,
+  variantId: z.string().min(1).max(64),
+  elementId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z][a-z0-9-]{0,63}$/),
+});
+
+/**
+ * Phase 3 — AI Regenerate. Generates a fresh broadcast-ready line for one
+ * editable text slot via Claude Haiku 4.5 and writes it into the
+ * `overlay_text_elements.content` field. Admins can free-edit afterwards
+ * through the existing Text panel input. The slot must be in the
+ * `ai_regenerate.SLOT_BRIEFS` allowlist (the 11 cover-up text elements
+ * seeded by migration 20260802000001); other element IDs are rejected
+ * so this action can never be coerced into generating arbitrary copy.
+ */
+export async function regenerateOverlayCopyAction(formData: FormData) {
+  const raw = {
+    overlayKey: String(formData.get("overlayKey") ?? ""),
+    variantId: String(formData.get("variantId") ?? "default"),
+    elementId: String(formData.get("elementId") ?? ""),
+  };
+  const parsed = RegenerateCopySchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `invalid regenerate payload: ${parsed.error.issues
+        .map((i) => i.message)
+        .join("; ")}`,
+    );
+  }
+
+  const {
+    isAiRegenerableElement,
+    getAnthropicClient,
+    regenerateCopy,
+  } = await import("@/server/overlays/copy/ai_regenerate");
+  type AnthropicLikeT = Parameters<typeof regenerateCopy>[0];
+
+  if (!isAiRegenerableElement(parsed.data.elementId)) {
+    throw new Error(
+      `regenerateOverlayCopy: element '${parsed.data.elementId}' is not AI-regenerable`,
+    );
+  }
+
+  const { sb, publicUserId, roles } = await gate();
+  const actor = { userId: publicUserId, roles };
+
+  const existing = await getTextElement(
+    sb,
+    parsed.data.overlayKey,
+    parsed.data.variantId,
+    parsed.data.elementId,
+  );
+  if (!existing) {
+    throw new Error(
+      `regenerateOverlayCopy: no seed row for ${parsed.data.overlayKey}/${parsed.data.elementId}`,
+    );
+  }
+
+  const client = getAnthropicClient() as unknown as AnthropicLikeT;
+  const fresh = await regenerateCopy(client, {
+    elementId: parsed.data.elementId,
+    currentContent: existing.content,
+    overlayKey: parsed.data.overlayKey,
+  });
+
+  await upsertTextElement(sb, actor, {
+    overlayKey: parsed.data.overlayKey,
+    variantId: parsed.data.variantId,
+    elementId: parsed.data.elementId,
+    origin: existing.origin,
+    kind: existing.kind,
+    displayLabel: existing.displayLabel,
+    visible: existing.visible,
+    content: fresh,
+    fontFamily: existing.fontFamily,
+    fontWeight: existing.fontWeight,
+    fontSizePx: existing.fontSizePx,
+    letterSpacing: existing.letterSpacing,
+    lineHeight: existing.lineHeight,
+    color: existing.color,
+    alignment: existing.alignment,
+    opacityPct: existing.opacityPct,
+    positionXPx: existing.positionXPx,
+    positionYPx: existing.positionYPx,
+    zIndex: existing.zIndex,
+    sortOrder: existing.sortOrder,
+  });
+
+  revalidatePath("/admin/broadcast/v2/design");
+  revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+}
+
 /* ------------------------------------------------------------------ *
  * Wave 2 Stage 3 — partner-strip + logo manager                      *
  * ------------------------------------------------------------------ */

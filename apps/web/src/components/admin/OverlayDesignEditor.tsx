@@ -13,6 +13,7 @@ import {
   uploadOverlayBgAction,
   setTextElementAction,
   clearTextElementAction,
+  regenerateOverlayCopyAction,
   setStripLayoutAction,
   uploadPartnerLogoAction,
   removePartnerLogoAction,
@@ -20,6 +21,25 @@ import {
   setAnimationAction,
   clearAnimationAction,
 } from "@/app/admin/broadcast/v2/design/actions";
+
+/**
+ * Element IDs that the AI Regenerate (Phase 3) action accepts. Mirrors
+ * the SLOT_BRIEFS map in `apps/web/src/server/overlays/copy/ai_regenerate.ts`
+ * so the ✨ button only renders for slots the server will actually accept.
+ */
+const AI_REGENERABLE_ELEMENT_IDS: ReadonlySet<string> = new Set([
+  "pr-blurb-1",
+  "pr-blurb-2",
+  "pr-blurb-3",
+  "pr-blurb-4",
+  "pr-blurb-5",
+  "dyk-detail",
+  "cm-subhead",
+  "pq-quote",
+  "pq-author",
+  "pq-role",
+  "gf-subhead",
+]);
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 import { supportsBgImage } from "@/server/overlays/design/defaults";
 
@@ -983,6 +1003,52 @@ export default function OverlayDesignEditor({
     [overlayKey, variantId, textRows],
   );
 
+  /**
+   * Phase 3 — fire AI Regenerate for one text slot. Server action calls
+   * Claude Haiku 4.5, upserts the resulting copy into `overlay_text_elements`,
+   * and revalidates the design page so `initialTextElements` re-seeds with
+   * the fresh content. The local `textRows` state is mirrored optimistically
+   * to "Generating..." for snappy UX; the revalidate refresh swaps it for
+   * the real AI output once the round-trip resolves.
+   */
+  const regenerateTextRow = useCallback(
+    (elementId: string) => {
+      setError(null);
+      setSuccess(false);
+      const before = textRows.find((r) => r.elementId === elementId);
+      if (!before) return;
+      setTextRows((prev) =>
+        prev.map((r) =>
+          r.elementId === elementId
+            ? { ...r, content: "Generating…" }
+            : r,
+        ),
+      );
+      startTransition(async () => {
+        try {
+          const fd = new FormData();
+          fd.set("overlayKey", overlayKey);
+          fd.set("variantId", variantId);
+          fd.set("elementId", elementId);
+          await regenerateOverlayCopyAction(fd);
+          setSuccess(true);
+        } catch (e) {
+          // Restore the previous content on failure so the admin sees what
+          // was there before the AI attempt.
+          setTextRows((prev) =>
+            prev.map((r) =>
+              r.elementId === elementId
+                ? { ...r, content: before.content }
+                : r,
+            ),
+          );
+          setError(e instanceof Error ? e.message : "AI regenerate failed");
+        }
+      });
+    },
+    [overlayKey, variantId, textRows],
+  );
+
   /* ---------------- Wave 2 Stage 3 — partner edits ---------------- */
 
   const updateStripLayout = useCallback(
@@ -1407,6 +1473,9 @@ export default function OverlayDesignEditor({
                             }
                             onSave={() => saveTextRow(row.elementId)}
                             onReset={() => resetTextRow(row.elementId)}
+                            onRegenerate={() =>
+                              regenerateTextRow(row.elementId)
+                            }
                           />
                         ))}
                       </div>
@@ -2064,6 +2133,7 @@ function TextElementEditorRow({
   onUpdate,
   onSave,
   onReset,
+  onRegenerate,
 }: {
   row: TextElementRow;
   fontOptions: ReadonlyArray<string>;
@@ -2071,7 +2141,12 @@ function TextElementEditorRow({
   onUpdate: (patch: Partial<TextElementRow>) => void;
   onSave: () => void;
   onReset: () => void;
+  /** Phase 3 — AI Regenerate. Only rendered when element is in the
+   *  AI_REGENERABLE_ELEMENT_IDS allowlist + callback supplied. */
+  onRegenerate?: () => void;
 }) {
+  const canRegenerate =
+    onRegenerate != null && AI_REGENERABLE_ELEMENT_IDS.has(row.elementId);
   const labelStyle =
     "block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-3)]";
   const inputStyle =
@@ -2368,6 +2443,18 @@ function TextElementEditorRow({
           >
             Reset
           </SecondaryButton>
+          {canRegenerate ? (
+            <SecondaryButton
+              type="button"
+              size="sm"
+              disabled={pending}
+              onClick={onRegenerate}
+              data-testid={`text-row-${row.elementId}-ai-regenerate`}
+              title="Generate fresh copy with Claude AI"
+            >
+              {pending ? "Generating…" : "✨ AI"}
+            </SecondaryButton>
+          ) : null}
           <label className="ml-auto inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
             <input
               type="checkbox"
