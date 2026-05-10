@@ -27,6 +27,7 @@ import {
   type PlayerOption,
 } from "@/components/broadcast/v2/controls/PlayerSquadsControl";
 import { HighlightControl } from "@/components/broadcast/v2/controls/HighlightControl";
+import { SimpleOverlayControl } from "@/components/broadcast/v2/controls/SimpleOverlayControl";
 
 /**
  * Plan 51 — control card grid layout.
@@ -212,6 +213,60 @@ export function ControlGrid({
         sessionId={sessionId}
         viewToken={viewToken}
         active={active["20-highlight"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="21-streaks"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["21-streaks"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="22-power-rankings"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["22-power-rankings"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="23-org-standings"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["23-org-standings"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="24-biggest-margins"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["24-biggest-margins"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="25-did-you-know"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["25-did-you-know"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="26-card-meta"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["26-card-meta"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="27-schedule"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["27-schedule"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="28-punditry"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["28-punditry"] ?? false}
+      />
+      <SimpleOverlayControl
+        overlayKey="29-goalfests"
+        sessionId={sessionId}
+        viewToken={viewToken}
+        active={active["29-goalfests"] ?? false}
       />
     </fieldset>
   );
