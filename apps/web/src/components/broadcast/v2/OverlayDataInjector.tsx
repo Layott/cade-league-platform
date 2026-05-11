@@ -1209,7 +1209,27 @@ export default function OverlayDataInjector({
       src={src}
       title={`Overlay v2 · ${overlayKey}`}
       allow="autoplay"
-      onLoad={() => setIframeLoaded(true)}
+      onLoad={(e) => {
+        setIframeLoaded(true);
+        // 2026-05-11 — inline seed-data post. Relying on the
+        // `useEffect([seedData, iframeLoaded])` chain alone proved flaky
+        // in production (the effect sometimes ran before
+        // iframe.contentWindow was usable for postMessage even though
+        // the load event had fired). Posting directly from the load
+        // handler guarantees the iframe receives the SSR data as soon
+        // as its `cadeGate` listener is attached.
+        if (seedData) {
+          try {
+            const win = (e.target as HTMLIFrameElement).contentWindow;
+            if (win) {
+              win.postMessage({ type: "update", data: seedData }, "*");
+              seedDeliveredRef.current = true;
+            }
+          } catch {
+            /* fall through to useEffect retry */
+          }
+        }
+      }}
       style={{
         border: 0,
         width: "100vw",
