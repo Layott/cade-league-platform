@@ -688,7 +688,11 @@ export default function OverlayDataInjector({
    * --------------------------------------------------------------- */
   useEffect(() => {
     if (!currentSessionId) return;
-    if (!active) return;
+    // 2026-05-11 — removed `if (!active) return` gate. OBS browser sources
+    // need live data to be present in the iframe at all times so trigger
+    // (just adds cade-visible class) renders the CURRENT payload instead
+    // of the baked HTML defaults. The cade-visible class still gates
+    // visibility on stream; data binding is decoupled from visibility.
     const builder = INITIAL_FETCH_PATH[overlayKey];
     if (!builder) return;
     if (!iframeLoaded) return;

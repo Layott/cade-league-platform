@@ -55,12 +55,21 @@ export type DidYouKnowFact = {
   player: CoverUpPlayer | null;
 };
 
+export type PunditryQuote = {
+  text: string;
+  author: string;
+  role: string;
+  /** Player whose photo should sit beside the quote. Falls back to didYouKnow.player. */
+  player: CoverUpPlayer | null;
+};
+
 export type CoverUpStatsPayload = {
   streaks: StreakRow[];
   orgs: OrgRow[];
   biggestMargins: FixtureRow[];
   goalfests: FixtureRow[];
   didYouKnow: DidYouKnowFact | null;
+  punditryQuote: PunditryQuote | null;
 };
 
 export type CoverUpStatsResult = {
@@ -286,6 +295,18 @@ export async function fetchCoverUpStats(
     (a, b) => b.totalPoints - a.totalPoints || b.totalGd - a.totalGd,
   );
 
+  // Helper — resolve a player by display-name match from the standings
+  // join. Used to fill `player` for biggest_win / goalfest didYouKnow
+  // variants so the 25-did-you-know overlay always has a photo to bind.
+  const playerByName = (name: string): CoverUpPlayer | null => {
+    const target = name.toLowerCase().trim();
+    for (const s of stRows) {
+      const cup = asCoverUpPlayer(s.player);
+      if (cup && cup.displayName.toLowerCase().trim() === target) return cup;
+    }
+    return null;
+  };
+
   // 5. Did You Know — pick the most interesting season-wide fact.
   // Priority: longest streak >= 3, then biggest win, then highest scorer.
   let didYouKnow: DidYouKnowFact | null = null;
@@ -298,11 +319,13 @@ export async function fetchCoverUpStats(
     };
   } else if (biggestMargins[0] && biggestMargins[0].margin >= 4) {
     const m = biggestMargins[0];
+    const winnerName = m.homeScore > m.awayScore ? m.home : m.away;
+    const loserName = m.homeScore > m.awayScore ? m.away : m.home;
     didYouKnow = {
       kind: "biggest_win",
       headline: `${m.margin}-GOAL THRASHING`,
-      detail: `${(m.homeScore > m.awayScore ? m.home : m.away).toUpperCase()} beat ${(m.homeScore > m.awayScore ? m.away : m.home).toUpperCase()} ${m.homeScore}-${m.awayScore} on ${m.date} — the widest margin of the season so far.`,
-      player: null,
+      detail: `${winnerName.toUpperCase()} beat ${loserName.toUpperCase()} ${m.homeScore}-${m.awayScore} on ${m.date} — the widest margin of the season so far.`,
+      player: playerByName(winnerName),
     };
   } else {
     // Highest scorer fall-through — pull top GF from standings.
@@ -320,9 +343,53 @@ export async function fetchCoverUpStats(
     }
   }
 
+  // 6. Punditry quote — rotate by week-of-year so the same payload
+  // doesn't always pick the same angle. Server-built from live stats
+  // so the broadcast never reads stale "Guru jumped 4 spots" text
+  // when the underlying numbers have moved on.
+  const wk = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+  const angles: PunditryQuote[] = [];
+  if (streaks[0] && streaks[0].streak >= 2) {
+    angles.push({
+      text: `${streaks[0].displayName.toUpperCase()} ON A ${streaks[0].streak}-MATCH WINNING RUN — THE STORY OF THE WEEK.`,
+      author: "CADE PUNDIT DESK",
+      role: "FORM TRACKER",
+      player: streaks[0],
+    });
+  }
+  if (biggestMargins[0]) {
+    const m = biggestMargins[0];
+    const winner = m.homeScore > m.awayScore ? m.home : m.away;
+    angles.push({
+      text: `${winner.toUpperCase()} JUST PUT ${m.margin} GOALS PAST ${(m.homeScore > m.awayScore ? m.away : m.home).toUpperCase()} — STATEMENT WIN OF THE SEASON.`,
+      author: "CADE PUNDIT DESK",
+      role: "RESULT OF THE WEEK",
+      player: playerByName(winner),
+    });
+  }
+  if (goalfests[0]) {
+    const g = goalfests[0];
+    angles.push({
+      text: `${g.total} GOALS BETWEEN ${g.home.toUpperCase()} AND ${g.away.toUpperCase()} — THE MOST ELECTRIC NIGHT OF THE SEASON.`,
+      author: "CADE PUNDIT DESK",
+      role: "GOALFEST OF THE WEEK",
+      player: playerByName(g.homeScore > g.awayScore ? g.home : g.away),
+    });
+  }
+  if (orgs[0] && orgs[0].topPlayer) {
+    angles.push({
+      text: `${orgs[0].name.toUpperCase()} DOMINATING THE ORG TABLE — ${orgs[0].totalPoints} POINTS COMBINED, ${orgs[0].roster.map((n) => n.toUpperCase()).join(" + ")} CARRYING.`,
+      author: "CADE PUNDIT DESK",
+      role: "ORG WATCH",
+      player: playerByName(orgs[0].topPlayer.name),
+    });
+  }
+  const punditryQuote: PunditryQuote | null =
+    angles.length > 0 ? angles[wk % angles.length] : null;
+
   return {
     seasonId,
     channel: REALTIME.standingsChannel(seasonId),
-    payload: { streaks, orgs, biggestMargins, goalfests, didYouKnow },
+    payload: { streaks, orgs, biggestMargins, goalfests, didYouKnow, punditryQuote },
   };
 }

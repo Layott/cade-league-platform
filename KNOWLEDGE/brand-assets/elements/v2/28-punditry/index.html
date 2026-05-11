@@ -152,10 +152,25 @@ body.cade-exiting .canvas { opacity: 0; }
   function update(data) {
     if (!data || typeof data !== 'object') return;
     var payload = data.payload || data;
-    // Quote + author + role stay admin-managed via overlay_text_elements
-    // (Phase 2 seed + Phase 3 AI Regenerate). We only swap the talking-
-    // head photo to whoever the headline stat features.
-    var p = payload.didYouKnow && payload.didYouKnow.player;
+    // Quote text + author + role rotate from server-built punditryQuote
+    // (live stats → server picks a fresh angle each week). Admin can
+    // still override via Text panel for a single trigger; next trigger
+    // re-binds to live.
+    var q = payload.punditryQuote;
+    if (q) {
+      var quoteEl = document.querySelector('.pq-quote');
+      if (quoteEl && q.text) {
+        // Highlight any 2-4 digit number / N-goal phrase in green for visual punch.
+        var html = q.text.replace(/(\b\d+(?:-\d+)?(?:\s+(?:GOAL|GOALS|MATCH|MATCHES|POINTS|SPOTS))?)/i, '<span class="accent">$1</span>');
+        quoteEl.innerHTML = html;
+      }
+      var authEl = document.querySelector('.pq-attrib .author');
+      if (authEl && q.author) authEl.textContent = q.author;
+      var roleEl = document.querySelector('.pq-attrib .role');
+      if (roleEl && q.role) roleEl.textContent = q.role;
+    }
+    // Photo — punditry preferred, fall back to didYouKnow.player.
+    var p = (q && q.player) || (payload.didYouKnow && payload.didYouKnow.player);
     if (!p) return;
     var img = document.querySelector('.pq-photo-wrap img');
     if (!img) return;

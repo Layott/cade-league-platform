@@ -168,8 +168,13 @@ body.cade-exiting .canvas { opacity: 0; }
       if (m) headlineEl.innerHTML = '<span class="pink">' + m[1] + '</span> ' + m[2];
       else headlineEl.textContent = dyk.headline;
     }
-    // Detail line is admin-managed via overlay_text_elements (Phase 2/3 AI).
-    // We DO NOT overwrite — the SSR resolver injects content separately.
+    // Detail line — bind to live didYouKnow.detail by default so the
+    // overlay always shows current-week stats. Admin can override via
+    // the Text panel; an admin save triggers a fresh trigger which
+    // re-binds to live again (admin override is per-trigger, not
+    // persistent — by design so the talking-point stays accurate).
+    var detailEl = document.querySelector('.dyk-detail');
+    if (detailEl && dyk.detail) detailEl.textContent = dyk.detail;
     var playerImg = document.querySelector('.dyk-photo-wrap img.player');
     if (playerImg && dyk.player) {
       if (dyk.player.photoUrl) playerImg.src = dyk.player.photoUrl;
