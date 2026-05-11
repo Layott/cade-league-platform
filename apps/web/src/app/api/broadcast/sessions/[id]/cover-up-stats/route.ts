@@ -50,6 +50,14 @@ export async function GET(
   const result = await fetchCoverUpStats(sb, md.season_id);
 
   return NextResponse.json(result, {
-    headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
+    headers: {
+      // 2026-05-11 — switched from no-store to CDN-cached + SWR so
+      // repeated tab opens / dashboard mounts hit the Vercel edge cache
+      // instead of cold-starting a function each time. 60s freshness is
+      // well below the realtime channel's update cadence; SWR keeps
+      // stale data on the wire while the next regen fires in the
+      // background. Major Hobby-compute saver.
+      "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+    },
   });
 }

@@ -185,7 +185,12 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
  * a steady-state hit (Supabase covers the index lookup). Exported so
  * tests can stub a faster cadence without faking timers.
  */
-export const AMBIENT_POLL_MS = 30_000;
+// 2026-05-11 — bumped 30s → 5min to stay under Vercel Hobby compute cap.
+// Realtime channel still drives sub-second mid-stream session switches;
+// the poll is just a backstop for missed events + cold-start hydration.
+// Each open OBS browser source previously fired 120 polls/hour per tab;
+// at 5min cadence the same surface area drops to 12/hour.
+export const AMBIENT_POLL_MS = 300_000;
 
 export type OverlayDataInjectorProps = {
   overlayKey: string;

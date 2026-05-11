@@ -50,6 +50,12 @@ export async function GET(
   const result = await fetchCardMetaData(sb, md.season_id, 8);
 
   return NextResponse.json(result, {
-    headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
+    headers: {
+      // 2026-05-11 — Card-meta is the slowest cover-up endpoint (joins
+      // squad_player_items × fc26_players). Cache 60s on CDN; Realtime
+      // squad.updated event still drives invalidation via the injector
+      // re-fetch path mid-stream.
+      "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+    },
   });
 }

@@ -80,7 +80,12 @@ export async function GET(
       channel: data.channel,
     },
     {
-      headers: { "Cache-Control": "no-store, max-age=0, must-revalidate" },
+      headers: {
+        // 2026-05-11 — CDN-cached to stay under Vercel Hobby compute
+        // cap. Realtime `standings.changed` event drives mid-stream
+        // re-fetch; the 60s edge cache absorbs the burst of tab opens.
+        "Cache-Control": "s-maxage=60, stale-while-revalidate=300",
+      },
     },
   );
 }
