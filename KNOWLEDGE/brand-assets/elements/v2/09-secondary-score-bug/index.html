@@ -1275,10 +1275,12 @@
 
     switch (msg.type) {
       case 'update': {
-        const d = msg.data || {};
-        // Accept two payload shapes:
+        // Accept three payload shapes:
         //   { playerA: {name, slug, score}, playerB: {...} }  (control panel preview)
-        //   { players: [{displayName, score}, {displayName, score}] }  (Plan 51 scoreBugSchema)
+        //   { players: [{displayName, score}, ...] }          (Plan 51 scoreBugSchema)
+        //   { payload: { players: [...] } }                  (cover-up SSR feed endpoint)
+        const raw = msg.data || {};
+        const d = raw.payload && typeof raw.payload === 'object' ? raw.payload : raw;
         let pA = d.playerA;
         let pB = d.playerB;
         if (!pA && Array.isArray(d.players) && d.players[0]) {
@@ -1317,8 +1319,9 @@
       case 'show': {
         // Process data payload if provided (broadcast control sends both
         // state + show in a single trigger event).
-        const d = msg.data;
-        if (d && typeof d === 'object') {
+        const raw = msg.data;
+        if (raw && typeof raw === 'object') {
+          const d = raw.payload && typeof raw.payload === 'object' ? raw.payload : raw;
           let pA = d.playerA;
           let pB = d.playerB;
           if (!pA && Array.isArray(d.players) && d.players[0]) {

@@ -1139,8 +1139,11 @@
       return { slug: slug, name: name, photoUrl: photoUrl };
     }
 
-    function update(data) {
-      if (!data) return;
+    function update(raw) {
+      if (!raw) return;
+      // Accept either bare shape or {payload: {...}} wrapper from the
+      // /api/broadcast/sessions/[id]/up-next feed endpoint.
+      var data = raw && raw.payload && typeof raw.payload === 'object' ? raw.payload : raw;
       // Accept three payload shapes:
       //   { player1, player2 }                    (legacy + control panel)
       //   { homePlayer, awayPlayer, kickoffAt? }  (broadcast trigger)

@@ -143,6 +143,11 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   "06-h2h-5": (s, k) =>
     `/api/broadcast/sessions/${s}/h2h?key=${encodeURIComponent(k)}`,
   "07-leaderboard": (s) => `/api/broadcast/sessions/${s}/leaderboard`,
+  // 09-secondary-score-bug + 10-up-next-bug — auto-load current /
+  // upcoming match so OBS browser sources don't need control-panel
+  // entry to render a meaningful first frame.
+  "09-secondary-score-bug": (s) => `/api/broadcast/sessions/${s}/score-bug`,
+  "10-up-next-bug": (s) => `/api/broadcast/sessions/${s}/up-next`,
   "11-match-scores-day": (s) => `/api/broadcast/sessions/${s}/match-scores-day`,
   "14-top-scorers": (s) => `/api/broadcast/sessions/${s}/top-scorers`,
   // v2-only stubs — orgs/coaches/penalties have no legacy counterpart.
