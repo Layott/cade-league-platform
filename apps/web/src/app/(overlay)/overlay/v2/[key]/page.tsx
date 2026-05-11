@@ -5,6 +5,9 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { getActiveSession } from "@/server/broadcast/active_session";
 import { isOverlayActive } from "@/server/broadcast/v2/overlay_active_state";
 import type { V2OverlayKey } from "@/components/broadcast/v2/overlay-keys";
+import { fetchLeaderboardData, toLeaderboardAnimatedPayload } from "@/server/overlays/leaderboard_data";
+import { fetchCoverUpStats } from "@/server/overlays/cover_up_stats";
+import { fetchCardMetaData } from "@/server/overlays/card_meta_data";
 import { resolveTokens } from "@/server/overlays/design/tokens";
 import { getActiveTemplateVariant } from "@/server/overlays/design/templates";
 import {
@@ -469,6 +472,48 @@ export default async function OverlayV2Page({
   // stay pinned to the operator-picked session and never auto-swap.
   const ambient = !isPreview;
 
+  /* --------------------------------------------------------------- *
+   * SSR data seed (2026-05-11).                                      *
+   *                                                                 *
+   * Pre-fetch the overlay's data feed server-side using the service- *
+   * role client. The injector posts this into the iframe on `load`   *
+   * so OBS browser sources never flash the baked HTML defaults —    *
+   * trigger (just adds `cade-visible`) reveals the current numbers.  *
+   * Wrapped in try/catch so a feed failure falls back to the         *
+   * existing client-side fetch path rather than blocking SSR.         *
+   * --------------------------------------------------------------- */
+  let seedData: unknown = undefined;
+  if (resolvedSeason && resolvedSession) {
+    try {
+      const sb2 = getServiceRoleSupabase();
+      if (key === "22-power-rankings" || key === "07-leaderboard") {
+        const data = await fetchLeaderboardData(
+          sb2,
+          resolvedSeason,
+          key === "22-power-rankings" ? 5 : 13,
+        );
+        seedData = {
+          payload: toLeaderboardAnimatedPayload(data),
+          seasonId: data.seasonId,
+          channel: data.channel,
+        };
+      } else if (
+        key === "21-streaks" ||
+        key === "23-org-standings" ||
+        key === "24-biggest-margins" ||
+        key === "25-did-you-know" ||
+        key === "28-punditry" ||
+        key === "29-goalfests"
+      ) {
+        seedData = await fetchCoverUpStats(sb2, resolvedSeason);
+      } else if (key === "26-card-meta") {
+        seedData = await fetchCardMetaData(sb2, resolvedSeason, 8);
+      }
+    } catch {
+      seedData = undefined;
+    }
+  }
+
   return (
     <>
       <style
@@ -498,6 +543,7 @@ export default async function OverlayV2Page({
         previewPartnerTokens={previewPartnerTokens ?? undefined}
         designAnimTokens={designAnimWire}
         previewAnimTokens={previewAnimTokens ?? undefined}
+        seedData={seedData}
       />
     </>
   );

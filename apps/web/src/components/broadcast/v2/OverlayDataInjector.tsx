@@ -439,6 +439,18 @@ export type OverlayDataInjectorProps = {
       >
     >
   >;
+  /**
+   * 2026-05-11 — SSR-resolved seed data.
+   *
+   * The page-level route may pre-fetch the overlay's data feed
+   * (cover-up-stats / leaderboard / card-meta / match-scores-day) via
+   * the service-role client and pass the payload here so the iframe
+   * receives current data immediately on `load` — no client-side
+   * round-trip, no token gymnastics. The injector still subscribes to
+   * Realtime for mid-stream updates; this prop just seeds the first
+   * render so OBS browser sources never flash baked HTML.
+   */
+  seedData?: unknown;
 };
 
 /**
@@ -507,9 +519,13 @@ export default function OverlayDataInjector({
   previewPartnerTokens,
   designAnimTokens,
   previewAnimTokens,
+  seedData,
 }: OverlayDataInjectorProps): ReactElement {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  // Track whether seedData has been delivered to the iframe so a parent
+  // re-render (e.g. ambient session swap) doesn't replay it.
+  const seedDeliveredRef = useRef(false);
 
   /* --------------------------------------------------------------- *
    * Ambient-session live state.                                      *
@@ -686,6 +702,32 @@ export default function OverlayDataInjector({
    * The payload is forwarded as a `{type:'update'}` postMessage      *
    * matching the Realtime event shape.                               *
    * --------------------------------------------------------------- */
+  /* --------------------------------------------------------------- *
+   * SSR-seed bypass (2026-05-11).                                    *
+   *                                                                 *
+   * When the page-level route pre-fetched the overlay's data via the *
+   * service-role client and passed it as `seedData`, post it into    *
+   * the iframe as soon as the iframe loads — no token, no client     *
+   * round-trip, no race. The Realtime channel still re-fetches on    *
+   * server-state changes so mid-stream updates flow as before.        *
+   * --------------------------------------------------------------- */
+  useEffect(() => {
+    if (!seedData) return;
+    if (!iframeLoaded) return;
+    if (seedDeliveredRef.current) return;
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(
+        { type: "update", data: seedData },
+        "*",
+      );
+      seedDeliveredRef.current = true;
+    } catch {
+      /* iframe closed / wrong origin — fall through to client fetch */
+    }
+  }, [seedData, iframeLoaded]);
+
   useEffect(() => {
     if (!currentSessionId) return;
     // 2026-05-11 — removed `if (!active) return` gate. OBS browser sources
@@ -696,6 +738,10 @@ export default function OverlayDataInjector({
     const builder = INITIAL_FETCH_PATH[overlayKey];
     if (!builder) return;
     if (!iframeLoaded) return;
+    // Skip client-side fetch when SSR seed already delivered (avoids
+    // double-fetch on first render). Realtime triggers still drive
+    // subsequent refreshes regardless of this guard.
+    if (seedDeliveredRef.current) return;
 
     let cancelled = false;
     const url = builder(currentSessionId, overlayKey);
