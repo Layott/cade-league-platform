@@ -15,9 +15,11 @@
 // ALL scrapers share the cloud Supabase project; writes are safe
 // (Postgres handles concurrent upserts via the partial unique index).
 //
-// Safety: max 6 workers. Futbin's CF heuristics start tagging >6
-// concurrent sessions from the same IP. If you need more cards covered
-// faster, run one batch, then another — not wider concurrency.
+// Safety: default cap 6 workers. Futbin's CF heuristics start tagging >6
+// concurrent sessions from the same IP. Pass --aggressive to lift cap to
+// 12 (one separate Chromium per worker). Combine with --tabs N to add N
+// parallel pages WITHIN each worker (same CF clearance, multiplicative
+// concurrency). Effective parallelism = workers × tabs.
 
 const fs = require("fs");
 const path = require("path");
@@ -26,7 +28,9 @@ const { createClient } = require("@supabase/supabase-js");
 const { diffUpsertFutbinRow } = require("./_lib_diff_upsert");
 
 const LIST_URL = (p) => `https://www.futbin.com/26/players?page=${p}`;
-const MAX_WORKERS = 6;
+const MAX_WORKERS_SAFE = 6;
+const MAX_WORKERS_AGGRESSIVE = 12;
+const MAX_TABS_PER_WORKER = 4;
 
 function loadEnv() {
   const p = path.resolve(__dirname, "..", "..", "apps", "web", ".env.local");
@@ -157,7 +161,7 @@ async function extract(page) {
   });
 }
 
-async function worker(workerId, fromPage, toPage, sb, sharedStats) {
+async function worker(workerId, fromPage, toPage, sb, sharedStats, tabsPerWorker = 1) {
   const profileDir = path.resolve(__dirname, `.futbin_chromium_profile_p${workerId}`);
   const ctx = await chromium.launchPersistentContext(profileDir, {
     headless: false, slowMo: 50,
@@ -169,7 +173,7 @@ async function worker(workerId, fromPage, toPage, sb, sharedStats) {
   await ctx.addInitScript(() => { Object.defineProperty(navigator, "webdriver", { get: () => undefined }); });
   const page = await ctx.newPage();
 
-  console.log(`[w${workerId}] warming ${profileDir}`);
+  console.log(`[w${workerId}] warming ${profileDir} (tabs=${tabsPerWorker})`);
   await page.goto("https://www.futbin.com/", { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForTimeout(5000);
   await page.goto(LIST_URL(fromPage), { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -228,25 +232,68 @@ async function worker(workerId, fromPage, toPage, sb, sharedStats) {
   }
 
   await processPage(probeRows, fromPage);
-  for (let p = fromPage + 1; p <= toPage; p++) {
-    await sleep(jitter());
+
+  // Helper to fetch one page on a given tab (reused for both single-tab
+  // and multi-tab workers). Retries with exponential backoff.
+  async function fetchPageOnTab(tab, p) {
     let attempt = 0;
     let pageRows = null;
     while (pageRows === null) {
       attempt++;
       try {
-        await page.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
-        await page.waitForTimeout(3500);
-        pageRows = await extract(page);
+        await tab.goto(LIST_URL(p), { waitUntil: "domcontentloaded", timeout: 60000 });
+        await tab.waitForTimeout(3500);
+        pageRows = await extract(tab);
       } catch (e) {
         const backoff = Math.min(300000, 10000 * attempt);
         console.error(`[w${workerId}] err p${p} attempt ${attempt}: ${e.message} — retry in ${backoff / 1000}s`);
         await sleep(backoff);
       }
     }
-    if (pageRows.length === 0) { console.log(`[w${workerId}] p${p}: 0 rows — end of range`); break; }
-    await processPage(pageRows, p);
+    return pageRows;
   }
+
+  if (tabsPerWorker <= 1) {
+    // Original single-tab path — sequential page-by-page walk.
+    for (let p = fromPage + 1; p <= toPage; p++) {
+      await sleep(jitter());
+      const pageRows = await fetchPageOnTab(page, p);
+      if (pageRows.length === 0) { console.log(`[w${workerId}] p${p}: 0 rows — end of range`); break; }
+      await processPage(pageRows, p);
+    }
+  } else {
+    // Multi-tab path — open (tabsPerWorker - 1) extra tabs that share the
+    // same Cloudflare-cleared persistent context. Slice remaining pages
+    // across all tabs (page already used by tab 0 for the probe).
+    const tabs = [page];
+    for (let i = 1; i < tabsPerWorker; i++) {
+      const t = await ctx.newPage();
+      tabs.push(t);
+    }
+    const remaining = [];
+    for (let p = fromPage + 1; p <= toPage; p++) remaining.push(p);
+    let cursor = 0;
+    let stopFlag = false;
+
+    async function tabLoop(tab, tabIdx) {
+      while (!stopFlag) {
+        const i = cursor++;
+        if (i >= remaining.length) break;
+        const p = remaining[i];
+        await sleep(jitter());
+        const pageRows = await fetchPageOnTab(tab, p);
+        if (pageRows.length === 0) {
+          console.log(`[w${workerId}/t${tabIdx}] p${p}: 0 rows — end of range`);
+          stopFlag = true;
+          break;
+        }
+        await processPage(pageRows, p);
+      }
+    }
+
+    await Promise.all(tabs.map((t, idx) => tabLoop(t, idx)));
+  }
+
   await ctx.close();
   console.log(`[w${workerId}] done`);
 }
@@ -256,16 +303,27 @@ async function main() {
   const fromArg = process.argv.indexOf("--from");
   const toArg = process.argv.indexOf("--to");
   const workersArg = process.argv.indexOf("--workers");
+  const tabsArg = process.argv.indexOf("--tabs");
   const resetProfiles = process.argv.includes("--reset-profiles");
+  const aggressive = process.argv.includes("--aggressive");
   if (fromArg < 0 || toArg < 0 || workersArg < 0) {
-    console.error("usage: --from N --to M --workers K [--reset-profiles]   (max workers = 6)");
+    console.error("usage: --from N --to M --workers K [--tabs T] [--aggressive] [--reset-profiles]");
+    console.error("       safe max workers = 6 | aggressive cap = 12 | tabs per worker max 4");
+    console.error("       effective parallelism = workers × tabs");
     process.exit(1);
   }
   const from = parseInt(process.argv[fromArg + 1], 10);
   const to = parseInt(process.argv[toArg + 1], 10);
-  const workers = Math.min(MAX_WORKERS, parseInt(process.argv[workersArg + 1], 10));
+  const cap = aggressive ? MAX_WORKERS_AGGRESSIVE : MAX_WORKERS_SAFE;
+  const workers = Math.min(cap, parseInt(process.argv[workersArg + 1], 10));
+  const tabsPerWorker = tabsArg >= 0
+    ? Math.min(MAX_TABS_PER_WORKER, Math.max(1, parseInt(process.argv[tabsArg + 1], 10)))
+    : 1;
   if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) { console.error("bad --from/--to"); process.exit(1); }
   if (!Number.isFinite(workers) || workers < 1) { console.error("bad --workers"); process.exit(1); }
+  if (aggressive && workers > MAX_WORKERS_SAFE) {
+    console.warn(`[parallel] WARN: aggressive mode — ${workers} workers + ${tabsPerWorker} tabs each = ${workers * tabsPerWorker} concurrent sessions. Watch for CF rate-limit.`);
+  }
 
   // Optional pre-run wipe of every worker's Chromium profile. Forces a
   // fresh CF solve in each window but cures stuck profiles (p1 crash
@@ -298,7 +356,7 @@ async function main() {
   console.log();
 
   const sharedStats = { pages: 0, rows: 0, inserted: 0, updated: 0, unchanged: 0, noPrice: 0 };
-  await Promise.all(slices.map((s) => worker(s.workerId, s.from, s.to, sb, sharedStats)));
+  await Promise.all(slices.map((s) => worker(s.workerId, s.from, s.to, sb, sharedStats, tabsPerWorker)));
 
   console.log("\n[parallel] done:", sharedStats);
   // 2026-05-02 — fan out fcdb.refreshed so 19-player-squads overlay
@@ -332,4 +390,9 @@ async function main() {
     console.error("[parallel] chem-rules refresh failed:", err && err.message ? err.message : err);
   }
 }
-main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });
+main()
+  .then(() => {
+    console.log("[parallel] all workers complete — exiting cleanly");
+    process.exit(0);
+  })
+  .catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });

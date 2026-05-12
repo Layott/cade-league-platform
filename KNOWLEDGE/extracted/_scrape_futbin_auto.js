@@ -284,4 +284,9 @@ async function main() {
   await ctx.close();
 }
 
-main().catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });
+main()
+  .then(() => {
+    console.log("[auto] exiting cleanly");
+    process.exit(0);
+  })
+  .catch((e) => { console.error("[fatal]", e.stack || e.message); process.exit(1); });

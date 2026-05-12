@@ -14,6 +14,26 @@ Append patterns after any correction from the user. Keep each entry short: what 
 
 ## Entries
 
+**Date:** 2026-05-12
+**Context:** User asked to (a) clone D4Vinci/Scrapling, (b) self-update on its features, (c) build `C:\Users\Sweez\Desktop\LAYO\CLAUDE\SCRAPING\` knowledge folder structured like the ADK 5-layer-stack image set, (d) upgrade Futbin scrapers for higher concurrency, (e) make terminals close themselves after scraper completion. Mid-task user added a global rule: "always update memory on changes done, no matter how small" — broader than the prior commit/push-triggered rule.
+**Mistake:** Initial plan for the SCRAPING folder was 15 numbered files (README + 10 docs + 4 recipes). That ignored the user's later structural directive to mirror the 6-image ADK pattern (1 overview + 5 layer cards, in image-order: Overview · L1 · L2 · L5 · L3 · L4). Subagent was halfway into the old structure when the correction came; redirected mid-flight via `SendMessage`.
+**Correction:**
+1. Sent `SendMessage` to in-flight subagent with the new 6-doc structure, A/B/C section template, mapping of scraping concepts onto ADK layers, and strict image-order filename numbering (`00..05`).
+2. Updated `feedback_auto_memory_update.md` memory: rule now applies to ANY change, not just commit/push events — covers folder additions, tool installs, user-stated rules, structural pivots. Added 2026-05-12 broadening note inline.
+3. Created `reference_scrapling.md` memory pointing to clone path + new SCRAPING knowledge folder structure.
+4. Built production Python scraper `KNOWLEDGE/extracted/_scrape_futbin_scrapling.py` (Scrapling AsyncStealthySession pool, max_pages=8, solve_cloudflare=True, supabase-py upsert, checkpoint resume).
+5. Upgraded `_scrape_futbin_parallel.js`: split worker cap into `MAX_WORKERS_SAFE=6` vs `MAX_WORKERS_AGGRESSIVE=12` (gated by `--aggressive` flag), added `--tabs N` for parallel tabs WITHIN each worker sharing the same CF-cleared persistent context. Effective parallelism = workers × tabs. Both `_scrape_futbin_auto.js` and parallel scraper now end with explicit `process.exit(0)` so no lingering handles keep Node alive.
+6. Created `KNOWLEDGE/extracted/run/` with .bat + .ps1 wrappers for every Futbin scraper (`auto`, `parallel`, `headful`, `scrapling`, `delta`, `prices`, `range`, `reverse`, `filters`, `cookies`). Each ends with `exit /b %RC%` or `finally { exit $code }` so the terminal closes on completion regardless of success/failure. README explicitly forbids `pause`.
+**Rule for future:**
+1. **Memory rule is now ANY-change scope, not commit-only.** User-stated rules, folder creations, tool installs, structural pivots all trigger an immediate memory write. Don't wait for shipping events.
+2. **When user shares images of a target structure, mirror it EXACTLY — including image order even if logically out-of-sequence.** ADK images render Layer 5 (Plugins) before Layer 3 (Hooks); the SCRAPING folder names files `03_LAYER_5_DISTRIBUTION.md` then `04_LAYER_3_HOOKS.md` to match. Don't re-sort to "logical" order.
+3. **Auto-close on Windows terminals = .bat ending with `exit /b %RC%`** invoked via `cmd /c <file.bat>` (Task Scheduler) or double-click (File Explorer). PowerShell wrapper equivalent: `try { … } finally { exit $code }`. Never `pause` — that's the source of stuck terminals.
+4. **Aggressive concurrency on third-party sites is gated, not default.** New `--aggressive` flag in `_scrape_futbin_parallel.js` opts user into 12 workers + 4 tabs each. Without the flag, defaults stay at the safe `MAX_WORKERS_SAFE=6` to avoid CF rate-limit retaliation.
+5. **Python scraper docstrings containing Windows paths (`.\.scrapling-venv\…`) MUST use `r"""…"""`** — non-raw triple-quoted string flags `\.` as SyntaxWarning in Python 3.12+. Caught + fixed inline.
+6. **Long-running subagents need a tracked Mid-flight directive channel.** When user pivots requirements while an agent is running, immediately `SendMessage` the agent with the new spec — don't wait for it to finish and re-do everything.
+
+---
+
 **Date:** 2026-05-10
 **Context:** User reported that triggering any of the 9 cover-up overlays (21..29 — streaks, power-rankings, org-standings, biggest-margins, did-you-know, card-meta, schedule, punditry, goalfests) from the v2 broadcast control room crashed the page. The trigger + hide buttons were wired by commit `02abb7ab` (SimpleOverlayControl + ControlGrid entries) but a click on any "Trigger ON" 500'd the server action.
 **Mistake:** `SimpleOverlayControl` defaulted `payload="{}"` for every cover-up control. The `toggleOverlayAction` server action calls `triggerOverlay(...)` which runs `TEMPLATE_REGISTRY[legacyKey].schema.parse(payload)`. The 9 v2 keys mapped to 4 legacy template_keys with REQUIRED Zod fields:
