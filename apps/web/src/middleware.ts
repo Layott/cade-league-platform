@@ -29,6 +29,28 @@ const PLAYER_AREA_ROLES = new Set([
 
 const REFEREE_AREA_ROLES = new Set(["admin", "moderator", "referee"]);
 
+/**
+ * Roles permitted to enter /admin/* at all. coach / team_manager / player /
+ * viewer never see the admin shell — they get redirected to /profile with
+ * `?error=admin_forbidden`. Per-hub perm gate (matchday.read, etc.) runs as
+ * a second layer inside the staff cohort.
+ *
+ * Discovered 2026-05-12: previous "at-least-one-perm" threshold allowed the
+ * player role through because `matches.read` is shared between the public
+ * standings view and the /admin/match-days hub. Same code path on old + new
+ * Vercel — pre-existing leak surfaced during migration walk-through.
+ */
+const ADMIN_AREA_ROLES = new Set([
+  "admin",
+  "loc",
+  "idc",
+  "referee",
+  "technical",
+  "production",
+  "design",
+  "moderator",
+]);
+
 /** Inline perm-match helper — duplicated from admin-nav.ts because the
  * Edge runtime can't pull `lib/admin-nav` at module load if it transitively
  * imports server-only Supabase code. The matchesPerm logic is small. */
@@ -114,9 +136,20 @@ export async function middleware(req: NextRequest) {
   const roles = (rolesRows ?? []).map((r: { role: string }) => r.role);
 
   if (isAdmin) {
-    // Threshold: ANY admin-area access requires the user to hold at least
-    // ONE permission row. Wildcard '*' (admin) trivially satisfies. We
-    // resolve perms once + reuse for the per-hub check.
+    // Threshold (1): caller must hold at least one staff-tier role.
+    // coach / team_manager / player / viewer get bounced to /profile —
+    // the admin shell never paints, even with `matches.read` shared
+    // between public standings and the match-days hub.
+    const hasStaffRole = roles.some((r) => ADMIN_AREA_ROLES.has(r));
+    if (!hasStaffRole) {
+      return NextResponse.redirect(
+        new URL("/profile?error=admin_forbidden", req.url),
+      );
+    }
+
+    // Threshold (2): staff role still needs at least one perm row to
+    // pass downstream hub gates. Defensive (a misconfigured role with
+    // no rows would otherwise crash inside hub resolution).
     if (roles.length === 0) {
       return NextResponse.redirect(
         new URL("/profile?error=admin_forbidden", req.url),
