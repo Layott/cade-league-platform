@@ -4,7 +4,7 @@
 
 **Confirmed scope:**
 - Same domain `cade-league.vercel.app` (no custom domain)
-- Crons kept (`publish-announcements` every 5min, `squad-deadline-check` hourly — now in `vercel.json`, auto-applied)
+- Crons kept (`publish-announcements` every 5min, `squad-deadline-check` hourly — now driven by GitHub Actions `.github/workflows/cron.yml`, NOT Vercel cron, since Hobby tier rejects sub-daily schedules)
 - One marketplace integration to replicate (Vercel KV / Upstash Redis for rate-limiting)
 - No live broadcast timing constraint
 
@@ -20,7 +20,7 @@
 | Vercel KV | Used only by `apps/web/src/lib/rate-limit.ts`. Re-provision = reset rate-limit windows. No business state lost |
 | Supabase DB | External (ref `vqzhczyugpaooegmolgk`). Unaffected |
 | Custom domain | None. Pure `.vercel.app` |
-| Crons | Now in `vercel.json` (commit added). Auto-applied on import to new account |
+| Crons | Driven by GitHub Actions (`.github/workflows/cron.yml`, commit `7adb71f6`). Hobby tier rejects sub-daily Vercel cron. Requires `CRON_SECRET` GitHub repo secret to match Vercel env var |
 
 ---
 
@@ -117,15 +117,15 @@ Expected: 200/307. If 500 → check Vercel build logs + verify env vars all set.
 
 Login as admin in browser, walk one flow (e.g. open `/admin/match-days`). Confirms Supabase auth round-trip works from new project.
 
-### 1.7 Confirm crons registered
+### 1.7 Confirm GitHub Actions cron workflow runs
 
-Vercel dashboard → new project → Settings → Cron Jobs. Should show 2 entries auto-loaded from `vercel.json`:
-- `/api/cron/publish-announcements` `*/5 * * * *`
-- `/api/cron/squad-deadline-check` `0 * * * *`
+Cron schedules are NOT in Vercel (Hobby blocks sub-daily). Workflow lives at `.github/workflows/cron.yml`, fires `*/5 * * * *` + `0 * * * *` against the production URL using `X-Cron-Secret` header.
 
-If Hobby tier rejects sub-daily schedules, Vercel shows error. Two fixes:
-- Upgrade to Pro (if Hobby still won't allow 5min/hourly)
-- Reduce schedule to daily (`0 8 * * *`) and rely on external trigger for higher frequency
+Required: GitHub repo Settings → Secrets and variables → Actions → New repository secret → `CRON_SECRET` = same value as the Vercel env var.
+
+Verify on GitHub: repo → Actions tab → workflow `cron` → last run is green. If still empty (just-added secret), trigger manually via "Run workflow" button.
+
+Vercel dashboard → new project → Settings → Cron Jobs should be EMPTY. Confirms no stale Vercel cron entries competing with GitHub Actions.
 
 ---
 
@@ -190,7 +190,7 @@ Same domain → any registered webhooks already point at correct URL. Skip.
 ### 4.1 Public routes
 
 ```bash
-for path in / /signin /standings /fixtures /tournaments /players /orgs; do
+for path in / /login /standings /fixtures /tournaments /players /orgs; do
   echo -n "$path → "
   curl -o /dev/null -s -w "%{http_code}\n" https://cade-league.vercel.app$path
 done
@@ -229,14 +229,16 @@ Expected: 200 each.
 
 ### 4.5 Cron endpoints manual fire
 
+Confirms endpoints reachable + accept header even if next scheduled GitHub Actions run is hours away.
+
 ```bash
-# Use CRON_SECRET from .env.local
+# Use CRON_SECRET from .env.local (same value used by GitHub Actions repo secret)
 SECRET=$(grep CRON_SECRET apps/web/.env.local | cut -d= -f2)
 curl -H "X-Cron-Secret: $SECRET" https://cade-league.vercel.app/api/cron/publish-announcements
 curl -H "X-Cron-Secret: $SECRET" https://cade-league.vercel.app/api/cron/squad-deadline-check
 ```
 
-Both return 200 + log entries visible in new Vercel dashboard → Logs.
+Both return 200 + log entries visible in new Vercel dashboard → Logs. Then verify last green GitHub Actions `cron` workflow run on the repo's Actions tab.
 
 ### 4.6 OBS browser-source check
 
@@ -262,7 +264,7 @@ Once Phase 2.2 fires (old project deleted), no rollback. Subdomain frees + new p
 | Supabase DB connection | Same | Same |
 | Env var VALUES | Same | Same |
 | Vercel KV connection strings | Old instance | NEW instance (auto-injected) |
-| Cron schedules | Dashboard config | `vercel.json` (deterministic) |
+| Cron driver | Vercel Cron (Hobby allowed) | GitHub Actions (`.github/workflows/cron.yml`) — Hobby on new account rejects sub-daily |
 | Vercel CLI `.vercel/project.json` | Old projectId | New projectId |
 | 4hr Fluid Active CPU cap | Resets monthly | **Same cap, same limit** |
 
