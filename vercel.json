@@ -12,9 +12,5 @@
         { "key": "Cache-Control", "value": "no-store, max-age=0, must-revalidate" }
       ]
     }
-  ],
-  "crons": [
-    { "path": "/api/cron/publish-announcements", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/squad-deadline-check", "schedule": "0 * * * *" }
   ]
 }

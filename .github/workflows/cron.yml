@@ -1,0 +1,37 @@
+name: cron
+
+# Replaces Vercel Cron Jobs (Hobby tier limited to daily-only).
+# Hits the same /api/cron/* endpoints via X-Cron-Secret header.
+# Secret stored in GitHub Actions repo secret CRON_SECRET (must match
+# the prod Vercel env var of the same name).
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # publish-announcements every 5 minutes
+    - cron: "0 * * * *"     # squad-deadline-check hourly
+  workflow_dispatch:
+
+jobs:
+  publish-announcements:
+    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire publish-announcements
+        run: |
+          curl -sS -X GET \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            "https://cade-league.vercel.app/api/cron/publish-announcements" \
+            -o /tmp/resp.txt -w "HTTP %{http_code}\n"
+          cat /tmp/resp.txt || true
+
+  squad-deadline-check:
+    if: github.event.schedule == '0 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire squad-deadline-check
+        run: |
+          curl -sS -X GET \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            "https://cade-league.vercel.app/api/cron/squad-deadline-check" \
+            -o /tmp/resp.txt -w "HTTP %{http_code}\n"
+          cat /tmp/resp.txt || true
