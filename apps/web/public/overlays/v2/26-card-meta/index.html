@@ -318,6 +318,16 @@ body.cade-exiting .canvas { opacity: 0; }
   new MutationObserver(apply).observe(document.body, {attributes:true, attributeFilter:['class']});
 })();
 </script>
+<script data-tag="cade-card-img-fallback">
+(function(){
+  function bind(img){
+    img.addEventListener('error', function(){ img.style.visibility = 'hidden'; });
+    img.addEventListener('load', function(){ if (img.naturalWidth > 0) img.style.visibility = ''; });
+    if (img.complete && img.naturalWidth === 0) img.style.visibility = 'hidden';
+  }
+  document.querySelectorAll('.cm-card img').forEach(bind);
+})();
+</script>
 <script data-tag="cade-demo-mode">
 (function(){
   if (new URLSearchParams(location.search).get('demo') !== '1') return;

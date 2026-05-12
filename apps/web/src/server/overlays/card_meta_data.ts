@@ -103,6 +103,12 @@ export async function fetchCardMetaData(
   for (const it of items) {
     if (!it.resolved_fc_player_id || !it.fc_player) continue;
     const fp = it.fc_player;
+    // Prefer the locally-mirrored URLs (Supabase Storage) over the
+    // raw Futbin CDN ones — Futbin's CDN hot-link-blocks any non-browser
+    // origin (see _backfill-card-images.mjs + scraper enhancement). Falls
+    // back to the Futbin URL for rows the backfill hasn't touched yet so
+    // the field is never undefined in a transitional state.
+    const attrs = fp.attributes ?? {};
     const entry =
       accum.get(fp.id) ??
       {
@@ -110,8 +116,14 @@ export async function fetchCardMetaData(
         name: fp.name,
         rating: fp.rating,
         itemType: fp.item_type,
-        cardBgUrl: (fp.attributes?.["card_bg_url"] as string) ?? null,
-        cardFaceUrl: (fp.attributes?.["card_image_url"] as string) ?? null,
+        cardBgUrl:
+          (attrs["card_bg_local"] as string) ??
+          (attrs["card_bg_url"] as string) ??
+          null,
+        cardFaceUrl:
+          (attrs["card_image_local"] as string) ??
+          (attrs["card_image_url"] as string) ??
+          null,
         submissions: new Set<string>(),
       };
     entry.submissions.add(it.submission_id);
