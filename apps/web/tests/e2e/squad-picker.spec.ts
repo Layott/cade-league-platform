@@ -66,8 +66,8 @@ test("picker page mounts with pitch layout + formation switcher", async ({
   // in some repos uses the admin password for all seeded users).
   await page.goto("/login");
   await page.getByLabel("Email").fill(PLAYER_EMAIL);
-  await page.getByLabel("Password").fill(PLAYER_PASSWORD);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByTestId("login-password-input").fill(PLAYER_PASSWORD);
+  await page.getByTestId("login-submit-btn").click();
 
   // Wait for either the player route or the login error.
   const at = await Promise.race([
@@ -111,8 +111,8 @@ test("picker API is reachable + gracefully empty on empty catalogue", async ({
 
   await page.goto("/login");
   await page.getByLabel("Email").fill(PLAYER_EMAIL);
-  await page.getByLabel("Password").fill(PLAYER_PASSWORD);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByTestId("login-password-input").fill(PLAYER_PASSWORD);
+  await page.getByTestId("login-submit-btn").click();
   const landed = await page
     .waitForURL(/\/player/, { timeout: 10_000 })
     .then(() => true)
