@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 /**
  * 2026-05-10 — drag-and-drop slot/lane assigner for /admin/match-days/[id].
@@ -69,6 +69,38 @@ export function SlotLaneDragBoard({
     return out;
   });
 
+  // Reconcile state when the `fixtures` prop changes — e.g. after
+  // `addFixtureAction` revalidates the route and a new fixture lands in
+  // SSR. Without this, the lazy-init state map is missing the new
+  // matchId and the lookups below crash with
+  // `Cannot read properties of undefined (reading 'slot')`. We only
+  // INSERT new keys (or DROP removed ones) and never overwrite existing
+  // user-edited entries so pending drag state survives revalidation.
+  useEffect(() => {
+    setState((prev) => {
+      const next: typeof prev = {};
+      let changed = false;
+      for (const f of fixtures) {
+        if (prev[f.matchId]) {
+          next[f.matchId] = prev[f.matchId];
+        } else {
+          next[f.matchId] = { slot: f.initialSlot, lane: f.initialLane };
+          changed = true;
+        }
+      }
+      // Detect removals too — fixtures dropped by the server are pruned.
+      if (!changed) {
+        for (const k of Object.keys(prev)) {
+          if (!(k in next)) {
+            changed = true;
+            break;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [fixtures]);
+
   // Highest slot currently used + at least 1. Producers can add more slots
   // via the "Add slot row" button; cap at 50 (matches server validator).
   const [maxSlot, setMaxSlot] = useState<number>(() => {
@@ -84,14 +116,13 @@ export function SlotLaneDragBoard({
   const [dragId, setDragId] = useState<string | null>(null);
 
   // Look up which fixture occupies a given cell (slot, lane). Pool = no slot.
+  // Fixtures the state map hasn't caught up to yet (newly-added between
+  // renders) are treated as pool members until the effect above seeds them.
   const occupants = useMemo(() => {
     const map = new Map<CellKey, FixtureChip>();
     for (const f of fixtures) {
-      const s = state[f.matchId];
-      if (s.slot == null || s.lane == null) {
-        // Pool members aren't single-occupant — skip.
-        continue;
-      }
+      const s = state[f.matchId] ?? { slot: null, lane: null };
+      if (s.slot == null || s.lane == null) continue;
       map.set(`slot-${s.slot}-${s.lane}`, f);
     }
     return map;
@@ -100,7 +131,7 @@ export function SlotLaneDragBoard({
   const poolFixtures = useMemo(
     () =>
       fixtures.filter((f) => {
-        const s = state[f.matchId];
+        const s = state[f.matchId] ?? { slot: null, lane: null };
         return s.slot == null || s.lane == null;
       }),
     [state, fixtures],
@@ -119,7 +150,7 @@ export function SlotLaneDragBoard({
       if (target.slot != null && target.lane != null) {
         const targetKey: CellKey = `slot-${target.slot}-${target.lane}`;
         const occupant = occupants.get(targetKey);
-        const myCurrent = prev[matchId];
+        const myCurrent = prev[matchId] ?? { slot: null, lane: null };
         if (occupant && occupant.matchId !== matchId) {
           next[occupant.matchId] = { slot: myCurrent.slot, lane: myCurrent.lane };
         }
@@ -162,7 +193,7 @@ export function SlotLaneDragBoard({
     const fd = new FormData();
     fd.set("matchDayId", matchDayId);
     for (const f of fixtures) {
-      const a = state[f.matchId];
+      const a = state[f.matchId] ?? { slot: null, lane: null };
       fd.set(`assignment[${f.matchId}][slot]`, a.slot != null ? String(a.slot) : "");
       fd.set(
         `assignment[${f.matchId}][lane]`,
