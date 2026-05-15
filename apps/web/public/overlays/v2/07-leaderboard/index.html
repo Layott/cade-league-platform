@@ -780,6 +780,7 @@
       54px      /* L */
       54px      /* D */
       72px      /* GD */
+      78px      /* DED — disciplinary deductions */
       78px;     /* PTS */
     column-gap: 6px;
     align-items: end;
@@ -811,7 +812,7 @@
   .row {
     display: grid;
     grid-template-columns:
-      62px 1fr 54px 54px 54px 54px 72px 78px;
+      62px 1fr 54px 54px 54px 54px 72px 78px 78px;
     column-gap: 6px;
     align-items: center;
     padding: 0 14px;
@@ -878,25 +879,31 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
 
-  /* Disciplinary deduction chip — inline after the player name when the
-     server-side `sanctions` field is populated (e.g. "−2 PTS · −3 GD").
-     Brand pink + small font so it reads as a status badge without
-     overpowering the name. */
-  .ded-chip {
-    display: inline-block;
-    margin-left: 10px;
-    padding: 1px 6px;
-    border: 1px solid rgba(254, 3, 109, 0.65);
-    background: rgba(254, 3, 109, 0.18);
-    color: #fe036d;
-    font-family: var(--mono, "JetBrains Mono", monospace);
-    font-size: 12px;
-    font-weight: 700;
+  /* Disciplinary deduction column cell. Empty rows render an em-dash
+     in the neutral chalk tone; deducted rows render the magnitudes
+     stacked ("−2 PTS" / "−3 GD") in brand pink so the impact is
+     readable at broadcast scale without breaking the row height. */
+  .stat-ded {
+    font-family: var(--display);
+    font-weight: 800; font-stretch: 75%;
+    font-size: 18px;
+    line-height: 1.05;
+    color: rgba(255, 255, 255, 0.35);
+    text-align: center;
     letter-spacing: 0.04em;
-    border-radius: 2px;
-    vertical-align: middle;
-    text-shadow: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
+  .stat-ded.has-ded {
+    color: #fe036d;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+  }
+  .stat-ded.has-ded span { display: block; }
+  .row.is-top .stat-ded { color: rgba(0, 0, 0, 0.55); }
+  .row.is-top .stat-ded.has-ded { color: #b9024f; }
 
   /* Numeric stat cells (MP / W / L / D / GD / PTS) */
   .stat {
@@ -1038,6 +1045,7 @@
           <div class="h--center">L</div>
           <div class="h--center">D</div>
           <div class="h--center">GD</div>
+          <div class="h--center">DED</div>
           <div class="h--pts">PTS</div>
         </div>
         <div class="rows" id="rows-left"></div>
@@ -1051,6 +1059,7 @@
           <div class="h--center">L</div>
           <div class="h--center">D</div>
           <div class="h--center">GD</div>
+          <div class="h--center">DED</div>
           <div class="h--pts">PTS</div>
         </div>
         <div class="rows" id="rows-right"></div>
@@ -1114,35 +1123,51 @@
       var l    = (s.l  != null ? s.l  : (s.losses || 0));
       var d    = (s.d  != null ? s.d  : (s.draws  || 0));
       var pts  = (s.pts != null ? s.pts : (s.points != null ? s.points : 0));
-      // 2026-05-15 — server-side `sanctions` string ("−2 PTS · −3 GD")
-      // renders as a pink chip right of the player name. Falls back to
-      // synthesising from punishment_(points|gd)_deducted when the
-      // payload carries raw numbers from a Realtime push.
-      var sanctions = s.sanctions || s.sanction_label || '';
-      if (!sanctions) {
-        var pDed = Number(s.punishment_points_deducted || s.pointsAdj && -s.pointsAdj || 0);
-        var gDed = Number(s.punishment_gd_deducted || s.gdAdj && -s.gdAdj || 0);
-        if (pDed > 0 || gDed > 0) {
-          var parts = [];
-          if (pDed > 0) parts.push('−' + pDed + ' PTS');
-          if (gDed > 0) parts.push('−' + gDed + ' GD');
-          sanctions = parts.join(' · ');
-        }
+      // 2026-05-15 — disciplinary deductions render in a dedicated DED
+      // column between GD and PTS. Server payload may arrive as a
+      // pre-formatted `sanctions` string ("−2 PTS · −3 GD") or as raw
+      // numeric magnitudes from a Realtime push — accept both.
+      var pDed = Number(
+        s.punishment_points_deducted != null
+          ? s.punishment_points_deducted
+          : s.pointsAdj && -s.pointsAdj || 0,
+      );
+      var gDed = Number(
+        s.punishment_gd_deducted != null
+          ? s.punishment_gd_deducted
+          : s.gdAdj && -s.gdAdj || 0,
+      );
+      if (s.sanctions && (!pDed && !gDed)) {
+        // Parse the canonical "−N PTS · −N GD" string into magnitudes
+        // when only the formatted text is available on the wire.
+        var m = String(s.sanctions);
+        var ptsMatch = m.match(/[-−](\d+)\s*PTS/i);
+        var gdMatch  = m.match(/[-−](\d+)\s*GD/i);
+        if (ptsMatch) pDed = Number(ptsMatch[1]);
+        if (gdMatch)  gDed = Number(gdMatch[1]);
       }
-      var sanctionsHtml = sanctions
-        ? '<span class="ded-chip" title="Disciplinary deductions">' + escHtml(sanctions) + '</span>'
-        : '';
+      var hasDed = (pDed > 0) || (gDed > 0);
+      var dedHtml;
+      if (hasDed) {
+        var pieces = '';
+        if (pDed > 0) pieces += '<span>−' + pDed + ' PTS</span>';
+        if (gDed > 0) pieces += '<span>−' + gDed + ' GD</span>';
+        dedHtml = '<div class="stat stat-ded has-ded" title="Disciplinary deductions">' + pieces + '</div>';
+      } else {
+        dedHtml = '<div class="stat stat-ded">—</div>';
+      }
       var klass = ['row'];
       if (isTop) klass.push('is-top');
       var pid = s.playerId || s.player_id || s.slug || ('row' + posIdx);
       return '<div class="' + klass.join(' ') + '" id="pid-' + pid + '" data-pos="' + pos + '">' +
         '<div class="pos-num">' + pos + '</div>' +
-        '<div class="player-name">' + escHtml(name) + sanctionsHtml + '</div>' +
+        '<div class="player-name">' + escHtml(name) + '</div>' +
         '<div class="stat">' + mp + '</div>' +
         '<div class="stat">' + w  + '</div>' +
         '<div class="stat">' + l  + '</div>' +
         '<div class="stat">' + d  + '</div>' +
         '<div class="stat stat-gd ' + gdClass + '">' + fmtSigned(gd) + '</div>' +
+        dedHtml +
         '<div class="pts">' + pts + '</div>' +
       '</div>';
     }
