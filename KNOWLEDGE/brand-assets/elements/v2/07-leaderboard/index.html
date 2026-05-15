@@ -1241,7 +1241,20 @@
             gf:  r.gf  != null ? r.gf  : (r.goals_for     || 0),
             ga:  r.ga  != null ? r.ga  : (r.goals_against || 0),
             gd:  r.gd  != null ? r.gd  : (r.goal_difference || 0),
-            pts: r.pts != null ? r.pts : (r.points || 0)
+            pts: r.pts != null ? r.pts : (r.points || 0),
+            // 2026-05-15 — forward disciplinary deduction signals so the
+            // DED column in buildRow lights up. The normalize step
+            // previously dropped these fields, which produced an
+            // em-dash for every row even when the live API payload
+            // carried `sanctions` for Dadaboi. Pre-formatted
+            // `sanctions` plus raw `punishment_(points|gd)_deducted`
+            // and `pointsAdj`/`gdAdj` ride through so buildRow can pick
+            // whichever shape arrived.
+            sanctions: r.sanctions,
+            punishment_points_deducted: r.punishment_points_deducted,
+            punishment_gd_deducted: r.punishment_gd_deducted,
+            pointsAdj: r.pointsAdj,
+            gdAdj: r.gdAdj
           };
         });
         rerender(normalized);
