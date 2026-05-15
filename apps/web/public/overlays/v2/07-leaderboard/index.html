@@ -1362,12 +1362,21 @@
 
 <script data-tag="cade-demo-mode">
 (function () {
-  if (new URLSearchParams(location.search).get('demo') !== '1') return;
+  var qs = new URLSearchParams(location.search);
+  if (qs.get('demo') !== '1') return;
   function fire(type) {
     window.dispatchEvent(new MessageEvent('message', { data: { type: type } }));
   }
   // Initial show after a tiny tick so the gate observer is wired.
   setTimeout(function () { fire('show'); }, 200);
+  // 2026-05-15 — admin design preview embeds this overlay with
+  // `?preview=1` so designers see a stable canvas while tweaking
+  // tokens. Skip the hide cadence entirely there — otherwise the
+  // overlay flips to black every 12s and admins think their edits
+  // wiped the preview. Standalone `?demo=1` (OBS smoke previews,
+  // designer downloads) keeps the original show/hide cycle so the
+  // motion design can be reviewed end-to-end.
+  if (qs.get('preview') === '1') return;
   // Loop: show 8s, hide 4s, repeat.
   setInterval(function () { fire('hide'); }, 12000);
   setTimeout(function () {

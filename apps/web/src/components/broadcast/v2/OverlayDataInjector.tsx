@@ -267,6 +267,20 @@ export type OverlayDataInjectorProps = {
    */
   demo?: boolean;
   /**
+   * 2026-05-15 — admin design preview flag.
+   *
+   * The /admin/broadcast/v2/design page mounts this overlay in an
+   * embedded iframe so designers can tune tokens with a live canvas
+   * next to the controls. With `demo=1` alone the static HTML cycles
+   * `show` 8s / `hide` 4s, which makes designers think their edit
+   * wiped the preview every time the hide phase lands. Forwarding
+   * `preview=1` lets the static HTML pin the canvas to its `show`
+   * state so the live preview stays continuously visible. OBS smoke
+   * previews + designer downloads still use `?demo=1` without
+   * `?preview=1` so they keep the original motion-design cycle.
+   */
+  preview?: boolean;
+  /**
    * Phase A — overlay design tokens.
    *
    * Persisted DB tokens for this overlay+variant, resolved server-side
@@ -521,6 +535,7 @@ export default function OverlayDataInjector({
   slot = null,
   ambient = false,
   demo = false,
+  preview = false,
   designTokens,
   previewTokens,
   designTextTokens,
@@ -1137,6 +1152,11 @@ export default function OverlayDataInjector({
   // `1` so the static HTML's strict equality check passes regardless of
   // which truthy form the caller used (`1` / `true` / `yes`).
   if (demo) params.set("demo", "1");
+  // 2026-05-15 — admin design preview pins the canvas to its `show`
+  // state by piping `?preview=1` through to the inner iframe (gated
+  // inside `data-tag="cade-demo-mode"`). Without this hop the demo
+  // hide cycle keeps blanking the preview every 12s.
+  if (preview) params.set("preview", "1");
   // Phase A — overlay design tokens are forwarded via b64-JSON query
   // params. The static HTML's inline bootstrap script decodes them and
   // appends a `<style id="cade-injected-tokens">` block to its own

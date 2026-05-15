@@ -496,6 +496,7 @@ export default async function OverlayV2Page({
         slot={slotParsed}
         ambient={ambient}
         demo={isDemo}
+        preview={isPreview}
         designTokens={designTokens}
         previewTokens={previewTokens ?? undefined}
         designTextTokens={designTextTokens}
