@@ -34,9 +34,15 @@ export type PitchLayoutProps = {
   onCardDragStart?: (slotIndex: number) => void;
   onCardDrop?: (slotIndex: number) => void;
   onCardDragEnd?: () => void;
+  /**
+   * 2026-05-15 — per-slot remove. Renders an × badge on filled pitch
+   * cards; click clears just that slot without triggering the slot's
+   * primary `onSlotClick`. Omit for read-only renders.
+   */
+  onSlotClear?: (slotIndex: number) => void;
 };
 
-export function PitchLayout({ formation, slots, onSlotClick, onCardDragStart, onCardDrop, onCardDragEnd }: PitchLayoutProps) {
+export function PitchLayout({ formation, slots, onSlotClick, onCardDragStart, onCardDrop, onCardDragEnd, onSlotClear }: PitchLayoutProps) {
   const defs = FORMATIONS[formation];
   return (
     <div
@@ -97,6 +103,9 @@ export function PitchLayout({ formation, slots, onSlotClick, onCardDragStart, on
                 onClick={() => onSlotClick(s)}
                 size="sm"
                 dataTestId={`pitch-slot-${s.slotIndex}`}
+                onRemove={
+                  card && onSlotClear ? () => onSlotClear(s.slotIndex) : undefined
+                }
               />
               <span className="rounded-sm bg-black/40 px-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/80">
                 {s.label}

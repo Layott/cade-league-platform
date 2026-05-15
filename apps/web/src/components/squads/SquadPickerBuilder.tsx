@@ -646,6 +646,7 @@ export function SquadPickerBuilder({
           onCardDragStart={(idx) => handleDragStart("slot", idx)}
           onCardDrop={(idx) => handleDrop("slot", idx)}
           onCardDragEnd={handleDragEnd}
+          onSlotClear={clearSlot}
         />
 
         <div className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-3">
@@ -678,16 +679,8 @@ export function SquadPickerBuilder({
                     size="sm"
                     onClick={() => openSub(i)}
                     dataTestId={`sub-slot-${i}`}
+                    onRemove={c ? () => clearSub(i) : undefined}
                   />
-                  {c ? (
-                    <button
-                      type="button"
-                      onClick={() => clearSub(i)}
-                      className="text-[9px] uppercase tracking-[0.14em] text-[var(--chalk-3)] hover:text-[var(--flare)]"
-                    >
-                      Clear
-                    </button>
-                  ) : null}
                 </div>
               );
             })}

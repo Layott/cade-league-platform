@@ -21,6 +21,14 @@ export type FutCardProps = {
   onClick?: () => void;
   size?: "sm" | "md";
   dataTestId?: string;
+  /**
+   * 2026-05-15 — per-slot remove badge. Rendered as a small × in the
+   * top-right corner of a filled card; clicking it calls `onRemove`
+   * WITHOUT triggering the parent `onClick` (the click is stopped so
+   * the picker dialog doesn't re-open during a clear gesture).
+   * Omit to disable the badge entirely (read-only views).
+   */
+  onRemove?: () => void;
 };
 
 type Band = {
@@ -73,7 +81,7 @@ function bandFor(card: CardSearchResult): Band {
   };
 }
 
-export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps) {
+export function FutCard({ card, onClick, size = "sm", dataTestId, onRemove }: FutCardProps) {
   if (!card) {
     return (
       <button
@@ -126,6 +134,32 @@ export function FutCard({ card, onClick, size = "sm", dataTestId }: FutCardProps
         } ${hasFrame ? "" : band.ring} ${band.text} ${dims} transition-transform hover:scale-[1.03]`
       }
     >
+      {onRemove ? (
+        // Per-slot remove badge. `span` (not nested `button`) — buttons
+        // inside buttons are invalid HTML and Firefox swallows the inner
+        // click. role+keyboard handler keep it operable.
+        <span
+          role="button"
+          aria-label="Remove player from this slot"
+          tabIndex={0}
+          data-testid={dataTestId ? `${dataTestId}-remove` : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onRemove();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.stopPropagation();
+              e.preventDefault();
+              onRemove();
+            }
+          }}
+          className="absolute right-0.5 top-0.5 z-10 inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/40 bg-black/70 text-[10px] font-bold leading-none text-white shadow-sm hover:border-[var(--flare)] hover:bg-[var(--flare)] hover:text-white"
+        >
+          ×
+        </span>
+      ) : null}
       {/* Card frame (gold/icon/hero/promo shell). Rendered FIRST so the
           portrait sits above it and the text overlays sit on top of both. */}
       {frameUrl ? (
