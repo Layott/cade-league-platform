@@ -41,13 +41,33 @@ const MIME = {
   '.otf': 'font/otf',
 };
 
+// Heavy PNGs that ship as compressed JPGs in portable builds only.
+// Source HTMLs reference the PNGs for cloud (where they load as separate
+// HTTP files); inlining the PNG would balloon portable files to 10MB+ and
+// break file:// loads on slower PCs. Substituting the same-name .jpg
+// variant keeps the visual close while shrinking by ~88%.
+const PORTABLE_PNG_TO_JPG = new Set([
+  'ELITE S2 BG.png',
+]);
+
 function inlineFile(path) {
-  if (!existsSync(path)) {
-    console.warn('MISSING:', path);
+  let resolved = path;
+  let ext = extname(path).toLowerCase();
+  if (ext === '.png') {
+    const base = path.split(/[\\/]/).pop();
+    if (PORTABLE_PNG_TO_JPG.has(base)) {
+      const jpgPath = path.slice(0, -4) + '.jpg';
+      if (existsSync(jpgPath)) {
+        resolved = jpgPath;
+        ext = '.jpg';
+      }
+    }
+  }
+  if (!existsSync(resolved)) {
+    console.warn('MISSING:', resolved);
     return null;
   }
-  const buf = readFileSync(path);
-  const ext = extname(path).toLowerCase();
+  const buf = readFileSync(resolved);
   const mime = MIME[ext] || 'application/octet-stream';
   return `data:${mime};base64,${buf.toString('base64')}`;
 }
