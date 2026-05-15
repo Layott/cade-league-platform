@@ -44,6 +44,10 @@ const COLS: Array<{ key: string; label: string; align?: "left" | "center" | "rig
   { key: "gf", label: "GF", align: "center" },
   { key: "ga", label: "GA", align: "center" },
   { key: "gd", label: "GD", align: "center" },
+  // 2026-05-15 — DED column surfaces disciplinary deductions on both
+  // points + goal difference so the impact baked into Pts + GD is
+  // visible at a glance. "—" when the player has no live deduction.
+  { key: "ded", label: "DED", align: "center" },
   { key: "pts", label: "Pts", align: "center" },
   { key: "form", label: "Form", align: "center" },
 ];
@@ -160,7 +164,7 @@ export function LiveLeaderboard({
                   {r.pos}
                 </td>
                 <td className="px-3 py-3">
-                  <PlayerCell name={r.name} gamerTag={r.gamerTag} pointsAdj={r.pointsAdj} />
+                  <PlayerCell name={r.name} gamerTag={r.gamerTag} />
                 </td>
                 <td className="px-3 py-3 text-center font-mono tabular">{r.played}</td>
                 <td className="px-3 py-3 text-center font-mono tabular text-[12px]">
@@ -170,6 +174,9 @@ export function LiveLeaderboard({
                 <td className="px-3 py-3 text-center font-mono tabular">{r.ga}</td>
                 <td className="px-3 py-3 text-center font-mono tabular">
                   {r.gd > 0 ? `+${r.gd}` : r.gd}
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <DedCell pointsAdj={r.pointsAdj} gdAdj={r.gdAdj} />
                 </td>
                 <td className="px-3 py-3 text-center font-mono tabular font-semibold text-[var(--chalk-0)]">
                   {r.pts}
@@ -189,11 +196,9 @@ export function LiveLeaderboard({
 function PlayerCell({
   name,
   gamerTag,
-  pointsAdj,
 }: {
   name: string;
   gamerTag: string;
-  pointsAdj: number;
 }) {
   const photo = getPlayerAvatarUrl(gamerTag);
   return (
@@ -217,16 +222,27 @@ function PlayerCell({
         <span className="font-display text-sm font-semibold text-[var(--chalk-0)]">
           {name}
         </span>
-        {pointsAdj < 0 ? (
-          <span
-            className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--flare)]"
-            data-testid="sanction-badge"
-          >
-            {pointsAdj}pts
-          </span>
-        ) : null}
       </div>
     </div>
+  );
+}
+
+function DedCell({ pointsAdj, gdAdj }: { pointsAdj: number; gdAdj: number }) {
+  // pointsAdj / gdAdj arrive negative (or 0) from loadLeaderboard.
+  const ptsDed = pointsAdj < 0 ? -pointsAdj : 0;
+  const gdDed = gdAdj < 0 ? -gdAdj : 0;
+  if (ptsDed === 0 && gdDed === 0) {
+    return <span className="font-mono text-[12px] tabular text-[var(--chalk-3)]">—</span>;
+  }
+  return (
+    <span
+      data-testid="sanction-badge"
+      title={`Disciplinary deductions${ptsDed > 0 ? ` · ${ptsDed} pts` : ""}${gdDed > 0 ? ` · ${gdDed} GD` : ""}`}
+      className="inline-flex flex-col items-center gap-0.5 rounded-sm border border-[var(--flare)]/60 bg-[var(--flare)]/15 px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none tracking-[0.05em] text-[var(--flare)]"
+    >
+      {ptsDed > 0 ? <span className="tabular">−{ptsDed} pts</span> : null}
+      {gdDed > 0 ? <span className="tabular">−{gdDed} gd</span> : null}
+    </span>
   );
 }
 

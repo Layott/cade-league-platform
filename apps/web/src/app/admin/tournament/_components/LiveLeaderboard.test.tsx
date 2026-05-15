@@ -79,9 +79,13 @@ describe("LiveLeaderboard", () => {
   });
 
   it("renders sanction badge for negative pointsAdj", () => {
+    // 2026-05-15 — DED column replaced the under-name `-3pts` chip with a
+    // dedicated cell. Badge text now lives inside the new column and uses
+    // the canonical "−N pts" form (positive magnitude + en-dash) so points
+    // + GD deductions can share the same formatting.
     render(<LiveLeaderboard seasonId="s1" initialRows={ROWS} />);
     const badge = screen.getByTestId("sanction-badge");
-    expect(badge.textContent).toBe("-3pts");
+    expect(badge.textContent).toContain("−3 pts");
   });
 
   it("renders form pills with correct letters", () => {

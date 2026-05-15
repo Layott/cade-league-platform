@@ -44,6 +44,10 @@ export function StandingsTable({ rows }: { rows: StandingsRow[] }) {
               <ColHeader label="GF" hint="Goals for" />
               <ColHeader label="GA" hint="Goals against" />
               <ColHeader label="GD" hint="Goal difference" />
+              <ColHeader
+                label="DED"
+                hint="Disciplinary deduction (points / goal difference)"
+              />
               <th
                 scope="col"
                 className="w-16 px-3 py-3 text-right font-bold tracking-[0.22em] text-[var(--signal)]"
@@ -57,7 +61,9 @@ export function StandingsTable({ rows }: { rows: StandingsRow[] }) {
               const rank = idx + 1;
               const zebra =
                 idx % 2 === 0 ? "bg-transparent" : "bg-[var(--ink-3)]/40";
-              const deduction = r.punishment_points_deducted;
+              const ptsDed = r.punishment_points_deducted;
+              const gdDed = r.punishment_gd_deducted;
+              const hasDed = ptsDed > 0 || gdDed > 0;
               return (
                 <tr
                   key={r.player_id}
@@ -86,15 +92,6 @@ export function StandingsTable({ rows }: { rows: StandingsRow[] }) {
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
                           <span>@{r.gamer_tag}</span>
-                          {deduction > 0 ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-sm border border-[var(--flare)]/60 bg-[var(--flare)]/15 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[var(--flare)]"
-                              title={`Points deducted: ${deduction}`}
-                            >
-                              <span aria-hidden>!</span>
-                              <span>−{deduction} pen</span>
-                            </span>
-                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -116,6 +113,19 @@ export function StandingsTable({ rows }: { rows: StandingsRow[] }) {
                           : undefined
                     }
                   />
+                  <td className="px-2 py-3 text-center">
+                    {hasDed ? (
+                      <span
+                        title={`Disciplinary deductions${ptsDed > 0 ? ` · ${ptsDed} pts` : ""}${gdDed > 0 ? ` · ${gdDed} GD` : ""}`}
+                        className="inline-flex flex-col items-center gap-0.5 rounded-sm border border-[var(--flare)]/60 bg-[var(--flare)]/15 px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none tracking-[0.05em] text-[var(--flare)]"
+                      >
+                        {ptsDed > 0 ? <span className="tabular">−{ptsDed} pts</span> : null}
+                        {gdDed > 0 ? <span className="tabular">−{gdDed} gd</span> : null}
+                      </span>
+                    ) : (
+                      <span className="tabular text-sm text-[var(--chalk-3)]">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 text-right">
                     <span className="tabular text-xl font-bold leading-none text-[var(--chalk-0)]">
                       {r.points}
@@ -134,13 +144,15 @@ export function StandingsTable({ rows }: { rows: StandingsRow[] }) {
         </span>
         <span className="mx-3 text-[var(--ink-5)]">·</span>
         <span>
-          Penalty deductions shown beside{" "}
+          <span className="text-[var(--chalk-1)]">DED</span> column shows
+          live{" "}
           <Link
             href="/punishments"
             className="underline decoration-[var(--signal)] underline-offset-4 hover:text-[var(--signal)]"
           >
-            player tags
-          </Link>
+            disciplinary deductions
+          </Link>{" "}
+          already baked into Pts + GD
         </span>
       </div>
     </div>
