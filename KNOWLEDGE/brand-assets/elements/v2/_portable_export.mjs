@@ -16,6 +16,18 @@ const TARGETS = [
   '03-animated-bg-v3',
 ];
 
+// Friendly-named copies kept in sync with portable.html so users dragging the
+// named file to another PC always pick up the latest inlined assets.
+const NAMED_COPY = {
+  '01-brb': 'BRB portable.html',
+  '12-starting-soon': 'STARTING SOON portable.html',
+  '13-stream-ended': 'STREAM ENDED portable.html',
+  '18-partners-strip': 'PARTNERS STRIP portable.html',
+  '03-animated-bg-v1': 'ANIMATED BG 1 portable.html',
+  '03-animated-bg-v2': 'ANIMATED BG 2 portable.html',
+  '03-animated-bg-v3': 'ANIMATED BG 3 portable.html',
+};
+
 const MIME = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -86,6 +98,10 @@ for (const dir of TARGETS) {
   }
   const out = processHtml(src);
   writeFileSync(dst, out, 'utf8');
+  const namedCopy = NAMED_COPY[dir];
+  if (namedCopy) {
+    writeFileSync(resolve(__dirname, dir, namedCopy), out, 'utf8');
+  }
   // Report size delta
   const inSize = readFileSync(src).byteLength;
   const outSize = Buffer.byteLength(out, 'utf8');

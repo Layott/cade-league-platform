@@ -8,10 +8,20 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TARGETS = [
+  ["01-brb", "portable.html"],
   ["01-brb", "BRB portable.html"],
+  ["12-starting-soon", "portable.html"],
   ["12-starting-soon", "STARTING SOON portable.html"],
+  ["13-stream-ended", "portable.html"],
   ["13-stream-ended", "STREAM ENDED portable.html"],
+  ["18-partners-strip", "portable.html"],
   ["18-partners-strip", "PARTNERS STRIP portable.html"],
+  ["03-animated-bg-v1", "portable.html"],
+  ["03-animated-bg-v1", "ANIMATED BG 1 portable.html"],
+  ["03-animated-bg-v2", "portable.html"],
+  ["03-animated-bg-v2", "ANIMATED BG 2 portable.html"],
+  ["03-animated-bg-v3", "portable.html"],
+  ["03-animated-bg-v3", "ANIMATED BG 3 portable.html"],
 ];
 
 let patched = 0;
