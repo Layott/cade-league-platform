@@ -58,6 +58,15 @@ export type LeaderboardRowDb = {
   goals_against: number;
   goal_difference: number;
   points: number;
+  /**
+   * 2026-05-15 — live disciplinary deductions baked into `points` /
+   * `goal_difference`. Surfaced separately so the overlay can render a
+   * sanction chip alongside the score without needing a second DB read.
+   * Magnitudes are stored as positive integers; downstream payload
+   * shaper formats them with the en-dash prefix.
+   */
+  punishment_points_deducted: number;
+  punishment_gd_deducted: number;
 };
 
 export type LeaderboardData = {
@@ -96,6 +105,7 @@ export async function fetchLeaderboardData(
       player_id,
       matches_played, wins, draws, losses,
       goals_for, goals_against, goal_difference, points,
+      punishment_points_deducted, punishment_gd_deducted,
       player:player_id (
         gamer_tag,
         users:users!players_user_id_fkey ( display_name )
@@ -123,6 +133,8 @@ export async function fetchLeaderboardData(
     goals_against: number;
     goal_difference: number;
     points: number;
+    punishment_points_deducted: number | null;
+    punishment_gd_deducted: number | null;
     player: {
       gamer_tag: string | null;
       users: { display_name: string | null } | null;
@@ -145,6 +157,8 @@ export async function fetchLeaderboardData(
     goals_against: r.goals_against,
     goal_difference: r.goal_difference,
     points: r.points,
+    punishment_points_deducted: r.punishment_points_deducted ?? 0,
+    punishment_gd_deducted: r.punishment_gd_deducted ?? 0,
   }));
 
   // Bug 4 fix (2026-04-26) — when `standings` is empty (fresh season,
@@ -193,6 +207,8 @@ export async function fetchLeaderboardData(
         goals_against: 0,
         goal_difference: 0,
         points: 0,
+        punishment_points_deducted: 0,
+        punishment_gd_deducted: 0,
       }));
     }
   }
@@ -289,6 +305,21 @@ export function toLeaderboardAnimatedPayload(
       : undefined;
     const photoUrl = r.photo_url ?? fallbackPhotoUrl;
     const orgLogoUrl = slug && PLAYER_ORG_LOGO[slug] ? PLAYER_ORG_LOGO[slug]! : undefined;
+    // 2026-05-15 — surface live disciplinary deductions into the
+    // `sanctions` field the schema already accepts. Format:
+    //   "−2 PTS"            (points only)
+    //   "−3 GD"             (GD only)
+    //   "−2 PTS · −3 GD"    (both). Capped at 40 chars by schema.
+    const sanctionPieces: string[] = [];
+    if (r.punishment_points_deducted > 0) {
+      sanctionPieces.push(`−${r.punishment_points_deducted} PTS`);
+    }
+    if (r.punishment_gd_deducted > 0) {
+      sanctionPieces.push(`−${r.punishment_gd_deducted} GD`);
+    }
+    const sanctions = sanctionPieces.length > 0
+      ? sanctionPieces.join(" · ")
+      : undefined;
     return {
       rank: r.rank,
       displayName: r.player_name,
@@ -303,6 +334,7 @@ export function toLeaderboardAnimatedPayload(
       l: r.losses,
       gf: r.goals_for,
       ga: r.goals_against,
+      sanctions,
     };
   });
   return leaderboardAnimatedSchema.parse({

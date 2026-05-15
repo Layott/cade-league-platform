@@ -254,9 +254,26 @@ export async function listStandingsAsOf(
     }
   }
 
+  // 2026-05-15 — apply disciplinary deductions whose `effective_from` is
+  // on-or-before the cutoff date so per-match-day standings reflect the
+  // running impact from the date the sanction landed onward. Only applied
+  // to cumulative ("matchday" / "match") cutoffs — the matchday-only and
+  // week-only views show points SCORED in the period, not net standings,
+  // and would double-count the deduction if a player carried a sanction
+  // INTO that window from a prior match day.
+  const punishmentByPlayer = await aggregatePunishmentsAsOf(
+    sb,
+    seasonId,
+    playerById,
+    cutoff,
+    included,
+    ordered,
+  );
+
   const rows: StandingsRow[] = [];
   for (const [pid, p] of playerById.entries()) {
     const a = agg.get(pid)!;
+    const ded = punishmentByPlayer.get(pid) ?? { pts: 0, gd: 0 };
     rows.push({
       player_id: pid,
       player_name: p.name,
@@ -267,10 +284,10 @@ export async function listStandingsAsOf(
       losses: a.l,
       goals_for: a.gf,
       goals_against: a.ga,
-      goal_difference: a.gf - a.ga,
-      points: a.w * 3 + a.d,
-      punishment_points_deducted: 0,
-      punishment_gd_deducted: 0,
+      goal_difference: a.gf - a.ga - ded.gd,
+      points: a.w * 3 + a.d - ded.pts,
+      punishment_points_deducted: ded.pts,
+      punishment_gd_deducted: ded.gd,
     });
   }
   rows.sort((a, b) => {
@@ -279,4 +296,93 @@ export async function listStandingsAsOf(
     return b.goals_for - a.goals_for;
   });
   return rows;
+}
+
+/**
+ * Aggregate live disciplinary deductions per player whose `effective_from`
+ * date is on-or-before the cutoff's reference date.
+ *
+ * Reference date by cutoff kind:
+ *   - "matchday" → the target match day's `match_date`. Deductions
+ *     effective on this date count (matches the user's "on May 10 + after"
+ *     mental model).
+ *   - "match"    → same as above; the target match's date.
+ *   - "matchday-only" / "week-only" → returns empty. These views are
+ *     intra-period scoring tables, not net cumulative standings.
+ *
+ * Returns Map<player_id, {pts, gd}> with zero defaults filled by the
+ * caller.
+ */
+async function aggregatePunishmentsAsOf(
+  sb: SupabaseClient,
+  seasonId: string,
+  playerById: Map<string, { id: string; tag: string; name: string }>,
+  cutoff: Cutoff,
+  included: MatchInOrder[],
+  ordered: MatchInOrder[],
+): Promise<Map<string, { pts: number; gd: number }>> {
+  const out = new Map<string, { pts: number; gd: number }>();
+  if (cutoff.type !== "matchday" && cutoff.type !== "match") return out;
+
+  // Resolve the cutoff calendar date — the deduction's `effective_from`
+  // must be <= this date for the deduction to count.
+  let cutoffDate: string | null = null;
+  if (cutoff.type === "matchday") {
+    const md = await sb
+      .from("match_days")
+      .select("match_date")
+      .eq("id", cutoff.matchDayId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    cutoffDate =
+      (md.data as { match_date: string } | null)?.match_date ?? null;
+  } else {
+    // "match" cutoff: derive from the included list (last included match's
+    // match_date). `included` is already pruned to <= cutoff match; fall
+    // back to scanning `ordered` if the target match isn't yet played.
+    const last = included[included.length - 1];
+    if (last?.match_date) cutoffDate = last.match_date;
+    else {
+      const found = ordered.find((m) => m.id === cutoff.matchId);
+      cutoffDate = found?.match_date ?? null;
+    }
+  }
+  if (!cutoffDate) return out;
+
+  // Pull every live sanction in the season + filter by date. Cross-table
+  // join through `disciplinary_cases` to surface the affected player.
+  const { data, error } = await sb
+    .from("disciplinary_actions")
+    .select(
+      `
+      magnitude, sanction_type, effective_from,
+      case:disciplinary_cases ( player_id, deleted_at )
+      `,
+    )
+    .in("sanction_type", ["point_deduction", "gd_deduction"])
+    .is("deleted_at", null)
+    .is("revoked_at", null)
+    .lte("effective_from", cutoffDate);
+  if (error) {
+    throw new Error(`aggregatePunishmentsAsOf failed: ${error.message}`);
+  }
+
+  type CaseRef = { player_id: string; deleted_at: string | null };
+  type ActionRow = {
+    magnitude: number;
+    sanction_type: "point_deduction" | "gd_deduction";
+    effective_from: string;
+    case: CaseRef | CaseRef[] | null;
+  };
+
+  for (const a of (data ?? []) as ActionRow[]) {
+    const c = firstOrNull(a.case);
+    if (!c || c.deleted_at) continue;
+    if (!playerById.has(c.player_id)) continue; // ignore players outside this season
+    const slot = out.get(c.player_id) ?? { pts: 0, gd: 0 };
+    if (a.sanction_type === "point_deduction") slot.pts += a.magnitude;
+    if (a.sanction_type === "gd_deduction") slot.gd += a.magnitude;
+    out.set(c.player_id, slot);
+  }
+  return out;
 }

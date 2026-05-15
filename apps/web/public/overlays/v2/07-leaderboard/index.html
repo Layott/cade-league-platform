@@ -878,6 +878,26 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
 
+  /* Disciplinary deduction chip — inline after the player name when the
+     server-side `sanctions` field is populated (e.g. "−2 PTS · −3 GD").
+     Brand pink + small font so it reads as a status badge without
+     overpowering the name. */
+  .ded-chip {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 1px 6px;
+    border: 1px solid rgba(254, 3, 109, 0.65);
+    background: rgba(254, 3, 109, 0.18);
+    color: #fe036d;
+    font-family: var(--mono, "JetBrains Mono", monospace);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-radius: 2px;
+    vertical-align: middle;
+    text-shadow: none;
+  }
+
   /* Numeric stat cells (MP / W / L / D / GD / PTS) */
   .stat {
     font-family: var(--display);
@@ -1077,6 +1097,12 @@
       return '0';
     }
 
+    function escHtml(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function buildRow(s, posIdx, isTop) {
       s = s || {};
       var pos = posIdx + 1;
@@ -1088,12 +1114,30 @@
       var l    = (s.l  != null ? s.l  : (s.losses || 0));
       var d    = (s.d  != null ? s.d  : (s.draws  || 0));
       var pts  = (s.pts != null ? s.pts : (s.points != null ? s.points : 0));
+      // 2026-05-15 — server-side `sanctions` string ("−2 PTS · −3 GD")
+      // renders as a pink chip right of the player name. Falls back to
+      // synthesising from punishment_(points|gd)_deducted when the
+      // payload carries raw numbers from a Realtime push.
+      var sanctions = s.sanctions || s.sanction_label || '';
+      if (!sanctions) {
+        var pDed = Number(s.punishment_points_deducted || s.pointsAdj && -s.pointsAdj || 0);
+        var gDed = Number(s.punishment_gd_deducted || s.gdAdj && -s.gdAdj || 0);
+        if (pDed > 0 || gDed > 0) {
+          var parts = [];
+          if (pDed > 0) parts.push('−' + pDed + ' PTS');
+          if (gDed > 0) parts.push('−' + gDed + ' GD');
+          sanctions = parts.join(' · ');
+        }
+      }
+      var sanctionsHtml = sanctions
+        ? '<span class="ded-chip" title="Disciplinary deductions">' + escHtml(sanctions) + '</span>'
+        : '';
       var klass = ['row'];
       if (isTop) klass.push('is-top');
       var pid = s.playerId || s.player_id || s.slug || ('row' + posIdx);
       return '<div class="' + klass.join(' ') + '" id="pid-' + pid + '" data-pos="' + pos + '">' +
         '<div class="pos-num">' + pos + '</div>' +
-        '<div class="player-name">' + name + '</div>' +
+        '<div class="player-name">' + escHtml(name) + sanctionsHtml + '</div>' +
         '<div class="stat">' + mp + '</div>' +
         '<div class="stat">' + w  + '</div>' +
         '<div class="stat">' + l  + '</div>' +
