@@ -1,6 +1,11 @@
 // Patches portable HTML files to be ALWAYS-ON (no triggers, no exit anim).
 // - Adds cade-visible class to body literal
 // - Strips the cade-demo-mode loop entirely so no auto-hide ever fires
+// - Injects a hard <style> override so .bg-image / .partners / .body /
+//   .top-band / .chevrons / .season-mark / .bg-vignette / .bg-grain are
+//   opacity:1 with NO transition the moment the page parses. Belt &
+//   braces: even if the MutationObserver gate script is delayed by a
+//   slow data-URI decode on an older PC, the visible layers still paint.
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +61,41 @@ for (const [dir, name] of TARGETS) {
     /(else if \(msg\.type === ['"]hide['"]\)\s*\{)[^}]*\}/g,
     "$1 /* portable: hide ignored */ }",
   );
+
+  // 4. Inject portable force-show stylesheet immediately before </head>.
+  //    Guarantees the background + content layers are painted even if the
+  //    MutationObserver gate script hasn't run yet on a slow / older PC.
+  const FORCE_SHOW_BLOCK = `<style id="cade-portable-force-show">
+/* portable always-on hard override */
+.bg-image,
+.bg-vignette,
+.bg-grain,
+.body,
+.partners,
+.partners-strip,
+.top-band,
+.chevrons,
+.season-mark,
+.matchup,
+.timer,
+.timer-badge,
+[data-element-id] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transition: none !important;
+  animation-delay: 0s !important;
+}
+body.cade-exiting * {
+  opacity: 1 !important;
+}
+</style>`;
+  if (!next.includes('id="cade-portable-force-show"')) {
+    if (next.includes("</head>")) {
+      next = next.replace("</head>", FORCE_SHOW_BLOCK + "\n</head>");
+    } else {
+      next = next.replace("<body", FORCE_SHOW_BLOCK + "\n<body");
+    }
+  }
 
   if (next !== html) {
     writeFileSync(path, next, "utf8");

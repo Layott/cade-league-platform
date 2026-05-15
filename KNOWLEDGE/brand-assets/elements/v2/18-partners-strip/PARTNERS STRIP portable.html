@@ -353,6 +353,30 @@
   /* Universal partner-img sizing — applies regardless of nested marquee wrapper. */
   [data-element-id="partners-strip"] img.partner { height: 50px !important; width: auto !important; object-fit: contain !important; }
 </style>
+<style id="cade-portable-force-show">
+/* portable always-on hard override */
+.bg-image,
+.bg-vignette,
+.bg-grain,
+.body,
+.partners,
+.partners-strip,
+.top-band,
+.chevrons,
+.season-mark,
+.matchup,
+.timer,
+.timer-badge,
+[data-element-id] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transition: none !important;
+  animation-delay: 0s !important;
+}
+body.cade-exiting * {
+  opacity: 1 !important;
+}
+</style>
 </head>
 <body class="cade-visible">
   <div class="stage">
