@@ -1272,7 +1272,14 @@
       { pos: 10, name: 'MR OGA',       mp: 1, w: 0, l: 1, d: 0, gd: -3, pts: 0 },
       { pos: 11, name: 'KILLER FREAK', mp: 2, w: 0, l: 2, d: 0, gd: -5, pts: 0 },
       { pos: 12, name: 'ANIFE',        mp: 1, w: 0, l: 1, d: 0, gd: -7, pts: 0 },
-      { pos: 13, name: 'DADABOI',      mp: 2, w: 0, l: 2, d: 0, gd: -12, pts: 0 }
+      // 2026-05-15 — demo row carries a sample disciplinary deduction so
+      // designers + admins viewing `?demo=1` see the DED chip render
+      // without needing a live session. Live data flows the same fields
+      // (`punishment_(points|gd)_deducted` + `sanctions`) so the runtime
+      // chip is driven by real sanctions when present.
+      { pos: 13, name: 'DADABOI',      mp: 2, w: 0, l: 2, d: 0, gd: -12, pts: 0,
+        punishment_points_deducted: 0, punishment_gd_deducted: 3,
+        sanctions: '−3 GD' }
     ];
     rerender(DEMO_ROWS);
 
