@@ -6,6 +6,7 @@ import {
   isWithinFridayWindow,
 } from "@/lib/time";
 import { getSquadWindowOverride } from "@/server/squads/window_override";
+import { resolveSquadWindowForMatchDay } from "@/server/squads/match_day_window";
 
 /**
  * Plan 41 — P41-F — squad-status helper for the /player dashboard card + banner.
@@ -44,6 +45,91 @@ type SubmissionMinimalRow = {
   rejection_reason: string | null;
   week_start_date: string;
 };
+
+/**
+ * Plan 56 — enumerate match days in the player's current Thursday-anchor
+ * week, resolve the per-match-day window for each, and report the
+ * earliest-deadline OPEN match day the player has not yet submitted for.
+ *
+ * Bug 2026-05-15: the legacy dashboard card only consulted the WEEKLY
+ * override + Thursday 10:00 WAT default. When admins force-open (or
+ * push the deadline via `match_day_schedule_overrides`) a specific
+ * upcoming match day, the dashboard ignored it and rendered
+ * "Window closed — waiting for match day" even while
+ * `/admin/squads` showed AUTO • OPEN. Mirror the per-match-day
+ * resolver that `/player/squad` already uses so the two surfaces
+ * stay coherent.
+ *
+ * Returns null when every match day in the week is either:
+ *   - past its deadline,
+ *   - already submitted by this player (live, non-deleted), or
+ *   - in the past relative to `now`.
+ */
+type UpcomingOpenMatchDay = {
+  matchDayId: string;
+  matchDate: string;
+  deadline: Date;
+};
+
+async function findOpenUpcomingMatchDay(
+  sb: SupabaseClient,
+  playerId: string,
+  weekStart: string,
+  now: Date,
+): Promise<UpcomingOpenMatchDay | null> {
+  // Thursday-anchor week spans 7 days (Thu → Wed). Submissions naturally
+  // target Sat + Sun match days but admins can schedule one-off matches
+  // anywhere in that window, so include the full span.
+  const weekStartDate = new Date(`${weekStart}T00:00:00+01:00`);
+  const weekEndExclusive = new Date(weekStartDate.getTime());
+  weekEndExclusive.setUTCDate(weekEndExclusive.getUTCDate() + 7);
+  const weekStartIso = weekStartDate.toISOString().slice(0, 10);
+  const weekEndIso = weekEndExclusive.toISOString().slice(0, 10);
+
+  const { data: mds, error } = await sb
+    .from("match_days")
+    .select("id, match_date")
+    .gte("match_date", weekStartIso)
+    .lt("match_date", weekEndIso)
+    .is("deleted_at", null)
+    .order("match_date", { ascending: true });
+  if (error) {
+    // Non-fatal — fall back to the weekly window logic.
+    return null;
+  }
+  const rows = (mds ?? []) as Array<{
+    id: string;
+    match_date: string;
+  }>;
+  if (rows.length === 0) return null;
+
+  // Pull this player's existing live submissions for these match days in
+  // one round-trip to skip the ones already filed.
+  const mdIds = rows.map((r) => r.id);
+  const { data: existing } = await sb
+    .from("squad_submissions")
+    .select("match_day_id")
+    .eq("player_id", playerId)
+    .in("match_day_id", mdIds)
+    .is("deleted_at", null);
+  const filed = new Set(
+    ((existing as Array<{ match_day_id: string | null }> | null) ?? [])
+      .map((r) => r.match_day_id)
+      .filter((v): v is string => !!v),
+  );
+
+  let best: UpcomingOpenMatchDay | null = null;
+  for (const md of rows) {
+    if (filed.has(md.id)) continue;
+    const resolution = await resolveSquadWindowForMatchDay(sb, md.id, { now });
+    if (!resolution.open) continue;
+    const deadline = new Date(resolution.effectiveDeadlineAt);
+    if (best === null || deadline.getTime() < best.deadline.getTime()) {
+      best = { matchDayId: md.id, matchDate: md.match_date, deadline };
+    }
+  }
+  return best;
+}
 
 async function fetchCurrentSubmission(
   sb: SupabaseClient,
@@ -150,6 +236,18 @@ export async function getCurrentSquadStatus(
         Math.ceil((deadline.getTime() - now.getTime()) / 3_600_000),
       );
       return { kind: "pre_deadline", hoursUntil, deadline };
+    }
+    // 2026-05-15 — past the Thursday default but a specific upcoming
+    // match day may have been force-opened OR pushed via
+    // match_day_schedule_overrides. Surface the earliest such match day
+    // so the dashboard mirrors what /player/squad already renders.
+    const openMd = await findOpenUpcomingMatchDay(sb, playerId, weekStart, now);
+    if (openMd) {
+      const hoursUntil = Math.max(
+        0,
+        Math.ceil((openMd.deadline.getTime() - now.getTime()) / 3_600_000),
+      );
+      return { kind: "pre_deadline", hoursUntil, deadline: openMd.deadline };
     }
     return { kind: "window_closed" };
   }
