@@ -558,8 +558,11 @@
     --overlay-font-display: "Agharti", "Oswald", "Bebas Neue", "Impact", sans-serif;
     --overlay-font-body: "Quedora", "Rajdhani", "Saira Condensed", sans-serif;
     --overlay-scale: 1;
-    --overlay-pos-x: 0px;
-    --overlay-pos-y: 60px;
+    /* Bare numbers — multiplied by 1px inside the .bug calc(). Matches
+       the format the design-token resolver emits ("0", "60") so admin
+       overrides cascade cleanly. */
+    --overlay-pos-x: 0;
+    --overlay-pos-y: 60;
     --overlay-pattern: none;
     --overlay-partner-strip-show: flex;
   }
