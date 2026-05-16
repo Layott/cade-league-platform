@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
+import { usePersistedState } from "../use-persisted-state";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -33,7 +34,8 @@ export function UpNextBugControl({
   upcoming,
   active = false,
 }: UpNextBugControlProps) {
-  const [matchId, setMatchId] = useState<string>(
+  const [matchId, setMatchId] = usePersistedState<string>(
+    `v2-upnextbug:${sessionId}:matchId`,
     upcoming[0]?.matchId ?? "",
   );
   const iframeRef = useRef<HTMLIFrameElement | null>(null);

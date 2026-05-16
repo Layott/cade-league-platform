@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
+import { usePersistedState } from "../use-persisted-state";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -29,10 +30,22 @@ export function TimerControl({
   viewToken,
   active = false,
 }: SimpleControlProps) {
-  const [minutes, setMinutes] = useState<number>(3);
-  const [seconds, setSeconds] = useState<number>(0);
-  const [endClock, setEndClock] = useState<string>("");
-  const [mode, setMode] = useState<"duration" | "clock">("duration");
+  const [minutes, setMinutes] = usePersistedState<number>(
+    `v2-timer:${sessionId}:minutes`,
+    3,
+  );
+  const [seconds, setSeconds] = usePersistedState<number>(
+    `v2-timer:${sessionId}:seconds`,
+    0,
+  );
+  const [endClock, setEndClock] = usePersistedState<string>(
+    `v2-timer:${sessionId}:endClock`,
+    "",
+  );
+  const [mode, setMode] = usePersistedState<"duration" | "clock">(
+    `v2-timer:${sessionId}:mode`,
+    "duration",
+  );
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const payloadInputRef = useRef<HTMLInputElement | null>(null);
 

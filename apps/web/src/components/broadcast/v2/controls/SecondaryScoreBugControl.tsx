@@ -1,56 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import { PlayerSelect } from "../PlayerSelect";
+import { usePersistedState } from "../use-persisted-state";
 import { V2_PLAYER_NAMES, type V2PlayerSlug } from "../players";
 import type { SimpleControlProps } from "./BrbControl";
-
-/**
- * 2026-05-16 — persist operator-typed fields across router refreshes.
- *
- * ControlGrid calls router.refresh() on every overlay.triggered /
- * overlay.cleared Realtime event so the per-card `active` flag flips
- * its toggle button colour. The refresh re-runs the page tree which
- * remounts the per-card controls — and that wipes whatever the
- * operator just typed into the OTHER cards (player picks, scores,
- * h2h slot players, etc.). The operator was losing the entire
- * score-bug entry every time another overlay fired.
- *
- * Mitigation: snapshot the local UI state to localStorage on every
- * change, keyed by sessionId, and hydrate from it on mount. State is
- * scoped per-session so swapping match-day sessions doesn't drag the
- * previous session's picks into the new one.
- */
-type ScoreBugPersist = {
-  aSlug: V2PlayerSlug;
-  bSlug: V2PlayerSlug;
-  aScore: number;
-  bScore: number;
-};
-
-function loadPersisted(sessionId: string): ScoreBugPersist | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(`v2-scorebug:${sessionId}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<ScoreBugPersist>;
-    if (
-      typeof parsed.aSlug !== "string" ||
-      typeof parsed.bSlug !== "string"
-    )
-      return null;
-    return {
-      aSlug: parsed.aSlug as V2PlayerSlug,
-      bSlug: parsed.bSlug as V2PlayerSlug,
-      aScore: typeof parsed.aScore === "number" ? parsed.aScore : 0,
-      bScore: typeof parsed.bScore === "number" ? parsed.bScore : 0,
-    };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Plan 51 — secondary score bug control.
@@ -69,31 +25,23 @@ export function SecondaryScoreBugControl({
   viewToken,
   active = false,
 }: SimpleControlProps) {
-  const persisted = loadPersisted(sessionId);
-  const [aSlug, setASlug] = useState<V2PlayerSlug>(
-    persisted?.aSlug ?? "baji_jnr",
+  const [aSlug, setASlug] = usePersistedState<V2PlayerSlug>(
+    `v2-scorebug:${sessionId}:aSlug`,
+    "baji_jnr",
   );
-  const [bSlug, setBSlug] = useState<V2PlayerSlug>(
-    persisted?.bSlug ?? "king_nonex",
+  const [bSlug, setBSlug] = usePersistedState<V2PlayerSlug>(
+    `v2-scorebug:${sessionId}:bSlug`,
+    "king_nonex",
   );
-  const [aScore, setAScore] = useState<number>(persisted?.aScore ?? 0);
-  const [bScore, setBScore] = useState<number>(persisted?.bScore ?? 0);
+  const [aScore, setAScore] = usePersistedState<number>(
+    `v2-scorebug:${sessionId}:aScore`,
+    0,
+  );
+  const [bScore, setBScore] = usePersistedState<number>(
+    `v2-scorebug:${sessionId}:bScore`,
+    0,
+  );
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-
-  // Persist to localStorage on every change so router.refresh() (fired
-  // by ControlGrid on every overlay.* Realtime event) doesn't wipe the
-  // operator's typed scores when remounting the card.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        `v2-scorebug:${sessionId}`,
-        JSON.stringify({ aSlug, bSlug, aScore, bScore }),
-      );
-    } catch {
-      /* quota / blocked — best-effort */
-    }
-  }, [sessionId, aSlug, bSlug, aScore, bScore]);
 
   const onIframeReady = useCallback((el: HTMLIFrameElement | null) => {
     iframeRef.current = el;

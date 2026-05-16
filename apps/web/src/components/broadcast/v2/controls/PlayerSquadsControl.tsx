@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
+import { usePersistedState } from "../use-persisted-state";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -37,7 +38,8 @@ export function PlayerSquadsControl({
   players,
 }: SimpleControlProps & { players: PlayerOption[] }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [pinnedPlayerId, setPinnedPlayerId] = useState<string>(
+  const [pinnedPlayerId, setPinnedPlayerId] = usePersistedState<string>(
+    `v2-playersquads:${sessionId}:playerId`,
     players[0]?.playerId ?? "",
   );
 

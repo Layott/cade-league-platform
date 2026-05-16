@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import { SecondaryButton } from "@/components/admin/buttons";
+import { usePersistedState } from "../use-persisted-state";
 import type { SimpleControlProps } from "./BrbControl";
 
 /**
@@ -89,7 +90,10 @@ export function LowerThirdControl({
   active = false,
   cardLabel,
 }: LowerThirdControlProps) {
-  const [state, setState] = useState<SlotState>(DEFAULT_SLOTS[slot]);
+  const [state, setState] = usePersistedState<SlotState>(
+    `v2-lowerthird:${sessionId}:slot${slot}`,
+    DEFAULT_SLOTS[slot],
+  );
   const [presets, setPresets] = useState<LtPreset[]>([]);
   // S2 smoke fix (2026-04-26): replace `window.prompt` with inline input.
   // null = not editing; string = current draft text in the inline field.

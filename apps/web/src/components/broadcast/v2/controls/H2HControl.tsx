@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
 import { PlayerSelect } from "../PlayerSelect";
+import { usePersistedState } from "../use-persisted-state";
 import { V2_PLAYER_NAMES, type V2PlayerSlug } from "../players";
 import type { V2OverlayKey } from "../overlay-keys";
 
@@ -36,7 +37,8 @@ export function H2HControl({
   defaultSlugs,
   active = false,
 }: H2HControlProps) {
-  const [slugs, setSlugs] = useState<V2PlayerSlug[]>(() =>
+  const [slugs, setSlugs] = usePersistedState<V2PlayerSlug[]>(
+    `v2-h2h:${sessionId}:${overlayKey}:slugs`,
     defaultSlugs.slice(0, count),
   );
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
