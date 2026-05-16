@@ -117,6 +117,10 @@ body.cade-exiting .canvas { opacity: 0; }
 .cm-card .card-bg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 180px; height: 180px; object-fit: contain; }
 .cm-card .card-face { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -42%) scale(0.55); width: 180px; height: 180px; object-fit: contain; mix-blend-mode: normal; }
 .cm-card .name { font-family: var(--display); font-size: 22px; line-height: 1.05; letter-spacing: 0.02em; }
+.cm-card .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.20); }
+.cm-card .stat-cell { display: flex; align-items: baseline; gap: 6px; font-family: var(--display); line-height: 1; }
+.cm-card .stat-cell .stat-lbl { font-size: 11px; letter-spacing: 0.18em; color: var(--chalk-2); flex-shrink: 0; }
+.cm-card .stat-cell .stat-val { font-size: 20px; color: #fff; font-variant-numeric: tabular-nums; }
 .cm-card .meta-row { display: flex; align-items: baseline; gap: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.20); }
 .cm-card .meta-row .rating { font-family: var(--display); font-size: 38px; line-height: 1; color: #ffd400; text-shadow: 0 0 12px rgba(255,212,0,0.40); }
 .cm-card .meta-row .pick { font-family: var(--display); font-size: 36px; line-height: 1; color: var(--pink); margin-left: auto; }
@@ -141,6 +145,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p117677750.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=092a18d50d16db47707a802ccff94672" referrerpolicy="no-referrer">
       </div>
       <div class="name">SCOTT MCTOMINAY</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">94</span>
         <span class="pick">13</span>
@@ -154,6 +166,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50578278.png?fm=png&ixlib=java-2.1.0&verzion=2&w=256&s=9c9a34a5346e3ee795f99b8e7b93edd9" referrerpolicy="no-referrer">
       </div>
       <div class="name">AJIBADE</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">89</span>
         <span class="pick">11</span>
@@ -167,6 +187,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p67387203.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=1e5944076a90a0bf024f12c5fa23b8d7" referrerpolicy="no-referrer">
       </div>
       <div class="name">MARCO PALESTRA</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">93</span>
         <span class="pick">11</span>
@@ -180,6 +208,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p100940723.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=9da551cc5ce91f2d866c51a3b4ed1749" referrerpolicy="no-referrer">
       </div>
       <div class="name">NICO O'REILLY</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">92</span>
         <span class="pick">10</span>
@@ -193,6 +229,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50402614.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=d8ec5e3c327e0f751a7a7a74d5013e7c" referrerpolicy="no-referrer">
       </div>
       <div class="name">JACOBO RAMÓN NAVEROS</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">94</span>
         <span class="pick">10</span>
@@ -206,6 +250,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50470097.png?fm=png&ixlib=java-2.1.0&verzion=2&w=256&s=3ee864252d8a6096c1410c2858e6e934" referrerpolicy="no-referrer">
       </div>
       <div class="name">DOS SANTOS LEITE</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">92</span>
         <span class="pick">6</span>
@@ -219,6 +271,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p67324562.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=a549388237ba941c056ed9f609050069" referrerpolicy="no-referrer">
       </div>
       <div class="name">MIKE MAIGNAN</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">93</span>
         <span class="pick">6</span>
@@ -232,6 +292,14 @@ body.cade-exiting .canvas { opacity: 0; }
         <img class="card-face" src="https://cdn3.futbin.com/content/fifa26/img/players/p50558017.png?fm=png&ixlib=java-2.1.0&verzion=1&w=256&s=c6edfaca5d3135dbcdc27245dc82e8c3" referrerpolicy="no-referrer">
       </div>
       <div class="name">SCHELIN</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-lbl">PAC</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">SHO</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PAS</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DRI</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">DEF</span><span class="stat-val">--</span></div>
+        <div class="stat-cell"><span class="stat-lbl">PHY</span><span class="stat-val">--</span></div>
+      </div>
       <div class="meta-row">
         <span class="rating">91</span>
         <span class="pick">6</span>
@@ -283,6 +351,25 @@ body.cade-exiting .canvas { opacity: 0; }
       if (pick) pick.textContent = String(c.pickCount);
       var pickLbl = card.querySelector('.meta-row .pick-lbl');
       if (pickLbl) pickLbl.textContent = 'SQUADS · ' + c.pickPct + '%';
+      // 6-stat grid — swaps PAC/SHO/PAS/DRI/DEF/PHY for GK (DIV/HAN/KIC/REF/SPE/POS).
+      // Backed by attributes.mains from fc26_players. Falls back to "--"
+      // when the scraper hasn't populated the row's stats yet.
+      var statsGrid = card.querySelector('.stats-grid');
+      if (statsGrid) {
+        var outfield = ['PAC','SHO','PAS','DRI','DEF','PHY'];
+        var gk = ['DIV','HAN','KIC','REF','SPE','POS'];
+        var keys = ['pac','sho','pas','dri','def','phy'];
+        var labels = c.isGoalkeeper ? gk : outfield;
+        var stats = c.mainStats || {};
+        var cells = statsGrid.querySelectorAll('.stat-cell');
+        for (var s = 0; s < cells.length && s < 6; s++) {
+          var lbl = cells[s].querySelector('.stat-lbl');
+          var val = cells[s].querySelector('.stat-val');
+          if (lbl) lbl.textContent = labels[s];
+          var raw = stats[keys[s]];
+          if (val) val.textContent = (raw != null && raw !== '') ? String(raw) : '--';
+        }
+      }
     }
   }
   window.addEventListener('message', function (ev) {

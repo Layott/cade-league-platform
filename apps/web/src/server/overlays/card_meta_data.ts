@@ -19,6 +19,22 @@ export type CardMetaRow = {
   name: string;
   rating: number | null;
   itemType: string | null;
+  position: string | null;
+  isGoalkeeper: boolean;
+  /**
+   * Six main stats (0-99). Same key shape for outfield + GK — the
+   * overlay swaps labels (PAC/SHO/PAS/DRI/DEF/PHY ↔ DIV/HAN/KIC/REF/SPE/POS)
+   * based on `isGoalkeeper`. Null when the scraper hasn't populated
+   * `attributes.mains` for that card yet.
+   */
+  mainStats: {
+    pac: number | null;
+    sho: number | null;
+    pas: number | null;
+    dri: number | null;
+    def: number | null;
+    phy: number | null;
+  } | null;
   cardBgUrl: string | null;
   cardFaceUrl: string | null;
   pickCount: number;
@@ -43,11 +59,36 @@ type ItemJoin = {
         id: string;
         name: string;
         rating: number | null;
+        position: string | null;
         item_type: string | null;
         attributes: Record<string, unknown> | null;
       }
     | null;
 };
+
+function readMainStats(attrs: Record<string, unknown> | null): {
+  pac: number | null;
+  sho: number | null;
+  pas: number | null;
+  dri: number | null;
+  def: number | null;
+  phy: number | null;
+} | null {
+  if (!attrs || typeof attrs !== "object") return null;
+  const m = attrs["mains"];
+  if (!m || typeof m !== "object") return null;
+  const rec = m as Record<string, unknown>;
+  const toInt = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  return {
+    pac: toInt(rec.pac),
+    sho: toInt(rec.sho),
+    pas: toInt(rec.pas),
+    dri: toInt(rec.dri),
+    def: toInt(rec.def),
+    phy: toInt(rec.phy),
+  };
+}
 
 export async function fetchCardMetaData(
   sb: SupabaseClient,
@@ -79,7 +120,7 @@ export async function fetchCardMetaData(
       `
       submission_id,
       resolved_fc_player_id,
-      fc_player:resolved_fc_player_id ( id, name, rating, item_type, attributes )
+      fc_player:resolved_fc_player_id ( id, name, rating, position, item_type, attributes )
       `,
     )
     .in("submission_id", subIds)
@@ -95,6 +136,9 @@ export async function fetchCardMetaData(
     name: string;
     rating: number | null;
     itemType: string | null;
+    position: string | null;
+    isGoalkeeper: boolean;
+    mainStats: CardMetaRow["mainStats"];
     cardBgUrl: string | null;
     cardFaceUrl: string | null;
     submissions: Set<string>;
@@ -109,6 +153,7 @@ export async function fetchCardMetaData(
     // back to the Futbin URL for rows the backfill hasn't touched yet so
     // the field is never undefined in a transitional state.
     const attrs = fp.attributes ?? {};
+    const position = fp.position ?? null;
     const entry =
       accum.get(fp.id) ??
       {
@@ -116,6 +161,9 @@ export async function fetchCardMetaData(
         name: fp.name,
         rating: fp.rating,
         itemType: fp.item_type,
+        position,
+        isGoalkeeper: (position ?? "").toUpperCase() === "GK",
+        mainStats: readMainStats(attrs),
         cardBgUrl:
           (attrs["card_bg_local"] as string) ??
           (attrs["card_bg_url"] as string) ??
@@ -137,6 +185,9 @@ export async function fetchCardMetaData(
       name: a.name,
       rating: a.rating,
       itemType: a.itemType,
+      position: a.position,
+      isGoalkeeper: a.isGoalkeeper,
+      mainStats: a.mainStats,
       cardBgUrl: a.cardBgUrl,
       cardFaceUrl: a.cardFaceUrl,
       pickCount: a.submissions.size,
