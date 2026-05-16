@@ -184,6 +184,30 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
 };
 
 /**
+ * Overlay keys whose Trigger payload is OPERATOR-AUTHORITATIVE — i.e.
+ * the broadcast control panel sends a fully-populated payload (players,
+ * scores) and the trigger-time auto-refetch must NOT override it.
+ *
+ * Bug 2026-05-16: operator picked Guru vs Dadaboi on the score-bug
+ * control, hit Trigger, and the overlay flashed Guru/Dadaboi for ~50ms
+ * before the auto-refetch from `/api/.../score-bug` overwrote it with
+ * Faruk vs Wolevation (the endpoint picks the first in_progress match
+ * or falls back to the first scheduled one — neither matched what the
+ * operator had typed).
+ *
+ * These overlays still keep their INITIAL_FETCH_PATH for the AMBIENT
+ * mount-time seed (OBS browser source opens cold and needs something to
+ * render) AND for score.changed / match.ended Realtime refreshes that
+ * fire OUTSIDE a manual Trigger. The override is only suppressed when
+ * the operator just clicked Trigger — the payload on that event is the
+ * source of truth.
+ */
+const TRIGGER_PAYLOAD_AUTHORITATIVE: ReadonlySet<string> = new Set([
+  "09-secondary-score-bug",
+  "10-up-next-bug",
+]);
+
+/**
  * Ambient-session poll interval — see "ambient mode" jsdoc on
  * OverlayDataInjector. 30s matches the spec; tunable if event ops want
  * snappier failover, but each poll is a single fetch with no DB read on
@@ -890,7 +914,14 @@ export default function OverlayDataInjector({
       // forward THAT alongside `show`. Other (non-data-driven) keys
       // fall through to the original payload-only path.
       const builder = INITIAL_FETCH_PATH[overlayKey];
-      if (builder && currentSessionId) {
+      // Operator-authoritative overlays (score-bug, up-next-bug) MUST
+      // not auto-refetch on trigger — the payload the operator just
+      // clicked through is the source of truth. Auto-fetch is reserved
+      // for ambient mount-seed + Realtime score/match-ended refreshes
+      // OUTSIDE a manual trigger.
+      const operatorAuthoritative =
+        TRIGGER_PAYLOAD_AUTHORITATIVE.has(overlayKey);
+      if (builder && currentSessionId && !operatorAuthoritative) {
         const url = builder(currentSessionId, overlayKey);
         const fetchUrl = currentToken
           ? `${url}${url.includes("?") ? "&" : "?"}t=${encodeURIComponent(currentToken)}`
