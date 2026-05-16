@@ -1024,6 +1024,8 @@ export default function OverlayDataInjector({
     });
 
     const fetchBuilder = INITIAL_FETCH_PATH[overlayKey];
+    const operatorAuthoritative =
+      TRIGGER_PAYLOAD_AUTHORITATIVE.has(overlayKey);
 
     async function refetchAndPost(
       event: KeyEvent,
@@ -1035,7 +1037,18 @@ export default function OverlayDataInjector({
       // before. This preserves prior behaviour for score.changed on
       // 09-secondary-score-bug (the SQL realtime.send carries the score
       // delta itself, no API roundtrip needed).
-      if (!fetchBuilder || !currentSessionId) {
+      //
+      // Operator-authoritative overlays (score-bug, up-next-bug) ALSO
+      // take the bare-forward branch — Realtime refetch would overwrite
+      // the operator's manually-picked players with whatever the
+      // endpoint thinks is the current match, which broke a live stream
+      // 2026-05-16 (Guru/Dadaboi flipped to Faruk/Wolevation mid-stream
+      // after a score.changed Realtime event fired). The iframe's
+      // update() handler treats a bare {seasonId, at} payload as a
+      // no-op (no playerA/playerB/players fields to apply), so this
+      // safely freezes the operator's pick until the next manual
+      // Trigger.
+      if (!fetchBuilder || !currentSessionId || operatorAuthoritative) {
         iframe.contentWindow.postMessage(
           { type: "update", event, payload: origPayload ?? null },
           "*",
