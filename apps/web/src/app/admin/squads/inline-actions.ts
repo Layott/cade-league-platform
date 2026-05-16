@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
@@ -118,20 +117,11 @@ async function resolveSubmissionOwnerUserId(
   return { userId, weekStartDate: row.week_start_date };
 }
 
-function listRedirectTarget(formData: FormData): string {
-  const week = String(formData.get("weekStart") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim();
-  const params = new URLSearchParams();
-  if (week) params.set("week", week);
-  if (status) params.set("status", status);
-  const qs = params.toString();
-  return qs ? `/admin/squads?${qs}` : "/admin/squads";
-}
-
 /**
  * Inline approve from the list page. Same business path as the detail
- * page action but redirects back to the list (preserving week+status
- * filter) so admins can rip through a queue without context switching.
+ * page action but does NOT redirect — useTransition on the client
+ * re-renders the table in place via revalidatePath, preserving scroll
+ * position so admins can rip through a long queue without losing context.
  */
 export async function inlineApproveAction(formData: FormData): Promise<void> {
   const submissionId = String(formData.get("submissionId") ?? "");
@@ -174,7 +164,6 @@ export async function inlineApproveAction(formData: FormData): Promise<void> {
     revalidatePath("/admin/squads");
     revalidatePath("/player/squad");
   }
-  redirect(listRedirectTarget(formData));
 }
 
 /**
@@ -228,5 +217,4 @@ export async function inlineRejectAction(formData: FormData): Promise<void> {
     revalidatePath("/admin/squads");
     revalidatePath("/player/squad");
   }
-  redirect(listRedirectTarget(formData));
 }

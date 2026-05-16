@@ -64,7 +64,7 @@ type StatusFilter = "all" | "pending" | "approved" | "rejected";
 export default async function AdminSquadsListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; week?: string }>;
+  searchParams: Promise<{ status?: string; week?: string; matchDay?: string }>;
 }) {
   const sp = await searchParams;
   const sb = await getServerSupabase();
@@ -78,10 +78,17 @@ export default async function AdminSquadsListPage({
 
   const weekStart = sp.week ?? weekStartThursday(new Date());
   const status = (sp.status ?? "all") as StatusFilter;
+  const matchDayFilter = (sp.matchDay ?? "all").trim();
 
   const rows: SubmissionRow[] = season
     ? await listSubmissionsForWeek(sb, season.id, weekStart, {
         status: status === "all" ? undefined : status,
+        matchDayId:
+          matchDayFilter === "all"
+            ? undefined
+            : matchDayFilter === "none"
+              ? "none"
+              : matchDayFilter,
       })
     : [];
 
@@ -142,12 +149,25 @@ export default async function AdminSquadsListPage({
   );
   const submittedPlayerIds = new Set(rows.map((r) => r.player_id));
 
+  // Match days for the current season — used by both the per-match-day
+  // override panel (perm-gated) AND the always-on Match Day filter
+  // dropdown above the submissions table. Cheap (~13 rows / season).
+  const allMatchDays = season ? await listMatchDays(svc, season.id) : [];
+
+  // Filter options: only match days that fall inside the currently
+  // selected week (Thursday-anchor → next Wednesday). The list view is
+  // already week-scoped, so showing every season match day in the
+  // dropdown would just produce no-op selections.
+  const weekMatchDays = allMatchDays.filter(
+    (d) => weekStartThursday(d.match_date) === weekStart,
+  );
+
   // Per-match-day override panel data. Only build when the user has the
   // window perm — same gate as the weekly panel.
   let matchDayRows: AdminMatchDayRow[] = [];
   let scheduleOverrideRows: ScheduleOverrideRow[] = [];
   if (canManageWindow && season) {
-    const days = await listMatchDays(svc, season.id);
+    const days = allMatchDays;
     const now = new Date();
     const both = await Promise.all(
       days.map(async (d) => {
@@ -348,9 +368,9 @@ export default async function AdminSquadsListPage({
         />
       ) : null}
 
-      <form method="GET" className="flex items-center gap-3">
+      <form method="GET" className="flex flex-wrap items-center gap-3">
         <label className="text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
-          Filter
+          Status
         </label>
         <select
           name="status"
@@ -362,6 +382,24 @@ export default async function AdminSquadsListPage({
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
+        </select>
+        <label className="text-[10px] uppercase tracking-[0.2em] text-[var(--chalk-3)]">
+          Match day
+        </label>
+        <select
+          name="matchDay"
+          defaultValue={matchDayFilter}
+          data-testid="squad-match-day-filter"
+          className="rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-2 py-1 text-xs text-[var(--chalk-0)]"
+        >
+          <option value="all">All</option>
+          {weekMatchDays.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.match_date}
+              {d.venue_name ? ` · ${d.venue_name}` : ""}
+            </option>
+          ))}
+          <option value="none">Legacy (no match day)</option>
         </select>
         <input type="hidden" name="week" value={weekStart} />
         <button

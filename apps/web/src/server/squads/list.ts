@@ -71,7 +71,15 @@ export async function listSubmissionsForWeek(
   sb: SupabaseClient,
   seasonId: string,
   weekStart: string,
-  opts: { status?: "pending" | "approved" | "rejected" } = {},
+  opts: {
+    status?: "pending" | "approved" | "rejected";
+    /**
+     * Filter by match_day_id. Pass a UUID to keep only submissions
+     * stamped with that match day, or "none" to keep only legacy weekly
+     * submissions (NULL match_day_id). Omit for no filter.
+     */
+    matchDayId?: string | "none";
+  } = {},
 ): Promise<SubmissionRow[]> {
   let q = sb
     .from("squad_submissions")
@@ -87,6 +95,8 @@ export async function listSubmissionsForWeek(
     .is("deleted_at", null)
     .order("submitted_at", { ascending: false });
   if (opts.status) q = q.eq("validation_status", opts.status);
+  if (opts.matchDayId === "none") q = q.is("match_day_id", null);
+  else if (opts.matchDayId) q = q.eq("match_day_id", opts.matchDayId);
   const { data, error } = await q;
   if (error) throw new Error(`listSubmissionsForWeek: ${error.message}`);
   // The embedded shape is `{ player: { id, gamer_tag, users: { display_name } } }`;
