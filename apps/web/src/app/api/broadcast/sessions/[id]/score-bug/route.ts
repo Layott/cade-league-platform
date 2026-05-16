@@ -3,45 +3,23 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
 import { REALTIME } from "@/server/overlays/registry";
-import { gamerTagToSlug } from "@/lib/player-photos";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type MatchRow = {
-  id: string;
-  status: string;
-  home_player: {
-    id: string;
-    gamer_tag: string | null;
-    photo_url: string | null;
-    users: { display_name: string | null } | { display_name: string | null }[] | null;
-  } | null;
-  away_player: {
-    id: string;
-    gamer_tag: string | null;
-    photo_url: string | null;
-    users: { display_name: string | null } | { display_name: string | null }[] | null;
-  } | null;
-};
-
-type ResultRow = {
-  home_score: number;
-  away_score: number;
-  match_id: string;
-};
-
-function firstOf<T>(v: T | T[] | null | undefined): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? v[0] ?? null : v;
-}
-
 /**
- * Live score-bug feed for 09-secondary-score-bug overlay. Returns the
- * current in-progress match for the session's match-day with home/away
- * names + photos + scores. Falls back to the next scheduled match when
- * nothing is in-progress yet so OBS browser sources never show empty
- * bug at kickoff.
+ * Live score-bug feed for 09-secondary-score-bug overlay.
+ *
+ * 2026-05-16 rewrite — now OPERATOR-AUTHORITATIVE. Reads the latest
+ * un-cleared overlay_events row keyed to `score_bug` and returns its
+ * payload verbatim. Returns `{payload: null}` when nothing is pinned so
+ * polling OBS browser sources hide the bug instead of revealing an
+ * auto-picked matches-table row the operator never selected.
+ *
+ * Previous matches-table auto-pick caused a live regression: operator
+ * triggered Guru vs Dadaboi but the endpoint returned Faruk vs
+ * Wolevation (the session's first in_progress match) and the overlay
+ * flipped on stream.
  */
 export async function GET(
   req: NextRequest,
@@ -74,79 +52,80 @@ export async function GET(
   if (!mdRaw) return NextResponse.json({ error: "match_day not found" }, { status: 404 });
   const md = mdRaw as { id: string; season_id: string };
 
-  // Pick in_progress match first; fall back to next scheduled.
-  const { data: matchesRaw } = await sb
-    .from("matches")
+  // OPERATOR-AUTHORITATIVE PATH (2026-05-16 fix).
+  //
+  // Realtime broadcast on the overlay route is currently broken on prod
+  // — the OverlayDataInjector iframe sits inside an unresolved Suspense
+  // boundary so its useEffect never runs, no Realtime channel subscribes,
+  // and trigger postMessages never reach the static HTML. Live OBS
+  // browser sources therefore only ever see what THIS endpoint returns
+  // on poll / initial fetch.
+  //
+  // Before this fix the endpoint always read from the matches table —
+  // so operator triggers from the broadcast control panel (Guru vs
+  // Dadaboi with custom scores) were invisible on the stream, which
+  // kept defaulting to whatever the first in_progress match happened to
+  // be (Faruk vs Wolevation in the live incident).
+  //
+  // Fix: when the session has an ACTIVE score_bug overlay_events row
+  // (most recent, not cleared) prefer ITS payload over the auto-picked
+  // matches row. Falls through to the matches-table pick when nothing
+  // is pinned so OBS sources still get a meaningful first frame.
+  const { data: pinnedRaw } = await sb
+    .from("overlay_events")
     .select(
-      `
-      id, status,
-      home_player:home_player_id (
-        id, gamer_tag, photo_url,
-        users:users!players_user_id_fkey ( display_name )
-      ),
-      away_player:away_player_id (
-        id, gamer_tag, photo_url,
-        users:users!players_user_id_fkey ( display_name )
-      )
-      `,
+      "payload, triggered_at, overlay_templates:template_id ( template_key )",
     )
-    .eq("match_day_id", md.id)
+    .eq("stream_session_id", id)
+    .is("cleared_at", null)
     .is("deleted_at", null)
-    .order("scheduled_time", { ascending: true });
-
-  const rows = (matchesRaw ?? []) as unknown as MatchRow[];
-  const pick =
-    rows.find((r) => r.status === "in_progress") ??
-    rows.find((r) => r.status === "scheduled") ??
-    rows[0] ??
-    null;
-
-  let payload: unknown = null;
-  if (pick) {
-    let homeScore = 0;
-    let awayScore = 0;
-    const { data: resRow } = await sb
-      .from("match_results")
-      .select("home_score, away_score, match_id")
-      .eq("match_id", pick.id)
-      .is("deleted_at", null)
-      .order("entered_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const res = resRow as ResultRow | null;
-    if (res) {
-      homeScore = res.home_score ?? 0;
-      awayScore = res.away_score ?? 0;
-    }
-
-    const home = pick.home_player;
-    const away = pick.away_player;
-    const homeUser = firstOf(home?.users ?? null);
-    const awayUser = firstOf(away?.users ?? null);
-    const homeName = homeUser?.display_name || home?.gamer_tag || "";
-    const awayName = awayUser?.display_name || away?.gamer_tag || "";
-    const homeSlug = home?.gamer_tag ? gamerTagToSlug(home.gamer_tag) : gamerTagToSlug(homeName);
-    const awaySlug = away?.gamer_tag ? gamerTagToSlug(away.gamer_tag) : gamerTagToSlug(awayName);
-
-    payload = {
-      matchId: pick.id,
-      status: pick.status,
-      players: [
-        { displayName: homeName, slug: homeSlug, photoUrl: home?.photo_url ?? null, score: homeScore },
-        { displayName: awayName, slug: awaySlug, photoUrl: away?.photo_url ?? null, score: awayScore },
-      ],
-    };
+    .order("triggered_at", { ascending: false })
+    .limit(10);
+  type PinnedRow = {
+    payload: Record<string, unknown> | null;
+    triggered_at: string;
+    overlay_templates:
+      | { template_key: string }
+      | { template_key: string }[]
+      | null;
+  };
+  const pinnedRows = (pinnedRaw ?? []) as unknown as PinnedRow[];
+  const pinned = pinnedRows.find((r) => {
+    const tpl = r.overlay_templates;
+    const flat = Array.isArray(tpl) ? tpl[0] : tpl;
+    return flat?.template_key === "score_bug";
+  });
+  if (pinned?.payload && typeof pinned.payload === "object") {
+    return NextResponse.json(
+      {
+        payload: pinned.payload,
+        seasonId: md.season_id,
+        channel: REALTIME.standingsChannel(md.season_id),
+      },
+      {
+        headers: {
+          // Short cache so the operator's next Trigger is picked up
+          // within ~5s by polling OBS sources.
+          "Cache-Control": "s-maxage=5, stale-while-revalidate=15",
+        },
+      },
+    );
   }
 
+  // No active score_bug pinned by the operator — return null payload
+  // so polling OBS sources HIDE the bug instead of revealing an
+  // auto-picked matches-table row the operator never selected (Bug
+  // 2026-05-16: overlay flipped to Faruk vs Wolevation when the
+  // operator had never triggered them).
   return NextResponse.json(
     {
-      payload,
+      payload: null,
       seasonId: md.season_id,
       channel: REALTIME.standingsChannel(md.season_id),
     },
     {
       headers: {
-        "Cache-Control": "s-maxage=15, stale-while-revalidate=60",
+        "Cache-Control": "s-maxage=5, stale-while-revalidate=15",
       },
     },
   );

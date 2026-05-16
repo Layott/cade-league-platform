@@ -1391,5 +1391,53 @@
   }, 8000 - 5000); // offset so show fires 5s after each hide
 })();
 </script>
+
+<script data-tag="cade-livefeed-poll">
+/* === 2026-05-16 emergency live-feed poll ===
+   The OverlayDataInjector React layer that normally posts Realtime
+   trigger events into this iframe is currently failing to hydrate on
+   prod (the /overlay/v2/[key] SSR Suspense boundary never resolves so
+   no Realtime channel subscribes). Until that hydration regression is
+   fixed properly, fall back to a simple poll: every 3 seconds fetch
+   the live score-bug feed and dispatch a synthetic update+show event
+   so the operator's pinned trigger payload (now stored in
+   overlay_events and surfaced first by the score-bug endpoint) lands
+   on the stream within one poll tick. === */
+(function () {
+  if (new URLSearchParams(location.search).get('demo') === '1') return;
+  var qs = new URLSearchParams(location.search);
+  var sessionId = qs.get('session');
+  var token = qs.get('token');
+  if (!sessionId) return;
+  function fetchOnce() {
+    var url = '/api/broadcast/sessions/' + encodeURIComponent(sessionId) +
+              '/score-bug' + (token ? '?token=' + encodeURIComponent(token) : '') +
+              (token ? '&' : '?') + '_=' + Date.now();
+    fetch(url, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        try {
+          if (d && d.payload && typeof d.payload === 'object') {
+            window.dispatchEvent(new MessageEvent('message', {
+              data: { type: 'update', data: d.payload },
+            }));
+            window.dispatchEvent(new MessageEvent('message', {
+              data: { type: 'show', data: d.payload },
+            }));
+          } else {
+            // No active pin — hide the bug. Operator cleared it via
+            // the broadcast control panel or never triggered.
+            window.dispatchEvent(new MessageEvent('message', {
+              data: { type: 'hide' },
+            }));
+          }
+        } catch (_) { /* swallow */ }
+      })
+      .catch(function () { /* swallow — next tick will retry */ });
+  }
+  fetchOnce();
+  setInterval(fetchOnce, 3000);
+})();
+</script>
 </body>
 </html>
