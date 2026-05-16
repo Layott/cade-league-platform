@@ -32,11 +32,16 @@ import {
 } from "@/components/admin/ScheduleOverrideControls";
 import { PlayerOverrideControls } from "@/components/admin/PlayerOverrideControls";
 import { SquadSubmissionsLiveRefresh } from "@/components/admin/SquadSubmissionsLiveRefresh";
+import { InlineSubmissionDecision } from "@/components/admin/InlineSubmissionDecision";
 import {
   forceOpenSquadWindowAction,
   forceCloseSquadWindowAction,
   clearSquadWindowOverrideAction,
 } from "./window-actions";
+import {
+  inlineApproveAction,
+  inlineRejectAction,
+} from "./inline-actions";
 import {
   setMatchDayWindowAction,
   clearMatchDayWindowAction,
@@ -105,6 +110,7 @@ export default async function AdminSquadsListPage({
     actor,
     "squads.player_override.manage",
   );
+  const canValidate = await hasPermAsync(svc, actor, "squads.validate");
   const [squadWindowOverride, playerOverrides, allPlayers] = await Promise.all([
     canManageWindow ? getSquadWindowOverride(svc, weekStart) : Promise.resolve(null),
     canManagePlayerOverride
@@ -274,12 +280,23 @@ export default async function AdminSquadsListPage({
       label: "Actions",
       align: "right",
       render: (r) => (
-        <Link
-          href={`/admin/squads/${r.id}`}
-          className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
-        >
-          Review
-        </Link>
+        <div className="flex items-center justify-end gap-3">
+          {canValidate && r.validation_status === "pending" ? (
+            <InlineSubmissionDecision
+              submissionId={r.id}
+              weekStart={weekStart}
+              status={status}
+              approveAction={inlineApproveAction}
+              rejectAction={inlineRejectAction}
+            />
+          ) : null}
+          <Link
+            href={`/admin/squads/${r.id}`}
+            className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--chalk-2)] hover:text-[var(--signal)]"
+          >
+            Review
+          </Link>
+        </div>
       ),
     },
   ];
