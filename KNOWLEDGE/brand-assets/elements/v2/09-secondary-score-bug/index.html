@@ -1411,7 +1411,7 @@
   if (!sessionId) return;
   function fetchOnce() {
     var url = '/api/broadcast/sessions/' + encodeURIComponent(sessionId) +
-              '/score-bug' + (token ? '?token=' + encodeURIComponent(token) : '') +
+              '/score-bug' + (token ? '?t=' + encodeURIComponent(token) : '') +
               (token ? '&' : '?') + '_=' + Date.now();
     fetch(url, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
