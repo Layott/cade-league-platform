@@ -1248,6 +1248,20 @@
   }
 
   function show() {
+    // Idempotent — already on stage in either entry or entered state
+    // → noop. Without this guard the 3s livefeed poll restarted the
+    // entry animation on every tick because each `show` would strip
+    // + re-add `.visible` and reflow the mount. Refreshing the
+    // rendered state (names/scores) belongs in `update()`, not here.
+    if (
+      !mount.classList.contains('hidden') &&
+      (mount.classList.contains('visible') ||
+        mount.classList.contains('entered'))
+    ) {
+      mount.style.opacity = '';
+      mount.style.transform = '';
+      return;
+    }
     mount.classList.remove('hidden');
     mount.classList.remove('entered');
     mount.classList.remove('visible');
