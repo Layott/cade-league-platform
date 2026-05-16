@@ -222,7 +222,7 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
     "partner-strip-show": "false",
   },
   "10-up-next-bug": {
-    "pos-x": "1480",
+    "pos-x": "0",
     "pos-y": "60",
     "partner-strip-show": "false",
   },

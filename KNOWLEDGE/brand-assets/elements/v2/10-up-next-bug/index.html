@@ -593,8 +593,14 @@
      ------------------------------------------------------------ */
   .bug {
     position: absolute;
-    left: calc(50% + var(--overlay-pos-x, 0px));
-    bottom: var(--overlay-pos-y, 60px);
+    /* pos-x/pos-y design tokens land as bare numbers (e.g. "40", "60") from
+       the admin design page — multiply by 1px so the calc stays valid
+       regardless of whether the token has a unit. Without the *1px wrap,
+       a numeric token like "1480" turned `calc(50% + 1480)` into an invalid
+       declaration that fell back to `left:auto`, then translateX(-50%) sliced
+       the bug in half off the canvas edge. */
+    left: calc(50% + (var(--overlay-pos-x, 0) * 1px));
+    bottom: calc(var(--overlay-pos-y, 60) * 1px);
     /* width is set inline by JS to fit names; default starting state */
     width: auto;
     height: 180px;
