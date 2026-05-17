@@ -53,6 +53,94 @@ export const ShadowSpecSchema = z.object({
 });
 export type ShadowSpec = z.infer<typeof ShadowSpecSchema>;
 
+// ────────── Wave 1B — GradientStop / Gradient ──────────
+//
+// Gradients fill rect / ellipse / text via CSS `linear-gradient` or
+// `radial-gradient`. Each gradient has ≥2 stops. The discriminator
+// `kind` lets the compiler emit the right CSS function.
+export const GradientStopSchema = z.object({
+  offset: z.number().min(0).max(1),
+  color: z.string(),
+});
+export type GradientStop = z.infer<typeof GradientStopSchema>;
+
+export const LinearGradientSchema = z.object({
+  kind: z.literal("linear"),
+  angle: z.number().min(0).max(360),
+  stops: z.array(GradientStopSchema).min(2),
+});
+export type LinearGradient = z.infer<typeof LinearGradientSchema>;
+
+export const RadialGradientSchema = z.object({
+  kind: z.literal("radial"),
+  cx: z.number().min(0).max(1),
+  cy: z.number().min(0).max(1),
+  radius: z.number().min(0).max(1),
+  stops: z.array(GradientStopSchema).min(2),
+});
+export type RadialGradient = z.infer<typeof RadialGradientSchema>;
+
+export const GradientSpecSchema = z.discriminatedUnion("kind", [
+  LinearGradientSchema,
+  RadialGradientSchema,
+]);
+export type GradientSpec = z.infer<typeof GradientSpecSchema>;
+
+// ────────── Wave 1B — FilterSpec ──────────
+//
+// Maps to CSS `filter: blur(...) brightness(...) hue-rotate(...) saturate(...)`.
+// All keys optional — admin enables only what they need.
+//   - blur in px, capped at 40 (anything larger is performance death).
+//   - brightness as multiplier, 0..2 (0 = black, 1 = identity, 2 = double).
+//   - hueRotate in degrees, 0..360.
+//   - saturate as multiplier, 0..2 (0 = grayscale, 1 = identity).
+export const FilterSpecSchema = z.object({
+  blur: z.number().min(0).max(40).optional(),
+  brightness: z.number().min(0).max(2).optional(),
+  hueRotate: z.number().min(0).max(360).optional(),
+  saturate: z.number().min(0).max(2).optional(),
+});
+export type FilterSpec = z.infer<typeof FilterSpecSchema>;
+
+// ────────── Wave 1B — ShadowStack ──────────
+//
+// Wave 1A accepted a single `ShadowSpec` on `style.shadow`. Wave 1B
+// adds an array form on `style.shadows`. The union schema accepts
+// either shape so the compiler can read both — back-compat preserved.
+export const ShadowStackSchema = z.union([
+  ShadowSpecSchema,
+  z.array(ShadowSpecSchema).max(8),
+]);
+export type ShadowStack = z.infer<typeof ShadowStackSchema>;
+
+// ────────── Wave 1B — FontUpload ──────────
+//
+// Server-side validation for the `/admin/broadcast/v2/builder/fonts`
+// upload endpoint. fontkit parse + ttf2woff2 conversion run after
+// this schema passes. 5MB hard cap matches spec §10.
+const FONT_MIME = new Set([
+  "font/ttf",
+  "font/otf",
+  "font/woff",
+  "font/woff2",
+  "application/font-sfnt",
+  "application/x-font-ttf",
+  "application/x-font-otf",
+]);
+
+export const FontUploadSchema = z.object({
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().refine((m) => FONT_MIME.has(m), {
+    message: "mimeType must be a known font MIME",
+  }),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(5 * 1024 * 1024, "Font file must be ≤ 5MB"),
+});
+export type FontUpload = z.infer<typeof FontUploadSchema>;
+
 // ────────────── Style ──────────────
 //
 // Style is a single permissive shape — element-type-discriminated
@@ -72,9 +160,20 @@ export const StyleSchema = z.object({
   lineHeight: z.number().optional(),
   textAlign: z.enum(["left", "center", "right"]).optional(),
   color: z.string().optional(),
+  // Wave 1A single shadow (preserved). Wave 1B `shadows` array below
+  // takes precedence in the compiler when both present.
   shadow: ShadowSpecSchema.optional(),
+  // Wave 1B — stack of up to 8 shadows. Compiled to a comma-joined
+  // CSS `box-shadow` rule.
+  shadows: z.array(ShadowSpecSchema).max(8).optional(),
+  // Wave 1B — gradient fill (replaces solid `fill` when present).
+  gradient: GradientSpecSchema.optional(),
+  // Wave 1B — CSS filter stack applied to the element.
+  filter: FilterSpecSchema.optional(),
   imageAssetId: z.string().optional(),
   imageFit: z.enum(["cover", "contain", "fill"]).optional(),
+  // Wave 1B — polygon sides (used by PolygonStyleSchema + compiler).
+  sides: z.number().int().min(3).max(12).optional(),
 });
 export type Style = z.infer<typeof StyleSchema>;
 

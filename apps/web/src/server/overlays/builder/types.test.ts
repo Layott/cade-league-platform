@@ -237,3 +237,165 @@ describe("types.ts — runtime Zod schemas + type aliases", () => {
     expect(typeof t).toBe("string");
   });
 });
+
+import {
+  GradientStopSchema,
+  LinearGradientSchema,
+  RadialGradientSchema,
+  GradientSpecSchema,
+  FilterSpecSchema,
+  ShadowStackSchema,
+  FontUploadSchema,
+  type GradientStop,
+  type LinearGradient,
+  type RadialGradient,
+  type GradientSpec,
+  type FilterSpec,
+  type ShadowStack,
+  type FontUpload,
+} from "./types";
+
+describe("types.ts — Wave 1B extensions (gradient/filter/shadow-stack/font)", () => {
+  it("GradientStopSchema parses a valid stop", () => {
+    const s: GradientStop = { offset: 0.5, color: "#6bcd06" };
+    expect(GradientStopSchema.parse(s)).toEqual(s);
+  });
+
+  it("GradientStopSchema rejects offset > 1", () => {
+    expect(() =>
+      GradientStopSchema.parse({ offset: 1.5, color: "#fff" }),
+    ).toThrow();
+  });
+
+  it("GradientStopSchema rejects offset < 0", () => {
+    expect(() =>
+      GradientStopSchema.parse({ offset: -0.1, color: "#fff" }),
+    ).toThrow();
+  });
+
+  it("LinearGradientSchema accepts 2-stop linear gradient", () => {
+    const g: LinearGradient = {
+      kind: "linear",
+      angle: 90,
+      stops: [
+        { offset: 0, color: "#6bcd06" },
+        { offset: 1, color: "#fe036d" },
+      ],
+    };
+    expect(LinearGradientSchema.parse(g)).toEqual(g);
+  });
+
+  it("LinearGradientSchema rejects single-stop gradient", () => {
+    expect(() =>
+      LinearGradientSchema.parse({
+        kind: "linear",
+        angle: 0,
+        stops: [{ offset: 0, color: "#000" }],
+      }),
+    ).toThrow();
+  });
+
+  it("RadialGradientSchema accepts centered radial", () => {
+    const g: RadialGradient = {
+      kind: "radial",
+      cx: 0.5,
+      cy: 0.5,
+      radius: 0.5,
+      stops: [
+        { offset: 0, color: "#ffffff" },
+        { offset: 1, color: "#000000" },
+      ],
+    };
+    expect(RadialGradientSchema.parse(g)).toEqual(g);
+  });
+
+  it("GradientSpecSchema discriminates linear vs radial via `kind`", () => {
+    const linear: GradientSpec = {
+      kind: "linear",
+      angle: 45,
+      stops: [
+        { offset: 0, color: "#000" },
+        { offset: 1, color: "#fff" },
+      ],
+    };
+    expect(GradientSpecSchema.parse(linear)).toEqual(linear);
+
+    const radial: GradientSpec = {
+      kind: "radial",
+      cx: 0.3,
+      cy: 0.7,
+      radius: 0.8,
+      stops: [
+        { offset: 0, color: "#6bcd06" },
+        { offset: 1, color: "#fe036d" },
+      ],
+    };
+    expect(GradientSpecSchema.parse(radial)).toEqual(radial);
+  });
+
+  it("FilterSpecSchema accepts partial filter (only blur)", () => {
+    const f: FilterSpec = { blur: 8 };
+    expect(FilterSpecSchema.parse(f)).toEqual(f);
+  });
+
+  it("FilterSpecSchema accepts full filter stack", () => {
+    const f: FilterSpec = {
+      blur: 4,
+      brightness: 1.2,
+      hueRotate: 180,
+      saturate: 1.5,
+    };
+    expect(FilterSpecSchema.parse(f)).toEqual(f);
+  });
+
+  it("FilterSpecSchema rejects blur > 40", () => {
+    expect(() => FilterSpecSchema.parse({ blur: 60 })).toThrow();
+  });
+
+  it("FilterSpecSchema rejects hueRotate > 360", () => {
+    expect(() => FilterSpecSchema.parse({ hueRotate: 400 })).toThrow();
+  });
+
+  it("ShadowStackSchema accepts a single-shadow object (Wave 1A shape)", () => {
+    const s = { offsetX: 2, offsetY: 4, blur: 8, color: "#000", opacity: 0.5 };
+    const parsed = ShadowStackSchema.parse(s) as ShadowStack;
+    expect(parsed).toEqual(s);
+  });
+
+  it("ShadowStackSchema accepts an array of shadows", () => {
+    const s: ShadowStack = [
+      { offsetX: 2, offsetY: 2, blur: 4, color: "#6bcd06", opacity: 0.8 },
+      { offsetX: -2, offsetY: -2, blur: 4, color: "#fe036d", opacity: 0.6 },
+    ];
+    expect(ShadowStackSchema.parse(s)).toEqual(s);
+  });
+
+  it("FontUploadSchema accepts a TTF upload meta", () => {
+    const f: FontUpload = {
+      filename: "Custom Bold.ttf",
+      mimeType: "font/ttf",
+      sizeBytes: 102400,
+    };
+    expect(FontUploadSchema.parse(f)).toEqual(f);
+  });
+
+  it("FontUploadSchema rejects size over 5MB", () => {
+    expect(() =>
+      FontUploadSchema.parse({
+        filename: "huge.ttf",
+        mimeType: "font/ttf",
+        sizeBytes: 6 * 1024 * 1024,
+      }),
+    ).toThrow();
+  });
+
+  it("FontUploadSchema rejects non-font MIME", () => {
+    expect(() =>
+      FontUploadSchema.parse({
+        filename: "evil.exe",
+        mimeType: "application/octet-stream",
+        sizeBytes: 1024,
+      }),
+    ).toThrow();
+  });
+});
