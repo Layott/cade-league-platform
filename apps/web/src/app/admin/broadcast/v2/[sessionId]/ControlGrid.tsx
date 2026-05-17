@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { CustomDesignsTab } from "@/components/admin/broadcast/v2/CustomDesignsTab";
+import type { CustomDesignSummary } from "@/components/admin/broadcast/v2/CustomDesignCard";
 import { BrbControl } from "@/components/broadcast/v2/controls/BrbControl";
 import { TimerControl } from "@/components/broadcast/v2/controls/TimerControl";
 import { H2H2Control } from "@/components/broadcast/v2/controls/H2H2Control";
@@ -55,6 +57,16 @@ export type ControlGridProps = {
   lowerThirdSlots: [boolean, boolean, boolean];
   /** 13 Elite players for the player-squads dropdown picker. */
   playerOptions?: PlayerOption[];
+  /**
+   * Published user designs to surface in the Custom tab.
+   * Populated server-side when overlayBuilder.enabled is true.
+   */
+  customDesigns?: CustomDesignSummary[];
+  /**
+   * When true, appends the Custom tab section below the built-in grid.
+   * Maps directly to featureFlags.overlayBuilder.enabled.
+   */
+  overlayBuilderEnabled?: boolean;
 };
 
 export function ControlGrid({
@@ -65,6 +77,8 @@ export function ControlGrid({
   active,
   lowerThirdSlots,
   playerOptions = [],
+  customDesigns = [],
+  overlayBuilderEnabled = false,
 }: ControlGridProps) {
   const router = useRouter();
 
@@ -103,6 +117,7 @@ export function ControlGrid({
   // canTrigger surfaced via fieldset disabling so readers see the form
   // shape but cannot submit.
   return (
+    <>
     <fieldset
       disabled={!canTrigger}
       className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
@@ -269,5 +284,40 @@ export function ControlGrid({
         active={active["29-goalfests"] ?? false}
       />
     </fieldset>
+
+    {/* Wave 1A — Custom Designs tab: published user-authored overlays. */}
+    {overlayBuilderEnabled ? (
+      <div className="mt-6 space-y-3">
+        <div className="flex items-center gap-3 border-b border-[var(--ink-4)]/50 pb-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-2)]">
+            Custom Designs
+          </h2>
+          <span className="rounded-sm border border-[var(--signal)]/30 bg-[var(--signal)]/8 px-1.5 py-px font-mono text-[9px] text-[var(--signal)]">
+            Beta
+          </span>
+        </div>
+        <CustomDesignsTab
+          designs={customDesigns}
+          sessionId={sessionId}
+          viewToken={viewToken}
+          canTrigger={canTrigger}
+          enabled={overlayBuilderEnabled}
+          triggerAction={({ overlayKey, sessionId: sid }) => {
+            // User design overlays are driven purely via postMessage from
+            // CustomDesignCard's handleTrigger — this callback is a no-op
+            // server-side (user slugs are not in V2_OVERLAY_KEYS so the
+            // standard actions.ts gate would reject them). The card's
+            // onTrigger handler posts {type:'show'} to the iframe directly.
+            void overlayKey;
+            void sid;
+          }}
+          clearAction={({ overlayKey, sessionId: sid }) => {
+            void overlayKey;
+            void sid;
+          }}
+        />
+      </div>
+    ) : null}
+    </>
   );
 }

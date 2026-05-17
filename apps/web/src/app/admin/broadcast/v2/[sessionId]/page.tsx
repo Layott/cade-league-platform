@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
+import { featureFlags } from "@/lib/feature-flags";
+import { listPublishedUserDesigns } from "@/server/overlays/builder/registry";
 import {
   requirePermAsync,
   hasPermAsync,
@@ -206,6 +208,11 @@ export default async function BroadcastV2SessionPage({
   // resolves to one indexed lookup on overlay_events / overlay_active_instances.
   const activeState = await probeAllActiveStates(sb, session.id);
 
+  // Wave 1A — custom designs for the Custom tab (flag-gated).
+  const customDesigns = featureFlags.overlayBuilder.enabled
+    ? await listPublishedUserDesigns(sb)
+    : [];
+
   // 13 Elite players for the player-squads dropdown. We list players that
   // (a) have a non-null user link (so we can read display_name) and
   // (b) aren't soft-deleted. Sorted alphabetically by display name.
@@ -316,6 +323,8 @@ export default async function BroadcastV2SessionPage({
           activeState.multi["08-lower-third"] ?? [false, false, false]
         }
         playerOptions={playerOptions}
+        customDesigns={customDesigns}
+        overlayBuilderEnabled={featureFlags.overlayBuilder.enabled}
       />
     </div>
   );
