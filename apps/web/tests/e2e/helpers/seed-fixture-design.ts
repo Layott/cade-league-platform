@@ -248,3 +248,242 @@ export async function seedWave1aFixtureDesign(): Promise<FixtureSeedResult> {
     },
   };
 }
+
+/**
+ * Insert a 4-element Wave 1B fixture design directly into the
+ * `overlay_user_*` tables under a unique slug.
+ *
+ * Fixture shape (exercises every Wave 1B compiler path):
+ *   - 1 rect     (x:100, y:100, 600×240) with linear gradient green→pink,
+ *                 dual box-shadows, filter brightness+saturate.
+ *   - 1 ellipse  (x:900, y:100, 400×400) with radial gradient white→black.
+ *   - 1 polygon  (x:1400, y:100, 400×400) pink solid hexagon (sides=6).
+ *   - 1 text     (x:100, y:600, 1700×200) "WAVE 1B" Agharti 128 px with
+ *                 linear gradient green→pink.
+ *
+ * The design is published immediately so /overlay/v2/user/<slug>?demo=1
+ * is reachable without any editor interaction.
+ *
+ * Cleanup soft-deletes the design + related rows.
+ *
+ * Used by visual-regression-wave-1b.spec.ts.
+ */
+export async function seedWave1bFixtureDesign(): Promise<FixtureSeedResult> {
+  const sb = getServiceRoleClient();
+  const slug = `vr-wave1b-${Date.now().toString(36)}`;
+
+  // 1. Resolve the seeded admin user's id.
+  const { data: adminRow, error: adminErr } = await sb
+    .from("users")
+    .select("id")
+    .eq("email", "admin@cade.local")
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (adminErr || !adminRow) {
+    throw new Error(
+      `Could not resolve admin@cade.local user row: ${adminErr?.message ?? "no row"}`,
+    );
+  }
+  const createdBy = adminRow.id as string;
+
+  // 2. Insert the design in published state.
+  const { data: design, error: designErr } = await sb
+    .from("overlay_user_designs")
+    .insert({
+      slug,
+      title: "Wave 1B Visual Regression Fixture",
+      mode: "single",
+      status: "published",
+      canvas_width: 1920,
+      canvas_height: 1080,
+      created_by: createdBy,
+    })
+    .select("id")
+    .single();
+  if (designErr || !design) {
+    throw designErr ?? new Error("design insert failed");
+  }
+  const designId = design.id as string;
+
+  // 3. Insert one scene.
+  const { data: scene, error: sceneErr } = await sb
+    .from("overlay_user_design_scenes")
+    .insert({
+      design_id: designId,
+      order_index: 0,
+      name: "Scene 1",
+      duration_ms: 5000,
+      transition_in: "fade",
+      transition_out: "fade",
+    })
+    .select("id")
+    .single();
+  if (sceneErr || !scene) {
+    throw sceneErr ?? new Error("scene insert failed");
+  }
+  const sceneId = scene.id as string;
+
+  // 4. Insert 4 elements covering all Wave 1B compiler paths.
+  const elements = [
+    // Rect — linear gradient + dual shadows + filter.
+    {
+      scene_id: sceneId,
+      element_type: "rect",
+      z_index: 1,
+      transform: {
+        x: 100,
+        y: 100,
+        width: 600,
+        height: 240,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: {
+        gradient: {
+          kind: "linear",
+          angle: 90,
+          stops: [
+            { offset: 0, color: "#6bcd06" },
+            { offset: 1, color: "#fe036d" },
+          ],
+        },
+        shadows: [
+          { offsetX: 4, offsetY: 4, blur: 16, color: "#000000", opacity: 0.6 },
+          { offsetX: -4, offsetY: -4, blur: 16, color: "#6bcd06", opacity: 0.4 },
+        ],
+        filter: { brightness: 1.1, saturate: 1.2 },
+      },
+      content: {},
+    },
+    // Ellipse — radial gradient (produces border-radius: 50% in HTML output).
+    {
+      scene_id: sceneId,
+      element_type: "ellipse",
+      z_index: 2,
+      transform: {
+        x: 900,
+        y: 100,
+        width: 400,
+        height: 400,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: {
+        gradient: {
+          kind: "radial",
+          cx: 0.5,
+          cy: 0.5,
+          radius: 0.7,
+          stops: [
+            { offset: 0, color: "#ffffff" },
+            { offset: 1, color: "#050505" },
+          ],
+        },
+      },
+      content: {},
+    },
+    // Polygon — solid pink hexagon (produces clip-path: polygon() in HTML output).
+    {
+      scene_id: sceneId,
+      element_type: "polygon",
+      z_index: 3,
+      transform: {
+        x: 1400,
+        y: 100,
+        width: 400,
+        height: 400,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: { fill: "#fe036d", sides: 6 },
+      content: {},
+    },
+    // Text — Agharti 128 px with linear gradient ink.
+    {
+      scene_id: sceneId,
+      element_type: "text",
+      z_index: 4,
+      transform: {
+        x: 100,
+        y: 600,
+        width: 1700,
+        height: 200,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: {
+        fontFamily: "Agharti",
+        fontSize: 128,
+        fontWeight: 700,
+        color: "#ffffff",
+        gradient: {
+          kind: "linear",
+          angle: 45,
+          stops: [
+            { offset: 0, color: "#6bcd06" },
+            { offset: 1, color: "#fe036d" },
+          ],
+        },
+      },
+      content: { text: "WAVE 1B" },
+    },
+  ];
+
+  const { error: elErr } = await sb
+    .from("overlay_user_design_elements")
+    .insert(elements);
+  if (elErr) throw elErr;
+
+  // 5. Optionally register the user-design variant row. Not load-bearing for
+  //    the overlay route (which resolves by slug directly) but mirrors the
+  //    Wave 1A fixture convention for DB consistency.
+  try {
+    await sb.from("overlay_template_variants").insert({
+      overlay_key: `user-${slug}`,
+      variant_id: "default",
+      label: "Wave 1B VR Fixture",
+      html_path: `/overlay/v2/user/${slug}`,
+      active: true,
+    });
+  } catch {
+    // Table may not exist in this schema revision — not load-bearing.
+  }
+
+  return {
+    designId,
+    sceneId,
+    slug,
+    cleanup: async () => {
+      const sbInner = getServiceRoleClient();
+      const now = new Date().toISOString();
+      try {
+        await sbInner
+          .from("overlay_template_variants")
+          .update({ deleted_at: now })
+          .eq("overlay_key", `user-${slug}`);
+      } catch {
+        // optional table
+      }
+      await sbInner
+        .from("overlay_user_design_elements")
+        .update({ deleted_at: now })
+        .eq("scene_id", sceneId);
+      await sbInner
+        .from("overlay_user_design_scenes")
+        .update({ deleted_at: now })
+        .eq("id", sceneId);
+      await sbInner
+        .from("overlay_user_designs")
+        .update({ deleted_at: now })
+        .eq("id", designId);
+    },
+  };
+}
