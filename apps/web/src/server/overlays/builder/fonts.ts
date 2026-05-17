@@ -86,6 +86,7 @@ export async function uploadFont(
   }
 
   // 1. fontkit parse.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const font = (fontkit as unknown as { create: (b: Buffer) => any }).create(
     input.fileBuffer,
   );

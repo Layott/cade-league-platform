@@ -9,6 +9,7 @@ function makeSb() {
   };
   const storageUploads: Array<{ bucket: string; path: string; bytes: number }> = [];
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb: any = {
     from: (table: string) => ({
       insert: (rows: unknown) => ({
