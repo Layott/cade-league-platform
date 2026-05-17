@@ -114,17 +114,32 @@ function rowToDesign(r: DesignRow, scenes: SceneRow[] = [], elementsByScene: Rec
   };
 }
 
+export type Actor = { userId: string; roles: readonly string[] };
+
 export type CreateDesignInput = {
   title: string;
   mode: "single" | "sequence";
   description?: string | null;
-  createdBy: string;
+  createdBy?: string;
 };
 
 export async function createDesign(
   sb: SupabaseClient,
-  input: CreateDesignInput,
+  actorOrInput: Actor | CreateDesignInput,
+  inputArg?: CreateDesignInput,
 ): Promise<Design> {
+  // Support both calling conventions:
+  //   createDesign(sb, input)           — legacy / direct server module call
+  //   createDesign(sb, actor, input)    — action-layer call (audit-ready)
+  let input: CreateDesignInput;
+  let actor: Actor | undefined;
+  if (inputArg !== undefined) {
+    actor = actorOrInput as Actor;
+    input = inputArg;
+  } else {
+    input = actorOrInput as CreateDesignInput;
+  }
+  const createdBy = input.createdBy ?? actor?.userId ?? "unknown";
   const base = titleToSlug(input.title) || "untitled";
   let slug = base;
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -148,7 +163,7 @@ export async function createDesign(
       status: "draft",
       canvas_width: 1920,
       canvas_height: 1080,
-      created_by: input.createdBy,
+      created_by: createdBy,
     })
     .select()
     .single();
@@ -249,7 +264,18 @@ export type DesignMetaPatch = Partial<{
   description: string | null;
   mode: "single" | "sequence";
   status: "draft" | "published";
+  canvas_width: number;
+  canvas_height: number;
 }>;
+
+export async function updateDesign(
+  sb: SupabaseClient,
+  actor: Actor,
+  designId: string,
+  patch: DesignMetaPatch,
+): Promise<void> {
+  return updateDesignMeta(sb, designId, patch);
+}
 
 export async function updateDesignMeta(
   sb: SupabaseClient,
@@ -263,6 +289,8 @@ export async function updateDesignMeta(
   if (patch.description !== undefined) update.description = patch.description;
   if (patch.mode !== undefined) update.mode = patch.mode;
   if (patch.status !== undefined) update.status = patch.status;
+  if (patch.canvas_width !== undefined) update.canvas_width = patch.canvas_width;
+  if (patch.canvas_height !== undefined) update.canvas_height = patch.canvas_height;
 
   const { error } = await sb
     .from("overlay_user_designs")
@@ -275,8 +303,10 @@ export async function updateDesignMeta(
 
 export async function publishDesign(
   sb: SupabaseClient,
-  designId: string,
+  actorOrId: Actor | string,
+  maybeDesignId?: string,
 ): Promise<void> {
+  const designId = typeof actorOrId === "string" ? actorOrId : maybeDesignId!;
   const { data: designData, error: getErr } = await sb
     .from("overlay_user_designs")
     .select("*")
@@ -322,8 +352,10 @@ export async function publishDesign(
 
 export async function unpublishDesign(
   sb: SupabaseClient,
-  designId: string,
+  actorOrId: Actor | string,
+  maybeDesignId?: string,
 ): Promise<void> {
+  const designId = typeof actorOrId === "string" ? actorOrId : maybeDesignId!;
   const { data: designData, error: getErr } = await sb
     .from("overlay_user_designs")
     .select("*")
@@ -360,8 +392,10 @@ export async function unpublishDesign(
 
 export async function softDeleteDesign(
   sb: SupabaseClient,
-  designId: string,
+  actorOrId: Actor | string,
+  maybeDesignId?: string,
 ): Promise<void> {
+  const designId = typeof actorOrId === "string" ? actorOrId : maybeDesignId!;
   const nowIso = new Date().toISOString();
   const { error } = await sb
     .from("overlay_user_designs")

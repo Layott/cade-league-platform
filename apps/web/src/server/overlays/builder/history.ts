@@ -44,11 +44,26 @@ export type SnapshotMeta = {
   note: string | null;
 };
 
+export type Actor = { userId: string; roles: readonly string[] };
+
 export async function snapshotDesign(
   sb: SupabaseClient,
-  designId: string,
+  actorOrId: Actor | string,
+  designIdOrNote?: string,
   note?: string,
 ): Promise<SnapshotResult> {
+  // Support both calling conventions:
+  //   snapshotDesign(sb, designId, note?)           — legacy
+  //   snapshotDesign(sb, actor, designId, note?)    — action-layer
+  let designId: string;
+  let resolvedNote: string | undefined;
+  if (typeof actorOrId === "string") {
+    designId = actorOrId;
+    resolvedNote = designIdOrNote;
+  } else {
+    designId = designIdOrNote!;
+    resolvedNote = note;
+  }
   // Load the design by ID. getDesign looks up by slug, so we need to
   // fetch slug first.
   const { data: designData, error: getErr } = await sb
@@ -72,7 +87,7 @@ export async function snapshotDesign(
     .insert({
       design_id: designId,
       snapshot: snapshotJson,
-      note: note ?? null,
+      note: resolvedNote ?? null,
     })
     .select()
     .single();

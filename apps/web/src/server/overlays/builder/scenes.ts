@@ -224,6 +224,45 @@ export async function deleteScene(
   }
 }
 
+// ────────────── Bulk update (Wave 1A save-design flow) ──────────────
+
+export type SceneBulkUpdate = {
+  id: string;
+  patch: Partial<{
+    name: string | null;
+    durationMs: number;
+    transitionIn: string;
+    transitionOut: string;
+    orderIndex: number;
+  }>;
+};
+
+/**
+ * Thin loop wrapper around `updateScene`. Applies each patch entry in
+ * order. Used by `saveDesignAction` to flush the entire scene list from
+ * the Zustand store in one server-action call.
+ *
+ * @returns Array of scene IDs that were updated (same order as input).
+ */
+export async function updateScenes(
+  sb: SupabaseClient,
+  _actor: { userId: string; roles: readonly string[] },
+  _designId: string,
+  updates: SceneBulkUpdate[],
+): Promise<string[]> {
+  const updated: string[] = [];
+  for (const { id, patch } of updates) {
+    await updateScene(sb, id, {
+      name: patch.name,
+      durationMs: patch.durationMs,
+      transitionIn: patch.transitionIn,
+      transitionOut: patch.transitionOut,
+    });
+    updated.push(id);
+  }
+  return updated;
+}
+
 export async function cloneScene(
   sb: SupabaseClient,
   sceneId: string,

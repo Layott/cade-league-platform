@@ -5,6 +5,7 @@ import {
   deleteElement,
   reorderElements,
   updateElement,
+  updateElements,
 } from "./elements";
 
 type FakeRow = Record<string, unknown>;
@@ -214,6 +215,34 @@ describe("elements.ts — add/update/delete", () => {
     expect(find(c.id)?.z_index).toBe(0);
     expect(find(b.id)?.z_index).toBe(1);
     expect(find(a.id)?.z_index).toBe(2);
+  });
+
+  it("updateElements bulk-applies patches to multiple elements", async () => {
+    const a = await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      VALID_TEXT_INPUT,
+    );
+    const b = await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      VALID_TEXT_INPUT,
+    );
+    const mockActor = { userId: "u-1", roles: ["admin"] as readonly string[] };
+    const updated = await updateElements(
+      sb as unknown as Parameters<typeof updateElements>[0],
+      mockActor,
+      "design-1",
+      [
+        { id: a.id, patch: { locked: true } },
+        { id: b.id, patch: { visible: false } },
+      ],
+    );
+    expect(updated).toEqual([a.id, b.id]);
+    const rowA = sb._tables.overlay_user_design_elements.rows.find((r) => r.id === a.id);
+    expect(rowA?.locked).toBe(true);
+    const rowB = sb._tables.overlay_user_design_elements.rows.find((r) => r.id === b.id);
+    expect(rowB?.visible).toBe(false);
   });
 
   it("cloneElement duplicates with +20px offset on x/y", async () => {

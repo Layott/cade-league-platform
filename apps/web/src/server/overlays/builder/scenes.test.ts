@@ -5,6 +5,7 @@ import {
   deleteScene,
   reorderScenes,
   updateScene,
+  updateScenes,
 } from "./scenes";
 
 type FakeRow = Record<string, unknown>;
@@ -205,6 +206,44 @@ describe("scenes.ts", () => {
     expect(findRow("s2")?.deleted_at).not.toBeNull();
     expect(findRow("s1")?.order_index).toBe(0);
     expect(findRow("s3")?.order_index).toBe(1);
+  });
+
+  it("updateScenes bulk-applies patches in order", async () => {
+    sb._tables.overlay_user_design_scenes.rows.push({
+      id: "s1",
+      design_id: "d1",
+      order_index: 0,
+      name: null,
+      duration_ms: 5000,
+      transition_in: "fade",
+      transition_out: "fade",
+      deleted_at: null,
+    });
+    sb._tables.overlay_user_design_scenes.rows.push({
+      id: "s2",
+      design_id: "d1",
+      order_index: 1,
+      name: null,
+      duration_ms: 5000,
+      transition_in: "fade",
+      transition_out: "fade",
+      deleted_at: null,
+    });
+    const mockActor = { userId: "u-1", roles: ["admin"] as readonly string[] };
+    const updated = await updateScenes(
+      sb as unknown as Parameters<typeof updateScenes>[0],
+      mockActor,
+      "d1",
+      [
+        { id: "s1", patch: { durationMs: 8000, name: "intro" } },
+        { id: "s2", patch: { transitionIn: "cut", transitionOut: "cut" } },
+      ],
+    );
+    expect(updated).toEqual(["s1", "s2"]);
+    const row1 = sb._tables.overlay_user_design_scenes.rows.find((r) => r.id === "s1");
+    expect(row1?.duration_ms).toBe(8000);
+    const row2 = sb._tables.overlay_user_design_scenes.rows.find((r) => r.id === "s2");
+    expect(row2?.transition_in).toBe("cut");
   });
 
   it("cloneScene duplicates a scene and its elements with fresh ids", async () => {
