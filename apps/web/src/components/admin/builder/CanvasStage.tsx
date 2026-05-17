@@ -1,17 +1,24 @@
 "use client";
 
-import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon } from "react-konva";
+import { useState } from "react";
+import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine } from "react-konva";
 import { useBuilderStore } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
+import { useAlignmentGuides, computeAlignmentGuides } from "./use-alignment-guides";
 
 /**
  * Wave 1A — canvas drawing surface.
+ * Wave 1B — adds ellipse / line / polygon renderers + alignment guides.
  *
  * Renders active scene's elements as react-konva nodes sorted by
  * zIndex. Drag-end commits the new transform to the zustand store;
  * click (or shift-click) sets selection. Container scrolls if window
  * smaller than canvas — pan/zoom polish deferred.
+ *
+ * Alignment guides: during drag, 1px dashed pink lines snap dragged
+ * element to edges/centers of other elements or the canvas itself
+ * within 5px (guide) / 3px (snap) thresholds.
  */
 export function CanvasStage() {
   const design = useBuilderStore((s) => s.design);
@@ -21,6 +28,28 @@ export function CanvasStage() {
   const updateElement = useBuilderStore((s) => s.updateElement);
   const selectElement = useBuilderStore((s) => s.selectElement);
 
+  const [dragState, setDragState] = useState<{
+    id: string;
+    transform: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+
+  const scene = design && activeSceneId
+    ? design.scenes.find((s) => s.id === activeSceneId) ?? null
+    : null;
+
+  const others = scene
+    ? scene.elements
+        .filter((e) => dragState && e.id !== dragState.id)
+        .map((e) => ({ id: e.id, transform: e.transform as { x: number; y: number; width: number; height: number } }))
+    : [];
+
+  const alignment = useAlignmentGuides(
+    dragState?.id ?? null,
+    dragState?.transform ?? null,
+    others,
+    { width: design?.canvasWidth ?? 1920, height: design?.canvasHeight ?? 1080 },
+  );
+
   if (!design || !activeSceneId) {
     return (
       <div className="flex h-full items-center justify-center text-white/30">
@@ -29,7 +58,6 @@ export function CanvasStage() {
     );
   }
 
-  const scene = design.scenes.find((s) => s.id === activeSceneId);
   if (!scene) return null;
 
   const sorted = [...scene.elements]
@@ -54,8 +82,44 @@ export function CanvasStage() {
                   transform: { ...el.transform, x, y },
                 } as Partial<Element>)
               }
+              onDragMove={(x, y) => {
+                setDragState({
+                  id: el.id,
+                  transform: { x, y, width: el.transform.width, height: el.transform.height },
+                });
+              }}
+              onDragEnd={(x, y) => {
+                setDragState(null);
+                updateElement(el.id, {
+                  transform: { ...el.transform, x, y },
+                } as Partial<Element>);
+              }}
+              canvasWidth={design.canvasWidth}
+              canvasHeight={design.canvasHeight}
+              othersForSnap={others.filter((o) => o.id !== el.id)}
             />
           ))}
+          {alignment.guides.map((g, i) =>
+            g.kind === "v" ? (
+              <KLine
+                key={`g-${i}`}
+                points={[g.pos, g.from, g.pos, g.to]}
+                stroke="#fe036d"
+                strokeWidth={1}
+                dash={[4, 4]}
+                listening={false}
+              />
+            ) : (
+              <KLine
+                key={`g-${i}`}
+                points={[g.from, g.pos, g.to, g.pos]}
+                stroke="#fe036d"
+                strokeWidth={1}
+                dash={[4, 4]}
+                listening={false}
+              />
+            ),
+          )}
         </Layer>
       </Stage>
     </div>
@@ -67,18 +131,43 @@ function RenderedElement({
   selected,
   onSelect,
   onMove,
+  onDragMove,
+  onDragEnd,
+  canvasWidth,
+  canvasHeight,
+  othersForSnap,
 }: {
   el: Element;
   selected: boolean;
   onSelect: (shift: boolean) => void;
   onMove: (x: number, y: number) => void;
+  onDragMove: (x: number, y: number) => void;
+  onDragEnd: (x: number, y: number) => void;
+  canvasWidth: number;
+  canvasHeight: number;
+  othersForSnap: Array<{ id: string; transform: { x: number; y: number; width: number; height: number } }>;
 }) {
-  const handleDragEnd = (e: { target: { x: () => number; y: () => number } }) => {
-    onMove(e.target.x(), e.target.y());
-  };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onClick = (e: { evt?: any }) => {
     onSelect(Boolean(e.evt?.shiftKey));
+  };
+
+  const handleDragMove = (e: { target: { x: () => number; y: () => number; position: (p: { x: number; y: number }) => void } }) => {
+    const rawX = e.target.x();
+    const rawY = e.target.y();
+    onDragMove(rawX, rawY);
+    const a = computeAlignmentGuides(
+      { x: rawX, y: rawY, width: el.transform.width, height: el.transform.height },
+      othersForSnap,
+      { width: canvasWidth, height: canvasHeight },
+    );
+    if (a.snappedX !== rawX || a.snappedY !== rawY) {
+      e.target.position({ x: a.snappedX, y: a.snappedY });
+    }
+  };
+
+  const handleDragEnd = (e: { target: { x: () => number; y: () => number } }) => {
+    onDragEnd(e.target.x(), e.target.y());
   };
 
   const t = el.transform;
@@ -106,6 +195,7 @@ function RenderedElement({
         draggable
         onClick={onClick}
         onTap={onClick}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
       />
     );
@@ -128,6 +218,7 @@ function RenderedElement({
         draggable
         onClick={onClick}
         onTap={onClick}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
       />
     );
@@ -141,6 +232,7 @@ function RenderedElement({
         stroke={stroke}
         strokeWidth={strokeWidth}
         onClick={onClick}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
       />
     );
@@ -161,8 +253,21 @@ function RenderedElement({
         draggable
         onClick={onClick}
         onTap={onClick}
+        onDragMove={(e: { target: { x: () => number; y: () => number; position: (p: { x: number; y: number }) => void } }) => {
+          const rawX = e.target.x() - t.width / 2;
+          const rawY = e.target.y() - t.height / 2;
+          onDragMove(rawX, rawY);
+          const a = computeAlignmentGuides(
+            { x: rawX, y: rawY, width: t.width, height: t.height },
+            othersForSnap,
+            { width: canvasWidth, height: canvasHeight },
+          );
+          if (a.snappedX !== rawX || a.snappedY !== rawY) {
+            e.target.position({ x: a.snappedX + t.width / 2, y: a.snappedY + t.height / 2 });
+          }
+        }}
         onDragEnd={(e: { target: { x: () => number; y: () => number } }) =>
-          onMove(e.target.x() - t.width / 2, e.target.y() - t.height / 2)
+          onDragEnd(e.target.x() - t.width / 2, e.target.y() - t.height / 2)
         }
       />
     );
@@ -181,6 +286,7 @@ function RenderedElement({
         draggable
         onClick={onClick}
         onTap={onClick}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
       />
     );
@@ -203,8 +309,21 @@ function RenderedElement({
         draggable
         onClick={onClick}
         onTap={onClick}
+        onDragMove={(e: { target: { x: () => number; y: () => number; position: (p: { x: number; y: number }) => void } }) => {
+          const rawX = e.target.x() - t.width / 2;
+          const rawY = e.target.y() - t.height / 2;
+          onDragMove(rawX, rawY);
+          const a = computeAlignmentGuides(
+            { x: rawX, y: rawY, width: t.width, height: t.height },
+            othersForSnap,
+            { width: canvasWidth, height: canvasHeight },
+          );
+          if (a.snappedX !== rawX || a.snappedY !== rawY) {
+            e.target.position({ x: a.snappedX + t.width / 2, y: a.snappedY + t.height / 2 });
+          }
+        }}
         onDragEnd={(e: { target: { x: () => number; y: () => number } }) =>
-          onMove(e.target.x() - t.width / 2, e.target.y() - t.height / 2)
+          onDragEnd(e.target.x() - t.width / 2, e.target.y() - t.height / 2)
         }
       />
     );
@@ -219,6 +338,7 @@ function RenderedImage({
   stroke,
   strokeWidth,
   onClick,
+  onDragMove,
   onDragEnd,
 }: {
   el: Element;
@@ -227,6 +347,7 @@ function RenderedImage({
   strokeWidth: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onClick: (e: { evt?: any }) => void;
+  onDragMove: (e: { target: { x: () => number; y: () => number; position: (p: { x: number; y: number }) => void } }) => void;
   onDragEnd: (e: { target: { x: () => number; y: () => number } }) => void;
 }) {
   const url = (el.content?.assetUrl as string | undefined) ?? null;
@@ -245,6 +366,7 @@ function RenderedImage({
       draggable
       onClick={onClick}
       onTap={onClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
     />
   );
