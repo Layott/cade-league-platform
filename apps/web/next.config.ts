@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // output, that CSS file moves/disappears and page-data collection fails
   // ("default-stylesheet.css" ENOENT). Marking it external keeps jsdom
   // loaded from node_modules at runtime, where its asset files still live.
-  serverExternalPackages: ["isomorphic-dompurify", "jsdom"],
+  serverExternalPackages: ["isomorphic-dompurify", "jsdom", "fontkit", "ttf2woff2"],
   // There's a stray package-lock.json at C:\Users\Sweez\Desktop\LAYO\CLAUDE\
   // that Next 15's heuristic picks as the "workspace root". That misroutes
   // the asset-path resolution (Tailwind CSS served from the wrong public
