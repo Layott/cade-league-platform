@@ -3,6 +3,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
 import { getDesign } from "@/server/overlays/builder/designs";
+import { listFonts } from "@/server/overlays/builder/fonts";
 import { CanvasEditorShell } from "@/components/admin/builder/CanvasEditorShell";
 import { featureFlags } from "@/lib/feature-flags";
 
@@ -59,5 +60,7 @@ export default async function BuilderEditPage({
   const { sb } = await resolveAdmin(`/admin/broadcast/v2/builder/${slug}/edit`);
   const design = await getDesign(sb, slug);
   if (!design) notFound();
-  return <CanvasEditorShell design={design} />;
+  const fontRows = await listFonts(sb);
+  const uploadedFonts = fontRows.map((f) => ({ id: f.id, familyName: f.family_name }));
+  return <CanvasEditorShell design={design} uploadedFonts={uploadedFonts} />;
 }

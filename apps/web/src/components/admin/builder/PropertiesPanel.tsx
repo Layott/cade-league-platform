@@ -8,6 +8,8 @@ import { GradientEditor } from "./GradientEditor";
 import { FilterEditor } from "./FilterEditor";
 import { ShadowStackEditor } from "./ShadowStackEditor";
 import { ManualBindEditor } from "./ManualBindEditor";
+import { FontFamilyPicker } from "./FontFamilyPicker";
+import type { UploadedFontMeta } from "./FontFamilyPicker";
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -15,7 +17,6 @@ import { ManualBindEditor } from "./ManualBindEditor";
 
 type TabKey = "style" | "transform" | "binding" | "animation";
 
-const FONT_FAMILIES = ["Agharti", "Quedora", "Inter", "JetBrains Mono"] as const;
 const FONT_WEIGHTS = [400, 500, 600, 700, 800] as const;
 
 const ANIM_TYPES = [
@@ -61,7 +62,11 @@ const TABS_BY_TYPE: Record<ElementType, TabKey[]> = {
 // PropertiesPanel
 // ─────────────────────────────────────────────────────────────
 
-export function PropertiesPanel() {
+export function PropertiesPanel({
+  uploadedFonts = [],
+}: {
+  uploadedFonts?: UploadedFontMeta[];
+} = {}) {
   const design = useBuilderStore((s) => s.design);
   const selectedIds = useBuilderStore((s) => s.selectedElementIds);
   const updateElement = useBuilderStore((s) => s.updateElement);
@@ -136,6 +141,7 @@ export function PropertiesPanel() {
             element={selected}
             patchStyle={patchStyle}
             patchContent={patchContent}
+            uploadedFonts={uploadedFonts}
           />
         )}
         {safeTab === "transform" && (
@@ -225,10 +231,12 @@ function StyleTab({
   element,
   patchStyle,
   patchContent,
+  uploadedFonts = [],
 }: {
   element: Element;
   patchStyle: (s: Record<string, unknown>) => void;
   patchContent: (c: Record<string, unknown>) => void;
+  uploadedFonts?: UploadedFontMeta[];
 }) {
   const s = element.style ?? {};
 
@@ -308,22 +316,13 @@ function StyleTab({
           onChange={(c) => patchStyle({ color: c })}
         />
 
-        <label className="mb-2 block">
-          <span className="mb-1 block text-xs uppercase tracking-wide text-white/50">
-            Font family
-          </span>
-          <select
-            aria-label="Font family"
+        <label className="mt-2 block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-white/50">Font family</span>
+          <FontFamilyPicker
             value={(s.fontFamily as string) ?? "Agharti"}
-            onChange={(e) => patchStyle({ fontFamily: e.target.value })}
-            className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
-          >
-            {FONT_FAMILIES.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+            uploaded={uploadedFonts}
+            onChange={(f) => patchStyle({ fontFamily: f })}
+          />
         </label>
 
         <NumberField

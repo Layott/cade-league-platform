@@ -9,6 +9,7 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import { LayersPanel } from "./LayersPanel";
 import { DataSlotsPanel } from "./DataSlotsPanel";
 import type { Design } from "@/server/overlays/builder/types";
+import type { UploadedFontMeta } from "./FontFamilyPicker";
 
 /**
  * Wave 1A — canvas editor shell.
@@ -32,7 +33,13 @@ import type { Design } from "@/server/overlays/builder/types";
  * LayersPanel) are stub placeholders in Wave 1A — Tasks 23-26 replace
  * them with real implementations.
  */
-export function CanvasEditorShell({ design }: { design: Design }) {
+export function CanvasEditorShell({
+  design,
+  uploadedFonts = [],
+}: {
+  design: Design;
+  uploadedFonts?: UploadedFontMeta[];
+}) {
   const loadDesign = useBuilderStore((s) => s.loadDesign);
 
   useEffect(() => {
@@ -50,7 +57,7 @@ export function CanvasEditorShell({ design }: { design: Design }) {
           </div>
           <LayersPanel />
         </div>
-        <PropertiesPanel />
+        <PropertiesPanel uploadedFonts={uploadedFonts} />
       </div>
       <DataSlotsPanel />
     </div>
