@@ -1,0 +1,134 @@
+import { describe, expect, it } from "vitest";
+import { compileDesignToHtml } from "./compiler";
+import { designRectTextImage } from "./fixtures/design-rect-text-image";
+import { designWithBinding } from "./fixtures/design-with-binding";
+import { designWithAnimation } from "./fixtures/design-with-animation";
+
+describe("compileDesignToHtml — §14 contract", () => {
+  const html = compileDesignToHtml(designRectTextImage, 0);
+
+  it("emits doctype + lang + meta charset + color-scheme dark", () => {
+    expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
+    expect(html).toContain('<html lang="en">');
+    expect(html).toContain('<meta charset="UTF-8"');
+    expect(html).toContain('name="color-scheme" content="dark"');
+  });
+
+  it("sets title from design", () => {
+    expect(html).toContain("<title>Fixture: rect + text + image</title>");
+  });
+
+  it("forces transparent canvas + dark scheme + opaque body", () => {
+    expect(html).toMatch(
+      /html,\s*body\s*\{[^}]*background:\s*transparent\s*!important[^}]*\}/,
+    );
+    expect(html).toMatch(/color-scheme:\s*dark/);
+    expect(html).toMatch(/body\s*\{[^}]*opacity:\s*1\s*!important[^}]*\}/);
+  });
+
+  it("locks body to 1920x1080 with overflow hidden", () => {
+    expect(html).toMatch(/width:\s*1920px/);
+    expect(html).toMatch(/height:\s*1080px/);
+    expect(html).toMatch(/overflow:\s*hidden/);
+  });
+
+  it("emits per-element default rule with opacity 0", () => {
+    expect(html).toContain('[data-element-id="00000000-0000-0000-0000-000000000100"]');
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-000000000100"\]\s*\{[^}]*opacity:\s*0/,
+    );
+  });
+
+  it("emits cade-visible gate with element opacity restored", () => {
+    expect(html).toMatch(
+      /body\.cade-visible\s+\[data-element-id="00000000-0000-0000-0000-000000000100"\]\s*\{[^}]*opacity:\s*1/,
+    );
+  });
+
+  it("emits cade-exiting gate forcing element back to 0", () => {
+    expect(html).toMatch(
+      /body\.cade-exiting\s+\[data-element-id="00000000-0000-0000-0000-000000000100"\]\s*\{[^}]*opacity:\s*0/,
+    );
+  });
+
+  it("emits <div> per element with data-element-id", () => {
+    expect(html).toContain('data-element-id="00000000-0000-0000-0000-000000000100"');
+    expect(html).toContain('data-element-id="00000000-0000-0000-0000-000000000101"');
+    expect(html).toContain('data-element-id="00000000-0000-0000-0000-000000000102"');
+  });
+
+  it("renders text content for text elements", () => {
+    expect(html).toContain(">HELLO<");
+  });
+
+  it("renders <img> for image elements", () => {
+    expect(html).toMatch(/<img[^>]+data-element-img/);
+    expect(html).toContain("/overlay-user-assets/image/logo-test.png");
+  });
+
+  it("loads @font-face for Agharti when used", () => {
+    expect(html).toMatch(/@font-face\s*\{[^}]*font-family:\s*['"]?Agharti/);
+    expect(html).toContain("/overlays/v2/_assets/fonts/agharti-regular.woff2");
+  });
+
+  it("injects BOOTSTRAP_SCRIPT inline at end of body", () => {
+    expect(html).toContain("<script>");
+    // Bootstrap exports a marker constant the runtime can check.
+    expect(html).toMatch(/cade-visible-gate-observer-v2/);
+  });
+});
+
+describe("compileDesignToHtml — data binding", () => {
+  const html = compileDesignToHtml(designWithBinding, 0);
+
+  it("emits data-binding-* attrs on bound element", () => {
+    expect(html).toContain('data-binding-feed="standings"');
+    expect(html).toContain('data-binding-path="standings[0].name"');
+    expect(html).toContain('data-binding-template="${standings[0].name}"');
+  });
+
+  it("emits __OVERLAY_FEEDS__ with standings entry", () => {
+    expect(html).toContain("window.__OVERLAY_FEEDS__");
+    expect(html).toMatch(/standings:\s*\{[^}]*fetchPath:/);
+    expect(html).toContain("/leaderboard");
+    expect(html).toMatch(/realtimeChannels:\s*\[[^\]]*['"]standings\.changed['"]/);
+  });
+
+  it("does not include feeds that are not used", () => {
+    // designWithBinding only uses standings — top_scorers should be absent.
+    expect(html).not.toMatch(/top_scorers:\s*\{/);
+  });
+
+  it("uses ${sessionId} placeholder in fetchPath", () => {
+    expect(html).toContain("${sessionId}");
+  });
+});
+
+describe("compileDesignToHtml — animations", () => {
+  const html = compileDesignToHtml(designWithAnimation, 0);
+
+  it("emits @keyframes for slide-left entry", () => {
+    expect(html).toContain("@keyframes slide-left-in");
+    expect(html).toMatch(/translateX\(-32px\)/);
+  });
+
+  it("emits per-element animation rule referencing the keyframes", () => {
+    expect(html).toMatch(
+      /body\.cade-visible\s+\[data-element-id="00000000-0000-0000-0000-000000000300"\]\s*\{[^}]*animation:[^}]*slide-left-in/,
+    );
+    expect(html).toMatch(/600ms/);
+    expect(html).toMatch(/ease-out/);
+  });
+});
+
+describe("compileDesignToHtml — opts.demo", () => {
+  it("does NOT auto-show when demo flag is false", () => {
+    const html = compileDesignToHtml(designRectTextImage, 0, { demo: false });
+    expect(html).not.toContain("__OVERLAY_DEMO__ = true");
+  });
+
+  it("sets demo flag when opts.demo=true", () => {
+    const html = compileDesignToHtml(designRectTextImage, 0, { demo: true });
+    expect(html).toContain("__OVERLAY_DEMO__ = true");
+  });
+});
