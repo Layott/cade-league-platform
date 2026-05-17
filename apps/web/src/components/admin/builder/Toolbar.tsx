@@ -10,6 +10,9 @@ import {
   Database,
   Undo2,
   Redo2,
+  Circle,
+  Minus,
+  Hexagon,
 } from "lucide-react";
 import { useBuilderStore, useTemporalStore } from "@/state/builder/store";
 
@@ -57,6 +60,33 @@ export function Toolbar() {
     });
   }
 
+  function addEllipse() {
+    if (!activeSceneId) return;
+    addElement(activeSceneId, "ellipse", {
+      transform: { x: 860, y: 490, width: 200, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: { fill: "#6bcd06" },
+      zIndex: 0,
+    });
+  }
+
+  function addLine() {
+    if (!activeSceneId) return;
+    addElement(activeSceneId, "line", {
+      transform: { x: 760, y: 540, width: 400, height: 6, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: { stroke: "#6bcd06", strokeWidth: 6 },
+      zIndex: 0,
+    });
+  }
+
+  function addPolygon() {
+    if (!activeSceneId) return;
+    addElement(activeSceneId, "polygon", {
+      transform: { x: 820, y: 440, width: 200, height: 200, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: { fill: "#fe036d", sides: 6 },
+      zIndex: 0,
+    });
+  }
+
   function openDataSlots() {
     window.dispatchEvent(new CustomEvent("builder:open-data-slots"));
   }
@@ -74,6 +104,15 @@ export function Toolbar() {
       </ToolButton>
       <ToolButton label="Image" onClick={addImage}>
         <ImageIcon size={18} />
+      </ToolButton>
+      <ToolButton label="Ellipse" onClick={addEllipse}>
+        <Circle size={18} />
+      </ToolButton>
+      <ToolButton label="Line" onClick={addLine}>
+        <Minus size={18} />
+      </ToolButton>
+      <ToolButton label="Polygon" onClick={addPolygon}>
+        <Hexagon size={18} />
       </ToolButton>
       <ToolButton label="Data Slot" onClick={openDataSlots}>
         <Database size={18} />

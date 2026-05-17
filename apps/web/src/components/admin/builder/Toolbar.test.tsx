@@ -97,4 +97,34 @@ describe("Toolbar", () => {
     expect(handler).toHaveBeenCalled();
     window.removeEventListener("builder:open-data-slots", handler);
   });
+
+  it("renders Ellipse / Line / Polygon buttons", () => {
+    render(<Toolbar />);
+    expect(screen.getByRole("button", { name: /^ellipse$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^line$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^polygon$/i })).toBeInTheDocument();
+  });
+
+  it("clicking Ellipse adds an ellipse element", () => {
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^ellipse$/i }));
+    const els = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(els[0].elementType).toBe("ellipse");
+  });
+
+  it("clicking Line adds a line element with stroke", () => {
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^line$/i }));
+    const els = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(els[0].elementType).toBe("line");
+    expect((els[0].style as { stroke?: string }).stroke).toBeDefined();
+  });
+
+  it("clicking Polygon adds a polygon with sides=6", () => {
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^polygon$/i }));
+    const els = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(els[0].elementType).toBe("polygon");
+    expect((els[0].style as { sides?: number }).sides).toBe(6);
+  });
 });
