@@ -4,16 +4,19 @@ import { CanvasStage } from "./CanvasStage";
 import { useBuilderStore } from "@/state/builder/store";
 
 // Mock react-konva so the test can render in jsdom without a real canvas.
-vi.mock("react-konva", () => {
-  const React = require("react");
-  const make = (tag: string) =>
-    React.forwardRef((props: Record<string, unknown>, ref: unknown) =>
+vi.mock("react-konva", async () => {
+  const React = await import("react");
+  const make = (tag: string) => {
+    const C = React.forwardRef((props: Record<string, unknown>, ref: unknown) =>
       React.createElement(
         "div",
         { ...props, ref, "data-konva-tag": tag, role: tag === "Stage" ? "img" : undefined },
-        props.children,
+        props.children as React.ReactNode,
       ),
     );
+    C.displayName = `Konva${tag}`;
+    return C;
+  };
   return {
     Stage: make("Stage"),
     Layer: make("Layer"),

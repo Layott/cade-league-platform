@@ -12,9 +12,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PublishedUserDesign = {
+  id: string;
   slug: string;
   title: string;
-  overlayKey: string;
+  overlayKey: `user-${string}`;
   thumbnailUrl: string | null;
   updatedAt: string;
 };
@@ -70,10 +71,11 @@ export async function listPublishedUserDesigns(
     // Application-level guard: skip soft-deleted design rows that the
     // mock's is() no-op may have let through.
     if (d.deleted_at != null) continue;
-    const overlayKey = `user-${d.slug}`;
+    const overlayKey = `user-${d.slug}` as `user-${string}`;
     const variant = variantsByKey.get(overlayKey);
     if (!variant) continue;
     out.push({
+      id: d.id,
       slug: d.slug,
       title: d.title,
       overlayKey,

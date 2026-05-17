@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDesignAction } from "@/app/admin/broadcast/v2/builder/actions";
-import type { Design } from "@/server/overlays/builder/types";
+import type { DesignSummary } from "@/server/overlays/builder/designs";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 
 /**
@@ -18,7 +18,7 @@ import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
  * Note: createDesignAction is a FormData server action. This component
  * builds a FormData object from the modal form state before calling it.
  */
-export function BuilderLibrary({ designs }: { designs: Design[] }) {
+export function BuilderLibrary({ designs }: { designs: DesignSummary[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -141,7 +141,7 @@ export function BuilderLibrary({ designs }: { designs: Design[] }) {
   );
 }
 
-function DesignCard({ design }: { design: Design }) {
+function DesignCard({ design }: { design: DesignSummary }) {
   const updated = design.updatedAt
     ? new Date(design.updatedAt).toLocaleDateString()
     : "—";
@@ -167,7 +167,7 @@ function DesignCard({ design }: { design: Design }) {
   );
 }
 
-function StatusBadge({ status }: { status: Design["status"] }) {
+function StatusBadge({ status }: { status: DesignSummary["status"] }) {
   const cls =
     status === "published"
       ? "bg-[#6bcd06]/15 text-[#6bcd06]"

@@ -14,7 +14,7 @@ import { z } from "zod";
 export const CreateDesignSchema = z.object({
   title: z.string().min(1, "title required").max(120),
   mode: z.enum(["single", "sequence"], {
-    errorMap: () => ({ message: "mode must be 'single' or 'sequence'" }),
+    error: "mode must be 'single' or 'sequence'",
   }),
 });
 

@@ -76,7 +76,8 @@ function RenderedElement({
   const handleDragEnd = (e: { target: { x: () => number; y: () => number } }) => {
     onMove(e.target.x(), e.target.y());
   };
-  const onClick = (e: { evt?: { shiftKey?: boolean } }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onClick = (e: { evt?: any }) => {
     onSelect(Boolean(e.evt?.shiftKey));
   };
 
@@ -160,7 +161,8 @@ function RenderedImage({
   t: Element["transform"];
   stroke?: string;
   strokeWidth: number;
-  onClick: (e: { evt?: { shiftKey?: boolean } }) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onClick: (e: { evt?: any }) => void;
   onDragEnd: (e: { target: { x: () => number; y: () => number } }) => void;
 }) {
   const url = (el.content?.assetUrl as string | undefined) ?? null;

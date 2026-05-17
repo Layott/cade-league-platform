@@ -13,6 +13,7 @@ import {
   unpublishDesign,
   softDeleteDesign,
 } from "@/server/overlays/builder/designs";
+import type { Style } from "@/server/overlays/builder/types";
 import { snapshotDesign } from "@/server/overlays/builder/history";
 import { updateScenes } from "@/server/overlays/builder/scenes";
 import { updateElements } from "@/server/overlays/builder/elements";
@@ -160,6 +161,9 @@ export async function saveDesignAction(formData: FormData): Promise<void> {
   );
 
   // Flatten all elements across scenes for one bulk update call.
+  // Cast to ElementBulkUpdate[]: schemas.ts uses .nullable() for round-trip
+  // safety but domain types use .optional()-only. Values are Zod-validated
+  // at runtime so the cast is safe — null fields are absent in practice.
   await updateElements(
     sb,
     actor,
@@ -170,16 +174,17 @@ export async function saveDesignAction(formData: FormData): Promise<void> {
         patch: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           transform: el.transform as any,
-          style: el.style,
+          style: el.style as Style | undefined,
           content: el.content ?? undefined,
           binding: el.binding ?? null,
-          animation: el.animation ?? undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          animation: el.animation as any,
           locked: el.locked,
           visible: el.visible,
           scene_id: s.id,
         },
       })),
-    ),
+    ) as import("@/server/overlays/builder/elements").ElementBulkUpdate[],
   );
 
   revalidatePath("/admin/broadcast/v2/builder");

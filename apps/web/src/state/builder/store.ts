@@ -238,7 +238,8 @@ export function toServerJson(design: Design): SaveDesignInput {
         style: el.style,
         content: el.content ?? null,
         binding: el.binding ?? null,
-        animation: el.animation ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        animation: (el.animation ?? null) as any,
       })),
     })),
   };
