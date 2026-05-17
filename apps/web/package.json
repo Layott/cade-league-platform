@@ -33,6 +33,7 @@
     "framer-motion": "^12.38.0",
     "jszip": "^3.10.1",
     "konva": "^10.3.0",
+    "lucide-react": "^1.16.0",
     "marked": "^14.1.4",
     "nanoid": "^3.3.11",
     "next": "15.5.15",
