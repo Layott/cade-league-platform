@@ -7,6 +7,7 @@ import { Toolbar } from "./Toolbar";
 import { CanvasStage } from "./CanvasStage";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { LayersPanel } from "./LayersPanel";
+import { DataSlotsPanel } from "./DataSlotsPanel";
 import type { Design } from "@/server/overlays/builder/types";
 
 /**
@@ -51,6 +52,7 @@ export function CanvasEditorShell({ design }: { design: Design }) {
         </div>
         <PropertiesPanel />
       </div>
+      <DataSlotsPanel />
     </div>
   );
 }
