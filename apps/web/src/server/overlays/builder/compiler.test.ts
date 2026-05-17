@@ -132,3 +132,75 @@ describe("compileDesignToHtml — opts.demo", () => {
     expect(html).toContain("__OVERLAY_DEMO__ = true");
   });
 });
+
+import { designWave1b } from "./fixtures/design-wave-1b";
+
+describe("compileDesignToHtml — Wave 1B", () => {
+  const html = compileDesignToHtml(designWave1b, 0);
+
+  it("emits linear-gradient background for rect with gradient", () => {
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab21"\]\s*\{[^}]*background:\s*linear-gradient\(90deg,\s*#6bcd06 0%,\s*#fe036d 100%\)/,
+    );
+  });
+
+  it("emits radial-gradient background for ellipse", () => {
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab22"\]\s*\{[^}]*background:\s*radial-gradient\(circle at 50% 50%,\s*#ffffff 0%,\s*#050505 100%\)/,
+    );
+  });
+
+  it("emits border-radius: 50% for ellipse", () => {
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab22"\]\s*\{[^}]*border-radius:\s*50%/,
+    );
+  });
+
+  it("emits clip-path polygon() for polygon shape with 6 sides", () => {
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab24"\]\s*\{[^}]*clip-path:\s*polygon\(/,
+    );
+  });
+
+  it("emits multi-shadow box-shadow with comma-joined entries", () => {
+    // Two shadow entries separated by a comma. The rgba() values each contain
+    // commas internally, so we look for both offset+blur prefixes anywhere in
+    // the box-shadow value rather than using a comma-anchor regex.
+    expect(html).toContain('box-shadow: 4px 4px 12px');
+    expect(html).toContain('-4px -4px 12px');
+    // Both are in the same CSS rule for element ab21.
+    const block = html.match(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab21"\]\s*\{([^}]*)\}/,
+    )?.[1] ?? "";
+    expect(block).toMatch(/box-shadow:/);
+    expect(block).toContain('4px 4px 12px');
+    expect(block).toContain('-4px -4px 12px');
+  });
+
+  it("emits filter rule with brightness + saturate concatenated", () => {
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab21"\]\s*\{[^}]*filter:[^;]*brightness\(1\.1\)[^;]*saturate\(1\.2\)/,
+    );
+  });
+
+  it("emits text background-clip:text + transparent color for gradient text", () => {
+    const block = html.match(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab25"\]\s*\{([^}]*)\}/,
+    )?.[1] ?? "";
+    expect(block).toMatch(/background-clip:\s*text/);
+    expect(block).toMatch(/-webkit-background-clip:\s*text/);
+    expect(block).toMatch(/color:\s*transparent/);
+  });
+
+  it("renders ellipse/line/polygon as <div> elements with data-element-id", () => {
+    expect(html).toContain('data-element-id="00000000-0000-0000-0000-00000000ab22"');
+    expect(html).toContain('data-element-id="00000000-0000-0000-0000-00000000ab23"');
+    expect(html).toContain('data-element-id="00000000-0000-0000-0000-00000000ab24"');
+  });
+
+  it("emits stroke + strokeWidth as border for line element", () => {
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab23"\]\s*\{[^}]*background-color:\s*#6bcd06/,
+    );
+  });
+});

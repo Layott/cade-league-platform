@@ -150,19 +150,129 @@ function transformCss(t: Transform): string {
   return parts.length ? `transform: ${parts.join(" ")};` : "";
 }
 
-function shadowCss(shadow: Style["shadow"]): string {
+function rgbaFromHex(hex: string, opacity: number): string {
+  // Accepts #RGB, #RRGGBB. Returns rgba(R,G,B,A).
+  const m3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(hex);
+  const m6 = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  let r = 0, g = 0, b = 0;
+  if (m3) {
+    r = parseInt(m3[1] + m3[1], 16);
+    g = parseInt(m3[2] + m3[2], 16);
+    b = parseInt(m3[3] + m3[3], 16);
+  } else if (m6) {
+    r = parseInt(m6[1], 16);
+    g = parseInt(m6[2], 16);
+    b = parseInt(m6[3], 16);
+  } else {
+    // Non-hex (e.g. CSS named color) — fall back to opaque hex pass-through.
+    return hex;
+  }
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+function shadowCss(style: Style | null | undefined): string {
+  if (!style) return "";
+  // Wave 1B prefers the `shadows` array when present.
+  if (Array.isArray(style.shadows) && style.shadows.length > 0) {
+    const parts = style.shadows.map(
+      (s) =>
+        `${s.offsetX}px ${s.offsetY}px ${s.blur}px ${rgbaFromHex(s.color, s.opacity)}`,
+    );
+    return `box-shadow: ${parts.join(", ")};`;
+  }
+  // Wave 1A single-shadow back-compat path.
+  const shadow = style.shadow;
   if (!shadow) return "";
-  const spread = typeof shadow.opacity === "number" ? `` : "";
-  return `box-shadow: ${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px ${spread}${shadow.color};`;
+  return `box-shadow: ${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px ${rgbaFromHex(shadow.color, shadow.opacity)};`;
+}
+
+function gradientCss(gradient: NonNullable<Style["gradient"]>): string {
+  const stops = gradient.stops
+    .map((s) => `${s.color} ${Math.round(s.offset * 100)}%`)
+    .join(", ");
+  if (gradient.kind === "linear") {
+    return `linear-gradient(${gradient.angle}deg, ${stops})`;
+  }
+  // radial
+  const cxPct = Math.round(gradient.cx * 100);
+  const cyPct = Math.round(gradient.cy * 100);
+  return `radial-gradient(circle at ${cxPct}% ${cyPct}%, ${stops})`;
+}
+
+function filterCss(filter: Style["filter"]): string {
+  if (!filter) return "";
+  const parts: string[] = [];
+  if (typeof filter.blur === "number" && filter.blur > 0) {
+    parts.push(`blur(${filter.blur}px)`);
+  }
+  if (typeof filter.brightness === "number" && filter.brightness !== 1) {
+    parts.push(`brightness(${filter.brightness})`);
+  }
+  if (typeof filter.hueRotate === "number" && filter.hueRotate !== 0) {
+    parts.push(`hue-rotate(${filter.hueRotate}deg)`);
+  }
+  if (typeof filter.saturate === "number" && filter.saturate !== 1) {
+    parts.push(`saturate(${filter.saturate})`);
+  }
+  return parts.length > 0 ? `filter: ${parts.join(" ")};` : "";
+}
+
+function polygonClipPath(sides: number): string {
+  // Regular polygon inscribed in unit box. Vertex i at angle
+  // `i * 2π / sides - π/2` (starts at top), mapped to [0..100%].
+  const pts: string[] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
+    const x = 50 + 50 * Math.cos(angle);
+    const y = 50 + 50 * Math.sin(angle);
+    pts.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
+  }
+  return `polygon(${pts.join(", ")})`;
+}
+
+function shapeCss(element: Element): string {
+  if (element.elementType === "ellipse") {
+    return "border-radius: 50%;";
+  }
+  if (element.elementType === "polygon") {
+    const sides = element.style?.sides ?? 6;
+    return `clip-path: ${polygonClipPath(sides)};`;
+  }
+  return "";
 }
 
 function fillCss(element: Element): string {
-  const fill = element.style?.fill;
-  if (!fill) return "";
+  const style = element.style;
+  if (!style) return "";
+
+  // Gradient takes precedence over solid fill.
+  if (style.gradient) {
+    const gradient = gradientCss(style.gradient);
+    if (element.elementType === "text") {
+      // Text gradient needs the bg-clip trick.
+      return `background: ${gradient}; background-clip: text; -webkit-background-clip: text; color: transparent;`;
+    }
+    return `background: ${gradient};`;
+  }
+
+  const fill = style.fill;
+  if (!fill) {
+    // For line elements: emit stroke as background-color so the thin
+    // rect appears coloured.
+    if (element.elementType === "line" && style.stroke) {
+      return `background-color: ${style.stroke};`;
+    }
+    return "";
+  }
+
   if (element.elementType === "text") {
     return `color: ${fill};`;
   }
-  if (element.elementType === "rect" || element.elementType === "ellipse") {
+  if (
+    element.elementType === "rect" ||
+    element.elementType === "ellipse" ||
+    element.elementType === "polygon"
+  ) {
     return `background-color: ${fill};`;
   }
   return "";
@@ -302,11 +412,15 @@ function elementDefaultRule(el: Element): string {
   const tr = transformCss(t);
   if (tr) parts.push(tr.replace(/;$/, ""));
   const fill = fillCss(el);
-  if (fill) parts.push(fill.replace(/;$/, ""));
+  if (fill) parts.push(fill.replace(/;$/g, ""));
   const font = fontCss(el.style);
   if (font) parts.push(font.replace(/;$/g, ""));
-  const sh = shadowCss(el.style?.shadow);
+  const sh = shadowCss(el.style);
   if (sh) parts.push(sh.replace(/;$/, ""));
+  const flt = filterCss(el.style?.filter);
+  if (flt) parts.push(flt.replace(/;$/, ""));
+  const shape = shapeCss(el);
+  if (shape) parts.push(shape.replace(/;$/, ""));
   if (el.visible === false) parts.push("display: none");
   return `[data-element-id="${el.id}"] { ${parts.join("; ")}; }`;
 }
