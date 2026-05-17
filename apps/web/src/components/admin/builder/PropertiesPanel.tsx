@@ -7,6 +7,7 @@ import type { Element, ElementType } from "@/server/overlays/builder/types";
 import { GradientEditor } from "./GradientEditor";
 import { FilterEditor } from "./FilterEditor";
 import { ShadowStackEditor } from "./ShadowStackEditor";
+import { ManualBindEditor } from "./ManualBindEditor";
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -143,9 +144,8 @@ export function PropertiesPanel() {
         {safeTab === "binding" && (
           <BindingTab
             element={selected}
-            clear={() =>
-              patch({ binding: null } as Partial<Element>)
-            }
+            patch={patch}
+            clear={() => patch({ binding: undefined } as Partial<Element>)}
           />
         )}
         {safeTab === "animation" && (
@@ -502,51 +502,24 @@ function TransformTab({
 }
 
 // ─────────────────────────────────────────────────────────────
-// Binding tab — read-only + clear (Wave 1A; manual bind in Wave 1B)
+// Binding tab — manual free-form editor (Wave 1B)
 // ─────────────────────────────────────────────────────────────
 
 function BindingTab({
   element,
+  patch,
   clear,
 }: {
   element: Element;
+  patch: (p: Partial<Element>) => void;
   clear: () => void;
 }) {
-  const b = element.binding;
   return (
-    <div>
-      {b ? (
-        <>
-          <p className="mb-1 text-xs uppercase tracking-wide text-white/50">Feed</p>
-          <p className="mb-3 text-sm text-white/80">{b.feed}</p>
-
-          <p className="mb-1 text-xs uppercase tracking-wide text-white/50">Field path</p>
-          <p className="mb-3 break-all text-sm text-white/80">{b.fieldPath}</p>
-
-          {b.templateString && (
-            <>
-              <p className="mb-1 text-xs uppercase tracking-wide text-white/50">
-                Template
-              </p>
-              <p className="mb-3 break-all text-sm text-white/80">{b.templateString}</p>
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={clear}
-            className="rounded border border-rose-500/40 px-3 py-1 text-sm text-rose-400 hover:bg-rose-500/10"
-          >
-            Clear binding
-          </button>
-        </>
-      ) : (
-        <p className="text-sm text-white/40">
-          No binding attached. Use the Data Slots panel (toolbar) to attach one.
-          Manual bind UI ships in Wave 1B.
-        </p>
-      )}
-    </div>
+    <ManualBindEditor
+      value={element.binding ?? null}
+      onChange={(b) => patch({ binding: b } as Partial<Element>)}
+      onClear={clear}
+    />
   );
 }
 

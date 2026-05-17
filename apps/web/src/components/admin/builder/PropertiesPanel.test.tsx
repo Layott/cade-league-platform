@@ -146,4 +146,11 @@ describe("PropertiesPanel", () => {
     };
     expect(g.kind).toBe("linear");
   });
+
+  it("BindingTab for text element renders ManualBindEditor with feed dropdown", () => {
+    useBuilderStore.setState({ selectedElementIds: ["text-1"] });
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /binding/i }));
+    expect(screen.getByLabelText(/feed/i)).toBeInTheDocument();
+  });
 });
