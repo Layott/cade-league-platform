@@ -1,17 +1,259 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Trash2,
+  GripVertical,
+  Square,
+  Type,
+  Image as ImageIcon,
+  Database,
+} from "lucide-react";
+import { useBuilderStore } from "@/state/builder/store";
+import type { Element } from "@/server/overlays/builder/types";
+
 /**
- * Wave 1A stub — replaced by Task 26.
+ * Wave 1A — bottom layers panel.
  *
- * Renders a placeholder bottom panel so CanvasEditorShell mounts without
- * errors. Real layers list implementation lands in Task 26.
+ * Lists active scene's elements in reverse z_index order with drag-
+ * reorder (@dnd-kit/sortable), visibility / lock toggles, type icon,
+ * label, and delete button. Collapsible via the chevron header.
  */
 export function LayersPanel() {
+  const design = useBuilderStore((s) => s.design);
+  const activeSceneId = useBuilderStore((s) => s.activeSceneId);
+  const selectedIds = useBuilderStore((s) => s.selectedElementIds);
+  const selectElement = useBuilderStore((s) => s.selectElement);
+  const updateElement = useBuilderStore((s) => s.updateElement);
+  const deleteElement = useBuilderStore((s) => s.deleteElement);
+  const reorderElement = useBuilderStore((s) => s.reorderElement);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Test hook — lets test suite drive reorder without simulating dnd-kit
+  // pointer events (jsdom does not support PointerSensor drag sequences).
+  useEffect(() => {
+    (
+      window as unknown as {
+        __builderTestReorder?: (id: string, z: number) => void;
+      }
+    ).__builderTestReorder = reorderElement;
+    return () => {
+      delete (
+        window as unknown as { __builderTestReorder?: unknown }
+      ).__builderTestReorder;
+    };
+  }, [reorderElement]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+
+  const scene = design?.scenes.find((s) => s.id === activeSceneId);
+  // Descending z_index so topmost layer appears at top of the list.
+  const sorted = scene
+    ? [...scene.elements].sort((a, b) => b.zIndex - a.zIndex)
+    : [];
+
+  function onDragEnd(e: DragEndEvent) {
+    if (!e.over || e.over.id === e.active.id) return;
+    const oldIdx = sorted.findIndex((el) => el.id === e.active.id);
+    const newIdx = sorted.findIndex((el) => el.id === e.over!.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const next = arrayMove(sorted, oldIdx, newIdx);
+    // Sorted list is DESC; reverse to get ascending order and re-assign
+    // contiguous zIndex values 0..n-1.
+    const ascending = [...next].reverse();
+    ascending.forEach((el, i) => reorderElement(el.id, i));
+  }
+
   return (
     <section
-      className="h-[200px] shrink-0 border-t border-white/10 bg-zinc-950"
       aria-label="Layers"
-      data-builder-component="LayersPanel"
-    />
+      className={`shrink-0 border-t border-white/10 bg-zinc-950 transition-all ${
+        collapsed ? "h-9" : "h-[200px]"
+      }`}
+    >
+      <header className="flex h-9 items-center justify-between border-b border-white/5 px-3">
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          className="text-xs uppercase tracking-wider text-white/50"
+        >
+          Layers ({sorted.length}) {collapsed ? "▸" : "▾"}
+        </button>
+      </header>
+
+      {!collapsed && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
+        >
+          <SortableContext
+            items={sorted.map((s) => s.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul
+              role="list"
+              className="h-[calc(100%-2.25rem)] overflow-auto"
+            >
+              {sorted.map((el) => (
+                <LayerRow
+                  key={el.id}
+                  el={el}
+                  selected={selectedIds.includes(el.id)}
+                  onSelect={() => selectElement(el.id, false)}
+                  onToggleVisible={() =>
+                    updateElement(el.id, {
+                      visible: el.visible === false ? true : false,
+                    } as Partial<Element>)
+                  }
+                  onToggleLock={() =>
+                    updateElement(el.id, {
+                      locked: !el.locked,
+                    } as Partial<Element>)
+                  }
+                  onDelete={() => deleteElement(el.id)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+function iconFor(t: Element["elementType"]) {
+  if (t === "rect") return <Square size={14} />;
+  if (t === "text") return <Type size={14} />;
+  if (t === "image") return <ImageIcon size={14} />;
+  if (t === "data-slot") return <Database size={14} />;
+  return <Square size={14} />;
+}
+
+function labelFor(el: Element): string {
+  if (el.elementType === "text") {
+    return ((el.content?.text as string) ?? "Text").slice(0, 40);
+  }
+  if (el.elementType === "image") {
+    return (el.content?.assetId as string) ?? "Image";
+  }
+  if (el.elementType === "rect") return "Rect";
+  return el.elementType;
+}
+
+// ─────────────────────────────────────────────────────────────
+// LayerRow — individual row with sortable drag handle
+// ─────────────────────────────────────────────────────────────
+
+function LayerRow({
+  el,
+  selected,
+  onSelect,
+  onToggleVisible,
+  onToggleLock,
+  onDelete,
+}: {
+  el: Element;
+  selected: boolean;
+  onSelect: () => void;
+  onToggleVisible: () => void;
+  onToggleLock: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: el.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      role="listitem"
+      className={`flex items-center gap-2 border-b border-white/5 px-2 py-1 text-sm ${
+        selected ? "bg-[#6bcd06]/10" : "hover:bg-white/5"
+      }`}
+      onClick={onSelect}
+    >
+      <button
+        type="button"
+        aria-label="Drag handle"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab text-white/40 hover:text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical size={14} />
+      </button>
+
+      <button
+        type="button"
+        aria-label="Toggle visibility"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleVisible();
+        }}
+        className="text-white/60 hover:text-white"
+      >
+        {el.visible !== false ? <Eye size={14} /> : <EyeOff size={14} />}
+      </button>
+
+      <button
+        type="button"
+        aria-label="Toggle lock"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleLock();
+        }}
+        className="text-white/60 hover:text-white"
+      >
+        {el.locked ? <Lock size={14} /> : <Unlock size={14} />}
+      </button>
+
+      <span className="text-white/40">{iconFor(el.elementType)}</span>
+      <span className="min-w-0 flex-1 truncate text-white/80">
+        {labelFor(el)}
+      </span>
+
+      <button
+        type="button"
+        aria-label="Delete"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="text-rose-400 hover:text-rose-300"
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
   );
 }
