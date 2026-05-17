@@ -1302,3 +1302,29 @@ All slices verified live. Build pipeline auto-deploys docs commit on completion.
 ### Next action
 User picks: (a) start Phase 1 implementation now, or (b) more spec edits first.
 
+
+
+## 2026-05-17 — Wave 1A Overlay Builder: Verification Review
+
+### Result: SHIPPED
+
+- 35 commits pushed to origin/main (including this cleanup commit `ee49d8f8`).
+- Unit tests: 2800/2802 pass. 2 pre-existing failures unchanged (diff_upsert_bg HMAC + OverlayDataInjector mini-preview gate).
+- Lint: 0 errors, 26 pre-existing warnings.
+- Build: clean production build. 7 type errors found and fixed during this gate:
+  - `PublishedUserDesign` missing `id` field vs `CustomDesignSummary`
+  - `overlayKey` string vs template-literal mismatch
+  - `actions.ts` nullable-vs-optional style/animation bridge
+  - Zod v4 `errorMap` renamed to `error` in schemas.ts
+  - `BuilderLibrary` was typed for full `Design[]` but receives `DesignSummary[]`
+  - `CanvasStage.tsx` Konva onTap event type mismatch (TouchEvent vs MouseEvent)
+  - `store.ts` animation nullable vs optional in `toServerJson`
+- E2E: SKIPPED (dev server not running, cloud DB seeding fragile under headless). User to run manually post-push.
+- Visual regression baseline: SKIPPED. Same reason.
+- Chrome manual end-to-end: SKIPPED per task brief (Step 5 in user instructions).
+- Push: `git push origin main` → `4257cb24..ee49d8f8`.
+- Production probes (post-push):
+  - GET /admin/broadcast/v2/builder → 307 (unauthenticated redirect)
+  - GET /admin/broadcast/v2/builder/no-such-slug/edit → 307
+  - GET /overlay/v2/user/no-such-slug → 404
+- Next: Wave 1B brainstorm/plan dispatch.

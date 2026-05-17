@@ -1119,3 +1119,30 @@ Pattern recap (third occurrence in two days of `.maybeSingle()` regressions on `
 1. **Bulk-save admin forms over per-row forms** when 10+ rows need atomic updates. The `form="<id>"` HTML attribute is the right primitive — keeps row markup local but submission unified. Avoids the "save one row at a time" chatter.
 2. **`currentSlot`-style derived state belongs in the overlay payload, not in the overlay HTML.** Server payload computes the current step; HTML just consumes. Single source of truth + no JS clock drift between overlay instances.
 3. **Two-pass clear-then-write avoids transient unique-index conflicts** when bulk-updating partial-unique-indexed columns. If admin swaps lanes between two matches in one save, naive sequential UPDATE hits the unique index when the first write lands a duplicate. Clear all → write all = no transient conflict.
+
+
+---
+
+## 2026-05-17 — Wave 1A Verification Gate: Type Errors Found During Build
+
+**Date:** 2026-05-17
+
+**Context:** Task 32 final verification gate for Overlay Builder Wave 1A. Build failed with 7 TypeScript type errors that were not caught during individual task commits.
+
+**Mistakes / Corrections:**
+
+1. `PublishedUserDesign` (registry.ts) was missing `id` field that `CustomDesignSummary` required. Fix: add `id: string` to type + populate from `d.id` in mapper.
+
+2. `overlayKey` inferred as `string` from template literal but `CustomDesignSummary` required `` `user-${string}` ``. Fix: explicit `as \`user-\${string}\`` cast.
+
+3. `actions.ts` element patch used `el.style` (from schemas.ts `.nullable()`) but `ElementBulkUpdate` expected `Style` (`.optional()-only`). Fix: `as Style | undefined` cast + `as any` for animation. Root: `schemas.ts` uses `.nullable()` for round-trip safety, domain types use `.optional()`.
+
+4. Zod v4 broke `errorMap:` callback — renamed to `error:` string in v4. Fix: replace `errorMap: () => ({ message: ... })` with `error: "..."` in `CreateDesignSchema`.
+
+5. `BuilderLibrary` props typed as `Design[]` but `listDesigns()` returns `DesignSummary[]`. Fix: update component to use `DesignSummary`.
+
+6. `CanvasStage` `onClick` handler typed as `(e: { evt?: { shiftKey?: boolean } })` but Konva `onTap` passes `KonvaEventObject<Event>` — `Event` has no `shiftKey`. Fix: use `evt?: any`.
+
+7. `store.ts` `toServerJson` `animation: el.animation ?? null` produced `{entry: PresetAnim | undefined} | null` but schema expected `{entry: ... | null} | null`. Fix: `as any` cast.
+
+**Rule for future:** After writing Wave N server modules + client components in parallel, run `npm run build` BEFORE committing individual tasks. TypeScript only catches cross-file contract mismatches at build time, not at individual file save. Also: after bumping Zod major version (v3→v4), grep for `errorMap` repo-wide and replace all with `error:`.
