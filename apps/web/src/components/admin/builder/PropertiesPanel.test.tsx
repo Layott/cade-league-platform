@@ -132,4 +132,18 @@ describe("PropertiesPanel", () => {
     const el = useBuilderStore.getState().design!.scenes[0].elements[0];
     expect(el.animation?.entry?.type).toBeDefined();
   });
+
+  it("StyleTab on rect exposes a gradient editor", () => {
+    render(<PropertiesPanel />);
+    expect(screen.getByLabelText(/linear/i)).toBeInTheDocument();
+  });
+
+  it("selecting Linear gradient stores GradientSpec on element.style.gradient", () => {
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByLabelText(/linear/i));
+    const g = useBuilderStore.getState().design!.scenes[0].elements[0].style.gradient as {
+      kind: string;
+    };
+    expect(g.kind).toBe("linear");
+  });
 });

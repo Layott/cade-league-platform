@@ -4,6 +4,9 @@ import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
 import { useBuilderStore } from "@/state/builder/store";
 import type { Element, ElementType } from "@/server/overlays/builder/types";
+import { GradientEditor } from "./GradientEditor";
+import { FilterEditor } from "./FilterEditor";
+import { ShadowStackEditor } from "./ShadowStackEditor";
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -254,10 +257,29 @@ function StyleTab({
           value={(s.cornerRadius as number) ?? 0}
           onChange={(n) => patchStyle({ cornerRadius: n })}
         />
-        {/* Shadow controls */}
-        <ShadowSection
-          shadow={s.shadow as ShadowValue | undefined}
-          onShadow={(sh) => patchStyle({ shadow: sh })}
+
+        {/* Wave 1B — gradient editor (replaces solid fill when set) */}
+        <p className="mt-4 mb-2 text-xs uppercase tracking-wider text-white/50">Gradient</p>
+        <GradientEditor
+          value={(s as { gradient?: import("@/server/overlays/builder/types").GradientSpec }).gradient}
+          onChange={(g) => patchStyle({ gradient: g })}
+        />
+
+        {/* Wave 1B — filter sliders */}
+        <p className="mt-4 mb-2 text-xs uppercase tracking-wider text-white/50">Filter</p>
+        <FilterEditor
+          value={(s as { filter?: import("@/server/overlays/builder/types").FilterSpec }).filter}
+          onChange={(f) => patchStyle({ filter: f })}
+        />
+
+        {/* Wave 1B — multi-stack shadow editor */}
+        <p className="mt-4 mb-2 text-xs uppercase tracking-wider text-white/50">Shadows</p>
+        <ShadowStackEditor
+          value={
+            (s as { shadows?: import("@/server/overlays/builder/types").ShadowSpec[]; shadow?: import("@/server/overlays/builder/types").ShadowSpec }).shadows ??
+            (s as { shadow?: import("@/server/overlays/builder/types").ShadowSpec }).shadow
+          }
+          onChange={(stack) => patchStyle({ shadows: stack, shadow: undefined })}
         />
       </div>
     );
@@ -401,82 +423,6 @@ function StyleTab({
     <p className="text-sm text-white/40">
       No style controls for this element type.
     </p>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Shadow sub-section (used by rect style tab)
-// ─────────────────────────────────────────────────────────────
-
-type ShadowValue = {
-  offsetX: number;
-  offsetY: number;
-  blur: number;
-  color: string;
-  opacity: number;
-};
-
-const DEFAULT_SHADOW: ShadowValue = {
-  offsetX: 4,
-  offsetY: 4,
-  blur: 8,
-  color: "#000000",
-  opacity: 0.5,
-};
-
-function ShadowSection({
-  shadow,
-  onShadow,
-}: {
-  shadow: ShadowValue | undefined;
-  onShadow: (v: ShadowValue | undefined) => void;
-}) {
-  const enabled = Boolean(shadow);
-  const sv = shadow ?? DEFAULT_SHADOW;
-
-  return (
-    <div className="mt-2 border-t border-white/5 pt-3">
-      <label className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-white/50">
-        <input
-          type="checkbox"
-          aria-label="Enable shadow"
-          checked={enabled}
-          onChange={(e) => onShadow(e.target.checked ? DEFAULT_SHADOW : undefined)}
-        />
-        Shadow
-      </label>
-      {enabled && (
-        <>
-          <NumberField
-            label="Offset X"
-            value={sv.offsetX}
-            onChange={(n) => onShadow({ ...sv, offsetX: n })}
-          />
-          <NumberField
-            label="Offset Y"
-            value={sv.offsetY}
-            onChange={(n) => onShadow({ ...sv, offsetY: n })}
-          />
-          <NumberField
-            label="Blur"
-            value={sv.blur}
-            onChange={(n) => onShadow({ ...sv, blur: n })}
-          />
-          <ColorField
-            label="Shadow color"
-            ariaLabel="Shadow color hex"
-            value={sv.color}
-            onChange={(c) => onShadow({ ...sv, color: c })}
-          />
-          <NumberField
-            label="Shadow opacity"
-            value={sv.opacity}
-            step={0.05}
-            onChange={(n) => onShadow({ ...sv, opacity: n })}
-          />
-        </>
-      )}
-    </div>
   );
 }
 
