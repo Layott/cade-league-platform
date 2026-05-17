@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
 import { listDesigns } from "@/server/overlays/builder/designs";
 import { BuilderLibrary } from "@/components/admin/builder/BuilderLibrary";
+import { featureFlags } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,9 @@ async function resolveAdmin() {
 }
 
 export default async function BuilderLibraryPage() {
+  if (!featureFlags.overlayBuilder.enabled) {
+    notFound();
+  }
   const { sb } = await resolveAdmin();
   const designs = await listDesigns(sb);
   return (

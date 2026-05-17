@@ -1,3 +1,5 @@
+import { featureFlags } from "./feature-flags";
+
 /**
  * UI Audit Slice 4 (2026-04-28) — single source of truth for admin IA v2.
  *
@@ -282,6 +284,17 @@ export const ADMIN_HUBS: readonly AdminHub[] = [
         href: "/admin/broadcast/social",
         perm: "social.read",
       },
+      // Wave 1A — Overlay Builder. Only surfaces when the feature flag is on.
+      ...(featureFlags.overlayBuilder.enabled
+        ? [
+            {
+              key: "builder",
+              label: "Builder",
+              href: "/admin/broadcast/v2/builder",
+              perm: "overlay.design.manage",
+            } satisfies AdminSubtab,
+          ]
+        : []),
     ],
   },
   {

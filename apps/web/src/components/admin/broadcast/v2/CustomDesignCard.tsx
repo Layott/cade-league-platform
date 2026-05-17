@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 export type CustomDesignSummary = {
@@ -141,10 +142,13 @@ export function CustomDesignCard({
             loading="lazy"
           />
         ) : design.thumbnailUrl ? (
-          <img
+          <Image
             alt={`Thumbnail for ${design.title}`}
             src={design.thumbnailUrl}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            fill
+            sizes={`${TILE_WIDTH}px`}
+            style={{ objectFit: "cover" }}
+            unoptimized
           />
         ) : (
           <div

@@ -4,6 +4,7 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { requirePermAsync, PermissionError } from "@/lib/perms-db";
 import { getDesign } from "@/server/overlays/builder/designs";
 import { CanvasEditorShell } from "@/components/admin/builder/CanvasEditorShell";
+import { featureFlags } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,9 @@ export default async function BuilderEditPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  if (!featureFlags.overlayBuilder.enabled) {
+    notFound();
+  }
   const { slug } = await params;
   const { sb } = await resolveAdmin(`/admin/broadcast/v2/builder/${slug}/edit`);
   const design = await getDesign(sb, slug);

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CustomDesignCard, type CustomDesignSummary } from "./CustomDesignCard";
 
 export type CustomDesignsTabProps = {
@@ -44,7 +45,7 @@ export function CustomDesignsTab({
         <p className="mt-2 text-[11px] text-[var(--chalk-3)]">
           Set{" "}
           <code className="font-mono text-[var(--signal)]">
-            NEXT_PUBLIC_OVERLAY_BUILDER_ENABLED=true
+            {"NEXT_PUBLIC_OVERLAY_BUILDER_ENABLED=true"}
           </code>{" "}
           to enable.
         </p>
@@ -63,12 +64,12 @@ export function CustomDesignsTab({
         </p>
         <p className="mt-2 text-[11px] text-[var(--chalk-3)]">
           Create one in{" "}
-          <a
+          <Link
             href="/admin/broadcast/v2/builder"
             className="text-[var(--signal)] underline"
           >
             Builder
-          </a>{" "}
+          </Link>{" "}
           then publish to surface it here.
         </p>
       </div>
@@ -85,12 +86,12 @@ export function CustomDesignsTab({
         <h3 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[var(--chalk-1)]">
           Custom Designs ({designs.length})
         </h3>
-        <a
+        <Link
           href="/admin/broadcast/v2/builder"
           className="text-[11px] uppercase tracking-[0.18em] text-[var(--signal)] hover:underline"
         >
           Manage in Builder →
-        </a>
+        </Link>
       </header>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {designs.map((design) => (
