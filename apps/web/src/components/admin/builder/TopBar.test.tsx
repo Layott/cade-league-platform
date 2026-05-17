@@ -1,0 +1,113 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { TopBar } from "./TopBar";
+import { useBuilderStore } from "@/state/builder/store";
+import type { Design } from "@/server/overlays/builder/types";
+
+// saveDesignAction(FormData), publishDesignAction(designId: string),
+// unpublishDesignAction(designId: string), updateDesignMetaAction(designId, patch)
+const saveDesignActionMock = vi.fn();
+const publishDesignActionMock = vi.fn();
+const unpublishDesignActionMock = vi.fn();
+const updateDesignMetaActionMock = vi.fn();
+
+vi.mock("@/app/admin/broadcast/v2/builder/actions", () => ({
+  saveDesignAction: (...args: unknown[]) => saveDesignActionMock(...args),
+  publishDesignAction: (...args: unknown[]) => publishDesignActionMock(...args),
+  unpublishDesignAction: (...args: unknown[]) => unpublishDesignActionMock(...args),
+  updateDesignMetaAction: (...args: unknown[]) => updateDesignMetaActionMock(...args),
+}));
+
+const fixture: Design = {
+  id: "d1",
+  slug: "test",
+  title: "Test Title",
+  mode: "single",
+  status: "draft",
+  canvasWidth: 1920,
+  canvasHeight: 1080,
+  scenes: [
+    {
+      id: "s1",
+      designId: "d1",
+      orderIndex: 0,
+      durationMs: 5000,
+      transitionIn: "fade",
+      transitionOut: "fade",
+      elements: [],
+    },
+  ],
+} as Design;
+
+describe("TopBar", () => {
+  beforeEach(() => {
+    saveDesignActionMock.mockReset();
+    publishDesignActionMock.mockReset();
+    unpublishDesignActionMock.mockReset();
+    updateDesignMetaActionMock.mockReset();
+    useBuilderStore.setState({
+      design: fixture,
+      selectedElementIds: [],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+    });
+  });
+
+  it("Save button disabled when not dirty", () => {
+    render(<TopBar />);
+    expect(
+      (screen.getByRole("button", { name: /save/i }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("Save button enabled when dirty and triggers saveDesignAction + markClean", async () => {
+    useBuilderStore.setState({ dirty: true });
+    saveDesignActionMock.mockResolvedValueOnce(undefined);
+    render(<TopBar />);
+    const btn = screen.getByRole("button", { name: /save/i }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
+    await waitFor(() => {
+      expect(saveDesignActionMock).toHaveBeenCalled();
+      expect(useBuilderStore.getState().dirty).toBe(false);
+    });
+  });
+
+  it("Publish button reads draft state and calls publishDesignAction", async () => {
+    publishDesignActionMock.mockResolvedValueOnce(undefined);
+    render(<TopBar />);
+    const btn = screen.getByRole("button", { name: /publish/i });
+    fireEvent.click(btn);
+    await waitFor(() => {
+      expect(publishDesignActionMock).toHaveBeenCalledWith("d1");
+    });
+  });
+
+  it("Revert button rendered disabled with coming-soon tooltip", () => {
+    render(<TopBar />);
+    const revert = screen.getByRole("button", {
+      name: /revert/i,
+    }) as HTMLButtonElement;
+    expect(revert.disabled).toBe(true);
+    expect(revert.getAttribute("title")).toMatch(/next wave/i);
+  });
+
+  it("Title input debounces updateDesignMetaAction", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    updateDesignMetaActionMock.mockResolvedValueOnce(undefined);
+    render(<TopBar />);
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "Renamed" } });
+    // Not called immediately — debounce guard
+    expect(updateDesignMetaActionMock).not.toHaveBeenCalled();
+    // Advance past the 500 ms debounce window
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(updateDesignMetaActionMock).toHaveBeenCalledWith("d1", {
+      title: "Renamed",
+    });
+    vi.useRealTimers();
+  });
+});
