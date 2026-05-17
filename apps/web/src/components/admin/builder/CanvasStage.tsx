@@ -1,6 +1,6 @@
 "use client";
 
-import { Stage, Layer, Rect, Text, Image as KImage } from "react-konva";
+import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon } from "react-konva";
 import { useBuilderStore } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
@@ -142,6 +142,70 @@ function RenderedElement({
         strokeWidth={strokeWidth}
         onClick={onClick}
         onDragEnd={handleDragEnd}
+      />
+    );
+  }
+
+  if (el.elementType === "ellipse") {
+    return (
+      <Ellipse
+        x={t.x + t.width / 2}
+        y={t.y + t.height / 2}
+        radiusX={t.width / 2}
+        radiusY={t.height / 2}
+        rotation={t.rotation ?? 0}
+        opacity={t.opacity ?? 1}
+        fill={(s.fill as string) ?? "#cccccc"}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        draggable
+        onClick={onClick}
+        onTap={onClick}
+        onDragEnd={(e: { target: { x: () => number; y: () => number } }) =>
+          onMove(e.target.x() - t.width / 2, e.target.y() - t.height / 2)
+        }
+      />
+    );
+  }
+
+  if (el.elementType === "line") {
+    return (
+      <Line
+        x={t.x}
+        y={t.y}
+        points={[0, 0, t.width, 0]}
+        stroke={(s.stroke as string) ?? "#ffffff"}
+        strokeWidth={(s.strokeWidth as number) ?? 2}
+        rotation={t.rotation ?? 0}
+        opacity={t.opacity ?? 1}
+        draggable
+        onClick={onClick}
+        onTap={onClick}
+        onDragEnd={handleDragEnd}
+      />
+    );
+  }
+
+  if (el.elementType === "polygon") {
+    const sides = (s.sides as number) ?? 6;
+    const radius = Math.min(t.width, t.height) / 2;
+    return (
+      <RegularPolygon
+        x={t.x + t.width / 2}
+        y={t.y + t.height / 2}
+        sides={sides}
+        radius={radius}
+        rotation={t.rotation ?? 0}
+        opacity={t.opacity ?? 1}
+        fill={(s.fill as string) ?? "#cccccc"}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        draggable
+        onClick={onClick}
+        onTap={onClick}
+        onDragEnd={(e: { target: { x: () => number; y: () => number } }) =>
+          onMove(e.target.x() - t.width / 2, e.target.y() - t.height / 2)
+        }
       />
     );
   }

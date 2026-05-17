@@ -23,6 +23,9 @@ vi.mock("react-konva", async () => {
     Rect: make("Rect"),
     Text: make("Text"),
     Image: make("Image"),
+    Ellipse: make("Ellipse"),
+    Line: make("Line"),
+    RegularPolygon: make("RegularPolygon"),
   };
 });
 
@@ -110,5 +113,52 @@ describe("CanvasStage", () => {
     useBuilderStore.setState({ activeSceneId: null });
     const { container } = render(<CanvasStage />);
     expect(container.querySelector('[data-konva-tag="Rect"]')).toBeNull();
+  });
+});
+
+const shapesFixture = () => ({
+  id: "d1", slug: "t", title: "T", mode: "single" as const,
+  status: "draft" as const, canvasWidth: 1920, canvasHeight: 1080,
+  scenes: [{
+    id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000,
+    transitionIn: "fade", transitionOut: "fade",
+    elements: [
+      { id: "e-ellipse", elementType: "ellipse" as const, zIndex: 0, locked: false, visible: true,
+        transform: { x: 0, y: 0, width: 200, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+        style: { fill: "#6bcd06" }, content: {} },
+      { id: "e-line", elementType: "line" as const, zIndex: 1, locked: false, visible: true,
+        transform: { x: 100, y: 200, width: 400, height: 4, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+        style: { stroke: "#fff", strokeWidth: 4 }, content: {} },
+      { id: "e-polygon", elementType: "polygon" as const, zIndex: 2, locked: false, visible: true,
+        transform: { x: 600, y: 100, width: 200, height: 200, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+        style: { fill: "#fe036d", sides: 6 }, content: {} },
+    ],
+  }],
+});
+
+describe("CanvasStage — Wave 1B shapes", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: shapesFixture() as never,
+      selectedElementIds: [],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+    });
+  });
+
+  it("renders a Konva Ellipse for ellipse elements", () => {
+    const { container } = render(<CanvasStage />);
+    expect(container.querySelectorAll('[data-konva-tag="Ellipse"]').length).toBe(1);
+  });
+
+  it("renders a Konva Line for line elements", () => {
+    const { container } = render(<CanvasStage />);
+    expect(container.querySelectorAll('[data-konva-tag="Line"]').length).toBe(1);
+  });
+
+  it("renders a Konva RegularPolygon for polygon elements", () => {
+    const { container } = render(<CanvasStage />);
+    expect(container.querySelectorAll('[data-konva-tag="RegularPolygon"]').length).toBe(1);
   });
 });
