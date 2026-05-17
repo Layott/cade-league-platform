@@ -160,3 +160,95 @@ describe("style-validator — edge cases", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("style-validator — Wave 1B shapes", () => {
+  it("accepts ellipse with gradient fill", () => {
+    const r = validateStyle("ellipse", {
+      gradient: {
+        kind: "linear",
+        angle: 90,
+        stops: [
+          { offset: 0, color: "#6bcd06" },
+          { offset: 1, color: "#fe036d" },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts line with stroke + strokeWidth only", () => {
+    const r = validateStyle("line", {
+      stroke: "#ffffff",
+      strokeWidth: 4,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects line carrying a `fill` (line has no fill)", () => {
+    const r = validateStyle("line", {
+      fill: "#fe036d",
+      stroke: "#fff",
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("accepts polygon with sides + fill", () => {
+    const r = validateStyle("polygon", {
+      fill: "#6bcd06",
+      strokeWidth: 0,
+      sides: 6,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects polygon with sides < 3", () => {
+    const r = validateStyle("polygon", {
+      fill: "#6bcd06",
+      sides: 2,
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("accepts text with full filter stack", () => {
+    const r = validateStyle("text", {
+      fontFamily: "Agharti",
+      fontSize: 48,
+      color: "#ffffff",
+      filter: { blur: 4, brightness: 1.2, hueRotate: 90, saturate: 1.5 },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts rect with multi-stack shadows array", () => {
+    const r = validateStyle("rect", {
+      fill: "#fe036d",
+      shadows: [
+        { offsetX: 2, offsetY: 2, blur: 4, color: "#000", opacity: 0.5 },
+        { offsetX: -2, offsetY: -2, blur: 4, color: "#6bcd06", opacity: 0.4 },
+      ],
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects gradient stop color containing javascript:", () => {
+    const r = validateStyle("ellipse", {
+      gradient: {
+        kind: "linear",
+        angle: 0,
+        stops: [
+          { offset: 0, color: "javascript:alert(1)" },
+          { offset: 1, color: "#fff" },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects shadows array longer than 8", () => {
+    const shadows = Array.from({ length: 9 }, () => ({
+      offsetX: 1, offsetY: 1, blur: 2, color: "#000", opacity: 0.3,
+    }));
+    const r = validateStyle("rect", { fill: "#fff", shadows });
+    expect(r.ok).toBe(false);
+  });
+});
