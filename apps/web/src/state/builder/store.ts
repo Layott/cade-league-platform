@@ -62,6 +62,17 @@ export type BuilderState = {
 
   // Wave 1C — multi-select
   selectMultiple: (ids: string[]) => void;
+
+  // Wave 3A — scene mutations + mode toggle
+  setActiveScene: (sceneId: string) => void;
+  addScene: (scene: Design["scenes"][number]) => void;
+  updateScene: (
+    sceneId: string,
+    patch: Partial<Pick<Design["scenes"][number], "name" | "durationMs" | "transitionIn" | "transitionOut">>,
+  ) => void;
+  deleteScene: (sceneId: string) => void;
+  reorderScenes: (sceneIdOrder: string[]) => void;
+  setMode: (mode: "single" | "sequence") => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -376,6 +387,87 @@ export const useBuilderStore = create<BuilderState>()(
 
       // Wave 1C — multi-select (marquee / select-all / paste)
       selectMultiple: (ids) => set({ selectedElementIds: Array.from(new Set(ids)) }),
+
+      // ── Wave 3A: scene mutations + mode toggle ───────────────────────────
+      setActiveScene: (sceneId) => set({ activeSceneId: sceneId }),
+
+      addScene: (scene) =>
+        set((state) => {
+          if (!state.design) return state;
+          return {
+            design: {
+              ...state.design,
+              scenes: [...state.design.scenes, scene]
+                .sort((a, b) => a.orderIndex - b.orderIndex),
+            },
+            dirty: true,
+          };
+        }),
+
+      updateScene: (sceneId, patch) =>
+        set((state) => {
+          if (!state.design) return state;
+          return {
+            design: {
+              ...state.design,
+              scenes: state.design.scenes.map((s) =>
+                s.id === sceneId ? { ...s, ...patch } : s,
+              ),
+            },
+            dirty: true,
+          };
+        }),
+
+      deleteScene: (sceneId) =>
+        set((state) => {
+          if (!state.design) return state;
+          const filtered = state.design.scenes
+            .filter((s) => s.id !== sceneId)
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .map((s, idx) => ({ ...s, orderIndex: idx }));
+          const nextActive =
+            state.activeSceneId === sceneId
+              ? filtered[0]?.id ?? null
+              : state.activeSceneId;
+          return {
+            design: { ...state.design, scenes: filtered },
+            activeSceneId: nextActive,
+            dirty: true,
+          };
+        }),
+
+      reorderScenes: (sceneIdOrder) =>
+        set((state) => {
+          if (!state.design) return state;
+          const byId = new Map(state.design.scenes.map((s) => [s.id, s]));
+          const reordered = sceneIdOrder
+            .map((id, idx) => {
+              const src = byId.get(id);
+              if (!src) return null;
+              return { ...src, orderIndex: idx };
+            })
+            .filter((s): s is NonNullable<typeof s> => s !== null);
+          return {
+            design: { ...state.design, scenes: reordered },
+            dirty: true,
+          };
+        }),
+
+      setMode: (mode) =>
+        set((state) => {
+          if (!state.design) return state;
+          let scenes = state.design.scenes;
+          let activeSceneId = state.activeSceneId;
+          if (mode === "single" && scenes.length > 1) {
+            scenes = [scenes[0]];
+            activeSceneId = scenes[0].id;
+          }
+          return {
+            design: { ...state.design, mode, scenes },
+            activeSceneId,
+            dirty: true,
+          };
+        }),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.

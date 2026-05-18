@@ -242,4 +242,115 @@ describe("builder store", () => {
     useBuilderStore.getState().commitTransientHistory();
     expect(useTemporalStore.getState().pastStates.length).toBe(baselinePast + 1);
   });
+
+  it("setActiveScene switches activeSceneId without marking dirty", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1",
+      slug: "x",
+      title: "t",
+      mode: "sequence",
+      status: "draft",
+      canvasWidth: 1920,
+      canvasHeight: 1080,
+      scenes: [
+        { id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+        { id: "s2", designId: "d1", orderIndex: 1, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+      ],
+    } as never);
+    useBuilderStore.getState().setActiveScene("s2");
+    expect(useBuilderStore.getState().activeSceneId).toBe("s2");
+    expect(useBuilderStore.getState().dirty).toBe(false);
+  });
+
+  it("addScene inserts at the requested position and marks dirty", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1", slug: "x", title: "t", mode: "sequence", status: "draft",
+      canvasWidth: 1920, canvasHeight: 1080,
+      scenes: [{ id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] }],
+    } as never);
+    useBuilderStore.getState().addScene({
+      id: "s2", designId: "d1", orderIndex: 1, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [],
+    });
+    const scenes = useBuilderStore.getState().design!.scenes;
+    expect(scenes).toHaveLength(2);
+    expect(scenes[1].id).toBe("s2");
+    expect(useBuilderStore.getState().dirty).toBe(true);
+  });
+
+  it("updateScene patches and marks dirty", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1", slug: "x", title: "t", mode: "sequence", status: "draft",
+      canvasWidth: 1920, canvasHeight: 1080,
+      scenes: [{ id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] }],
+    } as never);
+    useBuilderStore.getState().updateScene("s1", { durationMs: 12000, name: "intro" });
+    const scene = useBuilderStore.getState().design!.scenes[0];
+    expect(scene.durationMs).toBe(12000);
+    expect(scene.name).toBe("intro");
+    expect(useBuilderStore.getState().dirty).toBe(true);
+  });
+
+  it("deleteScene removes scene and re-densifies orderIndex", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1", slug: "x", title: "t", mode: "sequence", status: "draft",
+      canvasWidth: 1920, canvasHeight: 1080,
+      scenes: [
+        { id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+        { id: "s2", designId: "d1", orderIndex: 1, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+        { id: "s3", designId: "d1", orderIndex: 2, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+      ],
+    } as never);
+    useBuilderStore.getState().setActiveScene("s2");
+    useBuilderStore.getState().deleteScene("s2");
+    const scenes = useBuilderStore.getState().design!.scenes;
+    expect(scenes.map((s) => s.id)).toEqual(["s1", "s3"]);
+    expect(scenes[1].orderIndex).toBe(1);
+    expect(useBuilderStore.getState().activeSceneId).toBe("s1");
+  });
+
+  it("reorderScenes reassigns orderIndex according to the supplied order", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1", slug: "x", title: "t", mode: "sequence", status: "draft",
+      canvasWidth: 1920, canvasHeight: 1080,
+      scenes: [
+        { id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+        { id: "s2", designId: "d1", orderIndex: 1, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+        { id: "s3", designId: "d1", orderIndex: 2, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+      ],
+    } as never);
+    useBuilderStore.getState().reorderScenes(["s3", "s1", "s2"]);
+    const scenes = useBuilderStore.getState().design!.scenes;
+    expect(scenes.map((s) => s.id)).toEqual(["s3", "s1", "s2"]);
+    expect(scenes[0].orderIndex).toBe(0);
+    expect(scenes[1].orderIndex).toBe(1);
+    expect(scenes[2].orderIndex).toBe(2);
+  });
+
+  it("setMode flips mode and marks dirty", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1", slug: "x", title: "t", mode: "single", status: "draft",
+      canvasWidth: 1920, canvasHeight: 1080,
+      scenes: [{ id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] }],
+    } as never);
+    useBuilderStore.getState().setMode("sequence");
+    expect(useBuilderStore.getState().design!.mode).toBe("sequence");
+    expect(useBuilderStore.getState().dirty).toBe(true);
+  });
+
+  it("setMode('single') truncates scenes to the first when downgrading", () => {
+    useBuilderStore.getState().loadDesign({
+      id: "d1", slug: "x", title: "t", mode: "sequence", status: "draft",
+      canvasWidth: 1920, canvasHeight: 1080,
+      scenes: [
+        { id: "s1", designId: "d1", orderIndex: 0, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+        { id: "s2", designId: "d1", orderIndex: 1, durationMs: 5000, transitionIn: "fade", transitionOut: "fade", elements: [] },
+      ],
+    } as never);
+    useBuilderStore.getState().setActiveScene("s2");
+    useBuilderStore.getState().setMode("single");
+    const scenes = useBuilderStore.getState().design!.scenes;
+    expect(scenes).toHaveLength(1);
+    expect(scenes[0].id).toBe("s1");
+    expect(useBuilderStore.getState().activeSceneId).toBe("s1");
+  });
 });
