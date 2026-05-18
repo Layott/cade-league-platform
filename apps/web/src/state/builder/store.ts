@@ -58,6 +58,9 @@ export type BuilderState = {
   // Wave 1C — grouping actions
   groupElements: (elementIds: string[]) => void;
   ungroupElements: (groupId: string) => void;
+
+  // Wave 1C — multi-select
+  selectMultiple: (ids: string[]) => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -345,6 +348,9 @@ export const useBuilderStore = create<BuilderState>()(
             dirty: true,
           };
         }),
+
+      // Wave 1C — multi-select (marquee / select-all / paste)
+      selectMultiple: (ids) => set({ selectedElementIds: Array.from(new Set(ids)) }),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.

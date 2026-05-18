@@ -213,4 +213,15 @@ describe("builder store", () => {
     const stillParented = elements.filter((e) => e.parentGroupId === group.id);
     expect(stillParented).toHaveLength(0);
   });
+
+  it("selectMultiple replaces selectedElementIds with deduped array", () => {
+    useBuilderStore.getState().selectMultiple(["a", "b", "c", "b"]);
+    expect(useBuilderStore.getState().selectedElementIds).toEqual(["a", "b", "c"]);
+  });
+
+  it("selectMultiple with empty array clears selection", () => {
+    useBuilderStore.setState({ selectedElementIds: ["x"] });
+    useBuilderStore.getState().selectMultiple([]);
+    expect(useBuilderStore.getState().selectedElementIds).toEqual([]);
+  });
 });
