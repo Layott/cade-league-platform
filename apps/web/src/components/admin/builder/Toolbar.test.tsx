@@ -32,6 +32,8 @@ describe("Toolbar", () => {
       activeSceneId: "s1",
       zoomLevel: 1,
       dirty: false,
+      toolMode: "select",
+      penDraft: null,
     });
     useTemporalStore.getState().clear();
   });
@@ -126,5 +128,28 @@ describe("Toolbar", () => {
     const els = useBuilderStore.getState().design!.scenes[0].elements;
     expect(els[0].elementType).toBe("polygon");
     expect((els[0].style as { sides?: number }).sides).toBe(6);
+  });
+
+  it("renders the Pen button", () => {
+    render(<Toolbar />);
+    expect(screen.getByRole("button", { name: /^pen$/i })).toBeInTheDocument();
+  });
+
+  it("clicking Pen flips toolMode to pen and starts a fresh draft", () => {
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^pen$/i }));
+    const s = useBuilderStore.getState();
+    expect(s.toolMode).toBe("pen");
+    expect(s.penDraft).not.toBeNull();
+    expect(s.penDraft?.nodes).toEqual([]);
+  });
+
+  it("clicking Select while a pen draft is open cancels the draft", () => {
+    useBuilderStore.setState({ toolMode: "pen", penDraft: { nodes: [], closed: false } });
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /select/i }));
+    const s = useBuilderStore.getState();
+    expect(s.toolMode).toBe("select");
+    expect(s.penDraft).toBeNull();
   });
 });

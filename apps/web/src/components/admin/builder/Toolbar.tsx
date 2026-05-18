@@ -13,6 +13,7 @@ import {
   Circle,
   Minus,
   Hexagon,
+  PenTool,
 } from "lucide-react";
 import { useBuilderStore, useTemporalStore } from "@/state/builder/store";
 
@@ -30,6 +31,10 @@ export function Toolbar() {
   const addElement = useBuilderStore((s) => s.addElement);
   const undo = useStore(useTemporalStore, (s) => s.undo);
   const redo = useStore(useTemporalStore, (s) => s.redo);
+  const toolMode = useBuilderStore((s) => s.toolMode);
+  const setToolMode = useBuilderStore((s) => s.setToolMode);
+  const startPenDraft = useBuilderStore((s) => s.startPenDraft);
+  const cancelPenDraft = useBuilderStore((s) => s.cancelPenDraft);
 
   function addRect() {
     if (!activeSceneId) return;
@@ -93,7 +98,11 @@ export function Toolbar() {
 
   return (
     <aside aria-label="Toolbar" className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-zinc-950 py-3">
-      <ToolButton label="Select" active={mode === "select"} onClick={() => setMode("select")}>
+      <ToolButton
+        label="Select"
+        active={toolMode === "select" && mode === "select"}
+        onClick={() => { setMode("select"); setToolMode("select"); cancelPenDraft(); }}
+      >
         <MousePointer2 size={18} />
       </ToolButton>
       <ToolButton label="Rect" onClick={addRect}>
@@ -104,6 +113,9 @@ export function Toolbar() {
       </ToolButton>
       <ToolButton label="Image" onClick={addImage}>
         <ImageIcon size={18} />
+      </ToolButton>
+      <ToolButton label="Pen" active={toolMode === "pen"} onClick={() => startPenDraft()}>
+        <PenTool size={18} />
       </ToolButton>
       <ToolButton label="Ellipse" onClick={addEllipse}>
         <Circle size={18} />
