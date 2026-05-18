@@ -16,6 +16,8 @@ import {
  * mod+c          copy selection
  * mod+v          paste
  * mod+d          duplicate selection (copy + paste, offsets +20 px)
+ * mod+g          group every selected element into a new group
+ * mod+shift+g    ungroup any selected group element (flatten its children)
  * delete/back    delete every selected element
  * arrow keys     nudge 1 px (10 px with shift)
  * escape         clear selection / cancel pen
@@ -72,6 +74,43 @@ export function useBuilderShortcuts() {
         await copyElementsToClipboard();
         await pasteElementsFromClipboard();
       })();
+    },
+    { enableOnFormTags: false },
+  );
+
+  useHotkeys(
+    "mod+shift+g",
+    (e) => {
+      e.preventDefault();
+      const state = useBuilderStore.getState();
+      if (!state.design || !state.activeSceneId) return;
+      const scene = state.design.scenes.find((s) => s.id === state.activeSceneId);
+      if (!scene) return;
+      // Ungroup every selected group; for non-group selections find any
+      // group ancestor via parentGroupId so the shortcut works whether
+      // the user has the group itself or a child element selected.
+      const ungroupIds = new Set<string>();
+      for (const id of state.selectedElementIds) {
+        const el = scene.elements.find((e) => e.id === id);
+        if (!el) continue;
+        if (el.elementType === "group") {
+          ungroupIds.add(el.id);
+        } else if (el.parentGroupId) {
+          ungroupIds.add(el.parentGroupId);
+        }
+      }
+      for (const id of ungroupIds) state.ungroupElements(id);
+    },
+    { enableOnFormTags: false },
+  );
+
+  useHotkeys(
+    "mod+g",
+    (e) => {
+      e.preventDefault();
+      const state = useBuilderStore.getState();
+      if (state.selectedElementIds.length === 0) return;
+      state.groupElements(state.selectedElementIds);
     },
     { enableOnFormTags: false },
   );

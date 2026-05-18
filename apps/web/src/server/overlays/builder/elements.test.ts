@@ -118,6 +118,27 @@ describe("elements.ts — add/update/delete", () => {
     expect(sb._tables.overlay_user_design_elements.insertedRows.length).toBe(1);
   });
 
+  it("addElement preserves client-provided id when supplied (Bug 4)", async () => {
+    const clientUuid = "11111111-1111-4111-8111-111111111111";
+    await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      { ...VALID_TEXT_INPUT, id: clientUuid },
+    );
+    const inserted = sb._tables.overlay_user_design_elements.insertedRows[0];
+    expect(inserted.id).toBe(clientUuid);
+  });
+
+  it("addElement still works when no explicit id is supplied", async () => {
+    const el = await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      VALID_TEXT_INPUT,
+    );
+    // The fake-sb stamps an id when the row didn't include one.
+    expect(el.id).toMatch(/^id-/);
+  });
+
   it("addElement rejects bad style (missing fontFamily on text)", async () => {
     await expect(
       addElement(sb as unknown as Parameters<typeof addElement>[0], "scene-1", {

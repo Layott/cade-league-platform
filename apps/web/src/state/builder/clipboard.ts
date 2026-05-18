@@ -1,7 +1,6 @@
 "use client";
 
-import { nanoid } from "nanoid";
-import { useBuilderStore } from "./store";
+import { useBuilderStore, makeUuid } from "./store";
 import type { Element } from "@/server/overlays/builder/types";
 
 /**
@@ -82,16 +81,17 @@ export async function pasteElementsFromClipboard(): Promise<void> {
   if (!state.design || !state.activeSceneId) return;
   const sceneId = state.activeSceneId;
 
-  // Build old->new id map for parentGroupId rewiring.
+  // Build old->new id map for parentGroupId rewiring. Use makeUuid so
+  // pasted elements satisfy the uuid PRIMARY KEY on save (Bug 4 fix).
   const idMap = new Map<string, string>();
-  for (const el of elements) idMap.set(el.id, nanoid());
+  for (const el of elements) idMap.set(el.id, makeUuid());
 
   const scene = state.design.scenes.find((s) => s.id === sceneId);
   const baseZ = scene ? scene.elements.length : 0;
 
   const fresh: Element[] = elements.map((el, i) => ({
     ...el,
-    id: idMap.get(el.id) ?? nanoid(),
+    id: idMap.get(el.id) ?? makeUuid(),
     parentGroupId: el.parentGroupId ? (idMap.get(el.parentGroupId) ?? null) : null,
     zIndex: baseZ + i,
     transform: {

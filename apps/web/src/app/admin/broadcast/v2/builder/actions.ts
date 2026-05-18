@@ -18,7 +18,11 @@ import {
   deleteScene as deleteSceneCrud,
   cloneScene as cloneSceneCrud,
 } from "@/server/overlays/builder/scenes";
-import { updateElements } from "@/server/overlays/builder/elements";
+import {
+  updateElements,
+  addElement as addElementCrud,
+  deleteElement as deleteElementCrud,
+} from "@/server/overlays/builder/elements";
 import {
   CreateDesignSchema,
   SaveDesignSchema,
@@ -77,6 +81,22 @@ export async function createDesignAction(
  * Persist the full design state (meta + all scenes + all elements).
  * Snapshots the prior state first so revert is always available.
  *
+ * Bug 4 (2026-05-18): the prior implementation only flushed updates —
+ * elements added in the client never reached the DB because no INSERT
+ * path was wired. The save now diffs payload-vs-DB and routes each row
+ * to INSERT / UPDATE / soft-DELETE so a fresh rect drawn on canvas
+ * survives a page reload.
+ *
+ * Diff strategy:
+ *   - Scenes: client must always round-trip a scene through
+ *     `addSceneAction` before save, so payload scenes are expected to
+ *     exist in DB. Missing scenes (id in DB, not in payload) get
+ *     soft-deleted to support sequence-mode trims.
+ *   - Elements: client generates v4 UUIDs (store.ts::makeUuid) and
+ *     keeps them stable across save → reload. Payload elements not in
+ *     DB get INSERTed with their client id; DB elements not in payload
+ *     get soft-deleted; intersections route through `updateElements`.
+ *
  * FormData fields:
  *   - designId  — required; existing design UUID
  *   - design    — required; JSON-serialised SaveDesignInput
@@ -115,12 +135,47 @@ export async function saveDesignAction(formData: FormData): Promise<void> {
     canvas_height: parsed.data.canvas_height,
   });
 
-  // Bulk-update scenes from the parsed scene list.
+  // ── Scene diff: payload vs live DB ─────────────────────────────
+  const { data: existingScenes, error: sceneListErr } = await sb
+    .from("overlay_user_design_scenes")
+    .select("id")
+    .eq("design_id", designId)
+    .is("deleted_at", null);
+  if (sceneListErr) {
+    throw new Error(`saveDesignAction scenes list: ${sceneListErr.message}`);
+  }
+  const existingSceneIds = new Set(
+    ((existingScenes ?? []) as Array<{ id: string }>).map((r) => r.id),
+  );
+  const payloadSceneIds = new Set(parsed.data.scenes.map((s) => s.id));
+
+  // Soft-delete scenes that vanished from the payload (sequence trims).
+  for (const id of existingSceneIds) {
+    if (!payloadSceneIds.has(id)) {
+      await deleteSceneCrud(sb, id);
+    }
+  }
+
+  // Update scenes that exist in both. New scenes are NOT expected here
+  // — the ScenePicker always round-trips via `addSceneAction` before
+  // save, so any payload scene id missing from DB indicates a client
+  // bug. Warn loud rather than silently inserting.
+  const scenesToUpdate = parsed.data.scenes.filter((s) =>
+    existingSceneIds.has(s.id),
+  );
+  if (scenesToUpdate.length !== parsed.data.scenes.length) {
+    const missing = parsed.data.scenes
+      .filter((s) => !existingSceneIds.has(s.id))
+      .map((s) => s.id);
+    console.warn(
+      `saveDesignAction: ${missing.length} scene id(s) not in DB; skipping update: ${missing.join(",")}`,
+    );
+  }
   await updateScenes(
     sb,
     actor,
     designId,
-    parsed.data.scenes.map((s) => ({
+    scenesToUpdate.map((s) => ({
       id: s.id,
       patch: {
         name: s.name ?? null,
@@ -132,32 +187,84 @@ export async function saveDesignAction(formData: FormData): Promise<void> {
     })),
   );
 
-  // Flatten all elements across scenes for one bulk update call.
-  // Cast to ElementBulkUpdate[]: schemas.ts uses .nullable() for round-trip
-  // safety but domain types use .optional()-only. Values are Zod-validated
-  // at runtime so the cast is safe — null fields are absent in practice.
-  await updateElements(
-    sb,
-    actor,
-    designId,
-    parsed.data.scenes.flatMap((s) =>
-      s.elements.map((el) => ({
-        id: el.id,
-        patch: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          transform: el.transform as any,
-          style: el.style as Style | undefined,
-          content: el.content ?? undefined,
-          binding: el.binding ?? null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          animation: el.animation as any,
-          locked: el.locked,
-          visible: el.visible,
-          scene_id: s.id,
-        },
-      })),
-    ) as import("@/server/overlays/builder/elements").ElementBulkUpdate[],
+  // ── Element diff: payload vs live DB ───────────────────────────
+  // Build live-element set scoped to surviving scenes (post-delete).
+  const liveSceneIds = parsed.data.scenes
+    .map((s) => s.id)
+    .filter((id) => existingSceneIds.has(id));
+  let existingElementIds = new Set<string>();
+  if (liveSceneIds.length > 0) {
+    const { data: existingElements, error: elListErr } = await sb
+      .from("overlay_user_design_elements")
+      .select("id")
+      .in("scene_id", liveSceneIds)
+      .is("deleted_at", null);
+    if (elListErr) {
+      throw new Error(`saveDesignAction elements list: ${elListErr.message}`);
+    }
+    existingElementIds = new Set(
+      ((existingElements ?? []) as Array<{ id: string }>).map((r) => r.id),
+    );
+  }
+
+  const payloadElements = parsed.data.scenes.flatMap((s) =>
+    s.elements.map((el) => ({ sceneId: s.id, el })),
   );
+  const payloadElementIds = new Set(payloadElements.map(({ el }) => el.id));
+
+  // INSERT elements present in payload but missing from DB.
+  for (const { sceneId, el } of payloadElements) {
+    if (existingElementIds.has(el.id)) continue;
+    // Skip elements whose owning scene was never created server-side.
+    if (!existingSceneIds.has(sceneId)) continue;
+    await addElementCrud(sb, sceneId, {
+      id: el.id,
+      elementType: el.element_type,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transform: el.transform as any,
+      style: el.style as Style,
+      content: (el.content ?? {}) as Record<string, unknown>,
+      // The schemas.ts wire shape allows `feed: string` but the runtime
+      // AddElementInput accepts the validated `FeedName` enum. The
+      // `validateBinding` gate inside addElementCrud will reject any
+      // payload that doesn't match the enum, so the cast is safe.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      binding: (el.binding ?? null) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      animation: (el.animation ?? {}) as any,
+      parentGroupId: el.parent_group_id ?? null,
+    });
+  }
+
+  // UPDATE elements present in both. Cast to ElementBulkUpdate[]:
+  // schemas.ts uses .nullable() for round-trip safety but domain types
+  // use .optional()-only. Values are Zod-validated at runtime so the
+  // cast is safe — null fields are absent in practice.
+  const elementsToUpdate = payloadElements
+    .filter(({ el }) => existingElementIds.has(el.id))
+    .map(({ sceneId, el }) => ({
+      id: el.id,
+      patch: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        transform: el.transform as any,
+        style: el.style as Style | undefined,
+        content: el.content ?? undefined,
+        binding: el.binding ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        animation: el.animation as any,
+        locked: el.locked,
+        visible: el.visible,
+        scene_id: sceneId,
+      },
+    })) as import("@/server/overlays/builder/elements").ElementBulkUpdate[];
+  await updateElements(sb, actor, designId, elementsToUpdate);
+
+  // Soft-delete elements that vanished from the payload.
+  for (const id of existingElementIds) {
+    if (!payloadElementIds.has(id)) {
+      await deleteElementCrud(sb, id);
+    }
+  }
 
   revalidatePath("/admin/broadcast/v2/builder");
   revalidatePath(`/admin/broadcast/v2/builder/${parsed.data.slug}/edit`);

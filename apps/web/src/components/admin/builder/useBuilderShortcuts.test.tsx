@@ -27,6 +27,26 @@ const fixtureDesign = () => ({
   }],
 });
 
+// Multi-element fixture used by group/ungroup tests — two siblings on
+// the same scene so groupElements has something to bundle.
+const fixtureTwoElements = () => ({
+  id: "d2", slug: "t2", title: "T2", mode: "single" as const, status: "draft" as const,
+  canvasWidth: 1920, canvasHeight: 1080,
+  scenes: [{ id: "s1", designId: "d2", orderIndex: 0, durationMs: 5000,
+    transitionIn: "fade", transitionOut: "fade",
+    elements: [
+      { id: "e1", elementType: "rect" as const, zIndex: 0, locked: false, visible: true,
+        parentGroupId: null,
+        transform: { x: 100, y: 100, width: 50, height: 50, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+        style: {}, content: {} },
+      { id: "e2", elementType: "rect" as const, zIndex: 1, locked: false, visible: true,
+        parentGroupId: null,
+        transform: { x: 200, y: 200, width: 50, height: 50, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+        style: {}, content: {} },
+    ],
+  }],
+});
+
 /** Map key names to their KeyboardEvent.code values for react-hotkeys-hook v5 matching. */
 const KEY_TO_CODE: Record<string, string> = {
   Delete: "Delete",
@@ -122,5 +142,84 @@ describe("useBuilderShortcuts", () => {
     await Promise.resolve();
     expect(copyMock).toHaveBeenCalled();
     expect(pasteMock).toHaveBeenCalled();
+  });
+
+  it("Ctrl+G groups every selected element into a new group", () => {
+    useBuilderStore.setState({
+      design: fixtureTwoElements() as never,
+      selectedElementIds: ["e1", "e2"],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+      toolMode: "select",
+      penDraft: null,
+    });
+    render(<Harness />);
+    pressKey("g", { ctrl: true });
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    const group = elements.find((e) => e.elementType === "group");
+    expect(group).toBeDefined();
+    const children = elements.filter((e) => e.parentGroupId === group!.id);
+    expect(children.map((e) => e.id).sort()).toEqual(["e1", "e2"]);
+  });
+
+  it("Ctrl+G is a no-op when nothing is selected", () => {
+    useBuilderStore.setState({
+      design: fixtureTwoElements() as never,
+      selectedElementIds: [],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+      toolMode: "select",
+      penDraft: null,
+    });
+    render(<Harness />);
+    pressKey("g", { ctrl: true });
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(elements.find((e) => e.elementType === "group")).toBeUndefined();
+  });
+
+  it("Ctrl+Shift+G flattens the selected group", () => {
+    useBuilderStore.setState({
+      design: fixtureTwoElements() as never,
+      selectedElementIds: ["e1", "e2"],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+      toolMode: "select",
+      penDraft: null,
+    });
+    render(<Harness />);
+    // First group, then ungroup.
+    pressKey("g", { ctrl: true });
+    const group = useBuilderStore
+      .getState()
+      .design!.scenes[0].elements.find((e) => e.elementType === "group")!;
+    // groupElements selects the new group itself.
+    expect(useBuilderStore.getState().selectedElementIds).toEqual([group.id]);
+    pressKey("g", { ctrl: true, shift: true });
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(elements.find((e) => e.elementType === "group")).toBeUndefined();
+    expect(elements.filter((e) => e.parentGroupId === group.id)).toHaveLength(0);
+  });
+
+  it("Ctrl+Shift+G flattens via parent when a group child is selected", () => {
+    // Pre-group children so we can target ungrouping by selecting a child.
+    useBuilderStore.setState({
+      design: fixtureTwoElements() as never,
+      selectedElementIds: ["e1", "e2"],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+      toolMode: "select",
+      penDraft: null,
+    });
+    useBuilderStore.getState().groupElements(["e1", "e2"]);
+    // Select a child so the ungroup walks parentGroupId up.
+    useBuilderStore.getState().selectMultiple(["e1"]);
+    render(<Harness />);
+    pressKey("g", { ctrl: true, shift: true });
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(elements.find((e) => e.elementType === "group")).toBeUndefined();
   });
 });

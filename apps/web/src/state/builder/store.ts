@@ -164,6 +164,57 @@ export type BuilderState = {
 // ─────────────────────────────────────────────────────────────
 let transientDepth = 0;
 
+/**
+ * Element/scene/group IDs MUST be valid v4 UUIDs because the underlying
+ * `overlay_user_design_elements.id` / `overlay_user_design_scenes.id`
+ * columns are `uuid PRIMARY KEY` (migration 20260901000002). Generating
+ * the id on the client lets the same value round-trip through Save →
+ * server INSERT → page reload without an id rewrite step.
+ *
+ * Prefers the native `crypto.randomUUID()` (available in browsers since
+ * 2022 + Node 14.17+); falls back to a deterministic v4-shaped string
+ * built from `crypto.getRandomValues` for older sandboxes (jsdom in
+ * Vitest sometimes lacks `randomUUID` depending on Node minor version).
+ *
+ * Keyframe IDs continue to use `nanoid(8)` — they are nested inside
+ * `animation.advancedTimeline[i].keyframes[j].id` (jsonb) and never
+ * become DB column values, so the 8-char alphabet is fine there.
+ */
+export function makeUuid(): string {
+  if (typeof crypto !== "undefined") {
+    const cAny = crypto as Crypto & { randomUUID?: () => string };
+    if (typeof cAny.randomUUID === "function") {
+      return cAny.randomUUID();
+    }
+    if (typeof cAny.getRandomValues === "function") {
+      const bytes = new Uint8Array(16);
+      cAny.getRandomValues(bytes);
+      // RFC 4122 section 4.4 — set version (4) + variant (10) bits.
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      return (
+        hex.slice(0, 8) +
+        "-" +
+        hex.slice(8, 12) +
+        "-" +
+        hex.slice(12, 16) +
+        "-" +
+        hex.slice(16, 20) +
+        "-" +
+        hex.slice(20, 32)
+      );
+    }
+  }
+  // Last-resort fallback (jsdom without webcrypto): Math.random v4 shape.
+  // Cryptographically weak but acceptable for test-only fallback —
+  // production paths always hit one of the branches above.
+  const rnd = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
+  return `${rnd()}${rnd()}-${rnd()}-4${rnd().slice(1)}-${
+    ((Math.floor(Math.random() * 4) + 8).toString(16) + rnd().slice(1))
+  }-${rnd()}${rnd()}${rnd()}`;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────
@@ -268,7 +319,7 @@ export const useBuilderStore = create<BuilderState>()(
           const scene = state.design.scenes.find((s) => s.id === sceneId);
           if (!scene) return state;
           const newEl: Element = {
-            id: nanoid(),
+            id: makeUuid(),
             sceneId,
             parentGroupId: null,
             elementType,
@@ -423,7 +474,7 @@ export const useBuilderStore = create<BuilderState>()(
           const scene = state.design.scenes.find((s) => s.id === sceneId);
           if (!scene) return { penDraft: null, toolMode: "select" };
           const newEl: Element = {
-            id: nanoid(),
+            id: makeUuid(),
             sceneId,
             parentGroupId: null,
             elementType: "path" as const,
@@ -464,7 +515,7 @@ export const useBuilderStore = create<BuilderState>()(
           const validIds = elementIds.filter((id) => scene.elements.some((e) => e.id === id));
           if (validIds.length === 0) return state;
           const newGroup: Element = {
-            id: nanoid(),
+            id: makeUuid(),
             sceneId,
             parentGroupId: null,
             elementType: "group" as const,

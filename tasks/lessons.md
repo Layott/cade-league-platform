@@ -1146,3 +1146,66 @@ Pattern recap (third occurrence in two days of `.maybeSingle()` regressions on `
 7. `store.ts` `toServerJson` `animation: el.animation ?? null` produced `{entry: PresetAnim | undefined} | null` but schema expected `{entry: ... | null} | null`. Fix: `as any` cast.
 
 **Rule for future:** After writing Wave N server modules + client components in parallel, run `npm run build` BEFORE committing individual tasks. TypeScript only catches cross-file contract mismatches at build time, not at individual file save. Also: after bumping Zod major version (v3→v4), grep for `errorMap` repo-wide and replace all with `error:`.
+
+---
+
+## 2026-05-17 — Wave 1B Overlay Builder final verification gate
+
+**Date:** 2026-05-17
+
+**Context:** Task 18 final verification gate for Overlay Builder Wave 1B (gradients + ellipse/line/polygon + custom font upload + CSS filters + multi-shadow + manual data bind + alignment guides/snap).
+
+**Mistakes / Corrections:**
+
+1. `fontkit` installed as a runtime dependency but its TypeScript declarations (`@types/fontkit`) were not installed. Build failed: `Could not find a declaration file for module 'fontkit'`. Fix: `npm --workspace apps/web install --save-dev @types/fontkit`. Package exists at v2.0.9 on npm.
+
+2. `ttf2woff2` uses native N-API bindings with a WASM fallback. Next.js webpack tried to bundle the WASM file, producing `ENOENT: no such file or directory, open '.next/server/chunks/ttf2woff2.wasm'` during page-data collection for `/admin/broadcast/v2/builder/fonts`. Fix: add both `fontkit` and `ttf2woff2` to `serverExternalPackages` in `next.config.ts`. This is the same pattern already used for `isomorphic-dompurify` + `jsdom` in this repo.
+
+**Rule for future:** When installing Node.js packages that use native bindings, WASM, or load assets from their own `node_modules` directory at runtime (e.g. `sharp`, `canvas`, `better-sqlite3`, `fontkit`, `ttf2woff2`, `jsdom`), ALWAYS add them to `serverExternalPackages` in `next.config.ts` at install time. Do not wait for build failure. Pre-flight checklist: grep `bindings` or `WASM` in the package source before Task 1 commit.
+
+---
+
+## 2026-05-18 — Overlay Builder Bug 4: Drawn elements never persisted
+
+**Date:** 2026-05-18
+
+**Context:** Wave 2A canvas editor: user drew a rect, clicked Save, refreshed — rect disappeared. Save action ran without error but no element row landed in DB.
+
+**Mistake:**
+
+1. Zustand store's `addElement` (store.ts:271) and `completePenDraft` / `groupElements` generated element ids via `nanoid()`. nanoid returns a 21-char URL-safe string (e.g. `V1StGXR8_Z5jdHi6B-myT`) which is NOT a valid UUID. The underlying `overlay_user_design_elements.id` column is `uuid PRIMARY KEY` (migration 20260901000002). Any save attempted to `.eq("id", nanoid_string)` against that column would have thrown `invalid input syntax for type uuid`.
+
+2. `saveDesignAction` only called `updateScenes()` + `updateElements()` — both update-only loops. There was NO insert path. New elements drawn on canvas were never INSERTed; the bulk update silently no-op'd them. Soft-deletes for vanished elements were also missing.
+
+**Correction (commit TBD):**
+
+1. **Client UUIDs.** New helper `makeUuid()` in `apps/web/src/state/builder/store.ts` prefers `crypto.randomUUID()` (browsers since 2022, Node 14.17+) with a `getRandomValues` → `Math.random` fallback chain. Replaced 3 element-id sites (`addElement`, `completePenDraft`, `groupElements`) + 1 paste-id site in `apps/web/src/state/builder/clipboard.ts`. Keyframe IDs kept `nanoid(8)` — nested inside jsonb, never DB column values.
+
+2. **Diff-based save in `saveDesignAction`** (`apps/web/src/app/admin/broadcast/v2/builder/actions.ts`). Before flushing scenes/elements, query existing IDs from DB:
+   - For each payload scene/element: missing-from-DB → INSERT, present-in-both → UPDATE.
+   - For each DB scene/element: missing-from-payload → soft-DELETE.
+   - `addElement` in `apps/web/src/server/overlays/builder/elements.ts` now accepts an optional `id` field so the client-generated UUID round-trips. Without explicit id, Postgres assigns one via `DEFAULT gen_random_uuid()`.
+
+**Verified end-to-end via Chrome MCP:** Created new design "Bug-4 Fix Verify" → drew rect → Save → DB query confirmed row at slug `bug-4-fix-verify` with element `id=38b84b2d-9fdc-45bf-a098-79c56639fe9b`, `style.fill=#6bcd06`, `transform.{x:860,y:490,w:200,h:100}` → page reload → canvas pixel at (900,500) reads RGB(107,205,6) = #6bcd06.
+
+**Rule for future:**
+
+1. **Any ID generation for a client-state object that ends up as a DB row column MUST match the column type.** Default to `crypto.randomUUID()` for `uuid` columns. `nanoid()` only for IDs that stay in jsonb / client-side / never become primary keys.
+
+2. **`saveDesignAction`-style "flush whole state" handlers MUST diff against DB**, not blindly call UPDATE. Insert + update + soft-delete are three different routes. A pure UPDATE loop drops every newly-created row silently — the worst kind of bug because Save succeeds and nothing logs.
+
+3. **Verify save+reload round-trip in Chrome end-to-end for any save action that lives in a "shipped" wave.** Static analysis + unit tests miss the column-type mismatch because mocked Supabase clients don't enforce `uuid` syntax. Smoke: Create row → Save → query DB → confirm row exists with correct shape.
+
+---
+
+## 2026-05-18 — Overlay Builder Bug 2: Ctrl+G / Ctrl+Shift+G keybindings missing
+
+**Date:** 2026-05-18
+
+**Context:** `useBuilderShortcuts.ts` documented mod+z / mod+c / mod+v / mod+d / Delete / Esc / arrows but had no group/ungroup hotkey wires even though `groupElements` + `ungroupElements` exist in the store.
+
+**Correction (same commit as Bug 4):** Added two `useHotkeys` blocks. `mod+shift+g` ungroups every selected group (walks `parentGroupId` up if a child element is selected). `mod+g` groups every currently-selected element. Order matters: `mod+shift+g` is registered FIRST so react-hotkeys-hook matches the more-specific shortcut before the bare `mod+g` would shadow it. Five new test cases in `useBuilderShortcuts.test.tsx` cover both directions + the parent-walk + the no-op-when-empty case.
+
+**Verified end-to-end via Chrome MCP:** Dispatched `KeyboardEvent('keydown', {key:'g', code:'KeyG', ctrlKey:true})` → LayersPanel count went from "GroupRectRectRect" → "GroupGroupRectRectRect" (new group element added). Then dispatched `{key:'G', code:'KeyG', ctrlKey:true, shiftKey:true}` → "GroupGroupRectRectRect" → "GroupRectRectRect" (group flattened). Both directions live-verified.
+
+**Rule for future:** When a store action ships in a wave, the matching keybinding ships in the same wave. Pre-flight: grep `useBuilderStore.*\.(<name>)` for every public store action and ensure either (a) a UI button, OR (b) a hotkey wires it. Orphaned store actions = dead code.

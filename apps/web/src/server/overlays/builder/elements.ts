@@ -64,6 +64,13 @@ function rowToElement(r: ElementRow): Element {
 }
 
 export type AddElementInput = {
+  /**
+   * Optional explicit element id. When provided MUST be a v4 UUID — the
+   * underlying column is `uuid PRIMARY KEY`. Used by `saveDesignAction`
+   * so client-generated ids round-trip without an id rewrite. Omit to
+   * let Postgres assign the id via `DEFAULT gen_random_uuid()`.
+   */
+  id?: string;
   elementType: ElementType;
   transform: Transform;
   style: unknown;
@@ -146,21 +153,24 @@ export async function addElement(
     .filter((s) => (s as unknown as ElementRow).deleted_at == null)
     .reduce((m, s) => Math.max(m, s.z_index), -1);
 
+  const insertRow: Record<string, unknown> = {
+    scene_id: sceneId,
+    parent_group_id: input.parentGroupId,
+    element_type: input.elementType,
+    z_index: maxZ + 1,
+    locked: false,
+    visible: true,
+    transform: input.transform,
+    style: v.style,
+    content: input.content,
+    binding: v.binding,
+    animation: v.animation,
+  };
+  if (input.id !== undefined) insertRow.id = input.id;
+
   const { data, error } = await sb
     .from("overlay_user_design_elements")
-    .insert({
-      scene_id: sceneId,
-      parent_group_id: input.parentGroupId,
-      element_type: input.elementType,
-      z_index: maxZ + 1,
-      locked: false,
-      visible: true,
-      transform: input.transform,
-      style: v.style,
-      content: input.content,
-      binding: v.binding,
-      animation: v.animation,
-    })
+    .insert(insertRow)
     .select()
     .single();
   if (error) throw new Error(`addElement insert: ${error.message}`);
