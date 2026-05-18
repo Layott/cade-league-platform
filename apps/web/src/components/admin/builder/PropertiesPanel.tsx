@@ -10,6 +10,7 @@ import { ShadowStackEditor } from "./ShadowStackEditor";
 import { ManualBindEditor } from "./ManualBindEditor";
 import { FontFamilyPicker } from "./FontFamilyPicker";
 import type { UploadedFontMeta } from "./FontFamilyPicker";
+import { ScenePropertiesDrawer } from "./ScenePropertiesDrawer";
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -72,6 +73,8 @@ export function PropertiesPanel({
   const updateElement = useBuilderStore((s) => s.updateElement);
   const groupElements = useBuilderStore((s) => s.groupElements);
   const ungroupElements = useBuilderStore((s) => s.ungroupElements);
+  const mode = useBuilderStore((s) => s.design?.mode);
+  const showSceneDrawer = selectedIds.length === 0 && mode === "sequence";
 
   // Single-select for Wave 1A.
   const selected = (() => {
@@ -94,9 +97,12 @@ export function PropertiesPanel({
     return (
       <aside
         aria-label="Properties"
-        className="flex w-[340px] shrink-0 items-center justify-center border-l border-white/10 bg-zinc-950 p-6 text-sm text-white/40"
+        className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-zinc-950"
       >
-        Select an element to edit its properties.
+        {showSceneDrawer && <ScenePropertiesDrawer />}
+        <div className="flex flex-1 items-center justify-center p-6 text-sm text-white/40">
+          Select an element to edit its properties.
+        </div>
       </aside>
     );
   }
