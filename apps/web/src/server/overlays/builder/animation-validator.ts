@@ -277,25 +277,28 @@ export function validateAnimation(
     return { ok: false, errors };
   }
 
-  // Strip keyframesBody from the returned Animation — that field lives
-  // on the phase payload but is not part of the canonical
-  // Animation/PresetAnim shape (it is consumed at compile time, not
-  // stored on the typed shape). The compiler reads it back from the
-  // raw JSON column. Callers that need to round-trip the body should
-  // keep the raw input alongside the validated value.
-  const stripBody = (p: PhasePayload | undefined): PresetAnim | undefined =>
-    p
-      ? {
-          type: p.type as AnimType,
-          durationMs: p.durationMs,
-          delayMs: p.delayMs,
-          easing: p.easing,
-        }
-      : undefined;
+  // Preserve every field on the phase payload that is part of the
+  // canonical PresetAnim shape (Wave 3B: `advancedTimeline` +
+  // `keyframesBody` were added to `PresetAnimSchema`, so they round
+  // trip through validation now). The compiler (`buildAdvancedKeyframesBody`
+  // in compiler.ts) reads `advancedTimeline` off the returned shape, so
+  // stripping it here would silently break the @keyframes emit path.
+  const preservePhase = (p: PhasePayload | undefined): PresetAnim | undefined => {
+    if (!p) return undefined;
+    const out: PresetAnim = {
+      type: p.type as AnimType,
+      durationMs: p.durationMs,
+      delayMs: p.delayMs,
+      easing: p.easing,
+    };
+    if (p.advancedTimeline !== undefined) out.advancedTimeline = p.advancedTimeline;
+    if (p.keyframesBody !== undefined) out.keyframesBody = p.keyframesBody;
+    return out;
+  };
 
   const value: Animation = {};
-  if (a.entry) value.entry = stripBody(a.entry);
-  if (a.exit) value.exit = stripBody(a.exit);
-  if (a.loop) value.loop = stripBody(a.loop);
+  if (a.entry) value.entry = preservePhase(a.entry);
+  if (a.exit) value.exit = preservePhase(a.exit);
+  if (a.loop) value.loop = preservePhase(a.loop);
   return { ok: true, value };
 }

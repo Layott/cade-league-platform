@@ -260,3 +260,152 @@ describe("elements.ts — add/update/delete", () => {
     expect(clone.transform.y).toBe(20);
   });
 });
+
+// ────────────── Wave 3B — advancedTimeline round-trip ──────────────
+//
+// PresetAnimSchema (types.ts) gained `advancedTimeline` in Task 1.
+// validateAnimation (animation-validator.ts) parses + validates the
+// extended shape but used to strip it from the returned value; the
+// compiler reads `anim.advancedTimeline` off the persisted row, so the
+// CRUD save path MUST round-trip the field intact. These tests guard
+// against regression in either direction (insert + update + clear).
+describe("elements.ts — Wave 3B advancedTimeline round-trip", () => {
+  let sb: ReturnType<typeof makeFakeSb>;
+  beforeEach(() => {
+    sb = makeFakeSb();
+  });
+
+  const TIMELINE_ENTRY = {
+    type: "noop" as const,
+    durationMs: 1000,
+    delayMs: 0,
+    easing: "linear",
+    advancedTimeline: [
+      {
+        property: "opacity" as const,
+        keyframes: [
+          { id: "k1", timeMs: 0, value: 0, easingOut: null },
+          { id: "k2", timeMs: 1000, value: 1, easingOut: null },
+        ],
+      },
+    ],
+  };
+
+  const TIMELINE_EXIT = {
+    type: "noop" as const,
+    durationMs: 600,
+    delayMs: 0,
+    easing: "linear",
+    advancedTimeline: [
+      {
+        property: "opacity" as const,
+        keyframes: [
+          { id: "x1", timeMs: 0, value: 1, easingOut: null },
+          { id: "x2", timeMs: 600, value: 0, easingOut: null },
+        ],
+      },
+    ],
+  };
+
+  it("addElement persists advancedTimeline on entry phase through insert", async () => {
+    const el = await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      {
+        ...VALID_TEXT_INPUT,
+        animation: { entry: TIMELINE_ENTRY },
+      },
+    );
+    const row = sb._tables.overlay_user_design_elements.rows.find(
+      (r) => r.id === el.id,
+    );
+    expect(row).toBeDefined();
+    const anim = row?.animation as {
+      entry?: { advancedTimeline?: typeof TIMELINE_ENTRY.advancedTimeline };
+    };
+    expect(anim.entry?.advancedTimeline).toEqual(TIMELINE_ENTRY.advancedTimeline);
+    // Compiler key invariant — preset `type` stays `noop` so the
+    // mutual-exclusivity branch in animation-validator.ts holds.
+    expect(
+      (row?.animation as { entry?: { type?: string } }).entry?.type,
+    ).toBe("noop");
+  });
+
+  it("updateElement adds advancedTimeline to exit phase on a previously-empty animation", async () => {
+    const el = await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      VALID_TEXT_INPUT,
+    );
+    await updateElement(
+      sb as unknown as Parameters<typeof updateElement>[0],
+      el.id,
+      { animation: { exit: TIMELINE_EXIT } },
+    );
+    const row = sb._tables.overlay_user_design_elements.rows.find(
+      (r) => r.id === el.id,
+    );
+    const anim = row?.animation as {
+      exit?: { advancedTimeline?: typeof TIMELINE_EXIT.advancedTimeline };
+    };
+    expect(anim.exit?.advancedTimeline).toEqual(TIMELINE_EXIT.advancedTimeline);
+  });
+
+  it("updateElement clears advancedTimeline by overwriting with empty animation", async () => {
+    const el = await addElement(
+      sb as unknown as Parameters<typeof addElement>[0],
+      "scene-1",
+      {
+        ...VALID_TEXT_INPUT,
+        animation: { entry: TIMELINE_ENTRY },
+      },
+    );
+    // Sanity — timeline is present after insert.
+    {
+      const row0 = sb._tables.overlay_user_design_elements.rows.find(
+        (r) => r.id === el.id,
+      );
+      expect(
+        (
+          row0?.animation as {
+            entry?: { advancedTimeline?: unknown[] };
+          }
+        ).entry?.advancedTimeline,
+      ).toBeDefined();
+    }
+    await updateElement(
+      sb as unknown as Parameters<typeof updateElement>[0],
+      el.id,
+      { animation: {} },
+    );
+    const row = sb._tables.overlay_user_design_elements.rows.find(
+      (r) => r.id === el.id,
+    );
+    expect(row?.animation).toEqual({});
+  });
+
+  it("addElement rejects advancedTimeline alongside a non-noop preset (mutual exclusivity)", async () => {
+    await expect(
+      addElement(sb as unknown as Parameters<typeof addElement>[0], "scene-1", {
+        ...VALID_TEXT_INPUT,
+        animation: {
+          entry: {
+            type: "slide-left",
+            durationMs: 600,
+            delayMs: 0,
+            easing: "ease-out",
+            advancedTimeline: [
+              {
+                property: "opacity",
+                keyframes: [
+                  { id: "k1", timeMs: 0, value: 0, easingOut: null },
+                  { id: "k2", timeMs: 600, value: 1, easingOut: null },
+                ],
+              },
+            ],
+          },
+        },
+      }),
+    ).rejects.toThrow(/mutual|exclusive|both/i);
+  });
+});
