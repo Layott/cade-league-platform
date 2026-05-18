@@ -7,9 +7,11 @@
  * runtime is exactly what was committed with the same SHA.
  *
  * Pieces:
- *   1. postMessage receiver for {type:'show'|'hide'|'update', data, slot?}
- *      envelope. show → body.cade-visible; hide → body.cade-exiting
- *      (stripped after exit duration); update → re-render with new data.
+ *   1. postMessage receiver for {type:'show'|'hide'|'update'|'next-scene',
+ *      data, slot?} envelope. show → body.cade-visible (+ kicks off
+ *      runSequence when scenes meta present); hide → body.cade-exiting
+ *      (stripped after exit duration) + stopSequence; update → re-render
+ *      with new data; next-scene → advance the sequence one step.
  *   2. cade-visible-gate-observer-v2 MutationObserver replicated from
  *      apps/web/public/overlays/v2/04-h2h-2/index.html — flips opacity
  *      transitions on every gated element so Chrome cross-origin iframe
@@ -19,6 +21,11 @@
  *   4. __cadeBuilderRuntime global — empty by default; the compiler-
  *      emitted per-design block populates it with INITIAL_FETCH_PATH +
  *      REALTIME_KEY_EVENTS arrays that the Realtime injector reads.
+ *   5. runSequence driver (Wave 3A) — consumes
+ *      window.__OVERLAY_SCENES_META__ (emitted by sequence-mode
+ *      compiler), flips data-scene-state through
+ *      inactive → entering → active → exiting on a per-scene
+ *      durationMs schedule. cut transitions are zero-duration no-ops.
  *
  * CLAUDE.md §14 contract pieces this script satisfies:
  *   - postMessage handler for show/hide/update envelope.
@@ -53,6 +60,109 @@ export const BOOTSTRAP_SCRIPT = `(function(){
   var EXIT_DURATION_MS = 480;
   var exitTimer = null;
 
+  // ────────── runSequence driver (Wave 3A) ──────────
+  // Consumes window.__OVERLAY_SCENES_META__ (an array of
+  // { id, durationMs, transitionIn, transitionOut } emitted by the
+  // sequence-mode compiler) and flips data-scene-state through
+  // inactive → entering → active → exiting on a per-scene schedule.
+  // SCENE_TRANSITION_DURATION matches the compiler-emitted
+  // @keyframes scene-<dir>-{in,out} timing (apps/web/src/server/
+  // overlays/builder/compiler.ts::SCENE_TRANSITION_DURATION_MS).
+  var SCENE_TRANSITION_DURATION = 480;
+  var seqIndex = -1;
+  var seqTimers = [];
+  var seqRunning = false;
+
+  function clearSeqTimers() {
+    for (var i = 0; i < seqTimers.length; i++) {
+      try { clearTimeout(seqTimers[i]); } catch (e) { /* swallow */ }
+    }
+    seqTimers = [];
+  }
+
+  function resetAllScenes() {
+    var nodes = document.querySelectorAll('[data-scene-id]');
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].setAttribute('data-scene-state', 'inactive');
+    }
+  }
+
+  function activateScene(meta, onActive) {
+    if (!meta) return;
+    var el = document.querySelector('[data-scene-id="' + meta.id + '"]');
+    if (!el) {
+      if (typeof onActive === 'function') onActive();
+      return;
+    }
+    var enterDur = meta.transitionIn === 'cut' ? 0 : SCENE_TRANSITION_DURATION;
+    el.setAttribute('data-scene-state', 'entering');
+    var t = setTimeout(function(){
+      el.setAttribute('data-scene-state', 'active');
+      if (typeof onActive === 'function') onActive();
+    }, enterDur);
+    seqTimers.push(t);
+  }
+
+  function runSequence() {
+    var meta = window.__OVERLAY_SCENES_META__;
+    if (!meta || !meta.length) return;
+    clearSeqTimers();
+    resetAllScenes();
+    seqIndex = 0;
+    seqRunning = true;
+    scheduleScene();
+  }
+
+  function scheduleScene() {
+    if (!seqRunning) return;
+    var meta = window.__OVERLAY_SCENES_META__;
+    if (!meta || seqIndex < 0 || seqIndex >= meta.length) {
+      seqRunning = false;
+      return;
+    }
+    var current = meta[seqIndex];
+    activateScene(current, function(){
+      // Hold for the scene's own durationMs, then transition out and
+      // advance to the next scene (if any).
+      var hold = setTimeout(function(){
+        if (!seqRunning) return;
+        advanceScene();
+      }, current.durationMs || 0);
+      seqTimers.push(hold);
+    });
+  }
+
+  function advanceScene() {
+    var meta = window.__OVERLAY_SCENES_META__;
+    if (!meta || !meta.length) return;
+    if (seqIndex < 0 || seqIndex >= meta.length) return;
+    var current = meta[seqIndex];
+    var el = current
+      ? document.querySelector('[data-scene-id="' + current.id + '"]')
+      : null;
+    var exitDur = current && current.transitionOut === 'cut'
+      ? 0
+      : SCENE_TRANSITION_DURATION;
+    if (el) el.setAttribute('data-scene-state', 'exiting');
+    var t = setTimeout(function(){
+      if (el) el.setAttribute('data-scene-state', 'inactive');
+      seqIndex += 1;
+      if (seqIndex >= meta.length) {
+        seqRunning = false;
+        return;
+      }
+      scheduleScene();
+    }, exitDur);
+    seqTimers.push(t);
+  }
+
+  function stopSequence() {
+    seqRunning = false;
+    clearSeqTimers();
+    resetAllScenes();
+    seqIndex = -1;
+  }
+
   function onMessage(ev) {
     var msg = ev && ev.data;
     if (!msg || typeof msg !== 'object') return;
@@ -62,7 +172,11 @@ export const BOOTSTRAP_SCRIPT = `(function(){
       document.body.classList.remove('cade-exiting');
       document.body.classList.add('cade-visible');
       try { applyUpdate(msg.data, msg.slot); } catch (e) { /* swallow */ }
+      if (window.__OVERLAY_SCENES_META__ && window.__OVERLAY_SCENES_META__.length) {
+        try { runSequence(); } catch (e) { /* swallow */ }
+      }
     } else if (type === 'hide') {
+      try { stopSequence(); } catch (e) { /* swallow */ }
       document.body.classList.remove('cade-visible');
       document.body.classList.add('cade-exiting');
       if (exitTimer) clearTimeout(exitTimer);
@@ -72,6 +186,8 @@ export const BOOTSTRAP_SCRIPT = `(function(){
       }, EXIT_DURATION_MS);
     } else if (type === 'update') {
       try { applyUpdate(msg.data, msg.slot); } catch (e) { /* swallow */ }
+    } else if (type === 'next-scene') {
+      try { advanceScene(); } catch (e) { /* swallow */ }
     }
   }
   window.addEventListener('message', onMessage);

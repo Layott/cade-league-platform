@@ -289,8 +289,11 @@ describe("compileDesignToHtml — sequence mode", () => {
   });
 
   it("does NOT emit __OVERLAY_SCENES_META__ for single-mode designs", () => {
-    // Use a single-mode fixture from Wave 1A
+    // Use a single-mode fixture from Wave 1A. The bootstrap script
+    // *references* the symbol (read-only — for runSequence's optional
+    // sequence path) so we assert the *assignment* is absent rather
+    // than the bare token.
     const singleHtml = compileDesignToHtml(designRectTextImage, 0);
-    expect(singleHtml).not.toContain("__OVERLAY_SCENES_META__");
+    expect(singleHtml).not.toContain("window.__OVERLAY_SCENES_META__ = [");
   });
 });

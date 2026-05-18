@@ -53,3 +53,24 @@ describe("BOOTSTRAP_SCRIPT", () => {
     expect(BOOTSTRAP_SCRIPT.length).toBeLessThan(20000);
   });
 });
+
+describe("BOOTSTRAP_SCRIPT — sequence mode", () => {
+  it("exposes a runSequence function or inline driver branch", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/runSequence|__OVERLAY_SCENES_META__/);
+  });
+
+  it("handles next-scene postMessage type", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/['"]next-scene['"]/);
+  });
+
+  it("references data-scene-state state machine", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/data-scene-state/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/['"]entering['"]/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/['"]active['"]/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/['"]exiting['"]/);
+  });
+
+  it("references SCENE_TRANSITION_DURATION constant (~480ms)", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/480|SCENE_TRANSITION_DURATION/);
+  });
+});
