@@ -4,7 +4,35 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createDesignAction } from "@/app/admin/broadcast/v2/builder/actions";
 import type { DesignSummary } from "@/server/overlays/builder/designs";
+import type { Scene } from "@/server/overlays/builder/types";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
+
+/**
+ * Wave 3B Task 16 — card prop shape accepts an OPTIONAL `scenes` field so
+ * the library can surface an "Animations: advanced" badge on designs that
+ * carry at least one advancedTimeline keyframe track. `DesignSummary` from
+ * `listDesigns` does not currently include scenes — when absent the badge
+ * is simply hidden. Future server work can extend the summary projection
+ * to populate this without touching the component.
+ */
+export type BuilderLibraryCard = DesignSummary & { scenes?: Scene[] };
+
+/**
+ * Wave 3B Task 16 helper — walks scenes / elements / animation phases
+ * and returns true if ANY phase carries a non-empty advancedTimeline.
+ */
+export function hasAdvancedTimeline(scenes: Scene[] | undefined): boolean {
+  if (!scenes) return false;
+  for (const scene of scenes) {
+    for (const el of scene.elements) {
+      const phases = [el.animation?.entry, el.animation?.exit, el.animation?.loop];
+      for (const phase of phases) {
+        if ((phase?.advancedTimeline?.length ?? 0) > 0) return true;
+      }
+    }
+  }
+  return false;
+}
 
 /**
  * Wave 1A — overlay builder library.
@@ -18,7 +46,7 @@ import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
  * Note: createDesignAction is a FormData server action. This component
  * builds a FormData object from the modal form state before calling it.
  */
-export function BuilderLibrary({ designs }: { designs: DesignSummary[] }) {
+export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -141,13 +169,23 @@ export function BuilderLibrary({ designs }: { designs: DesignSummary[] }) {
   );
 }
 
-function DesignCard({ design }: { design: DesignSummary }) {
+function DesignCard({ design }: { design: BuilderLibraryCard }) {
   const updated = design.updatedAt
     ? new Date(design.updatedAt).toLocaleDateString()
     : "—";
+  const advanced = hasAdvancedTimeline(design.scenes);
   return (
     <article className="group overflow-hidden rounded-lg border border-white/10 bg-zinc-950 transition hover:border-[#6bcd06]/60">
-      <div className="aspect-video bg-gradient-to-br from-zinc-800 to-zinc-900" />
+      <div className="relative aspect-video bg-gradient-to-br from-zinc-800 to-zinc-900">
+        {advanced && (
+          <span
+            data-testid="advanced-badge"
+            className="absolute right-2 top-2 rounded bg-[#fe036d] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black"
+          >
+            Animations: advanced
+          </span>
+        )}
+      </div>
       <div className="flex items-start justify-between p-4">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold">{design.title}</h3>
