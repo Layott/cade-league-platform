@@ -7,6 +7,7 @@ import {
   listPsdsAction,
   listLayersAction,
 } from "@/app/admin/broadcast/v2/builder/[slug]/edit/psd-data-actions";
+import { OpenInPhotopeaButton } from "@/components/admin/broadcast/v2/builder/OpenInPhotopeaButton";
 
 type PsdRow = {
   id: string;
@@ -43,7 +44,13 @@ type LayerRow = {
  * This is the only place where assetId is a path rather than a uuid;
  * the image-element renderer in the compiler tolerates both shapes.
  */
-export function PsdPlaceDrawer() {
+export function PsdPlaceDrawer({
+  designSlug,
+  photopeaEnabled = false,
+}: {
+  designSlug?: string;
+  photopeaEnabled?: boolean;
+} = {}) {
   const [open, setOpen] = useState(false);
   const [psds, setPsds] = useState<PsdRow[] | null>(null);
   const [layers, setLayers] = useState<LayerRow[] | null>(null);
@@ -196,11 +203,11 @@ export function PsdPlaceDrawer() {
             )}
             <ul className="space-y-1">
               {(psds ?? []).map((p) => (
-                <li key={p.id}>
+                <li key={p.id} className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => pickPsd(p)}
-                    className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm transition ${
+                    className={`flex flex-1 items-center gap-2 rounded px-3 py-2 text-left text-sm transition ${
                       activePsd?.id === p.id ? "bg-[#6bcd06]/15 text-[#6bcd06]" : "text-white/80 hover:bg-white/5"
                     }`}
                   >
@@ -208,6 +215,14 @@ export function PsdPlaceDrawer() {
                     <span className="flex-1 truncate">{p.originalFilename}</span>
                     <span className="text-xs text-white/40">{p.layerCount}L</span>
                   </button>
+                  {designSlug && (
+                    <OpenInPhotopeaButton
+                      designSlug={designSlug}
+                      assetId={p.id}
+                      assetType="psd"
+                      photopeaEnabled={photopeaEnabled}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

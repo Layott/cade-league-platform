@@ -62,5 +62,11 @@ export default async function BuilderEditPage({
   if (!design) notFound();
   const fontRows = await listFonts(sb);
   const uploadedFonts = fontRows.map((f) => ({ id: f.id, familyName: f.family_name }));
-  return <CanvasEditorShell design={design} uploadedFonts={uploadedFonts} />;
+  return (
+    <CanvasEditorShell
+      design={design}
+      uploadedFonts={uploadedFonts}
+      photopeaEnabled={featureFlags.overlayBuilder.photopeaEnabled}
+    />
+  );
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FileImage, FilePlus2 } from "lucide-react";
 import { uploadPsdAction } from "@/app/admin/broadcast/v2/builder/assets-actions";
 import type { UploadPsdResponse } from "@/app/admin/broadcast/v2/builder/assets-schemas";
+import { OpenInPhotopeaButton } from "@/components/admin/broadcast/v2/builder/OpenInPhotopeaButton";
 
 type PsdAsset = {
   id: string;
@@ -35,7 +36,13 @@ function formatBytes(n: number): string {
  * Drop-zone accepts .psd files, posts to uploadPsdAction, surfaces a
  * loading + error toast, then revalidates the listing via router.refresh().
  */
-export function AssetsLibrary({ psdAssets }: { psdAssets: PsdAsset[] }) {
+export function AssetsLibrary({
+  psdAssets,
+  photopeaEnabled = false,
+}: {
+  psdAssets: PsdAsset[];
+  photopeaEnabled?: boolean;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<"psds" | "images" | "fonts">("psds");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -204,6 +211,14 @@ export function AssetsLibrary({ psdAssets }: { psdAssets: PsdAsset[] }) {
                     <dt>Layers</dt>
                     <dd className="text-right">{a.layerCount} layers</dd>
                   </dl>
+                  <div className="mt-1 flex justify-end">
+                    <OpenInPhotopeaButton
+                      designSlug="library"
+                      assetId={a.id}
+                      assetType="psd"
+                      photopeaEnabled={photopeaEnabled}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

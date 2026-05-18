@@ -38,9 +38,11 @@ import type { UploadedFontMeta } from "./FontFamilyPicker";
 export function CanvasEditorShell({
   design,
   uploadedFonts = [],
+  photopeaEnabled = false,
 }: {
   design: Design;
   uploadedFonts?: UploadedFontMeta[];
+  photopeaEnabled?: boolean;
 }) {
   const loadDesign = useBuilderStore((s) => s.loadDesign);
 
@@ -64,7 +66,10 @@ export function CanvasEditorShell({
         <PropertiesPanel uploadedFonts={uploadedFonts} />
       </div>
       <DataSlotsPanel />
-      <PsdPlaceDrawer />
+      <PsdPlaceDrawer
+        designSlug={design.slug}
+        photopeaEnabled={photopeaEnabled}
+      />
     </div>
   );
 }

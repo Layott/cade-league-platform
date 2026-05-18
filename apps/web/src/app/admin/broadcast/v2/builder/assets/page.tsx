@@ -51,7 +51,10 @@ export default async function AssetsLibraryPage() {
   const psdAssets = await listPsdAssets(sb);
   return (
     <main className="min-h-screen bg-black text-white">
-      <AssetsLibrary psdAssets={psdAssets} />
+      <AssetsLibrary
+        psdAssets={psdAssets}
+        photopeaEnabled={featureFlags.overlayBuilder.photopeaEnabled}
+      />
     </main>
   );
 }
