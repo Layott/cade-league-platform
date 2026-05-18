@@ -79,9 +79,9 @@ const AnimationStepSchema = z
 
 const AnimationSchema = z
   .object({
-    entry: AnimationStepSchema,
-    exit: AnimationStepSchema,
-    loop: AnimationStepSchema,
+    entry: AnimationStepSchema.optional(),
+    exit: AnimationStepSchema.optional(),
+    loop: AnimationStepSchema.optional(),
     advancedTimeline: z.any().nullable().optional(),
   })
   .nullable();
