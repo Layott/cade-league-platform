@@ -6,6 +6,7 @@ import { useBuilderStore } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
 import { useAlignmentGuides, computeAlignmentGuides } from "./use-alignment-guides";
+import { PathPenOverlay } from "./PathPenOverlay";
 
 /**
  * Wave 1A — canvas drawing surface.
@@ -69,7 +70,28 @@ export function CanvasStage() {
 
   return (
     <div className="overflow-auto">
-      <Stage width={w} height={h} scaleX={zoom} scaleY={zoom}>
+      <Stage
+        width={w}
+        height={h}
+        scaleX={zoom}
+        scaleY={zoom}
+        onClick={(e: { evt: MouseEvent }) => {
+          const state = useBuilderStore.getState();
+          if (state.toolMode !== "pen") return;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const stage = (e as any).target.getStage?.() ?? (e as any).target;
+          const pt: { x: number; y: number } | null = stage.getPointerPosition?.() ?? null;
+          if (!pt) return;
+          state.appendPenNode({
+            x: pt.x / zoom,
+            y: pt.y / zoom,
+            ctrlInX: pt.x / zoom,
+            ctrlInY: pt.y / zoom,
+            ctrlOutX: pt.x / zoom,
+            ctrlOutY: pt.y / zoom,
+          });
+        }}
+      >
         <Layer>
           {sorted.map((el) => (
             <RenderedElement
@@ -121,6 +143,7 @@ export function CanvasStage() {
             ),
           )}
         </Layer>
+        <PathPenOverlay />
       </Stage>
     </div>
   );

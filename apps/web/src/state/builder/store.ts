@@ -9,6 +9,7 @@ import type {
   ElementType,
 } from "@/server/overlays/builder/types";
 import type { SaveDesignInput } from "@/app/admin/broadcast/v2/builder/schemas";
+import type { PenDraftNode } from "./pen-types";
 
 /**
  * Wave 1A — canvas editor store.
@@ -30,6 +31,16 @@ export type BuilderState = {
   activeSceneId: string | null;
   zoomLevel: number;
   dirty: boolean;
+
+  // Wave 1C — pen-tool mode + in-flight draft
+  toolMode: "select" | "pen";
+  penDraft: { nodes: PenDraftNode[]; closed: boolean } | null;
+  setToolMode: (mode: "select" | "pen") => void;
+  startPenDraft: () => void;
+  appendPenNode: (node: PenDraftNode) => void;
+  updatePenNode: (index: number, patch: Partial<PenDraftNode>) => void;
+  completePenDraft: (sceneId: string, transform: import("@/server/overlays/builder/types").Transform) => void;
+  cancelPenDraft: () => void;
 
   loadDesign: (design: Design) => void;
   addElement: (
@@ -70,6 +81,10 @@ export const useBuilderStore = create<BuilderState>()(
       activeSceneId: null,
       zoomLevel: 1.0,
       dirty: false,
+
+      // Wave 1C — pen-tool
+      toolMode: "select",
+      penDraft: null,
 
       loadDesign: (design) =>
         set({
@@ -184,6 +199,74 @@ export const useBuilderStore = create<BuilderState>()(
       setZoom: (level) => set({ zoomLevel: level }),
 
       markClean: () => set({ dirty: false }),
+
+      // ── Wave 1C: pen-tool actions ────────────────────────────────────────
+      setToolMode: (mode) => set({ toolMode: mode }),
+
+      startPenDraft: () => set({ penDraft: { nodes: [], closed: false }, toolMode: "pen" }),
+
+      appendPenNode: (node) =>
+        set((state) => {
+          if (!state.penDraft) return state;
+          return { penDraft: { ...state.penDraft, nodes: [...state.penDraft.nodes, node] } };
+        }),
+
+      updatePenNode: (index, patch) =>
+        set((state) => {
+          if (!state.penDraft) return state;
+          return {
+            penDraft: {
+              ...state.penDraft,
+              nodes: state.penDraft.nodes.map((n, i) => (i === index ? { ...n, ...patch } : n)),
+            },
+          };
+        }),
+
+      completePenDraft: (sceneId, transform) =>
+        set((state) => {
+          if (!state.penDraft || !state.design || state.penDraft.nodes.length < 2) {
+            return { penDraft: null, toolMode: "select" };
+          }
+          // Normalize nodes to element-local coordinate space (subtract transform.x/y).
+          const localNodes = state.penDraft.nodes.map((n) => ({
+            x: n.x - transform.x,
+            y: n.y - transform.y,
+            ctrlInX: n.ctrlInX - transform.x,
+            ctrlInY: n.ctrlInY - transform.y,
+            ctrlOutX: n.ctrlOutX - transform.x,
+            ctrlOutY: n.ctrlOutY - transform.y,
+          }));
+          const scene = state.design.scenes.find((s) => s.id === sceneId);
+          if (!scene) return { penDraft: null, toolMode: "select" };
+          const newEl: Element = {
+            id: nanoid(),
+            sceneId,
+            parentGroupId: null,
+            elementType: "path" as const,
+            zIndex: scene.elements.length,
+            locked: false,
+            visible: true,
+            transform,
+            style: { fill: "transparent", stroke: "#6bcd06", strokeWidth: 2 },
+            content: { path: { nodes: localNodes, closed: state.penDraft.closed } },
+            binding: null,
+            animation: {},
+          };
+          return {
+            design: {
+              ...state.design,
+              scenes: state.design.scenes.map((s) =>
+                s.id === sceneId ? { ...s, elements: [...s.elements, newEl] } : s,
+              ),
+            },
+            selectedElementIds: [newEl.id],
+            penDraft: null,
+            toolMode: "select",
+            dirty: true,
+          };
+        }),
+
+      cancelPenDraft: () => set({ penDraft: null, toolMode: "select" }),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.
