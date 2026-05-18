@@ -1,16 +1,87 @@
 "use client";
 
 import { useState } from "react";
-import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine } from "react-konva";
+import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine, Group } from "react-konva";
 import { useBuilderStore } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
 import { useAlignmentGuides, computeAlignmentGuides } from "./use-alignment-guides";
 import { PathPenOverlay } from "./PathPenOverlay";
 
+// ─────────────────────────────────────────────────────────────
+// Tree walker — renders a group as a Konva <Group> containing its
+// children recursively. Top-level call uses parentId=null.
+// ─────────────────────────────────────────────────────────────
+
+function renderTree(
+  sorted: Element[],
+  selectedIds: string[],
+  selectElement: (id: string, additive: boolean) => void,
+  updateElement: (id: string, patch: Partial<Element>) => void,
+  setDragState: (s: { id: string; transform: { x: number; y: number; width: number; height: number } } | null) => void,
+  others: Array<{ id: string; transform: { x: number; y: number; width: number; height: number } }>,
+  canvasWidth: number,
+  canvasHeight: number,
+  parentId: string | null,
+): React.ReactNode[] {
+  return sorted
+    .filter((e) => (e.parentGroupId ?? null) === parentId)
+    .map((el) => {
+      if (el.elementType === "group") {
+        return (
+          <Group
+            key={el.id}
+            x={el.transform.x}
+            y={el.transform.y}
+            draggable
+            onClick={(e: { evt?: { shiftKey?: boolean } }) =>
+              selectElement(el.id, Boolean(e.evt?.shiftKey))
+            }
+            onDragEnd={(e: { target: { x: () => number; y: () => number } }) =>
+              updateElement(el.id, {
+                transform: { ...el.transform, x: e.target.x(), y: e.target.y() },
+              } as Partial<Element>)
+            }
+          >
+            {renderTree(sorted, selectedIds, selectElement, updateElement, setDragState, others, canvasWidth, canvasHeight, el.id)}
+          </Group>
+        );
+      }
+      return (
+        <RenderedElement
+          key={el.id}
+          el={el}
+          selected={selectedIds.includes(el.id)}
+          onSelect={(shift) => selectElement(el.id, shift)}
+          onMove={(x, y) =>
+            updateElement(el.id, {
+              transform: { ...el.transform, x, y },
+            } as Partial<Element>)
+          }
+          onDragMove={(x, y) => {
+            setDragState({
+              id: el.id,
+              transform: { x, y, width: el.transform.width, height: el.transform.height },
+            });
+          }}
+          onDragEnd={(x, y) => {
+            setDragState(null);
+            updateElement(el.id, {
+              transform: { ...el.transform, x, y },
+            } as Partial<Element>);
+          }}
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
+          othersForSnap={others.filter((o) => o.id !== el.id)}
+        />
+      );
+    });
+}
+
 /**
  * Wave 1A — canvas drawing surface.
  * Wave 1B — adds ellipse / line / polygon renderers + alignment guides.
+ * Wave 1C — renderTree() nests children under Konva <Group> by parentGroupId.
  *
  * Renders active scene's elements as react-konva nodes sorted by
  * zIndex. Drag-end commits the new transform to the zustand store;
@@ -93,34 +164,7 @@ export function CanvasStage() {
         }}
       >
         <Layer>
-          {sorted.map((el) => (
-            <RenderedElement
-              key={el.id}
-              el={el}
-              selected={selectedIds.includes(el.id)}
-              onSelect={(shift) => selectElement(el.id, shift)}
-              onMove={(x, y) =>
-                updateElement(el.id, {
-                  transform: { ...el.transform, x, y },
-                } as Partial<Element>)
-              }
-              onDragMove={(x, y) => {
-                setDragState({
-                  id: el.id,
-                  transform: { x, y, width: el.transform.width, height: el.transform.height },
-                });
-              }}
-              onDragEnd={(x, y) => {
-                setDragState(null);
-                updateElement(el.id, {
-                  transform: { ...el.transform, x, y },
-                } as Partial<Element>);
-              }}
-              canvasWidth={design.canvasWidth}
-              canvasHeight={design.canvasHeight}
-              othersForSnap={others.filter((o) => o.id !== el.id)}
-            />
-          ))}
+          {renderTree(sorted, selectedIds, selectElement, updateElement, setDragState, others, design.canvasWidth, design.canvasHeight, null)}
           {alignment.guides.map((g, i) =>
             g.kind === "v" ? (
               <KLine

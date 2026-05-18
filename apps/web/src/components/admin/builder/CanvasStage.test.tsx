@@ -26,6 +26,8 @@ vi.mock("react-konva", async () => {
     Ellipse: make("Ellipse"),
     Line: make("Line"),
     RegularPolygon: make("RegularPolygon"),
+    Group: make("Group"),
+    Transformer: make("Transformer"),
   };
 });
 
@@ -160,5 +162,32 @@ describe("CanvasStage — Wave 1B shapes", () => {
   it("renders a Konva RegularPolygon for polygon elements", () => {
     const { container } = render(<CanvasStage />);
     expect(container.querySelectorAll('[data-konva-tag="RegularPolygon"]').length).toBe(1);
+  });
+});
+
+describe("CanvasStage — Wave 1C groups", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: fixture() as never,
+      selectedElementIds: [],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+    });
+  });
+
+  it("nests children under a Konva Group when parentGroupId is set", () => {
+    const d = fixture();
+    const groupId = "grp-1";
+    d.scenes[0].elements.push({
+      id: groupId, elementType: "group" as const, zIndex: 5, locked: false, visible: true,
+      transform: { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: {}, content: {}, parentGroupId: null,
+    } as never);
+    d.scenes[0].elements[0] = { ...d.scenes[0].elements[0], parentGroupId: groupId } as never;
+    useBuilderStore.setState({ design: d as never });
+    const { container } = render(<CanvasStage />);
+    const groups = container.querySelectorAll('[data-konva-tag="Group"]');
+    expect(groups.length).toBeGreaterThanOrEqual(1);
   });
 });
