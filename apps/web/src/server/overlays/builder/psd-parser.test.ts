@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parsePsd, MAX_PSD_BYTES, SOFT_WARN_PSD_BYTES } from "./psd-parser";
+import * as agPsd from "ag-psd";
 
 const FIXTURE = path.join(__dirname, "__fixtures__", "tiny.psd");
 
@@ -66,5 +67,25 @@ describe("parsePsd", () => {
       name: "PsdParseError",
       message: expect.stringMatching(/could not parse/i),
     });
+  });
+});
+
+describe("parsePsd — OOM safety net", () => {
+  it("wraps V8 RangeError (out-of-memory) into PsdParseError", async () => {
+    const spy = vi.spyOn(agPsd, "readPsd").mockImplementationOnce(() => {
+      throw new RangeError("Invalid string length");
+    });
+    const validHeader = Buffer.concat([
+      Buffer.from([0x38, 0x42, 0x50, 0x53]), // 8BPS
+      Buffer.alloc(30, 0),
+    ]);
+    try {
+      await expect(parsePsd(validHeader)).rejects.toMatchObject({
+        name: "PsdParseError",
+        message: expect.stringMatching(/parser raised/i),
+      });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
