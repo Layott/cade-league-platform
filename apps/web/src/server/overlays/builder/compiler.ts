@@ -434,6 +434,36 @@ function elementExitingRule(el: Element): string {
 }
 
 // -----------------------------------------------------------------------------
+// Path → SVG d attribute (Wave 1C).
+// -----------------------------------------------------------------------------
+
+type PathNodeShape = {
+  x: number; y: number;
+  ctrlInX: number; ctrlInY: number;
+  ctrlOutX: number; ctrlOutY: number;
+};
+
+function pathSpecToD(nodes: PathNodeShape[], closed: boolean): string {
+  if (nodes.length < 2) return "";
+  const parts: string[] = [`M ${nodes[0].x} ${nodes[0].y}`];
+  for (let i = 1; i < nodes.length; i++) {
+    const prev = nodes[i - 1];
+    const cur = nodes[i];
+    // Straight segment if every control point equals its anchor.
+    const straight =
+      prev.ctrlOutX === prev.x && prev.ctrlOutY === prev.y &&
+      cur.ctrlInX === cur.x && cur.ctrlInY === cur.y;
+    if (straight) {
+      parts.push(`L ${cur.x} ${cur.y}`);
+    } else {
+      parts.push(`C ${prev.ctrlOutX} ${prev.ctrlOutY} ${cur.ctrlInX} ${cur.ctrlInY} ${cur.x} ${cur.y}`);
+    }
+  }
+  if (closed) parts.push("Z");
+  return parts.join(" ");
+}
+
+// -----------------------------------------------------------------------------
 // Element DOM nodes.
 // -----------------------------------------------------------------------------
 
@@ -472,9 +502,25 @@ function renderElementDom(el: Element): string {
     return `<div ${attrs.join(" ")}><img data-element-img src="${initialSrc}" alt="" /></div>`;
   }
 
-  // rect / ellipse / line / polygon / path / group / data-slot / psd-layer
+  // Wave 1C — path element renders as inline <svg>.
+  if (el.elementType === "path") {
+    const spec = (el.content as { path?: { nodes?: PathNodeShape[]; closed?: boolean } } | null)?.path;
+    if (!spec || !spec.nodes || spec.nodes.length < 2) {
+      return `<div ${attrs.join(" ")}></div>`;
+    }
+    const d = pathSpecToD(spec.nodes, spec.closed === true);
+    const style = (el.style ?? {}) as { fill?: string; stroke?: string; strokeWidth?: number };
+    const fill = style.fill ? htmlEscape(style.fill) : "transparent";
+    const stroke = style.stroke ? htmlEscape(style.stroke) : "none";
+    const strokeWidth = typeof style.strokeWidth === "number" ? style.strokeWidth : 0;
+    const w = el.transform.width;
+    const h = el.transform.height;
+    return `<div ${attrs.join(" ")}><svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg"><path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" /></svg></div>`;
+  }
+
+  // rect / ellipse / line / polygon / group / data-slot / psd-layer
   // For Wave 1A, rect is the only non-text non-image we exercise. Others
-  // render as empty div — Wave 1B+ extends the path/polygon/ellipse rendering.
+  // render as empty div — Wave 1B+ extends the polygon/ellipse rendering.
   return `<div ${attrs.join(" ")}></div>`;
 }
 

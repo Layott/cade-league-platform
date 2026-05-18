@@ -134,6 +134,7 @@ describe("compileDesignToHtml — opts.demo", () => {
 });
 
 import { designWave1b } from "./fixtures/design-wave-1b";
+import { designWithPath } from "./fixtures/design-with-path";
 
 describe("compileDesignToHtml — Wave 1B", () => {
   const html = compileDesignToHtml(designWave1b, 0);
@@ -202,5 +203,40 @@ describe("compileDesignToHtml — Wave 1B", () => {
     expect(html).toMatch(
       /\[data-element-id="00000000-0000-0000-0000-00000000ab23"\]\s*\{[^}]*background-color:\s*#6bcd06/,
     );
+  });
+});
+
+describe("compileDesignToHtml — path elements", () => {
+  const html = compileDesignToHtml(designWithPath, 0);
+
+  it("emits <svg> inside the path element's <div>", () => {
+    expect(html).toMatch(
+      /<div[^>]+data-element-id="00000000-0000-0000-0000-000000000400"[^>]*>\s*<svg/,
+    );
+  });
+
+  it("svg sized to element transform (viewBox + width/height)", () => {
+    expect(html).toMatch(/<svg[^>]*viewBox="0 0 400 400"/);
+    expect(html).toMatch(/<svg[^>]*width="400"/);
+    expect(html).toMatch(/<svg[^>]*height="400"/);
+  });
+
+  it("emits a closed cubic-Bezier path with Z terminator", () => {
+    expect(html).toMatch(/<path[^>]+d="M 200 0/);
+    expect(html).toMatch(/Z"/);
+    expect(html).toMatch(/C /);
+  });
+
+  it("path inherits fill + stroke from element.style", () => {
+    expect(html).toMatch(/<path[^>]+fill="#6bcd06"/);
+    expect(html).toMatch(/<path[^>]+stroke="#050505"/);
+    expect(html).toMatch(/<path[^>]+stroke-width="4"/);
+  });
+
+  it("open path omits the Z terminator", () => {
+    const openFixture = JSON.parse(JSON.stringify(designWithPath));
+    openFixture.scenes[0].elements[0].content.path.closed = false;
+    const openHtml = compileDesignToHtml(openFixture, 0);
+    expect(openHtml).not.toMatch(/Z"/);
   });
 });
