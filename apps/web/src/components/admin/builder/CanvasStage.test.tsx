@@ -215,3 +215,189 @@ describe("CanvasStage — Wave 1C multi-select Transformer", () => {
     expect(container.querySelector('[data-konva-tag="Transformer"]')).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B (Task 14) — scrub preview
+// ─────────────────────────────────────────────────────────────
+
+const scrubFixture = () => ({
+  id: "d1",
+  slug: "t",
+  title: "T",
+  description: null,
+  mode: "single" as const,
+  status: "draft" as const,
+  canvasWidth: 1920,
+  canvasHeight: 1080,
+  createdBy: "u1",
+  scenes: [
+    {
+      id: "s1",
+      designId: "d1",
+      orderIndex: 0,
+      name: null,
+      durationMs: 5000,
+      transitionIn: "fade",
+      transitionOut: "fade",
+      elements: [
+        {
+          id: "e1",
+          sceneId: "s1",
+          parentGroupId: null,
+          elementType: "rect" as const,
+          zIndex: 0,
+          locked: false,
+          visible: true,
+          // base opacity 1.0; entry timeline animates opacity 0 → 1
+          // across 1000ms so a cursor at 500ms must resolve to 0.5.
+          transform: {
+            x: 100,
+            y: 200,
+            width: 100,
+            height: 50,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1,
+            opacity: 1,
+          },
+          style: { fill: "#fe036d" },
+          content: {},
+          binding: null,
+          animation: {
+            entry: {
+              type: "noop",
+              durationMs: 1000,
+              delayMs: 0,
+              easing: "linear",
+              advancedTimeline: [
+                {
+                  property: "opacity",
+                  keyframes: [
+                    { id: "kf-a", timeMs: 0, value: 0, easingOut: null },
+                    { id: "kf-b", timeMs: 1000, value: 1, easingOut: null },
+                  ],
+                },
+                {
+                  property: "x",
+                  keyframes: [
+                    { id: "kf-c", timeMs: 0, value: 0, easingOut: null },
+                    { id: "kf-d", timeMs: 1000, value: 40, easingOut: null },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  ],
+});
+
+describe("CanvasStage — Wave 3B scrub preview", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: scrubFixture() as never,
+      selectedElementIds: ["e1"],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+      timelinePanelOpen: false,
+      timelineCursorMs: {},
+      selectedKeyframeId: null,
+    });
+  });
+
+  it("renders the canonical opacity when the timeline panel is closed", () => {
+    useBuilderStore.setState({
+      timelinePanelOpen: false,
+      timelineCursorMs: { e1: { entry: 500 } },
+    });
+    const { container } = render(<CanvasStage />);
+    const rect = container.querySelector('[data-konva-tag="Rect"]');
+    // base transform.opacity = 1 — patch must NOT apply with panel closed.
+    expect(rect?.getAttribute("opacity")).toBe("1");
+  });
+
+  it("applies the interpolated opacity when the timeline panel is open", () => {
+    useBuilderStore.setState({
+      timelinePanelOpen: true,
+      timelineCursorMs: { e1: { entry: 500 } },
+    });
+    const { container } = render(<CanvasStage />);
+    const rect = container.querySelector('[data-konva-tag="Rect"]');
+    // Linear timeline 0 → 1 across 1000ms; midpoint cursor → 0.5.
+    expect(rect?.getAttribute("opacity")).toBe("0.5");
+  });
+
+  it("adds the interpolated x as a delta on top of the base transform", () => {
+    useBuilderStore.setState({
+      timelinePanelOpen: true,
+      timelineCursorMs: { e1: { entry: 500 } },
+    });
+    const { container } = render(<CanvasStage />);
+    const rect = container.querySelector('[data-konva-tag="Rect"]');
+    // base.x = 100, mid-timeline delta = 20 → rendered x = 120.
+    expect(rect?.getAttribute("x")).toBe("120");
+  });
+
+  it("does not apply the patch when a different element is selected", () => {
+    useBuilderStore.setState({
+      timelinePanelOpen: true,
+      timelineCursorMs: { e1: { entry: 500 } },
+      selectedElementIds: ["other-id"],
+    });
+    const { container } = render(<CanvasStage />);
+    const rect = container.querySelector('[data-konva-tag="Rect"]');
+    // Element e1 is no longer the edit target → render statically.
+    expect(rect?.getAttribute("opacity")).toBe("1");
+    expect(rect?.getAttribute("x")).toBe("100");
+  });
+
+  it("does not apply the patch when no cursor is set", () => {
+    useBuilderStore.setState({
+      timelinePanelOpen: true,
+      timelineCursorMs: {},
+    });
+    const { container } = render(<CanvasStage />);
+    const rect = container.querySelector('[data-konva-tag="Rect"]');
+    expect(rect?.getAttribute("opacity")).toBe("1");
+    expect(rect?.getAttribute("x")).toBe("100");
+  });
+
+  it("snaps to the timeline endpoints at cursor 0 and at duration", () => {
+    // Cursor at 0ms → opacity 0, x delta 0.
+    useBuilderStore.setState({
+      timelinePanelOpen: true,
+      timelineCursorMs: { e1: { entry: 0 } },
+    });
+    {
+      const { container } = render(<CanvasStage />);
+      const rect = container.querySelector('[data-konva-tag="Rect"]');
+      expect(rect?.getAttribute("opacity")).toBe("0");
+      expect(rect?.getAttribute("x")).toBe("100");
+    }
+    // Cursor at 1000ms → opacity 1, x delta 40 (base 100 + 40 = 140).
+    useBuilderStore.setState({
+      timelineCursorMs: { e1: { entry: 1000 } },
+    });
+    {
+      const { container } = render(<CanvasStage />);
+      const rect = container.querySelector('[data-konva-tag="Rect"]');
+      expect(rect?.getAttribute("opacity")).toBe("1");
+      expect(rect?.getAttribute("x")).toBe("140");
+    }
+  });
+
+  it("does not apply the patch when the element is part of a multi-selection", () => {
+    useBuilderStore.setState({
+      timelinePanelOpen: true,
+      timelineCursorMs: { e1: { entry: 500 } },
+      selectedElementIds: ["e1", "e2"],
+    });
+    const { container } = render(<CanvasStage />);
+    const rect = container.querySelector('[data-konva-tag="Rect"]');
+    // Multi-select → TimelinePanel hides and scrub preview suspends.
+    expect(rect?.getAttribute("opacity")).toBe("1");
+    expect(rect?.getAttribute("x")).toBe("100");
+  });
+});

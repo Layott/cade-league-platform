@@ -1,12 +1,162 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine, Group, Transformer } from "react-konva";
-import { useBuilderStore } from "@/state/builder/store";
+import { useBuilderStore, type AnimPhase } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
 import { useAlignmentGuides, computeAlignmentGuides } from "./use-alignment-guides";
 import { PathPenOverlay } from "./PathPenOverlay";
+import {
+  interpolateAt,
+  type InterpolatedPatch,
+} from "@/server/overlays/builder/scrub-interpolator";
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B (Task 14) — scrub-preview hook.
+//
+// While the operator drags the timeline cursor, CanvasStage layers an
+// `interpolateAt(timeline, cursorMs)` patch on top of the rendered
+// element so they see the keyframe values resolved at that instant.
+//
+// The override is purely client-side: the canonical zustand `Design`
+// stays unchanged. Saving persists keyframes — not preview snapshots.
+//
+// Gating: returns `{}` (no patch) unless ALL of:
+//   - `timelinePanelOpen` is true.
+//   - The rendered element is the one operator is editing — i.e. it
+//     is the sole selected element. CanvasStage only narrows to a
+//     single edit target when the TimelinePanel mounts, so this
+//     mirrors that contract.
+//   - A `timelineCursorMs[elementId]` entry exists for a phase that
+//     ALSO carries an `advancedTimeline` on that phase. The active
+//     phase is derived first from the currently selected keyframe's
+//     owning phase (if any), then by scanning entry → loop → exit
+//     for the first phase that has both a cursor and a timeline.
+//     With no cursor anywhere, no preview fires — the static design
+//     state remains the source of truth.
+// ─────────────────────────────────────────────────────────────
+
+const PHASE_PRIORITY: readonly AnimPhase[] = ["entry", "loop", "exit"];
+
+function resolveActivePhaseAndCursor(
+  element: Element,
+  cursorByPhase: Partial<Record<AnimPhase, number>> | undefined,
+  selectedKeyframeId: string | null,
+): { phase: AnimPhase; cursorMs: number } | null {
+  // 1. Selected keyframe's phase wins — find which phase's timeline
+  //    owns the kf id. Allows operator to scrub inside the phase they
+  //    are inspecting even when other phases have stale cursors.
+  if (selectedKeyframeId) {
+    for (const phase of PHASE_PRIORITY) {
+      const tl = element.animation?.[phase]?.advancedTimeline;
+      if (!tl) continue;
+      for (const track of tl) {
+        if (track.keyframes.some((k) => k.id === selectedKeyframeId)) {
+          const ms = cursorByPhase?.[phase];
+          if (typeof ms === "number") return { phase, cursorMs: ms };
+        }
+      }
+    }
+  }
+  // 2. Fall back to first phase with both a cursor entry AND an
+  //    advanced timeline. PHASE_PRIORITY puts `entry` first so the
+  //    natural author flow (entry-edit → preview) lands here.
+  if (cursorByPhase) {
+    for (const phase of PHASE_PRIORITY) {
+      const ms = cursorByPhase[phase];
+      if (typeof ms !== "number") continue;
+      const tl = element.animation?.[phase]?.advancedTimeline;
+      if (!tl || tl.length === 0) continue;
+      return { phase, cursorMs: ms };
+    }
+  }
+  return null;
+}
+
+function useScrubPreview(element: Element): InterpolatedPatch {
+  const panelOpen = useBuilderStore((s) => s.timelinePanelOpen);
+  const selectedIds = useBuilderStore((s) => s.selectedElementIds);
+  const cursorByPhase = useBuilderStore(
+    (s) => s.timelineCursorMs[element.id],
+  );
+  const selectedKeyframeId = useBuilderStore((s) => s.selectedKeyframeId);
+
+  // Only the singly-selected element gets a preview — matches
+  // TimelinePanel's own mount gate (`selectedIds.length === 1`).
+  const isEditTarget =
+    selectedIds.length === 1 && selectedIds[0] === element.id;
+
+  return useMemo<InterpolatedPatch>(() => {
+    if (!panelOpen || !isEditTarget) return {};
+    const active = resolveActivePhaseAndCursor(
+      element,
+      cursorByPhase,
+      selectedKeyframeId,
+    );
+    if (!active) return {};
+    const timeline = element.animation?.[active.phase]?.advancedTimeline;
+    if (!timeline || timeline.length === 0) return {};
+    return interpolateAt(timeline, active.cursorMs);
+  }, [
+    panelOpen,
+    isEditTarget,
+    element,
+    cursorByPhase,
+    selectedKeyframeId,
+  ]);
+}
+
+/**
+ * Apply a scrub-preview patch on top of an element's static transform
+ * + style. `x` / `y` keyframe values are deltas (matches the runtime
+ * compiler that emits `translate(x, y)` rather than rewriting
+ * absolute coords); every other property overrides the base value.
+ *
+ * Returns a plain `{ transform, style }` pair so renderers consume it
+ * the same way they consume the canonical element fields.
+ */
+function applyScrubPatch(
+  el: Element,
+  patch: InterpolatedPatch,
+): { transform: Element["transform"]; style: Element["style"] } {
+  if (
+    patch.x === undefined &&
+    patch.y === undefined &&
+    patch.opacity === undefined &&
+    patch.scaleX === undefined &&
+    patch.scaleY === undefined &&
+    patch.rotation === undefined &&
+    patch.color === undefined &&
+    patch.filter === undefined
+  ) {
+    return { transform: el.transform, style: el.style };
+  }
+  const base = el.transform;
+  const transform: Element["transform"] = {
+    ...base,
+    x: patch.x !== undefined ? base.x + patch.x : base.x,
+    y: patch.y !== undefined ? base.y + patch.y : base.y,
+    opacity: patch.opacity ?? base.opacity,
+    scaleX: patch.scaleX ?? base.scaleX,
+    scaleY: patch.scaleY ?? base.scaleY,
+    rotation: patch.rotation ?? base.rotation,
+  };
+  // Style patch values are strings — keep them untouched when absent
+  // so the existing optional chaining in renderers continues to work.
+  // `filter` arrives as a raw CSS string (its scrub-interpolator form)
+  // while the canonical `style.filter` is a structured `FilterSpec`
+  // the renderers consume field-by-field. We deliberately skip the
+  // filter override here because round-tripping CSS → FilterSpec mid-
+  // scrub would silently drop fields; color flows through cleanly
+  // because the renderers read `style.color` as a raw string already.
+  const styleBase = el.style ?? {};
+  const style: Element["style"] = {
+    ...styleBase,
+    ...(patch.color !== undefined ? { color: patch.color } : null),
+  };
+  return { transform, style };
+}
 
 // ─────────────────────────────────────────────────────────────
 // Tree walker — renders a group as a Konva <Group> containing its
@@ -253,6 +403,13 @@ function RenderedElement({
     onSelect(Boolean(e.evt?.shiftKey));
   };
 
+  // Wave 3B (Task 14) — scrub preview overlay. When the timeline panel
+  // is open and the cursor is set, the rendered transform / style come
+  // from `interpolateAt` layered on top of the canonical fields. With
+  // the panel closed the patch resolves to {} and we render statically.
+  const scrubPatch = useScrubPreview(el);
+  const { transform: t, style: s } = applyScrubPatch(el, scrubPatch);
+
   const handleDragMove = (e: { target: { x: () => number; y: () => number; position: (p: { x: number; y: number }) => void } }) => {
     const rawX = e.target.x();
     const rawY = e.target.y();
@@ -271,8 +428,6 @@ function RenderedElement({
     onDragEnd(e.target.x(), e.target.y());
   };
 
-  const t = el.transform;
-  const s = el.style ?? {};
   const stroke = selected ? "#6bcd06" : (s.stroke as string | undefined);
   const strokeWidth = selected ? 2 : ((s.strokeWidth as number | undefined) ?? 0);
 
