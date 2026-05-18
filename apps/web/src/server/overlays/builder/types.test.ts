@@ -440,3 +440,119 @@ describe("types.ts — Wave 1B extensions (gradient/filter/shadow-stack/font)", 
     ).toThrow();
   });
 });
+
+import {
+  AdvancedTimelineSchema,
+  AdvancedTimelineTrackSchema,
+  BezierEasingSchema,
+  KeyframeSchema,
+  TimelinePropertySchema,
+  type AdvancedTimeline,
+  type AdvancedTimelineTrack,
+  type BezierEasing,
+  type Keyframe,
+  type TimelineProperty,
+} from "./types";
+
+describe("types.ts — Wave 3B advanced timeline schemas", () => {
+  it("TimelinePropertySchema enumerates every animatable property", () => {
+    const props: TimelineProperty[] = [
+      "opacity", "x", "y", "scaleX", "scaleY", "rotation", "color", "filter",
+    ];
+    for (const p of props) {
+      expect(TimelinePropertySchema.parse(p)).toBe(p);
+    }
+    expect(() => TimelinePropertySchema.parse("translateZ")).toThrow();
+  });
+
+  it("BezierEasingSchema accepts four-control-point cubic bezier", () => {
+    const b: BezierEasing = { x1: 0.25, y1: 0.1, x2: 0.25, y2: 1 };
+    expect(BezierEasingSchema.parse(b)).toEqual(b);
+  });
+
+  it("BezierEasingSchema rejects x outside [0, 1]", () => {
+    expect(() =>
+      BezierEasingSchema.parse({ x1: -0.1, y1: 0, x2: 0.5, y2: 1 }),
+    ).toThrow();
+    expect(() =>
+      BezierEasingSchema.parse({ x1: 1.1, y1: 0, x2: 0.5, y2: 1 }),
+    ).toThrow();
+  });
+
+  it("BezierEasingSchema accepts y in [-1, 2] (CSS cubic-bezier allowance)", () => {
+    expect(
+      BezierEasingSchema.parse({ x1: 0.4, y1: -0.5, x2: 0.6, y2: 1.8 }),
+    ).toBeTruthy();
+  });
+
+  it("KeyframeSchema parses a numeric keyframe with bezier-out", () => {
+    const k: Keyframe = {
+      id: "kf-1",
+      timeMs: 250,
+      value: 0.6,
+      easingOut: { x1: 0.4, y1: 0, x2: 0.6, y2: 1 },
+    };
+    expect(KeyframeSchema.parse(k)).toEqual(k);
+  });
+
+  it("KeyframeSchema accepts string values for color/filter properties", () => {
+    const k: Keyframe = {
+      id: "kf-2",
+      timeMs: 500,
+      value: "#fe036d",
+      easingOut: null,
+    };
+    expect(KeyframeSchema.parse(k)).toEqual(k);
+  });
+
+  it("KeyframeSchema rejects negative timeMs", () => {
+    expect(() =>
+      KeyframeSchema.parse({ id: "kf-3", timeMs: -10, value: 1, easingOut: null }),
+    ).toThrow();
+  });
+
+  it("AdvancedTimelineTrackSchema enforces a property + keyframes array", () => {
+    const t: AdvancedTimelineTrack = {
+      property: "opacity",
+      keyframes: [
+        { id: "kf-a", timeMs: 0, value: 0, easingOut: null },
+        { id: "kf-b", timeMs: 600, value: 1, easingOut: null },
+      ],
+    };
+    expect(AdvancedTimelineTrackSchema.parse(t)).toEqual(t);
+  });
+
+  it("AdvancedTimelineSchema accepts an array of tracks", () => {
+    const tl: AdvancedTimeline = [
+      {
+        property: "opacity",
+        keyframes: [
+          { id: "k1", timeMs: 0, value: 0, easingOut: null },
+          { id: "k2", timeMs: 600, value: 1, easingOut: null },
+        ],
+      },
+    ];
+    expect(AdvancedTimelineSchema.parse(tl)).toEqual(tl);
+  });
+
+  it("AnimationSchema accepts entry.advancedTimeline alongside no preset", () => {
+    const a: Animation = {
+      entry: {
+        type: "fade",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "ease-out",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: 0, easingOut: null },
+              { id: "k2", timeMs: 600, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    };
+    expect(AnimationSchema.parse(a)).toBeTruthy();
+  });
+});

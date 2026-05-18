@@ -239,11 +239,61 @@ export const AnimTypeSchema = z.enum([
 ]);
 export type AnimType = z.infer<typeof AnimTypeSchema>;
 
+// ────────────── Wave 3B: Advanced keyframe timeline ──────────────
+//
+// Each animation phase (entry / exit / loop) can optionally carry an
+// `advancedTimeline` array alongside (or instead of) the preset `type`.
+// A track binds a single CSS-mapped property (opacity / x / y / scaleX /
+// scaleY / rotation / color / filter) to ≥2 keyframes. Keyframes hold a
+// timeMs offset, a value (number or string for color/filter), and an
+// optional outgoing cubic-bezier easing curve. Mutual exclusivity with
+// the preset `type` is enforced in `animation-validator.ts` so the
+// schema parse stays cheap and the editor can hold both shapes
+// side-by-side mid-edit.
+export const TimelinePropertySchema = z.enum([
+  "opacity",
+  "x",
+  "y",
+  "scaleX",
+  "scaleY",
+  "rotation",
+  "color",
+  "filter",
+]);
+export type TimelineProperty = z.infer<typeof TimelinePropertySchema>;
+
+export const BezierEasingSchema = z.object({
+  x1: z.number().min(0).max(1),
+  y1: z.number().min(-1).max(2),
+  x2: z.number().min(0).max(1),
+  y2: z.number().min(-1).max(2),
+});
+export type BezierEasing = z.infer<typeof BezierEasingSchema>;
+
+export const KeyframeSchema = z.object({
+  id: z.string().min(1),
+  timeMs: z.number().min(0).max(60_000),
+  value: z.union([z.number(), z.string()]),
+  easingOut: BezierEasingSchema.nullable(),
+});
+export type Keyframe = z.infer<typeof KeyframeSchema>;
+
+export const AdvancedTimelineTrackSchema = z.object({
+  property: TimelinePropertySchema,
+  keyframes: z.array(KeyframeSchema).min(2),
+});
+export type AdvancedTimelineTrack = z.infer<typeof AdvancedTimelineTrackSchema>;
+
+export const AdvancedTimelineSchema = z.array(AdvancedTimelineTrackSchema);
+export type AdvancedTimeline = z.infer<typeof AdvancedTimelineSchema>;
+
 export const PresetAnimSchema = z.object({
   type: AnimTypeSchema,
-  durationMs: z.number(),
-  delayMs: z.number(),
+  durationMs: z.number().min(0).max(60_000),
+  delayMs: z.number().min(0).max(60_000),
   easing: z.string(),
+  advancedTimeline: AdvancedTimelineSchema.optional(),
+  keyframesBody: z.string().optional(),
 });
 export type PresetAnim = z.infer<typeof PresetAnimSchema>;
 
