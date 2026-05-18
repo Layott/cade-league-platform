@@ -196,6 +196,31 @@ export const BindingSchema = z.object({
 });
 export type Binding = z.infer<typeof BindingSchema>;
 
+// ────────────── PathSpec (Wave 1C) ──────────────
+//
+// Path elements persist as a structured array of cubic-Bezier anchor
+// nodes instead of a raw SVG `d` string. The PathPenOverlay (Task 5)
+// edits the nodes directly; the compiler (Task 4) renders the `d`
+// attribute from them server-side so the wire stays sanitised.
+//
+// For a straight segment, ctrlOut* of the prior node and ctrlIn* of
+// the current node equal their owning anchor's (x, y).
+export const PathNodeSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  ctrlInX: z.number(),
+  ctrlInY: z.number(),
+  ctrlOutX: z.number(),
+  ctrlOutY: z.number(),
+});
+export type PathNode = z.infer<typeof PathNodeSchema>;
+
+export const PathSpecSchema = z.object({
+  nodes: z.array(PathNodeSchema).min(2),
+  closed: z.boolean().default(false),
+});
+export type PathSpec = z.infer<typeof PathSpecSchema>;
+
 // ────────────── Animation ──────────────
 export const AnimTypeSchema = z.enum([
   "slide-left",

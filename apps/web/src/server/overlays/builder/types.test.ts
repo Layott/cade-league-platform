@@ -6,6 +6,8 @@ import {
   ElementSchema,
   ElementTypeSchema,
   FeedNameSchema,
+  PathNodeSchema,
+  PathSpecSchema,
   PresetAnimSchema,
   SceneSchema,
   ShadowSpecSchema,
@@ -18,6 +20,8 @@ import {
   type Element,
   type ElementType,
   type FeedName,
+  type PathNode,
+  type PathSpec,
   type PresetAnim,
   type Scene,
   type ShadowSpec,
@@ -235,6 +239,43 @@ describe("types.ts — runtime Zod schemas + type aliases", () => {
     // exported. Vitest sees no assertion but the TS compiler does.
     const t: AnimType = "slide-left";
     expect(typeof t).toBe("string");
+  });
+
+  it("PathSpecSchema accepts a 3-node open path", () => {
+    const p: PathSpec = {
+      nodes: [
+        { x: 0, y: 0, ctrlInX: 0, ctrlInY: 0, ctrlOutX: 10, ctrlOutY: 10 },
+        { x: 100, y: 100, ctrlInX: 90, ctrlInY: 90, ctrlOutX: 110, ctrlOutY: 110 },
+        { x: 200, y: 0, ctrlInX: 190, ctrlInY: 10, ctrlOutX: 200, ctrlOutY: 0 },
+      ],
+      closed: false,
+    };
+    expect(PathSpecSchema.parse(p)).toEqual(p);
+  });
+
+  it("PathSpecSchema rejects fewer than 2 nodes", () => {
+    expect(() =>
+      PathSpecSchema.parse({
+        nodes: [{ x: 0, y: 0, ctrlInX: 0, ctrlInY: 0, ctrlOutX: 0, ctrlOutY: 0 }],
+        closed: false,
+      }),
+    ).toThrow();
+  });
+
+  it("PathSpecSchema defaults closed=false when omitted", () => {
+    const r = PathSpecSchema.parse({
+      nodes: [
+        { x: 0, y: 0, ctrlInX: 0, ctrlInY: 0, ctrlOutX: 0, ctrlOutY: 0 },
+        { x: 50, y: 50, ctrlInX: 0, ctrlInY: 0, ctrlOutX: 0, ctrlOutY: 0 },
+      ],
+    });
+    expect(r.closed).toBe(false);
+  });
+
+  it("PathNodeSchema requires all six numeric fields", () => {
+    expect(() =>
+      PathNodeSchema.parse({ x: 0, y: 0 }),
+    ).toThrow();
   });
 });
 
