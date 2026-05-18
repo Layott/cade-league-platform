@@ -297,3 +297,43 @@ describe("compileDesignToHtml — sequence mode", () => {
     expect(singleHtml).not.toContain("window.__OVERLAY_SCENES_META__ = [");
   });
 });
+
+import { designWithAdvancedTimeline } from "./fixtures/design-with-advanced-timeline";
+
+describe("compileDesignToHtml — Wave 3B advanced timeline", () => {
+  it("emits an @keyframes block named builder-<elementId>-entry", () => {
+    const html = compileDesignToHtml(designWithAdvancedTimeline, 0);
+    expect(html).toMatch(
+      /@keyframes\s+builder-00000000-0000-0000-0000-000000003100-entry/,
+    );
+  });
+
+  it("emits a 0% rule containing opacity:0 AND transform with translateX(-120px)", () => {
+    const html = compileDesignToHtml(designWithAdvancedTimeline, 0);
+    expect(html).toMatch(/0%\s*\{[^}]*opacity:\s*0\b/);
+    expect(html).toMatch(/0%\s*\{[^}]*translate(X|3d)\([^)]*-120/);
+  });
+
+  it("emits a 50% rule (mid-timeline) with opacity:1", () => {
+    const html = compileDesignToHtml(designWithAdvancedTimeline, 0);
+    expect(html).toMatch(/50%\s*\{[^}]*opacity:\s*1\b/);
+  });
+
+  it("emits a 100% rule with opacity:0.4 AND translateX(0)", () => {
+    const html = compileDesignToHtml(designWithAdvancedTimeline, 0);
+    expect(html).toMatch(/100%\s*\{[^}]*opacity:\s*0\.4\b/);
+    expect(html).toMatch(/100%\s*\{[^}]*translate(X|3d)\(0/);
+  });
+
+  it("emits cubic-bezier(0.4, 0, 0.6, 1) as the segment timing function", () => {
+    const html = compileDesignToHtml(designWithAdvancedTimeline, 0);
+    expect(html).toMatch(/animation-timing-function:\s*cubic-bezier\(0\.4,\s*0,\s*0\.6,\s*1\)/);
+  });
+
+  it("emits an animation: rule referencing the builder-<id>-entry keyframes", () => {
+    const html = compileDesignToHtml(designWithAdvancedTimeline, 0);
+    expect(html).toMatch(
+      /\[data-element-id="00000000-0000-0000-0000-000000003100"\][^{]*\{[^}]*animation:[^;]*builder-00000000-0000-0000-0000-000000003100-entry/,
+    );
+  });
+});

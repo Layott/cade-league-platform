@@ -1,5 +1,18 @@
 import { BOOTSTRAP_SCRIPT } from "./bootstrap-template";
-import type { Animation, Binding, Design, Element, Scene, Style, Transform } from "./types";
+import type {
+  AdvancedTimeline,
+  AdvancedTimelineTrack,
+  Animation,
+  BezierEasing,
+  Binding,
+  Design,
+  Element,
+  Keyframe,
+  Scene,
+  Style,
+  TimelineProperty,
+  Transform,
+} from "./types";
 
 /**
  * Wave 1A — JSON → HTML compiler.
@@ -123,6 +136,139 @@ function presetKeyframesFor(type: AnimTypeLocal, phase: "in" | "out"): string | 
       return null; // emitted via element.animation custom keyframes literal
     default:
       return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Wave 3B — Advanced keyframe timeline → @keyframes body.
+//
+// `buildAdvancedKeyframesBody` walks every track, collects distinct time
+// stops across all tracks, resolves each track's value at each stop
+// (exact-match or linear interp between flanking keyframes), and emits
+// one rule body per percent. Transform-derived properties (x/y/scaleX/
+// scaleY/rotation) merge into a single `transform:` declaration per
+// stop; opacity/color/filter emit independent declarations. Per-segment
+// bezier easing is emitted as `animation-timing-function: cubic-bezier(
+// x1, y1, x2, y2)` inside the keyframe rule it originates from — CSS
+// handles per-segment timing this way.
+// -----------------------------------------------------------------------------
+
+export function buildAdvancedKeyframesBody(
+  timeline: AdvancedTimeline,
+  phaseDurationMs: number,
+): string {
+  if (timeline.length === 0 || phaseDurationMs <= 0) return "";
+
+  // 1. Collect all distinct time stops across all tracks.
+  const stopsMs = new Set<number>();
+  for (const track of timeline) {
+    for (const kf of track.keyframes) stopsMs.add(kf.timeMs);
+  }
+  const sortedStops = [...stopsMs].sort((a, b) => a - b);
+
+  type Stop = {
+    percent: number;
+    declarations: Record<string, string>;
+    transformFragments: string[];
+    segmentEasing: BezierEasing | null;
+  };
+  const stops: Stop[] = [];
+
+  for (const ms of sortedStops) {
+    const declarations: Record<string, string> = {};
+    const transformFragments: string[] = [];
+    let segmentEasing: BezierEasing | null = null;
+
+    for (const track of timeline) {
+      const value = resolveTrackValueAtMs(track, ms);
+      if (value === null) continue;
+      const css = propertyToCss(track.property, value);
+      for (const [k, v] of Object.entries(css)) {
+        if (k === "transform") transformFragments.push(v);
+        else declarations[k] = v;
+      }
+      const exact = track.keyframes.find((k2) => k2.timeMs === ms);
+      if (exact?.easingOut && !segmentEasing) segmentEasing = exact.easingOut;
+    }
+
+    stops.push({
+      percent: Math.round((ms / phaseDurationMs) * 1000) / 10,
+      declarations,
+      transformFragments,
+      segmentEasing,
+    });
+  }
+
+  return stops
+    .map((s) => {
+      const declParts = Object.entries(s.declarations).map(
+        ([k, v]) => `${k}: ${v};`,
+      );
+      if (s.transformFragments.length > 0) {
+        declParts.unshift(`transform: ${s.transformFragments.join(" ")};`);
+      }
+      if (s.segmentEasing) {
+        const b = s.segmentEasing;
+        declParts.push(
+          `animation-timing-function: cubic-bezier(${b.x1}, ${b.y1}, ${b.x2}, ${b.y2});`,
+        );
+      }
+      return `  ${s.percent}% { ${declParts.join(" ")} }`;
+    })
+    .join("\n");
+}
+
+function resolveTrackValueAtMs(
+  track: AdvancedTimelineTrack,
+  ms: number,
+): number | string | null {
+  const kfs = track.keyframes;
+  if (ms < kfs[0]!.timeMs) return null;
+  if (ms > kfs[kfs.length - 1]!.timeMs) return null;
+
+  const exact = kfs.find((k) => k.timeMs === ms);
+  if (exact) return exact.value;
+
+  let prev: Keyframe = kfs[0]!;
+  let next: Keyframe = kfs[kfs.length - 1]!;
+  for (let i = 1; i < kfs.length; i++) {
+    if (kfs[i]!.timeMs >= ms) {
+      prev = kfs[i - 1]!;
+      next = kfs[i]!;
+      break;
+    }
+  }
+
+  if (typeof prev.value === "number" && typeof next.value === "number") {
+    const t = (ms - prev.timeMs) / (next.timeMs - prev.timeMs);
+    return prev.value + (next.value - prev.value) * t;
+  }
+  return prev.value;
+}
+
+function propertyToCss(
+  property: TimelineProperty,
+  value: number | string,
+): Record<string, string> {
+  switch (property) {
+    case "opacity":
+      return { opacity: String(value) };
+    case "x":
+      return { transform: `translateX(${value}px)` };
+    case "y":
+      return { transform: `translateY(${value}px)` };
+    case "scaleX":
+      return { transform: `scaleX(${value})` };
+    case "scaleY":
+      return { transform: `scaleY(${value})` };
+    case "rotation":
+      return { transform: `rotate(${value}deg)` };
+    case "color":
+      return { color: String(value) };
+    case "filter":
+      return { filter: String(value) };
+    default:
+      return {};
   }
 }
 
@@ -364,43 +510,61 @@ function collectAnimationBlocks(scene: Scene): { keyframes: string; rules: strin
     const a = el.animation as Animation | undefined;
     if (!a) continue;
 
-    const buildRule = (
-      phase: "in" | "out",
-      anim: Animation["entry"] | Animation["exit"] | undefined,
-      gate: string,
-    ) => {
-      if (!anim) return;
-      const t = anim.type as AnimTypeLocal;
-      const keyframesName = `${t}-${phase}`;
-      if (!keyframesSeen.has(keyframesName)) {
-        const block = presetKeyframesFor(t, phase);
-        if (block) keyframes.push(block);
-        keyframesSeen.add(keyframesName);
-      }
-      const dur = anim.durationMs ?? 400;
+    // Per-phase emit: Wave 3B advancedTimeline takes precedence; `noop`
+    // sentinel (with no timeline) is a skip; otherwise fall back to the
+    // Wave 1A preset path. The phase-name → gate / suffix mapping
+    // preserves the Wave 1A selectors so existing tests still pass.
+    const phases = [
+      { name: "entry" as const, anim: a.entry, gate: "body.cade-visible", suffix: "in" as const, fill: "both", defaultDur: 400, defaultEasing: "ease-out" },
+      { name: "exit" as const, anim: a.exit, gate: "body.cade-exiting", suffix: "out" as const, fill: "both", defaultDur: 400, defaultEasing: "ease-out" },
+      { name: "loop" as const, anim: a.loop, gate: "body.cade-visible", suffix: "in" as const, fill: "infinite", defaultDur: 1200, defaultEasing: "ease-in-out" },
+    ];
+
+    for (const p of phases) {
+      const anim = p.anim;
+      if (!anim) continue;
+
+      const dur = anim.durationMs ?? p.defaultDur;
       const delay = anim.delayMs ?? 0;
-      const easing = anim.easing ?? "ease-out";
-      rules.push(
-        `${gate} [data-element-id="${el.id}"] { animation: ${keyframesName} ${dur}ms ${easing} ${delay}ms both; }`,
-      );
-    };
+      const easing = anim.easing ?? p.defaultEasing;
 
-    buildRule("in", a.entry, "body.cade-visible");
-    buildRule("out", a.exit, "body.cade-exiting");
+      if (anim.advancedTimeline && anim.advancedTimeline.length > 0) {
+        // Wave 3B advanced-timeline path. Unique @keyframes per
+        // (element, phase) — body is interpolated per-fixture, so no
+        // dedup across elements possible.
+        const kfName = `builder-${el.id}-${p.name}`;
+        const body = buildAdvancedKeyframesBody(anim.advancedTimeline, dur);
+        if (body) {
+          keyframes.push(`@keyframes ${kfName} {\n${body}\n}`);
+          const iteration = p.name === "loop" ? "infinite" : "1";
+          const fill = p.name === "loop" ? "none" : "forwards";
+          rules.push(
+            `[data-element-id="${el.id}"].cade-anim-${p.name} { animation: ${kfName} ${dur}ms ${easing} ${delay}ms ${iteration} ${fill}; }`,
+          );
+        }
+        continue;
+      }
 
-    if (a.loop) {
-      const t = a.loop.type as AnimTypeLocal;
-      const keyframesName = `${t}-in`;
+      // Wave 3B `noop` sentinel without timeline = phase opt-out.
+      if (anim.type === "noop") continue;
+
+      // Wave 1A preset path.
+      const t = anim.type as AnimTypeLocal;
+      const keyframesName = `${t}-${p.suffix}`;
       if (!keyframesSeen.has(keyframesName)) {
-        const block = presetKeyframesFor(t, "in");
+        const block = presetKeyframesFor(t, p.suffix);
         if (block) keyframes.push(block);
         keyframesSeen.add(keyframesName);
       }
-      const dur = a.loop.durationMs ?? 1200;
-      const easing = a.loop.easing ?? "ease-in-out";
-      rules.push(
-        `body.cade-visible [data-element-id="${el.id}"] { animation: ${keyframesName} ${dur}ms ${easing} infinite; }`,
-      );
+      if (p.name === "loop") {
+        rules.push(
+          `${p.gate} [data-element-id="${el.id}"] { animation: ${keyframesName} ${dur}ms ${easing} ${p.fill}; }`,
+        );
+      } else {
+        rules.push(
+          `${p.gate} [data-element-id="${el.id}"] { animation: ${keyframesName} ${dur}ms ${easing} ${delay}ms ${p.fill}; }`,
+        );
+      }
     }
   }
 
