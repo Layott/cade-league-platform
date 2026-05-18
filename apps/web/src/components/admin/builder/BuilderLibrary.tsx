@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createDesignAction } from "@/app/admin/broadcast/v2/builder/actions";
+import { createDesignAction, softDeleteDesignAction } from "@/app/admin/broadcast/v2/builder/actions";
 import type { DesignSummary } from "@/server/overlays/builder/designs";
 import type { Scene } from "@/server/overlays/builder/types";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
@@ -170,10 +170,29 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
 }
 
 function DesignCard({ design }: { design: BuilderLibraryCard }) {
+  const router = useRouter();
+  const [isDeleting, startDelete] = useTransition();
   const updated = design.updatedAt
     ? new Date(design.updatedAt).toLocaleDateString()
     : "—";
   const advanced = hasAdvancedTimeline(design.scenes);
+
+  function onDelete() {
+    const ok = window.confirm(
+      `Delete "${design.title}"? You can restore it from Admin > Trash later.`,
+    );
+    if (!ok) return;
+    startDelete(async () => {
+      try {
+        await softDeleteDesignAction(design.id);
+        router.refresh();
+      } catch (e) {
+        console.error("softDeleteDesignAction failed", e);
+        window.alert("Delete failed — see console.");
+      }
+    });
+  }
+
   return (
     <article className="group overflow-hidden rounded-lg border border-white/10 bg-zinc-950 transition hover:border-[#6bcd06]/60">
       <div className="relative aspect-video bg-gradient-to-br from-zinc-800 to-zinc-900">
@@ -193,9 +212,19 @@ function DesignCard({ design }: { design: BuilderLibraryCard }) {
         </div>
         <StatusBadge status={design.status} />
       </div>
-      <div className="flex items-center justify-end gap-2 border-t border-white/5 p-3">
+      <div className="flex items-center justify-end gap-3 border-t border-white/5 p-3">
+        <button
+          type="button"
+          data-testid={`design-delete-${design.slug}`}
+          onClick={onDelete}
+          disabled={isDeleting}
+          className="text-sm text-white/50 transition hover:text-rose-400 disabled:opacity-40"
+        >
+          {isDeleting ? "Deleting…" : "Delete"}
+        </button>
         <a
           href={`/admin/broadcast/v2/builder/${design.slug}/edit`}
+          data-testid={`design-edit-${design.slug}`}
           className="text-sm text-[#6bcd06] hover:underline"
         >
           Edit

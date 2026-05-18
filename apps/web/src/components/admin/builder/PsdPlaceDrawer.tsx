@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FileImage, Layers, X } from "lucide-react";
+import Link from "next/link";
+import { FileImage, Layers, Upload, X } from "lucide-react";
 import { useBuilderStore } from "@/state/builder/store";
 import {
   listPsdsAction,
@@ -199,7 +200,21 @@ export function PsdPlaceDrawer({
             {loadingPsds && <p className="text-sm text-white/60">Loading…</p>}
             {error && <p className="text-sm text-red-300">{error}</p>}
             {psds && psds.length === 0 && !error && (
-              <p className="text-sm text-white/50">No PSDs uploaded yet.</p>
+              <div data-testid="psd-empty-state" className="mt-2 rounded border border-dashed border-white/15 bg-zinc-900/40 p-4 text-center">
+                <p className="text-sm text-white/60">No PSDs uploaded yet.</p>
+                <p className="mt-1 text-xs text-white/40">
+                  Upload a .psd in the asset library to place its layers here.
+                </p>
+                <Link
+                  href="/admin/broadcast/v2/builder/assets"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-1 rounded bg-[#6bcd06] px-3 py-2 text-sm font-semibold text-black hover:bg-[#7fe008]"
+                >
+                  <Upload size={14} />
+                  Upload a PSD
+                </Link>
+              </div>
             )}
             <ul className="space-y-1">
               {(psds ?? []).map((p) => (

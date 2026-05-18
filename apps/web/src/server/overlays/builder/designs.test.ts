@@ -207,6 +207,45 @@ describe("designs.ts — CRUD", () => {
     expect(variant?.html_path).toBe("/overlay/v2/user/my-design");
   });
 
+  it("publishDesign restores a soft-deleted template_variant row instead of duplicating", async () => {
+    // Regression for QA 2026-05-18: publishing a design whose previous
+    // template_variants row was soft-deleted (via unpublishDesign) must
+    // restore the existing row, not INSERT a duplicate that violates the
+    // (overlay_key, variant_id) UNIQUE constraint.
+    sb._tables.overlay_user_designs.rows.push({
+      id: "d-rep",
+      slug: "republish-me",
+      title: "Republish Me",
+      status: "draft",
+      mode: "single",
+      description: null,
+    });
+    sb._tables.overlay_template_variants.rows.push({
+      id: "tv-old",
+      overlay_key: "user-republish-me",
+      variant_id: "default",
+      label: "Republish Me (stale)",
+      html_path: "/overlay/v2/user/republish-me",
+      active: false,
+      kind: "dynamic",
+      deleted_at: "2026-05-17T00:00:00Z",
+    });
+
+    await publishDesign(
+      sb as unknown as Parameters<typeof publishDesign>[0],
+      "d-rep",
+    );
+
+    expect(sb._tables.overlay_template_variants.insertedRows.length).toBe(0);
+    const restored = sb._tables.overlay_template_variants.rows.find(
+      (r) => r.id === "tv-old",
+    );
+    expect(restored?.deleted_at).toBeNull();
+    expect(restored?.active).toBe(true);
+    expect(restored?.label).toBe("Republish Me");
+    expect(restored?.html_path).toBe("/overlay/v2/user/republish-me");
+  });
+
   it("unpublishDesign soft-deletes the template_variant row", async () => {
     sb._tables.overlay_user_designs.rows.push({
       id: "d1",

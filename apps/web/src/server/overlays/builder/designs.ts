@@ -328,25 +328,60 @@ export async function publishDesign(
   if (updateErr) throw new Error(`publishDesign update: ${updateErr.message}`);
 
   const overlayKey = `user-${design.slug}`;
-  const { error: variantErr } = await sb
+  // Republish-safe upsert: look up any existing row (including soft-deleted),
+  // UPDATE-with-restore if present, otherwise INSERT.
+  //
+  // Why not `.upsert(..., { onConflict })`? The full UNIQUE constraint
+  // `(overlay_key, variant_id)` would normally accept upserts, but the
+  // table also has a PARTIAL index keyed `WHERE deleted_at IS NULL` that
+  // Supabase-js can pick instead — which leads to PG 42P10 errors on
+  // some drivers. SELECT-then-UPDATE-or-INSERT mirrors the proven pattern
+  // from `tasks/lessons.md` 2026-04-30 (text-element rescue commit
+  // 7dac90a0) and is the canonical fix when any tombstone may exist.
+  const { data: existing, error: existingErr } = await sb
     .from("overlay_template_variants")
-    .insert({
-      overlay_key: overlayKey,
-      variant_id: "default",
-      label: design.title,
-      html_path: `/overlay/v2/user/${design.slug}`,
-      thumbnail_path: design.thumbnail_path ?? null,
-      active: true,
-      kind: "dynamic",
-    })
-    .select()
-    .single();
-  if (variantErr) {
-    // If a soft-deleted row exists for the same (overlay_key, variant_id)
-    // pair, surface that as a recoverable error — caller can choose to
-    // restore via a separate path. We don't auto-restore here so the
-    // history stays explicit.
-    throw new Error(`publishDesign variant: ${variantErr.message}`);
+    .select("id, deleted_at")
+    .eq("overlay_key", overlayKey)
+    .eq("variant_id", "default")
+    .maybeSingle();
+  if (existingErr) {
+    throw new Error(`publishDesign lookup: ${existingErr.message}`);
+  }
+  if (existing) {
+    const { error: variantErr } = await sb
+      .from("overlay_template_variants")
+      .update({
+        label: design.title,
+        html_path: `/overlay/v2/user/${design.slug}`,
+        thumbnail_path: design.thumbnail_path ?? null,
+        active: true,
+        kind: "dynamic",
+        deleted_at: null,
+        updated_at: nowIso,
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (variantErr) {
+      throw new Error(`publishDesign variant restore: ${variantErr.message}`);
+    }
+  } else {
+    const { error: variantErr } = await sb
+      .from("overlay_template_variants")
+      .insert({
+        overlay_key: overlayKey,
+        variant_id: "default",
+        label: design.title,
+        html_path: `/overlay/v2/user/${design.slug}`,
+        thumbnail_path: design.thumbnail_path ?? null,
+        active: true,
+        kind: "dynamic",
+      })
+      .select()
+      .single();
+    if (variantErr) {
+      throw new Error(`publishDesign variant: ${variantErr.message}`);
+    }
   }
 }
 

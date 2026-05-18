@@ -46,8 +46,10 @@ vi.mock("next/navigation", () => ({
 
 // createDesignAction accepts FormData — mock returns { id, slug }
 const createDesignActionMock = vi.fn();
+const softDeleteDesignActionMock = vi.fn();
 vi.mock("@/app/admin/broadcast/v2/builder/actions", () => ({
   createDesignAction: (...args: unknown[]) => createDesignActionMock(...args),
+  softDeleteDesignAction: (...args: unknown[]) => softDeleteDesignActionMock(...args),
 }));
 
 describe("BuilderLibrary", () => {

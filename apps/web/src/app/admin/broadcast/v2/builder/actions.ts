@@ -274,23 +274,50 @@ export async function saveDesignAction(formData: FormData): Promise<void> {
 /**
  * Publish a design — sets status = "published" and inserts a sibling
  * row in `overlay_template_variants` (kind = "dynamic").
+ *
+ * Also revalidates the `[slug]/edit` page so the in-canvas TopBar pill +
+ * Publish/Unpublish button swap reflect the new status without forcing
+ * the user to hard-reload (previously caused stale UI bug).
  */
 export async function publishDesignAction(designId: string): Promise<void> {
   if (!designId) throw new Error("designId required");
   const { sb, actor } = await gate();
   await publishDesign(sb, actor, designId);
   revalidatePath("/admin/broadcast/v2/builder");
+  // Look up the slug so we can revalidate the editor route too.
+  const { data: row } = await sb
+    .from("overlay_user_designs")
+    .select("slug")
+    .eq("id", designId)
+    .maybeSingle();
+  if (row?.slug) {
+    revalidatePath(`/admin/broadcast/v2/builder/${row.slug}/edit`);
+    revalidatePath(`/overlay/v2/user/${row.slug}`);
+  }
 }
 
 /**
  * Unpublish a design — sets status = "draft" and soft-deletes the
  * `overlay_template_variants` row so the broadcast control panel hides it.
+ *
+ * Also revalidates the `[slug]/edit` page so the in-canvas TopBar pill +
+ * Publish/Unpublish button swap reflect the new status without forcing
+ * the user to hard-reload.
  */
 export async function unpublishDesignAction(designId: string): Promise<void> {
   if (!designId) throw new Error("designId required");
   const { sb, actor } = await gate();
   await unpublishDesign(sb, actor, designId);
   revalidatePath("/admin/broadcast/v2/builder");
+  const { data: row } = await sb
+    .from("overlay_user_designs")
+    .select("slug")
+    .eq("id", designId)
+    .maybeSingle();
+  if (row?.slug) {
+    revalidatePath(`/admin/broadcast/v2/builder/${row.slug}/edit`);
+    revalidatePath(`/overlay/v2/user/${row.slug}`);
+  }
 }
 
 /**
