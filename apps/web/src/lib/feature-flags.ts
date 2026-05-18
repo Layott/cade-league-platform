@@ -7,9 +7,10 @@
  * value (including 'TRUE', '1', 'yes') is treated as off.
  *
  * Wave 1A flags (overlay builder):
- *   - overlayBuilder.enabled         — admin route + UI visibility
- *   - overlayBuilder.publishEnabled  — allow Publish action (Wave 1A end)
- *   - overlayBuilder.photopeaEnabled — Photopea iframe route (Wave 2B)
+ *   - overlayBuilder.enabled              — admin route + UI visibility
+ *   - overlayBuilder.publishEnabled       — allow Publish action (Wave 1A end)
+ *   - overlayBuilder.photopeaEnabled      — Photopea iframe route (Wave 2B)
+ *   - overlayBuilder.sequenceModeEnabled  — multi-scene authoring + sequence runtime (Wave 3A)
  *
  * Spec: docs/superpowers/specs/2026-05-17-overlay-builder-design.md §15
  */
@@ -24,6 +25,9 @@ export const featureFlags = {
     ),
     photopeaEnabled: isTrue(
       process.env.NEXT_PUBLIC_OVERLAY_BUILDER_PHOTOPEA_ENABLED,
+    ),
+    sequenceModeEnabled: isTrue(
+      process.env.NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED,
     ),
   },
 } as const;
