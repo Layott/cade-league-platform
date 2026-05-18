@@ -1,11 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { getServerSupabase } from "@/lib/supabase/server";
-import { getServiceRoleSupabase } from "@/lib/supabase/service";
-import { requirePermAsync, PermissionError } from "@/lib/perms-db";
-import { enforceAuthedWrite } from "@/lib/api-rate-limit";
 import {
   createDesign,
   updateDesign,
@@ -19,6 +14,7 @@ import { updateScenes } from "@/server/overlays/builder/scenes";
 import { updateElements } from "@/server/overlays/builder/elements";
 import { CreateDesignSchema, SaveDesignSchema } from "./schemas";
 import type { UpdateDesignMetaInput } from "./schemas";
+import { gate } from "./assets-actions-gate";
 
 /**
  * Wave 1A — admin server actions for the overlay builder.
@@ -28,49 +24,10 @@ import type { UpdateDesignMetaInput } from "./schemas";
  * `apps/web/src/app/admin/broadcast/v2/design/actions.ts`. Per
  * CLAUDE.md §10 this file exports ONLY async functions; the schemas
  * + types live in the sibling `schemas.ts` file.
+ *
+ * Wave 2A: gate() lifted to shared assets-actions-gate.ts — behavior
+ * unchanged; both action files share one implementation.
  */
-
-type Actor = { userId: string; roles: readonly string[] };
-
-type GateResult = {
-  sb: ReturnType<typeof getServiceRoleSupabase>;
-  actor: Actor;
-};
-
-/**
- * Authenticate + perm-gate + rate-limit. Mirrors existing gate() in
- * design/actions.ts. Throws "Forbidden: missing overlay.design.manage"
- * on perm miss; "rate_limited" if the per-user write limiter trips.
- */
-async function gate(): Promise<GateResult> {
-  const userClient = await getServerSupabase();
-  const { data: auth } = await userClient.auth.getUser();
-  if (!auth?.user) redirect("/login");
-  const { data: pub } = await userClient
-    .from("users")
-    .select("id")
-    .eq("supabase_auth_id", auth.user.id)
-    .maybeSingle();
-  if (!pub) redirect("/login");
-  const { data: roleRows } = await userClient
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", pub.id)
-    .is("deleted_at", null);
-  const roles = ((roleRows ?? []) as { role: string }[]).map((r) => r.role);
-  const sb = getServiceRoleSupabase();
-  try {
-    await requirePermAsync(sb, { userId: pub.id, roles }, "overlay.design.manage");
-  } catch (e) {
-    if (e instanceof PermissionError) {
-      throw new Error("Forbidden: missing overlay.design.manage");
-    }
-    throw e;
-  }
-  const limited = await enforceAuthedWrite(pub.id);
-  if (limited) throw new Error("rate_limited");
-  return { sb, actor: { userId: pub.id, roles } };
-}
 
 /**
  * Create a new overlay design. Returns the new design's `{ id, slug }`.

@@ -13,6 +13,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // `server-only` throws in any non-server context; vitest tests run in
+      // Node but do not go through Next.js module transforms. Map to an empty
+      // stub so tests that import server-only files don't crash.
+      "server-only": path.resolve(__dirname, "./src/__mocks__/server-only.ts"),
     },
   },
 });
