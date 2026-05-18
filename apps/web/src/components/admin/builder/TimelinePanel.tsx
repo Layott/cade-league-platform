@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { useBuilderStore, type AnimPhase } from "@/state/builder/store";
 import { TimelineRuler } from "./TimelineRuler";
 import { TimelineTracks } from "./TimelineTracks";
+import { KeyframeInspector } from "./KeyframeInspector";
 
 /**
  * Wave 3B (Task 6) — bottom-dock TimelinePanel shell.
@@ -78,7 +79,7 @@ export function TimelinePanel() {
 
       <div
         data-testid="timeline-panel-body"
-        className="flex min-h-0 flex-1 flex-col text-sm text-white/40"
+        className="flex min-h-0 flex-1 flex-row text-sm text-white/40"
       >
         {inAdvancedMode ? (
           <>
@@ -86,21 +87,33 @@ export function TimelinePanel() {
               Timeline editor mounted (Tasks 7-12).
             </span>
             <div
-              data-testid="timeline-panel-ruler-slot"
-              className="shrink-0 overflow-x-auto"
+              data-testid="timeline-panel-tracks-region"
+              className="flex min-h-0 min-w-0 flex-1 flex-col"
             >
-              <TimelineRuler
-                elementId={element.id}
-                phase={phase}
-                durationMs={phaseData?.durationMs ?? 0}
-              />
+              <div
+                data-testid="timeline-panel-ruler-slot"
+                className="shrink-0 overflow-x-auto"
+              >
+                <TimelineRuler
+                  elementId={element.id}
+                  phase={phase}
+                  durationMs={phaseData?.durationMs ?? 0}
+                />
+              </div>
+              <div
+                data-testid="timeline-panel-tracks-slot"
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <TimelineTracks element={element} phase={phase} />
+              </div>
             </div>
-            <div
-              data-testid="timeline-panel-tracks-slot"
-              className="flex min-h-0 flex-1 flex-col"
+            <aside
+              data-testid="timeline-panel-inspector-slot"
+              aria-label="Keyframe inspector"
+              className="flex w-72 shrink-0 flex-col border-l border-white/10 bg-zinc-950"
             >
-              <TimelineTracks element={element} phase={phase} />
-            </div>
+              <KeyframeInspector phase={phase} element={element} />
+            </aside>
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center">
