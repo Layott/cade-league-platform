@@ -17,11 +17,18 @@ import type { Element } from "@/server/overlays/builder/types";
  */
 export function DataSlotsPanel() {
   const [open, setOpen] = useState(false);
+  // Wave-1a e2e expects two-step picker flow: click field → highlight,
+  // then click confirm → insert + close. Keeps the picker open so users
+  // can see what's selected before committing (lower regret on misclicks).
+  const [pendingSlotId, setPendingSlotId] = useState<string | null>(null);
   const activeSceneId = useBuilderStore((s) => s.activeSceneId);
   const addElement = useBuilderStore((s) => s.addElement);
 
   useEffect(() => {
-    const handler = () => setOpen(true);
+    const handler = () => {
+      setOpen(true);
+      setPendingSlotId(null);
+    };
     window.addEventListener("builder:open-data-slots", handler);
     return () => window.removeEventListener("builder:open-data-slots", handler);
   }, []);
@@ -37,8 +44,10 @@ export function DataSlotsPanel() {
     return Array.from(map.entries());
   }, []);
 
-  function insert(preset: DataSlotPreset) {
-    if (!activeSceneId) return;
+  function confirm() {
+    if (!activeSceneId || !pendingSlotId) return;
+    const preset = DATA_SLOTS_CATALOG.find((s) => s.id === pendingSlotId);
+    if (!preset) return;
     const defaults: Partial<Omit<Element, "id" | "elementType" | "sceneId">> =
       {
         transform: {
@@ -58,6 +67,7 @@ export function DataSlotsPanel() {
         zIndex: 0,
       };
     addElement(activeSceneId, preset.defaultElementType, defaults);
+    setPendingSlotId(null);
     setOpen(false);
   }
 
@@ -85,7 +95,7 @@ export function DataSlotsPanel() {
         </button>
       </header>
 
-      <div className="h-[calc(100%-2.25rem)] overflow-auto p-2">
+      <div className="h-[calc(100%-2.25rem-2.75rem)] overflow-auto p-2">
         {grouped.map(([cat, slots]) => (
           <section
             key={cat}
@@ -96,22 +106,43 @@ export function DataSlotsPanel() {
               {cat}
             </h3>
             <ul className="space-y-1">
-              {slots.map((slot) => (
-                <li key={slot.id}>
-                  <button
-                    type="button"
-                    data-testid={`data-slot-field-${slot.id}`}
-                    onClick={() => insert(slot)}
-                    className="w-full rounded border border-white/10 bg-black px-2 py-2 text-left text-sm text-white/80 transition hover:border-[#6bcd06]/40 hover:text-white"
-                  >
-                    {slot.label}
-                  </button>
-                </li>
-              ))}
+              {slots.map((slot) => {
+                const isPending = pendingSlotId === slot.id;
+                return (
+                  <li key={slot.id}>
+                    <button
+                      type="button"
+                      data-testid={`data-slot-field-${slot.id}`}
+                      data-pending={isPending}
+                      aria-pressed={isPending}
+                      onClick={() => setPendingSlotId(slot.id)}
+                      className={`w-full rounded border bg-black px-2 py-2 text-left text-sm transition ${
+                        isPending
+                          ? "border-[#6bcd06] text-white"
+                          : "border-white/10 text-white/80 hover:border-[#6bcd06]/40 hover:text-white"
+                      }`}
+                    >
+                      {slot.label}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         ))}
       </div>
+
+      <footer className="flex h-11 items-center justify-end gap-2 border-t border-white/10 px-3">
+        <button
+          type="button"
+          data-testid="data-slot-picker-confirm"
+          disabled={!pendingSlotId}
+          onClick={confirm}
+          className="rounded bg-[#6bcd06] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-black transition hover:bg-[#7be018] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add slot
+        </button>
+      </footer>
     </div>
   );
 }

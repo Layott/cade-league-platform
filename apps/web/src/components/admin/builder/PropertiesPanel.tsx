@@ -611,9 +611,41 @@ function PhaseBlock({
   const enabled = Boolean(v?.type);
   const isAdvanced = (v?.advancedTimeline?.length ?? 0) > 0;
 
+  // Effective phase config — fall back to defaults when unset so the
+  // type select is always operable. Selecting a non-empty type promotes
+  // the phase from "disabled" to "enabled" without a separate checkbox
+  // step (e2e flow + UX cleanup, 2026-05-18).
+  //
+  // `type` lives in the `AnimType` zod-narrowed enum at the canonical
+  // boundary, but inside this component we widen to string so the
+  // controlled <select> can carry an empty-string placeholder ("none")
+  // for the disabled state. The patch path re-narrows by stripping
+  // the phase entirely when type is empty.
+  const effective: { type: string; durationMs: number; delayMs: number; easing: string } =
+    v ?? {
+      type: "",
+      durationMs: 400,
+      delayMs: 0,
+      easing: "ease-out",
+    };
+
+  function patchPhase(p: Partial<typeof effective>) {
+    const next = { ...a };
+    const merged = { ...effective, ...p };
+    if (!merged.type) {
+      delete next[phase];
+    } else {
+      // Cast back to PresetAnim — the merged.type is a runtime string
+      // but the union-narrowing happens at the schema boundary on save.
+      next[phase] = merged as unknown as NonNullable<Element["animation"]>[AnimPhase];
+    }
+    patch({ animation: next } as Partial<Element>);
+  }
+
   return (
     <section
       data-testid={`anim-phase-${phase}`}
+      data-enabled={enabled}
       className="mb-4 border-b border-white/5 pb-3"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -621,20 +653,14 @@ function PhaseBlock({
           <input
             type="checkbox"
             aria-label={`Enable ${phase}`}
+            data-testid={`animation-${phase}-enabled`}
             checked={enabled}
             onChange={(e) => {
-              const next = { ...a };
               if (e.target.checked) {
-                next[phase] = {
-                  type: "fade",
-                  durationMs: 400,
-                  delayMs: 0,
-                  easing: "ease-out",
-                };
+                patchPhase({ type: "fade" });
               } else {
-                delete next[phase];
+                patchPhase({ type: "" });
               }
-              patch({ animation: next } as Partial<Element>);
             }}
           />
           <span className="text-xs uppercase tracking-wide text-white/50">
@@ -678,88 +704,71 @@ function PhaseBlock({
         )}
       </div>
 
-      {enabled && v && (
-        <>
-          <label className="mb-2 block">
-            <span className="sr-only">{phase} type</span>
-            <select
-              aria-label={`${phase} type`}
-              data-testid={`animation-${phase}-type`}
-              value={v.type}
-              disabled={isAdvanced}
-              onChange={(e) =>
-                patch({
-                  animation: { ...a, [phase]: { ...v, type: e.target.value } },
-                } as Partial<Element>)
-              }
-              className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {ANIM_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
+      <label className="mb-2 block">
+        <span className="sr-only">{phase} type</span>
+        <select
+          aria-label={`${phase} type`}
+          data-testid={`animation-${phase}-type`}
+          value={effective.type}
+          disabled={isAdvanced}
+          onChange={(e) => patchPhase({ type: e.target.value })}
+          className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <option value="">(none)</option>
+          {ANIM_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </label>
 
-          <fieldset
-            disabled={isAdvanced}
-            className="contents disabled:opacity-40"
+      <fieldset
+        disabled={isAdvanced || !enabled}
+        className="contents disabled:opacity-40"
+      >
+        <NumberField
+          label="Duration ms"
+          testId={`animation-${phase}-duration`}
+          value={effective.durationMs ?? 400}
+          onChange={(n) => patchPhase({ durationMs: n })}
+        />
+
+        <NumberField
+          label="Delay ms"
+          testId={`animation-${phase}-delay`}
+          value={effective.delayMs ?? 0}
+          onChange={(n) => patchPhase({ delayMs: n })}
+        />
+
+        <label className="mb-2 block">
+          <span className="sr-only">{phase} easing</span>
+          <select
+            aria-label={`${phase} easing`}
+            data-testid={`animation-${phase}-easing`}
+            value={effective.easing ?? "ease-out"}
+            disabled={isAdvanced || !enabled}
+            onChange={(e) => patchPhase({ easing: e.target.value })}
+            className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <NumberField
-              label="Duration ms"
-              testId={`animation-${phase}-duration`}
-              value={v.durationMs ?? 400}
-              onChange={(n) =>
-                patch({
-                  animation: { ...a, [phase]: { ...v, durationMs: n } },
-                } as Partial<Element>)
-              }
-            />
+            {EASINGS.map((e) => (
+              <option key={e} value={e}>
+                {e}
+              </option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
 
-            <NumberField
-              label="Delay ms"
-              testId={`animation-${phase}-delay`}
-              value={v.delayMs ?? 0}
-              onChange={(n) =>
-                patch({
-                  animation: { ...a, [phase]: { ...v, delayMs: n } },
-                } as Partial<Element>)
-              }
-            />
-
-            <label className="mb-2 block">
-              <span className="sr-only">{phase} easing</span>
-              <select
-                aria-label={`${phase} easing`}
-                value={v.easing ?? "ease-out"}
-                disabled={isAdvanced}
-                onChange={(e) =>
-                  patch({
-                    animation: { ...a, [phase]: { ...v, easing: e.target.value } },
-                  } as Partial<Element>)
-                }
-                className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {EASINGS.map((e) => (
-                  <option key={e} value={e}>
-                    {e}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </fieldset>
-
-          {isAdvanced && (
-            <button
-              type="button"
-              onClick={toggleTimeline}
-              className="mt-1 w-full rounded bg-[#6bcd06] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-black hover:bg-[#7be018]"
-            >
-              Open Timeline
-            </button>
-          )}
-        </>
+      {isAdvanced && (
+        <button
+          type="button"
+          data-testid={`animation-${phase}-open-timeline`}
+          onClick={toggleTimeline}
+          className="mt-1 w-full rounded bg-[#6bcd06] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-black hover:bg-[#7be018]"
+        >
+          Open Timeline
+        </button>
       )}
     </section>
   );

@@ -95,12 +95,18 @@ describe("DataSlotsPanel", () => {
     expect(screen.getByText("Top Scorers #1 — Photo")).toBeTruthy();
   });
 
-  it("clicking a Standings preset inserts a text element with the binding", () => {
+  it("two-step pick + confirm inserts a Standings text element with the binding", () => {
+    // Wave 1a updated 2026-05-18: picker now requires a confirm click
+    // after the field is highlighted. This avoids accidental inserts when
+    // operators are scanning the catalog.
     render(<DataSlotsPanel />);
     act(() => {
       window.dispatchEvent(new CustomEvent("builder:open-data-slots"));
     });
     fireEvent.click(screen.getByText("Standings Rank 1 — Name"));
+    // Click alone no longer inserts — confirm is required.
+    expect(useBuilderStore.getState().design!.scenes[0].elements).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("data-slot-picker-confirm"));
     const els = useBuilderStore.getState().design!.scenes[0].elements;
     expect(els).toHaveLength(1);
     expect(els[0].elementType).toBe("text");
@@ -109,26 +115,41 @@ describe("DataSlotsPanel", () => {
     expect(els[0].style.color).toBe("#ffffff");
   });
 
-  it("clicking an image preset inserts an image element", () => {
+  it("two-step pick + confirm inserts an image element", () => {
     render(<DataSlotsPanel />);
     act(() => {
       window.dispatchEvent(new CustomEvent("builder:open-data-slots"));
     });
     fireEvent.click(screen.getByText("Top Scorers #1 — Photo"));
+    fireEvent.click(screen.getByTestId("data-slot-picker-confirm"));
     const els = useBuilderStore.getState().design!.scenes[0].elements;
     expect(els[0].elementType).toBe("image");
     expect(els[0].binding?.feed).toBe("top_scorers");
   });
 
-  it("after insert, drawer auto-closes and inserted element is selected", () => {
+  it("after confirm, drawer auto-closes and inserted element is selected", () => {
     const { container } = render(<DataSlotsPanel />);
     act(() => {
       window.dispatchEvent(new CustomEvent("builder:open-data-slots"));
     });
     fireEvent.click(screen.getByText("Standings Rank 1 — Pts"));
+    fireEvent.click(screen.getByTestId("data-slot-picker-confirm"));
     expect(container.querySelector('[data-state="closed"]')).toBeTruthy();
     const selectedId = useBuilderStore.getState().selectedElementIds[0];
     const inserted = useBuilderStore.getState().design!.scenes[0].elements[0];
     expect(selectedId).toBe(inserted.id);
+  });
+
+  it("confirm button is disabled until a field is picked", () => {
+    render(<DataSlotsPanel />);
+    act(() => {
+      window.dispatchEvent(new CustomEvent("builder:open-data-slots"));
+    });
+    const confirm = screen.getByTestId(
+      "data-slot-picker-confirm",
+    ) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(screen.getByText("Standings Rank 1 — Name"));
+    expect(confirm.disabled).toBe(false);
   });
 });

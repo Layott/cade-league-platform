@@ -214,13 +214,28 @@ function TrackRow({
 
   const handleClickArea = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      // Only react to direct clicks on the click-area itself; clicks on a
-      // KeyframeNode child stopPropagation in its own mousedown handler
-      // already, but this extra guard keeps the math from firing if a
-      // future child also propagates.
-      if (e.target !== e.currentTarget) return;
+      // Accept clicks on the row itself OR on transparent overlays we
+      // know don't carry their own click handler — namely the per-
+      // segment hover strip (pointer-events:auto, used solely for
+      // hover state) and any descendant of the bezier-handle SVG
+      // (the SVG itself is pointer-events:none; the drag knobs
+      // stopPropagation in their onMouseDown so they never bubble
+      // here either). KeyframeNode children stopPropagation in their
+      // onMouseDown, so clicks on existing keyframes never reach us.
       const node = clickAreaRef.current;
       if (!node) return;
+      const target = e.target as HTMLElement | null;
+      if (target && target !== e.currentTarget) {
+        const tid = target.getAttribute?.("data-testid") ?? "";
+        const closestKeyframe = target.closest?.(
+          '[data-testid^="keyframe-node-"]',
+        );
+        if (closestKeyframe) return; // click on an existing keyframe
+        if (!tid.startsWith("bezier-segment-hover-") && tid !== "") {
+          // Some other testid'd descendant — bail.
+          return;
+        }
+      }
       const r = node.getBoundingClientRect();
       const localX = e.clientX - r.left;
       const rawMs = pxToMs(localX, pxPerSecond);

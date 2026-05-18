@@ -718,6 +718,11 @@ export const useBuilderStore = create<BuilderState>()(
       addKeyframe: (elementId, phase, property, timeMs, value) =>
         set((state) => {
           if (!state.design) return state;
+          // Capture the id of the newly created keyframe so we can flip
+          // `selectedKeyframeId` in the same store mutation — this auto-
+          // opens the KeyframeInspector when an operator clicks an empty
+          // track row (Wave 3B e2e + matching UX expectation).
+          let newKeyframeId: string | null = null;
           const design = replaceElement(state.design, elementId, (el) => {
             const phaseAnim = el.animation?.[phase];
             if (!phaseAnim?.advancedTimeline) return null;
@@ -729,6 +734,7 @@ export const useBuilderStore = create<BuilderState>()(
               value,
               easingOut: null,
             };
+            newKeyframeId = newKeyframe.id;
             let nextTracks: AdvancedTimelineTrack[];
             if (!track) {
               track = { property, keyframes: [newKeyframe] };
@@ -752,7 +758,11 @@ export const useBuilderStore = create<BuilderState>()(
             };
           });
           if (design === state.design) return state;
-          return { design, dirty: true };
+          return {
+            design,
+            dirty: true,
+            selectedKeyframeId: newKeyframeId ?? state.selectedKeyframeId,
+          };
         }),
 
       updateKeyframe: (elementId, phase, property, keyframeId, patch) =>

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   saveDesignAction,
   publishDesignAction,
   unpublishDesignAction,
   updateDesignMetaAction,
+  softDeleteDesignAction,
 } from "@/app/admin/broadcast/v2/builder/actions";
 import { useBuilderStore, toServerJson } from "@/state/builder/store";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
@@ -36,6 +38,7 @@ function isSequenceFlagOn(): boolean {
  * - updateDesignMetaAction(designId, patch) — two positional args
  */
 export function TopBar() {
+  const router = useRouter();
   const design = useBuilderStore((s) => s.design);
   const dirty = useBuilderStore((s) => s.dirty);
   const markClean = useBuilderStore((s) => s.markClean);
@@ -46,7 +49,32 @@ export function TopBar() {
   const [title, setTitle] = useState(design?.title ?? "");
   const [isSaving, startSaving] = useTransition();
   const [isPublishing, startPublishing] = useTransition();
+  const [isDeleting, startDeleting] = useTransition();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuOpen]);
+
+  function onDelete() {
+    if (!design) return;
+    startDeleting(async () => {
+      try {
+        await softDeleteDesignAction(design.id);
+        router.push("/admin/broadcast/v2/builder");
+      } catch (e) {
+        console.error("softDeleteDesignAction failed", e);
+      }
+    });
+  }
 
   // Only re-run when the design ID swaps (different design loaded).
   // We intentionally exclude design?.title from deps — the user's in-progress
@@ -132,13 +160,16 @@ export function TopBar() {
             {design.status}
           </span>
         )}
-        {dirty && (
+        {design && (
           <span
             data-testid="builder-dirty-indicator"
-            className="text-[10px] uppercase tracking-wider text-[#fe036d]"
-            aria-label="unsaved changes"
+            data-dirty={dirty ? "true" : "false"}
+            className={`text-[10px] uppercase tracking-wider transition-opacity ${
+              dirty ? "text-[#fe036d]" : "text-white/20 opacity-60"
+            }`}
+            aria-label={dirty ? "unsaved changes" : "no unsaved changes"}
           >
-            • unsaved
+            {dirty ? "• unsaved" : "• saved"}
           </span>
         )}
       </div>
@@ -205,6 +236,82 @@ export function TopBar() {
         <span data-testid="builder-save-status" className="sr-only">
           {isSaving ? "saving" : dirty ? "dirty" : "saved"}
         </span>
+
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            aria-label="Design menu"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            data-testid="builder-design-menu"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded text-white/60 transition hover:bg-white/10 hover:text-white"
+          >
+            ⋮
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-10 z-50 w-44 rounded-md border border-white/10 bg-zinc-900 p-1 shadow-xl"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="builder-delete-design"
+                disabled={isDeleting || !design}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmDelete(true);
+                }}
+                className="w-full rounded px-3 py-2 text-left text-sm text-rose-300 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Delete design
+              </button>
+            </div>
+          )}
+          {confirmDelete && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              data-testid="builder-delete-confirm-modal"
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70"
+              onClick={() => !isDeleting && setConfirmDelete(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-sm rounded-lg border border-white/10 bg-zinc-950 p-5 shadow-xl"
+              >
+                <h2 className="mb-2 text-base font-semibold text-white">
+                  Delete &quot;{design?.title ?? "this design"}&quot;?
+                </h2>
+                <p className="mb-4 text-sm text-white/60">
+                  Soft-delete — can be restored from /admin/trash.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <SecondaryButton
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    Cancel
+                  </SecondaryButton>
+                  <button
+                    type="button"
+                    data-testid="builder-confirm-delete"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      setConfirmDelete(false);
+                      onDelete();
+                    }}
+                    className="rounded bg-rose-500 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isDeleting ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -133,15 +133,26 @@ describe("useBuilderShortcuts", () => {
     expect(pasteMock).toHaveBeenCalled();
   });
 
-  it("Ctrl+D duplicates selection (copy then paste)", async () => {
+  it("Ctrl+D duplicates the selection in place with a +20 px offset", () => {
+    // Wave 1C — duplicate is now in-memory (NOT via system clipboard) so
+    // it works in headless tests + insecure-origin contexts. Selection
+    // flips to the freshly duplicated element ids.
     render(<Harness />);
     pressKey("d", { ctrl: true });
-    // The handler fires both mocks inside an async IIFE; flush microtasks
-    // so both calls resolve before the assertions.
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(copyMock).toHaveBeenCalled();
-    expect(pasteMock).toHaveBeenCalled();
+    const els = useBuilderStore.getState().design!.scenes[0].elements;
+    // Started with one element (id "e1"); duplicate adds a second.
+    expect(els).toHaveLength(2);
+    const original = els.find((e) => e.id === "e1");
+    const copy = els.find((e) => e.id !== "e1");
+    expect(original).toBeDefined();
+    expect(copy).toBeDefined();
+    expect(copy!.transform.x).toBe(original!.transform.x + 20);
+    expect(copy!.transform.y).toBe(original!.transform.y + 20);
+    expect(useBuilderStore.getState().selectedElementIds).toEqual([copy!.id]);
+    // The clipboard mocks should be untouched — duplicate stopped using
+    // them in this wave.
+    expect(copyMock).not.toHaveBeenCalled();
+    expect(pasteMock).not.toHaveBeenCalled();
   });
 
   it("Ctrl+G groups every selected element into a new group", () => {

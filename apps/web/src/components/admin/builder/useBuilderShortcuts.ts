@@ -1,11 +1,12 @@
 "use client";
 
 import { useHotkeys } from "react-hotkeys-hook";
-import { useBuilderStore, useTemporalStore } from "@/state/builder/store";
+import { useBuilderStore, useTemporalStore, makeUuid } from "@/state/builder/store";
 import {
   copyElementsToClipboard,
   pasteElementsFromClipboard,
 } from "@/state/builder/clipboard";
+import type { Element } from "@/server/overlays/builder/types";
 
 /**
  * Wave 1C — every editor keyboard shortcut, in one hook.
@@ -67,13 +68,74 @@ export function useBuilderShortcuts() {
     "mod+d",
     (e) => {
       e.preventDefault();
-      // Fire both functions; the second awaits the first so cross-design
-      // paste receives a populated clipboard. Both calls are non-blocking
-      // from the handler's perspective.
-      void (async () => {
-        await copyElementsToClipboard();
-        await pasteElementsFromClipboard();
-      })();
+      // Wave 1C — in-memory duplicate.
+      //
+      // Earlier wiring (copy → paste through navigator.clipboard) was
+      // brittle: headless browsers + insecure-origin localhost block
+      // clipboard access by default, which broke the e2e
+      // duplicate-with-offset assertion. The duplicate semantic is
+      // intra-design only (same scene, +20 px), so the system
+      // clipboard is the wrong transport. We now walk the selection
+      // subtree, rewire parentGroupId via an old→new uuid map, offset
+      // each top-level element by +20 px, and append directly to the
+      // active scene's elements. Cross-design paste still flows
+      // through mod+c / mod+v.
+      const state = useBuilderStore.getState();
+      if (!state.design || !state.activeSceneId) return;
+      const scene = state.design.scenes.find(
+        (s) => s.id === state.activeSceneId,
+      );
+      if (!scene) return;
+      const selected = new Set(state.selectedElementIds);
+      if (selected.size === 0) return;
+      // Expand to include every descendant of any selected group.
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const el of scene.elements) {
+          if (
+            el.parentGroupId &&
+            selected.has(el.parentGroupId) &&
+            !selected.has(el.id)
+          ) {
+            selected.add(el.id);
+            changed = true;
+          }
+        }
+      }
+      const subtree = scene.elements.filter((el) => selected.has(el.id));
+      if (subtree.length === 0) return;
+      const idMap = new Map<string, string>();
+      for (const el of subtree) idMap.set(el.id, makeUuid());
+      const baseZ = scene.elements.length;
+      const fresh: Element[] = subtree.map((el, i) => ({
+        ...el,
+        id: idMap.get(el.id) ?? makeUuid(),
+        parentGroupId: el.parentGroupId
+          ? (idMap.get(el.parentGroupId) ?? null)
+          : null,
+        zIndex: baseZ + i,
+        transform: {
+          ...el.transform,
+          x: el.transform.x + 20,
+          y: el.transform.y + 20,
+        },
+      }));
+      useBuilderStore.setState((s) => {
+        if (!s.design) return s;
+        return {
+          design: {
+            ...s.design,
+            scenes: s.design.scenes.map((sc) =>
+              sc.id === scene.id
+                ? { ...sc, elements: [...sc.elements, ...fresh] }
+                : sc,
+            ),
+          },
+          selectedElementIds: fresh.map((e) => e.id),
+          dirty: true,
+        };
+      });
     },
     { enableOnFormTags: false },
   );

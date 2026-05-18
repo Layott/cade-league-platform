@@ -111,7 +111,7 @@ export function LayersPanel() {
           isGroup={isGroup}
           groupExpanded={isGroup ? isGroupExpanded(el.id) : true}
           onToggleGroupExpand={() => toggleGroupExpand(el.id)}
-          onSelect={() => selectElement(el.id, false)}
+          onSelect={(additive) => selectElement(el.id, additive)}
           onToggleVisible={() =>
             updateElement(el.id, {
               visible: el.visible === false ? true : false,
@@ -219,7 +219,7 @@ function LayerRow({
   isGroup: boolean;
   groupExpanded: boolean;
   onToggleGroupExpand: () => void;
-  onSelect: () => void;
+  onSelect: (additive: boolean) => void;
   onToggleVisible: () => void;
   onToggleLock: () => void;
   onDelete: () => void;
@@ -244,7 +244,7 @@ function LayerRow({
       className={`flex items-center gap-2 border-b border-white/5 py-1 pr-2 text-sm ${
         selected ? "bg-[#6bcd06]/10" : "hover:bg-white/5"
       }`}
-      onClick={onSelect}
+      onClick={(e) => onSelect(e.shiftKey || e.metaKey || e.ctrlKey)}
     >
       <button
         type="button"

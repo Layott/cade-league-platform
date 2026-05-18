@@ -5,17 +5,36 @@ import { useBuilderStore } from "@/state/builder/store";
 import type { Design } from "@/server/overlays/builder/types";
 
 // saveDesignAction(FormData), publishDesignAction(designId: string),
-// unpublishDesignAction(designId: string), updateDesignMetaAction(designId, patch)
+// unpublishDesignAction(designId: string), updateDesignMetaAction(designId, patch),
+// softDeleteDesignAction(designId: string)
 const saveDesignActionMock = vi.fn();
 const publishDesignActionMock = vi.fn();
 const unpublishDesignActionMock = vi.fn();
 const updateDesignMetaActionMock = vi.fn();
+const softDeleteDesignActionMock = vi.fn();
 
 vi.mock("@/app/admin/broadcast/v2/builder/actions", () => ({
   saveDesignAction: (...args: unknown[]) => saveDesignActionMock(...args),
   publishDesignAction: (...args: unknown[]) => publishDesignActionMock(...args),
   unpublishDesignAction: (...args: unknown[]) => unpublishDesignActionMock(...args),
   updateDesignMetaAction: (...args: unknown[]) => updateDesignMetaActionMock(...args),
+  softDeleteDesignAction: (...args: unknown[]) => softDeleteDesignActionMock(...args),
+}));
+
+// Wave 1A — TopBar now uses useRouter for post-delete redirect. The shell
+// is normally wrapped by Next's app-router provider; in jsdom tests we
+// stub a minimal mock so render() does not throw "invariant expected app
+// router to be mounted".
+const routerPushMock = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: routerPushMock,
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
 }));
 
 const fixture: Design = {

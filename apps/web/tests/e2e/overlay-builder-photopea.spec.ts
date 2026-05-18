@@ -14,8 +14,11 @@ import path from "node:path";
  * Spec: docs/superpowers/specs/2026-05-17-overlay-builder-design.md §9.2 + §13.2
  */
 
+// Resolve relative to this spec so it does not depend on the cwd
+// playwright was launched with (apps/web vs repo-root differ across CI
+// commands and local runs).
 const TINY_PSD = readFileSync(
-  path.resolve("apps/web/tests/e2e/fixtures/wave-2b-tiny.psd"),
+  path.resolve(__dirname, "fixtures/wave-2b-tiny.psd"),
 );
 
 test.describe("overlay-builder photopea bridge", () => {
