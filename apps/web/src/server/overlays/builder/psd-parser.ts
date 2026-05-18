@@ -267,9 +267,9 @@ export async function parsePsdAndStoreSprites(
     (_, n) => `psd/${parentAssetId}-layer-${n}.png`,
   );
 
-  // Storage writes first. Best-effort cleanup on failure: a future
-  // re-run will overwrite via upsert=true so orphaned blobs are
-  // tolerable in the admin-only surface.
+  // Storage writes first. Future re-run overwrites SAME-indexed blobs
+  // via upsert. Sprites with index > new layer count remain orphaned;
+  // admin trash/restore is the recovery path.
   const flatUp = (await sb.storage.from(BUCKET).upload(flatKey, parsed.flatPng, {
     contentType: PNG_MIME,
     upsert: true,
@@ -330,7 +330,7 @@ export async function parsePsdAndStoreSprites(
       })) as { error: { message: string } | null };
     if (layerIns?.error != null) {
       throw new Error(
-        `layer ${i} row insert failed: ${layerIns.error.message}`,
+        `sprite ${i} row insert failed: ${layerIns.error.message}`,
       );
     }
   }
