@@ -165,4 +165,52 @@ describe("builder store", () => {
     expect((scene as Record<string, unknown>).orderIndex).toBeUndefined();
     expect((scene as Record<string, unknown>).durationMs).toBeUndefined();
   });
+
+  it("groupElements creates a new group element + sets children's parentGroupId", () => {
+    useBuilderStore.getState().loadDesign(fixtureDesign());
+    useBuilderStore.getState().addElement("scene-1", "rect", {
+      transform: { x: 0, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: {}, zIndex: 0,
+    });
+    useBuilderStore.getState().addElement("scene-1", "rect", {
+      transform: { x: 200, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: {}, zIndex: 1,
+    });
+    const ids = useBuilderStore.getState().design!.scenes[0].elements.map((e) => e.id);
+    useBuilderStore.getState().groupElements(ids);
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    const group = elements.find((e) => e.elementType === "group");
+    expect(group).toBeDefined();
+    const children = elements.filter((e) => e.parentGroupId === group!.id);
+    expect(children).toHaveLength(2);
+  });
+
+  it("groupElements rejects empty selection", () => {
+    useBuilderStore.getState().loadDesign(fixtureDesign());
+    useBuilderStore.getState().groupElements([]);
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(elements.filter((e) => e.elementType === "group")).toHaveLength(0);
+  });
+
+  it("ungroupElements clears parentGroupId on children + soft-removes the group row", () => {
+    useBuilderStore.getState().loadDesign(fixtureDesign());
+    useBuilderStore.getState().addElement("scene-1", "rect", {
+      transform: { x: 0, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: {}, zIndex: 0,
+    });
+    useBuilderStore.getState().addElement("scene-1", "rect", {
+      transform: { x: 200, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: {}, zIndex: 1,
+    });
+    const ids = useBuilderStore.getState().design!.scenes[0].elements
+      .filter((e) => e.elementType === "rect").map((e) => e.id);
+    useBuilderStore.getState().groupElements(ids);
+    const group = useBuilderStore.getState().design!.scenes[0].elements
+      .find((e) => e.elementType === "group")!;
+    useBuilderStore.getState().ungroupElements(group.id);
+    const elements = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(elements.find((e) => e.id === group.id)).toBeUndefined();
+    const stillParented = elements.filter((e) => e.parentGroupId === group.id);
+    expect(stillParented).toHaveLength(0);
+  });
 });

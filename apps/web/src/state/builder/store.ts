@@ -54,6 +54,10 @@ export type BuilderState = {
   reorderElement: (elementId: string, newZIndex: number) => void;
   setZoom: (level: number) => void;
   markClean: () => void;
+
+  // Wave 1C — grouping actions
+  groupElements: (elementIds: string[]) => void;
+  ungroupElements: (groupId: string) => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -267,6 +271,80 @@ export const useBuilderStore = create<BuilderState>()(
         }),
 
       cancelPenDraft: () => set({ penDraft: null, toolMode: "select" }),
+
+      // ── Wave 1C: grouping actions ────────────────────────────────────────
+
+      groupElements: (elementIds) =>
+        set((state) => {
+          if (!state.design || elementIds.length === 0) return state;
+          const sceneId = state.activeSceneId;
+          if (!sceneId) return state;
+          const scene = state.design.scenes.find((s) => s.id === sceneId);
+          if (!scene) return state;
+          const validIds = elementIds.filter((id) => scene.elements.some((e) => e.id === id));
+          if (validIds.length === 0) return state;
+          const newGroup: Element = {
+            id: nanoid(),
+            sceneId,
+            parentGroupId: null,
+            elementType: "group" as const,
+            zIndex: scene.elements.length,
+            locked: false,
+            visible: true,
+            transform: {
+              x: 0,
+              y: 0,
+              width: state.design.canvasWidth,
+              height: state.design.canvasHeight,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              opacity: 1,
+            },
+            style: {},
+            content: {},
+            binding: null,
+            animation: {},
+          };
+          return {
+            design: {
+              ...state.design,
+              scenes: state.design.scenes.map((s) =>
+                s.id === sceneId
+                  ? {
+                      ...s,
+                      elements: [
+                        ...s.elements.map((e) =>
+                          validIds.includes(e.id) ? { ...e, parentGroupId: newGroup.id } : e,
+                        ),
+                        newGroup,
+                      ],
+                    }
+                  : s,
+              ),
+            },
+            selectedElementIds: [newGroup.id],
+            dirty: true,
+          } as Partial<BuilderState>;
+        }),
+
+      ungroupElements: (groupId) =>
+        set((state) => {
+          if (!state.design) return state;
+          return {
+            design: {
+              ...state.design,
+              scenes: state.design.scenes.map((s) => ({
+                ...s,
+                elements: s.elements
+                  .filter((e) => e.id !== groupId)
+                  .map((e) => (e.parentGroupId === groupId ? { ...e, parentGroupId: null } : e)),
+              })),
+            },
+            selectedElementIds: state.selectedElementIds.filter((id) => id !== groupId),
+            dirty: true,
+          };
+        }),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.
