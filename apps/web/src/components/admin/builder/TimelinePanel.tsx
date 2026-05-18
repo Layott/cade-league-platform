@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { useBuilderStore, type AnimPhase } from "@/state/builder/store";
 import { TimelineRuler } from "./TimelineRuler";
+import { TimelineTracks } from "./TimelineTracks";
 
 /**
  * Wave 3B (Task 6) — bottom-dock TimelinePanel shell.
@@ -96,9 +97,9 @@ export function TimelinePanel() {
             </div>
             <div
               data-testid="timeline-panel-tracks-slot"
-              className="flex min-h-0 flex-1 items-center justify-center text-xs text-white/30"
+              className="flex min-h-0 flex-1 flex-col"
             >
-              Tracks + keyframes mount here in Tasks 8-12.
+              <TimelineTracks element={element} phase={phase} />
             </div>
           </>
         ) : (

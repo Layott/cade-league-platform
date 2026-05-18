@@ -144,6 +144,16 @@ export type BuilderState = {
     phase: AnimPhase,
     ms: number,
   ) => void;
+
+  // ── Wave 3B (Task 9): selected keyframe id ────────────────────
+  //
+  // TimelineTracks routes click-on-KeyframeNode into this slot so the
+  // KeyframeInspector (Task 12) can read which keyframe is currently
+  // being edited. Holds a single id at a time across all tracks /
+  // phases / elements — switching selection in any track replaces it.
+  // `null` clears the selection (e.g. after delete or click-empty).
+  selectedKeyframeId: string | null;
+  selectKeyframe: (id: string | null) => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -825,6 +835,10 @@ export const useBuilderStore = create<BuilderState>()(
             },
           },
         })),
+
+      // ── Wave 3B (Task 9): selected keyframe id ────────────────
+      selectedKeyframeId: null,
+      selectKeyframe: (id) => set({ selectedKeyframeId: id }),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.
