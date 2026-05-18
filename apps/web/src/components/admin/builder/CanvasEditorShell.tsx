@@ -9,6 +9,7 @@ import { CanvasStage } from "./CanvasStage";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { LayersPanel } from "./LayersPanel";
 import { DataSlotsPanel } from "./DataSlotsPanel";
+import { PsdPlaceDrawer } from "./PsdPlaceDrawer";
 import type { Design } from "@/server/overlays/builder/types";
 import type { UploadedFontMeta } from "./FontFamilyPicker";
 
@@ -63,6 +64,7 @@ export function CanvasEditorShell({
         <PropertiesPanel uploadedFonts={uploadedFonts} />
       </div>
       <DataSlotsPanel />
+      <PsdPlaceDrawer />
     </div>
   );
 }
