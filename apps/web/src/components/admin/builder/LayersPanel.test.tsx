@@ -146,3 +146,47 @@ describe("LayersPanel", () => {
     expect(elements[elements.length - 1].zIndex).toBe(99);
   });
 });
+
+describe("LayersPanel — Wave 1C group tree", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: fixture() as never,
+      selectedElementIds: [],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+    });
+  });
+
+  it("renders group rows with chevrons and indented children", () => {
+    const d = fixture();
+    const groupId = "g-1";
+    d.scenes[0].elements = [
+      { id: "child-1", elementType: "rect" as const, zIndex: 0, locked: false, visible: true,
+        parentGroupId: groupId, transform: {} as never, style: {}, content: {} },
+      { id: groupId, elementType: "group" as const, zIndex: 1, locked: false, visible: true,
+        parentGroupId: null, transform: {} as never, style: {}, content: {} },
+    ] as never;
+    useBuilderStore.setState({ design: d as never });
+    render(<LayersPanel />);
+    expect(screen.getByRole("button", { name: /group/i })).toBeInTheDocument();
+    const indented = document.querySelectorAll('[data-layer-indent="1"]');
+    expect(indented.length).toBe(1);
+  });
+
+  it("clicking the group chevron collapses children rows", () => {
+    const d = fixture();
+    const groupId = "g-2";
+    d.scenes[0].elements = [
+      { id: "c-1", elementType: "rect" as const, zIndex: 0, locked: false, visible: true,
+        parentGroupId: groupId, transform: {} as never, style: {}, content: {} },
+      { id: groupId, elementType: "group" as const, zIndex: 1, locked: false, visible: true,
+        parentGroupId: null, transform: {} as never, style: {}, content: {} },
+    ] as never;
+    useBuilderStore.setState({ design: d as never });
+    render(<LayersPanel />);
+    const chevron = screen.getByLabelText(/toggle group/i);
+    fireEvent.click(chevron);
+    expect(document.querySelector('[data-layer-indent="1"]')).toBeNull();
+  });
+});

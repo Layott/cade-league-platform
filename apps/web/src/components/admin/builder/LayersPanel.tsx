@@ -27,6 +27,9 @@ import {
   Type,
   Image as ImageIcon,
   Database,
+  ChevronDown,
+  ChevronRight,
+  Layers,
 } from "lucide-react";
 import { useBuilderStore } from "@/state/builder/store";
 import type { Element } from "@/server/overlays/builder/types";
@@ -47,6 +50,7 @@ export function LayersPanel() {
   const deleteElement = useBuilderStore((s) => s.deleteElement);
   const reorderElement = useBuilderStore((s) => s.reorderElement);
   const [collapsed, setCollapsed] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Test hook — lets test suite drive reorder without simulating dnd-kit
   // pointer events (jsdom does not support PointerSensor drag sequences).
@@ -85,6 +89,49 @@ export function LayersPanel() {
     ascending.forEach((el, i) => reorderElement(el.id, i));
   }
 
+  function isGroupExpanded(id: string) {
+    return expandedGroups[id] !== false; // default expanded
+  }
+
+  function toggleGroupExpand(id: string) {
+    setExpandedGroups((prev) => ({ ...prev, [id]: prev[id] === false ? true : false }));
+  }
+
+  function renderRows(parentId: string | null, depth: number): React.ReactElement[] {
+    const rows: React.ReactElement[] = [];
+    const children = sorted.filter((el) => (el.parentGroupId ?? null) === parentId);
+    for (const el of children) {
+      const isGroup = el.elementType === "group";
+      rows.push(
+        <LayerRow
+          key={el.id}
+          el={el}
+          depth={depth}
+          selected={selectedIds.includes(el.id)}
+          isGroup={isGroup}
+          groupExpanded={isGroup ? isGroupExpanded(el.id) : true}
+          onToggleGroupExpand={() => toggleGroupExpand(el.id)}
+          onSelect={() => selectElement(el.id, false)}
+          onToggleVisible={() =>
+            updateElement(el.id, {
+              visible: el.visible === false ? true : false,
+            } as Partial<Element>)
+          }
+          onToggleLock={() =>
+            updateElement(el.id, {
+              locked: !el.locked,
+            } as Partial<Element>)
+          }
+          onDelete={() => deleteElement(el.id)}
+        />,
+      );
+      if (isGroup && isGroupExpanded(el.id)) {
+        rows.push(...renderRows(el.id, depth + 1));
+      }
+    }
+    return rows;
+  }
+
   return (
     <section
       aria-label="Layers"
@@ -116,25 +163,7 @@ export function LayersPanel() {
               role="list"
               className="h-[calc(100%-2.25rem)] overflow-auto"
             >
-              {sorted.map((el) => (
-                <LayerRow
-                  key={el.id}
-                  el={el}
-                  selected={selectedIds.includes(el.id)}
-                  onSelect={() => selectElement(el.id, false)}
-                  onToggleVisible={() =>
-                    updateElement(el.id, {
-                      visible: el.visible === false ? true : false,
-                    } as Partial<Element>)
-                  }
-                  onToggleLock={() =>
-                    updateElement(el.id, {
-                      locked: !el.locked,
-                    } as Partial<Element>)
-                  }
-                  onDelete={() => deleteElement(el.id)}
-                />
-              ))}
+              {renderRows(null, 0)}
             </ul>
           </SortableContext>
         </DndContext>
@@ -152,6 +181,7 @@ function iconFor(t: Element["elementType"]) {
   if (t === "text") return <Type size={14} />;
   if (t === "image") return <ImageIcon size={14} />;
   if (t === "data-slot") return <Database size={14} />;
+  if (t === "group") return <Layers size={14} />;
   return <Square size={14} />;
 }
 
@@ -163,6 +193,7 @@ function labelFor(el: Element): string {
     return (el.content?.assetId as string) ?? "Image";
   }
   if (el.elementType === "rect") return "Rect";
+  if (el.elementType === "group") return "Group";
   return el.elementType;
 }
 
@@ -172,14 +203,22 @@ function labelFor(el: Element): string {
 
 function LayerRow({
   el,
+  depth,
   selected,
+  isGroup,
+  groupExpanded,
+  onToggleGroupExpand,
   onSelect,
   onToggleVisible,
   onToggleLock,
   onDelete,
 }: {
   el: Element;
+  depth: number;
   selected: boolean;
+  isGroup: boolean;
+  groupExpanded: boolean;
+  onToggleGroupExpand: () => void;
   onSelect: () => void;
   onToggleVisible: () => void;
   onToggleLock: () => void;
@@ -191,6 +230,7 @@ function LayerRow({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+    paddingLeft: depth * 16 + 8,
   };
 
   return (
@@ -198,7 +238,8 @@ function LayerRow({
       ref={setNodeRef}
       style={style}
       role="listitem"
-      className={`flex items-center gap-2 border-b border-white/5 px-2 py-1 text-sm ${
+      data-layer-indent={depth}
+      className={`flex items-center gap-2 border-b border-white/5 py-1 pr-2 text-sm ${
         selected ? "bg-[#6bcd06]/10" : "hover:bg-white/5"
       }`}
       onClick={onSelect}
@@ -213,6 +254,20 @@ function LayerRow({
       >
         <GripVertical size={14} />
       </button>
+
+      {isGroup && (
+        <button
+          type="button"
+          aria-label="Toggle group"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleGroupExpand();
+          }}
+          className="text-white/60 hover:text-white"
+        >
+          {groupExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+      )}
 
       <button
         type="button"
