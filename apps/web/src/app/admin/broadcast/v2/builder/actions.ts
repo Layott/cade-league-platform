@@ -10,9 +10,24 @@ import {
 } from "@/server/overlays/builder/designs";
 import type { Style } from "@/server/overlays/builder/types";
 import { snapshotDesign } from "@/server/overlays/builder/history";
-import { updateScenes } from "@/server/overlays/builder/scenes";
+import {
+  updateScenes,
+  addScene as addSceneCrud,
+  updateScene as updateSceneCrud,
+  reorderScenes as reorderScenesCrud,
+  deleteScene as deleteSceneCrud,
+  cloneScene as cloneSceneCrud,
+} from "@/server/overlays/builder/scenes";
 import { updateElements } from "@/server/overlays/builder/elements";
-import { CreateDesignSchema, SaveDesignSchema } from "./schemas";
+import {
+  CreateDesignSchema,
+  SaveDesignSchema,
+  AddSceneInputSchema,
+  UpdateSceneInputSchema,
+  ReorderScenesInputSchema,
+  DeleteSceneInputSchema,
+  CloneSceneInputSchema,
+} from "./schemas";
 import type { UpdateDesignMetaInput } from "./schemas";
 import { gate } from "./assets-actions-gate";
 
@@ -199,4 +214,85 @@ export async function updateDesignMetaAction(
     ...(patch.status !== undefined && { status: patch.status }),
   });
   revalidatePath("/admin/broadcast/v2/builder");
+}
+
+// ────────────── Wave 3A — Scene-scoped server actions ──────────────
+//
+// Each gates on `overlay.design.manage` via the shared `gate()` helper
+// (perm check + rate limit), then delegates to the scenes.ts CRUD layer.
+// Sync Zod schemas live in `./schemas` per CLAUDE.md §10.
+
+/**
+ * Insert a new scene into a design after the scene currently at
+ * `afterOrderIndex`. Pass `-1` to insert at position 0 (the front).
+ */
+export async function addSceneAction(
+  raw: unknown,
+): Promise<{ ok: true; scene: Awaited<ReturnType<typeof addSceneCrud>> }> {
+  const input = AddSceneInputSchema.parse(raw);
+  const { sb } = await gate();
+  const scene = await addSceneCrud(sb, input.designId, {
+    afterOrderIndex: input.afterOrderIndex,
+    durationMs: input.durationMs,
+    transitionIn: input.transitionIn,
+    transitionOut: input.transitionOut,
+  });
+  revalidatePath(`/admin/broadcast/v2/builder/${input.designSlug}/edit`);
+  return { ok: true, scene };
+}
+
+/**
+ * Patch a scene's editable fields (name, duration, transitions). Only
+ * provided keys are updated.
+ */
+export async function updateSceneAction(
+  raw: unknown,
+): Promise<{ ok: true }> {
+  const input = UpdateSceneInputSchema.parse(raw);
+  const { sb } = await gate();
+  await updateSceneCrud(sb, input.sceneId, input.patch);
+  revalidatePath(`/admin/broadcast/v2/builder/${input.designSlug}/edit`);
+  return { ok: true };
+}
+
+/**
+ * Reassign `order_index` across a design's scenes in one transaction.
+ * `sceneIdOrder` must list every live scene id for the design.
+ */
+export async function reorderScenesAction(
+  raw: unknown,
+): Promise<{ ok: true }> {
+  const input = ReorderScenesInputSchema.parse(raw);
+  const { sb } = await gate();
+  await reorderScenesCrud(sb, input.designId, input.sceneIdOrder);
+  revalidatePath(`/admin/broadcast/v2/builder/${input.designSlug}/edit`);
+  return { ok: true };
+}
+
+/**
+ * Soft-delete a scene. The CRUD layer also reindexes remaining scenes
+ * so `order_index` stays dense.
+ */
+export async function deleteSceneAction(
+  raw: unknown,
+): Promise<{ ok: true }> {
+  const input = DeleteSceneInputSchema.parse(raw);
+  const { sb } = await gate();
+  await deleteSceneCrud(sb, input.sceneId);
+  revalidatePath(`/admin/broadcast/v2/builder/${input.designSlug}/edit`);
+  return { ok: true };
+}
+
+/**
+ * Duplicate a scene (deep copy elements). The clone is appended at the
+ * end of the design's scene chain.
+ */
+export async function cloneSceneAction(
+  raw: unknown,
+): Promise<{ ok: true; scene: Awaited<ReturnType<typeof cloneSceneCrud>> }> {
+  const input = CloneSceneInputSchema.parse(raw);
+  const { sb } = await gate();
+  const scene = await cloneSceneCrud(sb, input.sceneId);
+  revalidatePath(`/admin/broadcast/v2/builder/${input.designSlug}/edit`);
+  return { ok: true, scene };
 }

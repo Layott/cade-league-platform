@@ -163,3 +163,56 @@ export const UpdateDesignMetaSchema = z.object({
 });
 
 export type UpdateDesignMetaInput = z.infer<typeof UpdateDesignMetaSchema>;
+
+// ────────────── Wave 3A — Scene-scoped action schemas ──────────────
+
+export const TRANSITION_VALUES = [
+  "cut",
+  "fade",
+  "slide-left",
+  "slide-right",
+  "slide-up",
+  "slide-down",
+] as const;
+export const TransitionEnum = z.enum(TRANSITION_VALUES);
+export type Transition = z.infer<typeof TransitionEnum>;
+
+export const AddSceneInputSchema = z.object({
+  designId: z.string().uuid(),
+  designSlug: z.string().min(1),
+  afterOrderIndex: z.number().int().min(-1),
+  durationMs: z.number().int().min(200).max(60000).optional(),
+  transitionIn: TransitionEnum.optional(),
+  transitionOut: TransitionEnum.optional(),
+});
+
+export const UpdateScenePatchSchema = z
+  .object({
+    name: z.string().max(120).nullable(),
+    durationMs: z.number().int().min(200).max(60000),
+    transitionIn: TransitionEnum,
+    transitionOut: TransitionEnum,
+  })
+  .partial();
+
+export const UpdateSceneInputSchema = z.object({
+  sceneId: z.string().uuid(),
+  designSlug: z.string().min(1),
+  patch: UpdateScenePatchSchema,
+});
+
+export const ReorderScenesInputSchema = z.object({
+  designId: z.string().uuid(),
+  designSlug: z.string().min(1),
+  sceneIdOrder: z.array(z.string().uuid()).min(1),
+});
+
+export const DeleteSceneInputSchema = z.object({
+  sceneId: z.string().uuid(),
+  designSlug: z.string().min(1),
+});
+
+export const CloneSceneInputSchema = z.object({
+  sceneId: z.string().uuid(),
+  designSlug: z.string().min(1),
+});
