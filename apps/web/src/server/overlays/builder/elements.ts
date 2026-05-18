@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { validateAnimation } from "./animation-validator";
 import { validateBinding } from "./binding-validator";
+import { validatePath } from "./path-validator";
 import { validateStyle } from "./style-validator";
 import { FeedNameSchema } from "./types";
 import type {
@@ -82,6 +83,7 @@ function validateBundle(
   style: unknown,
   binding: Binding | null | undefined,
   animation: unknown,
+  content?: Record<string, unknown> | null,
 ): { style: Style; binding: Binding | null; animation: Animation } {
   const errors: string[] = [];
 
@@ -97,6 +99,17 @@ function validateBundle(
 
   const animR = validateAnimation(animation);
   if (!animR.ok) errors.push(...animR.errors);
+
+  // Wave 1C — path-element geometry validation.
+  if (elementType === "path") {
+    const pathPayload = (content ?? {})["path"];
+    if (!pathPayload) {
+      errors.push("path element requires content.path payload");
+    } else {
+      const pathR = validatePath(pathPayload);
+      if (!pathR.ok) errors.push(...pathR.errors);
+    }
+  }
 
   if (errors.length > 0) {
     throw new Error(`element validation failed: ${errors.join("; ")}`);
@@ -119,6 +132,7 @@ export async function addElement(
     input.style,
     input.binding,
     input.animation,
+    input.content,
   );
 
   // Determine z_index — append at the top of the stack.
@@ -187,7 +201,9 @@ export async function updateElement(
     patch.binding !== undefined ? patch.binding : (row.binding as Binding | null);
   const nextAnimation =
     patch.animation !== undefined ? patch.animation : row.animation;
-  validateBundle(elementType, nextStyle, nextBinding ?? null, nextAnimation);
+  const nextContent =
+    patch.content !== undefined ? patch.content : (row.content as Record<string, unknown>);
+  validateBundle(elementType, nextStyle, nextBinding ?? null, nextAnimation, nextContent);
 
   const update: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
