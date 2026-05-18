@@ -354,3 +354,191 @@ describe("builder store", () => {
     expect(useBuilderStore.getState().activeSceneId).toBe("s1");
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B — advanced-timeline actions + mutual-exclusivity guard
+// ─────────────────────────────────────────────────────────────
+
+describe("zustand store — Wave 3B advanced timeline actions", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: null,
+      selectedElementIds: [],
+      activeSceneId: null,
+      zoomLevel: 1.0,
+      dirty: false,
+    });
+    useTemporalStore.getState().clear();
+  });
+
+  function setupStoreWithOneElement(): { elementId: string } {
+    useBuilderStore.getState().loadDesign(fixtureDesign());
+    useBuilderStore.getState().addElement("scene-1", "text", {
+      transform: { x: 100, y: 100, width: 400, height: 80, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: { fill: "#ffffff", fontSize: 64 },
+      content: { text: "T" },
+    });
+    const elementId = useBuilderStore.getState().design!.scenes[0].elements[0].id;
+    return { elementId };
+  }
+
+  function getElement(elementId: string) {
+    const design = useBuilderStore.getState().design!;
+    for (const s of design.scenes) {
+      const found = s.elements.find((e) => e.id === elementId);
+      if (found) return found;
+    }
+    throw new Error(`Element ${elementId} not found`);
+  }
+
+  it("setElementAnimationMode('advanced') seeds opacity track with 2 keyframes", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    const el = getElement(elementId);
+    expect(el.animation?.entry?.type).toBe("noop");
+    expect(el.animation?.entry?.advancedTimeline).toHaveLength(1);
+    expect(el.animation?.entry?.advancedTimeline?.[0].property).toBe("opacity");
+    expect(el.animation?.entry?.advancedTimeline?.[0].keyframes).toHaveLength(2);
+    expect(el.animation?.entry?.advancedTimeline?.[0].keyframes[0].timeMs).toBe(0);
+    expect(el.animation?.entry?.advancedTimeline?.[0].keyframes[1].timeMs).toBe(600);
+  });
+
+  it("switching advanced -> preset clears advancedTimeline + restores a real preset type", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "preset");
+    const el = getElement(elementId);
+    expect(el.animation?.entry?.advancedTimeline).toBeUndefined();
+    expect(el.animation?.entry?.type).not.toBe("noop");
+  });
+
+  it("setElementAnimationMode preserves a non-noop preset type when re-entering preset mode", () => {
+    const { elementId } = setupStoreWithOneElement();
+    // Seed an explicit preset first so the mode toggle has something
+    // meaningful to round-trip through.
+    useBuilderStore.getState().updateElement(elementId, {
+      animation: {
+        entry: { type: "slide-left", durationMs: 500, delayMs: 0, easing: "ease-out" },
+      },
+    });
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    expect(getElement(elementId).animation?.entry?.type).toBe("noop");
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "preset");
+    // After bouncing back, the original 'slide-left' should NOT be
+    // restored — we only restore the default when the sentinel was
+    // active, which matches what the editor expects (user reselects a
+    // preset from the dropdown).
+    expect(getElement(elementId).animation?.entry?.type).not.toBe("noop");
+    expect(getElement(elementId).animation?.entry?.advancedTimeline).toBeUndefined();
+  });
+
+  it("addKeyframe inserts a new keyframe sorted by timeMs", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    useBuilderStore.getState().addKeyframe(elementId, "entry", "opacity", 300, 0.5);
+    const track = getElement(elementId).animation?.entry?.advancedTimeline?.find(
+      (t) => t.property === "opacity",
+    );
+    expect(track?.keyframes.map((k) => k.timeMs)).toEqual([0, 300, 600]);
+    expect(track?.keyframes.map((k) => k.value)).toEqual([0, 0.5, 1]);
+  });
+
+  it("addKeyframe on a property without a track creates the track", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    useBuilderStore.getState().addKeyframe(elementId, "entry", "x", 0, -120);
+    useBuilderStore.getState().addKeyframe(elementId, "entry", "x", 600, 0);
+    const tracks = getElement(elementId).animation?.entry?.advancedTimeline;
+    expect(tracks?.map((t) => t.property).sort()).toEqual(["opacity", "x"]);
+    const xTrack = tracks?.find((t) => t.property === "x");
+    expect(xTrack?.keyframes.map((k) => k.timeMs)).toEqual([0, 600]);
+  });
+
+  it("addKeyframe is a no-op when advancedTimeline is not seeded", () => {
+    const { elementId } = setupStoreWithOneElement();
+    // Element has empty animation — no advancedTimeline. Action MUST
+    // NOT crash and MUST NOT silently invent a phase.
+    useBuilderStore.getState().addKeyframe(elementId, "entry", "opacity", 200, 0.4);
+    expect(getElement(elementId).animation?.entry).toBeUndefined();
+  });
+
+  it("updateKeyframe patches timeMs + value + re-sorts", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    const tracks = getElement(elementId).animation!.entry!.advancedTimeline!;
+    const kfId = tracks[0].keyframes[1].id;
+    useBuilderStore.getState().updateKeyframe(elementId, "entry", "opacity", kfId, {
+      timeMs: 400,
+      value: 0.9,
+    });
+    const updated = getElement(elementId).animation?.entry?.advancedTimeline?.[0].keyframes.find(
+      (k) => k.id === kfId,
+    );
+    expect(updated?.timeMs).toBe(400);
+    expect(updated?.value).toBe(0.9);
+  });
+
+  it("updateKeyframe is a no-op when the keyframe id is unknown", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    const before = JSON.stringify(getElement(elementId).animation);
+    useBuilderStore.getState().updateKeyframe(elementId, "entry", "opacity", "ghost-id", {
+      timeMs: 999,
+    });
+    const after = JSON.stringify(getElement(elementId).animation);
+    expect(after).toBe(before);
+  });
+
+  it("removeKeyframe drops the keyframe — track collapsed when <2 keyframes remain", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    const tracks = getElement(elementId).animation!.entry!.advancedTimeline!;
+    const firstKfId = tracks[0].keyframes[0].id;
+    useBuilderStore.getState().removeKeyframe(elementId, "entry", "opacity", firstKfId);
+    const after = getElement(elementId).animation?.entry?.advancedTimeline;
+    // Only one keyframe left → schema would fail .min(2), so collapse.
+    expect(after?.find((t) => t.property === "opacity")).toBeUndefined();
+  });
+
+  it("removeKeyframe keeps the track when >=2 keyframes still remain", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    useBuilderStore.getState().addKeyframe(elementId, "entry", "opacity", 300, 0.5);
+    const tracks = getElement(elementId).animation!.entry!.advancedTimeline!;
+    const middleKfId = tracks[0].keyframes.find((k) => k.timeMs === 300)!.id;
+    useBuilderStore.getState().removeKeyframe(elementId, "entry", "opacity", middleKfId);
+    const after = getElement(elementId).animation?.entry?.advancedTimeline?.find(
+      (t) => t.property === "opacity",
+    );
+    expect(after?.keyframes.map((k) => k.timeMs)).toEqual([0, 600]);
+  });
+
+  it("setBezierEasing patches easingOut on a specific keyframe", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    const tracks = getElement(elementId).animation!.entry!.advancedTimeline!;
+    const kfId = tracks[0].keyframes[0].id;
+    useBuilderStore.getState().setBezierEasing(elementId, "entry", "opacity", kfId, {
+      x1: 0.4, y1: 0, x2: 0.6, y2: 1,
+    });
+    const updated = getElement(elementId).animation?.entry?.advancedTimeline?.[0].keyframes.find(
+      (k) => k.id === kfId,
+    );
+    expect(updated?.easingOut).toEqual({ x1: 0.4, y1: 0, x2: 0.6, y2: 1 });
+  });
+
+  it("setBezierEasing(null) clears the bezier curve", () => {
+    const { elementId } = setupStoreWithOneElement();
+    useBuilderStore.getState().setElementAnimationMode(elementId, "entry", "advanced");
+    const tracks = getElement(elementId).animation!.entry!.advancedTimeline!;
+    const kfId = tracks[0].keyframes[0].id;
+    useBuilderStore.getState().setBezierEasing(elementId, "entry", "opacity", kfId, {
+      x1: 0.4, y1: 0, x2: 0.6, y2: 1,
+    });
+    useBuilderStore.getState().setBezierEasing(elementId, "entry", "opacity", kfId, null);
+    const updated = getElement(elementId).animation?.entry?.advancedTimeline?.[0].keyframes.find(
+      (k) => k.id === kfId,
+    );
+    expect(updated?.easingOut).toBeNull();
+  });
+});

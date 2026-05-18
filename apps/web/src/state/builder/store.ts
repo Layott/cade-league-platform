@@ -4,12 +4,25 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { nanoid } from "nanoid";
 import type {
+  AdvancedTimelineTrack,
+  AnimType,
+  Animation,
+  BezierEasing,
   Design,
   Element,
   ElementType,
+  Keyframe,
+  PresetAnim,
+  TimelineProperty,
 } from "@/server/overlays/builder/types";
 import type { SaveDesignInput } from "@/app/admin/broadcast/v2/builder/schemas";
 import type { PenDraftNode } from "./pen-types";
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B — advanced-timeline action types
+// ─────────────────────────────────────────────────────────────
+export type AnimPhase = "entry" | "exit" | "loop";
+export type AnimationMode = "preset" | "advanced";
 
 /**
  * Wave 1A — canvas editor store.
@@ -73,6 +86,40 @@ export type BuilderState = {
   deleteScene: (sceneId: string) => void;
   reorderScenes: (sceneIdOrder: string[]) => void;
   setMode: (mode: "single" | "sequence") => void;
+
+  // ── Wave 3B: advanced-timeline actions ─────────────────────
+  setElementAnimationMode: (
+    elementId: string,
+    phase: AnimPhase,
+    mode: AnimationMode,
+  ) => void;
+  addKeyframe: (
+    elementId: string,
+    phase: AnimPhase,
+    property: TimelineProperty,
+    timeMs: number,
+    value: number | string,
+  ) => void;
+  updateKeyframe: (
+    elementId: string,
+    phase: AnimPhase,
+    property: TimelineProperty,
+    keyframeId: string,
+    patch: Partial<Pick<Keyframe, "timeMs" | "value" | "easingOut">>,
+  ) => void;
+  removeKeyframe: (
+    elementId: string,
+    phase: AnimPhase,
+    property: TimelineProperty,
+    keyframeId: string,
+  ) => void;
+  setBezierEasing: (
+    elementId: string,
+    phase: AnimPhase,
+    property: TimelineProperty,
+    keyframeId: string,
+    easing: BezierEasing | null,
+  ) => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -95,6 +142,66 @@ const replaceScene = (
   ...design,
   scenes: design.scenes.map((s) => (s.id === sceneId ? mut(s) : s)),
 });
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B helpers — element mutator + preset defaults
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Locate the element by id across every scene and replace it with the
+ * result of `mut`. Returns a NEW design only when the element was
+ * found AND `mut` produced a non-null result; otherwise returns the
+ * input design untouched so callers can branch on identity.
+ */
+const replaceElement = (
+  design: Design,
+  elementId: string,
+  mut: (el: Element) => Element | null,
+): Design => {
+  let touched = false;
+  const scenes = design.scenes.map((s) => {
+    if (!s.elements.some((e) => e.id === elementId)) return s;
+    return {
+      ...s,
+      elements: s.elements.map((e) => {
+        if (e.id !== elementId) return e;
+        const next = mut(e);
+        if (next === null) return e;
+        touched = true;
+        return next;
+      }),
+    };
+  });
+  if (!touched) return design;
+  return { ...design, scenes };
+};
+
+const DEFAULT_PRESET_BY_PHASE: Record<AnimPhase, AnimType> = {
+  entry: "fade",
+  exit: "fade",
+  loop: "pulse",
+};
+
+function defaultPresetForPhase(phase: AnimPhase): PresetAnim {
+  return {
+    type: DEFAULT_PRESET_BY_PHASE[phase],
+    durationMs: phase === "loop" ? 1200 : 400,
+    delayMs: 0,
+    easing: "ease-out",
+  };
+}
+
+function seedAdvancedTimeline(): AdvancedTimelineTrack[] {
+  return [
+    {
+      property: "opacity",
+      keyframes: [
+        { id: nanoid(8), timeMs: 0, value: 0, easingOut: null },
+        { id: nanoid(8), timeMs: 600, value: 1, easingOut: null },
+      ],
+    },
+  ];
+}
 
 // ─────────────────────────────────────────────────────────────
 // Store
@@ -467,6 +574,206 @@ export const useBuilderStore = create<BuilderState>()(
             activeSceneId,
             dirty: true,
           };
+        }),
+
+      // ── Wave 3B: advanced-timeline actions ─────────────────────
+      //
+      // Mutual-exclusivity guard lives in `setElementAnimationMode`:
+      //   - 'advanced' → 'preset' clears `advancedTimeline` from the phase
+      //     and restores a real preset type (so the dropdown re-engages).
+      //   - 'preset'   → 'advanced' parks the preset `type` at the 'noop'
+      //     sentinel and seeds a 2-keyframe opacity track so the timeline
+      //     editor isn't empty at first render.
+      //
+      // The other 4 actions are pure keyframe-list manipulations on the
+      // active track. `removeKeyframe` collapses its parent track when
+      // fewer than 2 keyframes remain so we never persist a track that
+      // would fail `AdvancedTimelineTrackSchema.keyframes.min(2)`.
+
+      setElementAnimationMode: (elementId, phase, mode) =>
+        set((state) => {
+          if (!state.design) return state;
+          const design = replaceElement(state.design, elementId, (el) => {
+            const animation: Animation = { ...(el.animation ?? {}) };
+            const current: PresetAnim =
+              animation[phase] ?? defaultPresetForPhase(phase);
+            let nextPhase: PresetAnim;
+            if (mode === "advanced") {
+              nextPhase = {
+                ...current,
+                type: "noop",
+                durationMs: current.durationMs ?? 600,
+                delayMs: 0,
+                easing: "linear",
+                advancedTimeline: seedAdvancedTimeline(),
+              };
+            } else {
+              const restored = defaultPresetForPhase(phase);
+              // Drop `advancedTimeline` and restore a real preset `type`
+              // when the current sentinel is 'noop'.
+              const {
+                advancedTimeline: _drop,
+                keyframesBody: _alsoDrop,
+                ...rest
+              } = current;
+              void _drop;
+              void _alsoDrop;
+              nextPhase = {
+                ...rest,
+                type: rest.type === "noop" ? restored.type : rest.type,
+              };
+            }
+            animation[phase] = nextPhase;
+            return { ...el, animation };
+          });
+          if (design === state.design) return state;
+          return { design, dirty: true };
+        }),
+
+      addKeyframe: (elementId, phase, property, timeMs, value) =>
+        set((state) => {
+          if (!state.design) return state;
+          const design = replaceElement(state.design, elementId, (el) => {
+            const phaseAnim = el.animation?.[phase];
+            if (!phaseAnim?.advancedTimeline) return null;
+            const tracks = phaseAnim.advancedTimeline;
+            let track = tracks.find((t) => t.property === property);
+            const newKeyframe: Keyframe = {
+              id: nanoid(8),
+              timeMs,
+              value,
+              easingOut: null,
+            };
+            let nextTracks: AdvancedTimelineTrack[];
+            if (!track) {
+              track = { property, keyframes: [newKeyframe] };
+              nextTracks = [...tracks, track];
+            } else {
+              const nextKeyframes = [...track.keyframes, newKeyframe].sort(
+                (a, b) => a.timeMs - b.timeMs,
+              );
+              nextTracks = tracks.map((t) =>
+                t.property === property
+                  ? { ...t, keyframes: nextKeyframes }
+                  : t,
+              );
+            }
+            return {
+              ...el,
+              animation: {
+                ...el.animation,
+                [phase]: { ...phaseAnim, advancedTimeline: nextTracks },
+              },
+            };
+          });
+          if (design === state.design) return state;
+          return { design, dirty: true };
+        }),
+
+      updateKeyframe: (elementId, phase, property, keyframeId, patch) =>
+        set((state) => {
+          if (!state.design) return state;
+          const design = replaceElement(state.design, elementId, (el) => {
+            const phaseAnim = el.animation?.[phase];
+            const tracks = phaseAnim?.advancedTimeline;
+            if (!phaseAnim || !tracks) return null;
+            const track = tracks.find((t) => t.property === property);
+            if (!track) return null;
+            if (!track.keyframes.some((k) => k.id === keyframeId)) return null;
+            const nextKeyframes = track.keyframes
+              .map((k) => {
+                if (k.id !== keyframeId) return k;
+                const next: Keyframe = { ...k };
+                if (patch.timeMs !== undefined) next.timeMs = patch.timeMs;
+                if (patch.value !== undefined) next.value = patch.value;
+                if (patch.easingOut !== undefined)
+                  next.easingOut = patch.easingOut;
+                return next;
+              })
+              .sort((a, b) => a.timeMs - b.timeMs);
+            return {
+              ...el,
+              animation: {
+                ...el.animation,
+                [phase]: {
+                  ...phaseAnim,
+                  advancedTimeline: tracks.map((t) =>
+                    t.property === property
+                      ? { ...t, keyframes: nextKeyframes }
+                      : t,
+                  ),
+                },
+              },
+            };
+          });
+          if (design === state.design) return state;
+          return { design, dirty: true };
+        }),
+
+      removeKeyframe: (elementId, phase, property, keyframeId) =>
+        set((state) => {
+          if (!state.design) return state;
+          const design = replaceElement(state.design, elementId, (el) => {
+            const phaseAnim = el.animation?.[phase];
+            const tracks = phaseAnim?.advancedTimeline;
+            if (!phaseAnim || !tracks) return null;
+            const track = tracks.find((t) => t.property === property);
+            if (!track) return null;
+            const filteredKeyframes = track.keyframes.filter(
+              (k) => k.id !== keyframeId,
+            );
+            // A track requires >=2 keyframes (per schema); drop it
+            // entirely once we'd fall below that floor.
+            const nextTracks =
+              filteredKeyframes.length < 2
+                ? tracks.filter((t) => t.property !== property)
+                : tracks.map((t) =>
+                    t.property === property
+                      ? { ...t, keyframes: filteredKeyframes }
+                      : t,
+                  );
+            return {
+              ...el,
+              animation: {
+                ...el.animation,
+                [phase]: { ...phaseAnim, advancedTimeline: nextTracks },
+              },
+            };
+          });
+          if (design === state.design) return state;
+          return { design, dirty: true };
+        }),
+
+      setBezierEasing: (elementId, phase, property, keyframeId, easing) =>
+        set((state) => {
+          if (!state.design) return state;
+          const design = replaceElement(state.design, elementId, (el) => {
+            const phaseAnim = el.animation?.[phase];
+            const tracks = phaseAnim?.advancedTimeline;
+            if (!phaseAnim || !tracks) return null;
+            const track = tracks.find((t) => t.property === property);
+            if (!track) return null;
+            if (!track.keyframes.some((k) => k.id === keyframeId)) return null;
+            const nextKeyframes = track.keyframes.map((k) =>
+              k.id === keyframeId ? { ...k, easingOut: easing } : k,
+            );
+            return {
+              ...el,
+              animation: {
+                ...el.animation,
+                [phase]: {
+                  ...phaseAnim,
+                  advancedTimeline: tracks.map((t) =>
+                    t.property === property
+                      ? { ...t, keyframes: nextKeyframes }
+                      : t,
+                  ),
+                },
+              },
+            };
+          });
+          if (design === state.design) return state;
+          return { design, dirty: true };
         }),
     }),
     {
