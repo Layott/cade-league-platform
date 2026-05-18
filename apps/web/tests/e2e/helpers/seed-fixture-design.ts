@@ -487,3 +487,282 @@ export async function seedWave1bFixtureDesign(): Promise<FixtureSeedResult> {
     },
   };
 }
+
+/**
+ * Insert a Wave 1C fixture design that exercises the new compiler paths
+ * introduced in Wave 1C: path elements and grouped elements.
+ *
+ * Two scenes:
+ *
+ *   Scene 1 — "path scene":
+ *     - 1 path     (closed cubic-Bézier triangle, fill #6bcd06, stroke #ffffff)
+ *
+ *   Scene 2 — "group scene":
+ *     - 1 group    (parent container — elementType="group")
+ *     - 1 rect     (child of group, fill #fe036d)
+ *     - 1 text     (child of group, "WAVE 1C", Agharti 96 px, fill #ffffff)
+ *
+ * Both scenes are in a single design published immediately so
+ * /overlay/v2/user/<slug>?demo=1 is reachable without editor interaction.
+ *
+ * Fixture shape deliberately uses distinct, pixel-stable positions so the
+ * captured baseline PNG is reproducible across machines (canvas 1920×1080).
+ *
+ * Used by visual-regression-wave-1c.spec.ts.
+ */
+export async function seedWave1cFixtureDesign(): Promise<FixtureSeedResult> {
+  const sb = getServiceRoleClient();
+  const slug = `vr-wave1c-${Date.now().toString(36)}`;
+
+  // 1. Resolve the seeded admin user's id.
+  const { data: adminRow, error: adminErr } = await sb
+    .from("users")
+    .select("id")
+    .eq("email", "admin@cade.local")
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (adminErr || !adminRow) {
+    throw new Error(
+      `Could not resolve admin@cade.local user row: ${adminErr?.message ?? "no row"}`,
+    );
+  }
+  const createdBy = adminRow.id as string;
+
+  // 2. Insert the design in published state.
+  const { data: design, error: designErr } = await sb
+    .from("overlay_user_designs")
+    .insert({
+      slug,
+      title: "Wave 1C Visual Regression Fixture",
+      mode: "slideshow",
+      status: "published",
+      canvas_width: 1920,
+      canvas_height: 1080,
+      created_by: createdBy,
+    })
+    .select("id")
+    .single();
+  if (designErr || !design) {
+    throw designErr ?? new Error("design insert failed");
+  }
+  const designId = design.id as string;
+
+  // 3. Insert Scene 1 — path scene.
+  const { data: scene1, error: scene1Err } = await sb
+    .from("overlay_user_design_scenes")
+    .insert({
+      design_id: designId,
+      order_index: 0,
+      name: "Path Scene",
+      duration_ms: 6000,
+      transition_in: "fade",
+      transition_out: "fade",
+    })
+    .select("id")
+    .single();
+  if (scene1Err || !scene1) {
+    throw scene1Err ?? new Error("scene 1 insert failed");
+  }
+  const scene1Id = scene1.id as string;
+
+  // 4. Insert Scene 2 — group scene.
+  const { data: scene2, error: scene2Err } = await sb
+    .from("overlay_user_design_scenes")
+    .insert({
+      design_id: designId,
+      order_index: 1,
+      name: "Group Scene",
+      duration_ms: 6000,
+      transition_in: "fade",
+      transition_out: "fade",
+    })
+    .select("id")
+    .single();
+  if (scene2Err || !scene2) {
+    throw scene2Err ?? new Error("scene 2 insert failed");
+  }
+  const scene2Id = scene2.id as string;
+
+  // 5a. Scene 1 elements — one closed cubic-Bézier triangle.
+  const scene1Elements = [
+    {
+      scene_id: scene1Id,
+      parent_group_id: null,
+      element_type: "path",
+      z_index: 1,
+      locked: false,
+      visible: true,
+      transform: {
+        x: 600,
+        y: 300,
+        width: 720,
+        height: 480,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: { fill: "#6bcd06", stroke: "#ffffff", strokeWidth: 4 },
+      content: {
+        path: {
+          nodes: [
+            { x: 360, y: 0,   ctrlInX: 360, ctrlInY: 0,   ctrlOutX: 720, ctrlOutY: 240 },
+            { x: 720, y: 480, ctrlInX: 720, ctrlInY: 480, ctrlOutX: 0,   ctrlOutY: 480 },
+            { x: 0,   y: 480, ctrlInX: 0,   ctrlInY: 480, ctrlOutX: 0,   ctrlOutY: 0   },
+          ],
+          closed: true,
+        },
+      },
+      binding: null,
+      animation: null,
+    },
+  ];
+
+  const { error: el1Err } = await sb
+    .from("overlay_user_design_elements")
+    .insert(scene1Elements);
+  if (el1Err) throw el1Err;
+
+  // 5b. Scene 2 elements — a group parent + rect child + text child.
+  //     Insert the group placeholder first to obtain its id for parent_group_id.
+  const { data: groupEl, error: groupElErr } = await sb
+    .from("overlay_user_design_elements")
+    .insert({
+      scene_id: scene2Id,
+      parent_group_id: null,
+      element_type: "group",
+      z_index: 1,
+      locked: false,
+      visible: true,
+      transform: {
+        x: 400,
+        y: 200,
+        width: 1000,
+        height: 600,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: {},
+      content: {},
+      binding: null,
+      animation: null,
+    })
+    .select("id")
+    .single();
+  if (groupElErr || !groupEl) {
+    throw groupElErr ?? new Error("group element insert failed");
+  }
+  const groupId = groupEl.id as string;
+
+  const groupChildren = [
+    // Rect child.
+    {
+      scene_id: scene2Id,
+      parent_group_id: groupId,
+      element_type: "rect",
+      z_index: 2,
+      locked: false,
+      visible: true,
+      transform: {
+        x: 0,
+        y: 0,
+        width: 1000,
+        height: 600,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: { fill: "#fe036d" },
+      content: {},
+      binding: null,
+      animation: null,
+    },
+    // Text child.
+    {
+      scene_id: scene2Id,
+      parent_group_id: groupId,
+      element_type: "text",
+      z_index: 3,
+      locked: false,
+      visible: true,
+      transform: {
+        x: 100,
+        y: 250,
+        width: 800,
+        height: 100,
+        rotation: 0,
+        scale_x: 1,
+        scale_y: 1,
+        opacity: 1,
+      },
+      style: {
+        fontFamily: "Agharti",
+        fontSize: 96,
+        fontWeight: 700,
+        color: "#ffffff",
+      },
+      content: { text: "WAVE 1C" },
+      binding: null,
+      animation: null,
+    },
+  ];
+
+  const { error: el2Err } = await sb
+    .from("overlay_user_design_elements")
+    .insert(groupChildren);
+  if (el2Err) throw el2Err;
+
+  // 6. Optionally register the user-design variant row for DB consistency
+  //    (not load-bearing for the overlay route, which resolves by slug directly).
+  try {
+    await sb.from("overlay_template_variants").insert({
+      overlay_key: `user-${slug}`,
+      variant_id: "default",
+      label: "Wave 1C VR Fixture",
+      html_path: `/overlay/v2/user/${slug}`,
+      active: true,
+    });
+  } catch {
+    // Table may not exist in this schema revision — not load-bearing.
+  }
+
+  // Cleanup uses scene1Id as the representative sceneId in FixtureSeedResult;
+  // the cleanup fn deletes all elements by design_id to cover both scenes.
+  return {
+    designId,
+    sceneId: scene1Id,
+    slug,
+    cleanup: async () => {
+      const sbInner = getServiceRoleClient();
+      const now = new Date().toISOString();
+      try {
+        await sbInner
+          .from("overlay_template_variants")
+          .update({ deleted_at: now })
+          .eq("overlay_key", `user-${slug}`);
+      } catch {
+        // optional table
+      }
+      // Delete elements across both scenes via design_id → scene join.
+      for (const sid of [scene1Id, scene2Id]) {
+        await sbInner
+          .from("overlay_user_design_elements")
+          .update({ deleted_at: now })
+          .eq("scene_id", sid);
+      }
+      for (const sid of [scene1Id, scene2Id]) {
+        await sbInner
+          .from("overlay_user_design_scenes")
+          .update({ deleted_at: now })
+          .eq("id", sid);
+      }
+      await sbInner
+        .from("overlay_user_designs")
+        .update({ deleted_at: now })
+        .eq("id", designId);
+    },
+  };
+}
