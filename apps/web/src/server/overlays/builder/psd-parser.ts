@@ -21,8 +21,10 @@ import { PNG } from "pngjs";
 // pure-JS stub so the module works under Node / Vercel Functions without
 // node-canvas (which pulls native binaries the Functions runtime can't run).
 initializeCanvas(
-  // createCanvas stub — returns a minimal object with getContext
-  (w: number, h: number) => ({
+  // createCanvas stub — returns a minimal object with getContext.
+  // Cast to HTMLCanvasElement since ag-psd's type signature expects it
+  // but only actually uses getContext/width/height at runtime.
+  ((w: number, h: number) => ({
     width: w,
     height: h,
     getContext: () => ({
@@ -34,13 +36,13 @@ initializeCanvas(
       putImageData: () => undefined,
       drawImage: () => undefined,
     }),
-  }),
+  })) as unknown as (w: number, h: number) => HTMLCanvasElement,
   // createImageData stub — the version ag-psd calls for pixel scratch buffers
-  (w: number, h: number) => ({
+  ((w: number, h: number) => ({
     data: new Uint8ClampedArray(w * h * 4),
     width: w,
     height: h,
-  }),
+  })) as unknown as (w: number, h: number) => ImageData,
 );
 
 export const MAX_PSD_BYTES = 100 * 1024 * 1024; // 100 MB

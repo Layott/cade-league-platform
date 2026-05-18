@@ -281,12 +281,12 @@ export async function uploadPsd(
       .from("overlay_user_assets")
       .update({ deleted_at: new Date().toISOString() })
       .eq("psd_parent_asset_id", parentId)
-      .catch(() => undefined);
+      .then(() => undefined, () => undefined);
     await sb
       .from("overlay_user_assets")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", parentId)
-      .catch(() => undefined);
+      .then(() => undefined, () => undefined);
     throw new PsdUploadError("DB write failed", cause);
   }
 
