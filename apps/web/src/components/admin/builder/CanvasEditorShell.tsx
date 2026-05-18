@@ -11,6 +11,7 @@ import { LayersPanel } from "./LayersPanel";
 import { DataSlotsPanel } from "./DataSlotsPanel";
 import { PsdPlaceDrawer } from "./PsdPlaceDrawer";
 import { ScenePicker } from "./ScenePicker";
+import { TimelinePanel } from "./TimelinePanel";
 import type { Design } from "@/server/overlays/builder/types";
 import type { UploadedFontMeta } from "./FontFamilyPicker";
 
@@ -64,6 +65,7 @@ export function CanvasEditorShell({
             <CanvasStage />
           </div>
           <LayersPanel />
+          <TimelinePanel />
         </div>
         <PropertiesPanel uploadedFonts={uploadedFonts} />
       </div>

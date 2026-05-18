@@ -40,6 +40,8 @@ export function TopBar() {
   const dirty = useBuilderStore((s) => s.dirty);
   const markClean = useBuilderStore((s) => s.markClean);
   const setMode = useBuilderStore((s) => s.setMode);
+  const timelinePanelOpen = useBuilderStore((s) => s.timelinePanelOpen);
+  const toggleTimelinePanel = useBuilderStore((s) => s.toggleTimelinePanel);
   const sequenceFlagOn = isSequenceFlagOn();
   const [title, setTitle] = useState(design?.title ?? "");
   const [isSaving, startSaving] = useTransition();
@@ -152,6 +154,14 @@ export function TopBar() {
         </div>
       )}
       <div className="flex items-center gap-2">
+        <SecondaryButton
+          type="button"
+          onClick={toggleTimelinePanel}
+          aria-pressed={timelinePanelOpen}
+          aria-label="Toggle timeline"
+        >
+          Timeline
+        </SecondaryButton>
         <SecondaryButton
           type="button"
           disabled
