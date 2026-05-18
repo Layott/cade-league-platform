@@ -48,7 +48,8 @@ export type BuilderState = {
     elementType: ElementType,
     defaults: Partial<Omit<Element, "id" | "elementType" | "sceneId">>,
   ) => void;
-  updateElement: (elementId: string, patch: Partial<Element>) => void;
+  updateElement: (elementId: string, patch: Partial<Element>, opts?: { transient?: boolean }) => void;
+  commitTransientHistory: () => void;
   deleteElement: (elementId: string) => void;
   selectElement: (elementId: string, additive?: boolean) => void;
   reorderElement: (elementId: string, newZIndex: number) => void;
@@ -62,6 +63,14 @@ export type BuilderState = {
   // Wave 1C — multi-select
   selectMultiple: (ids: string[]) => void;
 };
+
+// ─────────────────────────────────────────────────────────────
+// Module-scoped transient depth counter.
+// Tracks how many in-flight transient updateElement calls are
+// active. Used by commitTransientHistory() to know whether a
+// coalesced entry needs to be pushed.
+// ─────────────────────────────────────────────────────────────
+let transientDepth = 0;
 
 // ─────────────────────────────────────────────────────────────
 // Internal helpers
@@ -142,7 +151,12 @@ export const useBuilderStore = create<BuilderState>()(
           };
         }),
 
-      updateElement: (elementId, patch) =>
+      updateElement: (elementId, patch, opts) => {
+        const transient = opts?.transient === true;
+        if (transient) {
+          useBuilderStore.temporal.getState().pause();
+          transientDepth++;
+        }
         set((state) => {
           if (!state.design) return state;
           return {
@@ -157,7 +171,18 @@ export const useBuilderStore = create<BuilderState>()(
             },
             dirty: true,
           };
-        }),
+        });
+        if (transient) {
+          useBuilderStore.temporal.getState().resume();
+        }
+      },
+
+      commitTransientHistory: () => {
+        if (transientDepth === 0) return;
+        transientDepth = 0;
+        // Force a single coalesced history entry by re-setting design to itself.
+        set((state) => ({ design: state.design ? { ...state.design } : null }));
+      },
 
       deleteElement: (elementId) =>
         set((state) => {

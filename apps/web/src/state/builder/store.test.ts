@@ -224,4 +224,22 @@ describe("builder store", () => {
     useBuilderStore.getState().selectMultiple([]);
     expect(useBuilderStore.getState().selectedElementIds).toEqual([]);
   });
+
+  it("transient updates do not produce extra history entries", () => {
+    useBuilderStore.getState().loadDesign(fixtureDesign());
+    useBuilderStore.getState().addElement("scene-1", "rect", {
+      transform: { x: 0, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      style: {}, zIndex: 0,
+    });
+    const id = useBuilderStore.getState().design!.scenes[0].elements[0].id;
+    const baselinePast = useTemporalStore.getState().pastStates.length;
+    for (let x = 0; x < 30; x++) {
+      useBuilderStore.getState().updateElement(id, {
+        transform: { x, y: 0, width: 100, height: 100, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
+      } as never, { transient: true });
+    }
+    expect(useTemporalStore.getState().pastStates.length).toBe(baselinePast);
+    useBuilderStore.getState().commitTransientHistory();
+    expect(useTemporalStore.getState().pastStates.length).toBe(baselinePast + 1);
+  });
 });
