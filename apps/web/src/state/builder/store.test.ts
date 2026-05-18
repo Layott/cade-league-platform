@@ -542,3 +542,40 @@ describe("zustand store — Wave 3B advanced timeline actions", () => {
     expect(updated?.easingOut).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B (Task 5+6) — timeline panel visibility
+// ─────────────────────────────────────────────────────────────
+
+describe("zustand store — Wave 3B timeline panel visibility", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: null,
+      selectedElementIds: [],
+      activeSceneId: null,
+      zoomLevel: 1.0,
+      dirty: false,
+      timelinePanelOpen: false,
+    });
+    useTemporalStore.getState().clear();
+  });
+
+  it("toggleTimelinePanel flips timelinePanelOpen", () => {
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(false);
+    useBuilderStore.getState().toggleTimelinePanel();
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(true);
+    useBuilderStore.getState().toggleTimelinePanel();
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(false);
+  });
+
+  it("openTimelinePanel + closeTimelinePanel set the flag explicitly", () => {
+    useBuilderStore.getState().openTimelinePanel();
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(true);
+    useBuilderStore.getState().openTimelinePanel(); // idempotent
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(true);
+    useBuilderStore.getState().closeTimelinePanel();
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(false);
+    useBuilderStore.getState().closeTimelinePanel(); // idempotent
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(false);
+  });
+});

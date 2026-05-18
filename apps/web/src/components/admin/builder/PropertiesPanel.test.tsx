@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { useBuilderStore } from "@/state/builder/store";
 
@@ -152,5 +152,159 @@ describe("PropertiesPanel", () => {
     render(<PropertiesPanel />);
     fireEvent.click(screen.getByRole("tab", { name: /binding/i }));
     expect(screen.getByLabelText(/feed/i)).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Wave 3B (Task 5) — animation mode toggle
+// ─────────────────────────────────────────────────────────────
+
+describe("PropertiesPanel — Wave 3B animation mode toggle", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: baseFixture() as never,
+      selectedElementIds: ["rect-1"],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+      timelinePanelOpen: false,
+    });
+  });
+
+  // Seed `animation.entry` on the rect via updateElement so each test
+  // starts with the entry phase enabled (the toggle is gated on the
+  // phase being enabled, mirroring the existing checkbox-driven UI).
+  function enableEntryPhase() {
+    useBuilderStore.getState().updateElement("rect-1", {
+      animation: {
+        entry: { type: "fade", durationMs: 400, delayMs: 0, easing: "ease-out" },
+      },
+    } as never);
+  }
+
+  it("renders Preset / Advanced toggle inside the entry phase block", () => {
+    enableEntryPhase();
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /animation/i }));
+
+    const entryGroup = screen.getByTestId("anim-phase-entry");
+    expect(
+      within(entryGroup).getByRole("button", { name: /preset/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(entryGroup).getByRole("button", { name: /advanced/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking Advanced calls setElementAnimationMode(..., 'entry', 'advanced')", () => {
+    enableEntryPhase();
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /animation/i }));
+    const entryGroup = screen.getByTestId("anim-phase-entry");
+    fireEvent.click(
+      within(entryGroup).getByRole("button", { name: /advanced/i }),
+    );
+    const el = useBuilderStore.getState().design!.scenes[0].elements[0];
+    expect(el.animation?.entry?.type).toBe("noop");
+    expect(el.animation?.entry?.advancedTimeline).toBeDefined();
+    expect(el.animation?.entry?.advancedTimeline?.[0].property).toBe("opacity");
+  });
+
+  it("when advancedTimeline is non-empty, preset dropdown is disabled and Advanced is the active pill", () => {
+    useBuilderStore.getState().updateElement("rect-1", {
+      animation: {
+        entry: {
+          type: "noop",
+          durationMs: 600,
+          delayMs: 0,
+          easing: "linear",
+          advancedTimeline: [
+            {
+              property: "opacity",
+              keyframes: [
+                { id: "a", timeMs: 0, value: 0, easingOut: null },
+                { id: "b", timeMs: 600, value: 1, easingOut: null },
+              ],
+            },
+          ],
+        },
+      },
+    } as never);
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /animation/i }));
+    const entryGroup = screen.getByTestId("anim-phase-entry");
+    expect(
+      within(entryGroup).getByRole("button", { name: /advanced/i }),
+    ).toHaveAttribute("data-active", "true");
+    expect(
+      within(entryGroup).getByRole("button", { name: /preset/i }),
+    ).toHaveAttribute("data-active", "false");
+    expect(within(entryGroup).getByLabelText(/entry type/i)).toBeDisabled();
+  });
+
+  it("clicking 'Open Timeline' toggles timelinePanelOpen in the store", () => {
+    useBuilderStore.getState().updateElement("rect-1", {
+      animation: {
+        entry: {
+          type: "noop",
+          durationMs: 600,
+          delayMs: 0,
+          easing: "linear",
+          advancedTimeline: [
+            {
+              property: "opacity",
+              keyframes: [
+                { id: "a", timeMs: 0, value: 0, easingOut: null },
+                { id: "b", timeMs: 600, value: 1, easingOut: null },
+              ],
+            },
+          ],
+        },
+      },
+    } as never);
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /animation/i }));
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /open timeline/i }));
+    expect(useBuilderStore.getState().timelinePanelOpen).toBe(true);
+  });
+
+  it("switching Advanced back to Preset clears advancedTimeline + re-enables the dropdown", () => {
+    enableEntryPhase();
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /animation/i }));
+    const entryGroup = screen.getByTestId("anim-phase-entry");
+
+    fireEvent.click(
+      within(entryGroup).getByRole("button", { name: /advanced/i }),
+    );
+    // Sanity: dropdown disabled now.
+    expect(within(entryGroup).getByLabelText(/entry type/i)).toBeDisabled();
+
+    fireEvent.click(
+      within(entryGroup).getByRole("button", { name: /preset/i }),
+    );
+    expect(within(entryGroup).getByLabelText(/entry type/i)).not.toBeDisabled();
+    const el = useBuilderStore.getState().design!.scenes[0].elements[0];
+    expect(el.animation?.entry?.advancedTimeline).toBeUndefined();
+    expect(el.animation?.entry?.type).not.toBe("noop");
+  });
+
+  it("each phase (entry / exit / loop) gets its own toggle once enabled", () => {
+    useBuilderStore.getState().updateElement("rect-1", {
+      animation: {
+        entry: { type: "fade", durationMs: 400, delayMs: 0, easing: "ease-out" },
+        exit: { type: "fade", durationMs: 400, delayMs: 0, easing: "ease-out" },
+        loop: { type: "pulse", durationMs: 1200, delayMs: 0, easing: "linear" },
+      },
+    } as never);
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole("tab", { name: /animation/i }));
+
+    for (const phase of ["entry", "exit", "loop"] as const) {
+      const group = screen.getByTestId(`anim-phase-${phase}`);
+      expect(within(group).getByRole("button", { name: /preset/i })).toBeInTheDocument();
+      expect(within(group).getByRole("button", { name: /advanced/i })).toBeInTheDocument();
+    }
   });
 });

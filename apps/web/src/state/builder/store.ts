@@ -120,6 +120,16 @@ export type BuilderState = {
     keyframeId: string,
     easing: BezierEasing | null,
   ) => void;
+
+  // ── Wave 3B (Task 5+6): timeline panel visibility ─────────────
+  //
+  // Toggled from the Properties panel's "Open Timeline" button when
+  // a phase is switched to advanced mode. TimelinePanel (Task 6) reads
+  // this flag to mount itself into the bottom dock.
+  timelinePanelOpen: boolean;
+  toggleTimelinePanel: () => void;
+  openTimelinePanel: () => void;
+  closeTimelinePanel: () => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -775,6 +785,13 @@ export const useBuilderStore = create<BuilderState>()(
           if (design === state.design) return state;
           return { design, dirty: true };
         }),
+
+      // ── Wave 3B (Task 5+6): timeline panel visibility ─────────
+      timelinePanelOpen: false,
+      toggleTimelinePanel: () =>
+        set((state) => ({ timelinePanelOpen: !state.timelinePanelOpen })),
+      openTimelinePanel: () => set({ timelinePanelOpen: true }),
+      closeTimelinePanel: () => set({ timelinePanelOpen: false }),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.

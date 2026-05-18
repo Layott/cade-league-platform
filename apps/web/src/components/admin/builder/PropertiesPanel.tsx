@@ -557,7 +557,15 @@ function BindingTab({
 
 // ─────────────────────────────────────────────────────────────
 // Animation tab — Entry / Exit / Loop phases
+//
+// Wave 3B (Task 5) adds a per-phase Preset / Advanced pill toggle.
+// Advanced mode is auto-detected when `advancedTimeline` is populated
+// — the toggle flips and the preset dropdown grays out. Switching to
+// Advanced reveals an "Open Timeline" button that toggles the bottom
+// TimelinePanel via the store (TimelinePanel shell lands in Task 6).
 // ─────────────────────────────────────────────────────────────
+
+type AnimPhase = "entry" | "exit" | "loop";
 
 function AnimationTab({
   element,
@@ -566,107 +574,179 @@ function AnimationTab({
   element: Element;
   patch: (p: Partial<Element>) => void;
 }) {
-  const a = element.animation ?? {};
-
   return (
     <div>
-      {(["entry", "exit", "loop"] as const).map((phase) => {
-        const enabled = Boolean(a[phase]?.type);
-        const v = a[phase];
-
-        return (
-          <section key={phase} className="mb-4 border-b border-white/5 pb-3">
-            <label className="mb-2 flex items-center gap-2">
-              <input
-                type="checkbox"
-                aria-label={`Enable ${phase}`}
-                checked={enabled}
-                onChange={(e) => {
-                  const next = { ...a };
-                  if (e.target.checked) {
-                    next[phase] = {
-                      type: "fade",
-                      durationMs: 400,
-                      delayMs: 0,
-                      easing: "ease-out",
-                    };
-                  } else {
-                    delete next[phase];
-                  }
-                  patch({ animation: next } as Partial<Element>);
-                }}
-              />
-              <span className="text-xs uppercase tracking-wide text-white/50">
-                {phase}
-              </span>
-            </label>
-
-            {enabled && v && (
-              <>
-                <label className="mb-2 block">
-                  <span className="sr-only">{phase} type</span>
-                  <select
-                    aria-label={`${phase} type`}
-                    value={v.type}
-                    onChange={(e) =>
-                      patch({
-                        animation: { ...a, [phase]: { ...v, type: e.target.value } },
-                      } as Partial<Element>)
-                    }
-                    className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
-                  >
-                    {ANIM_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <NumberField
-                  label="Duration ms"
-                  value={v.durationMs ?? 400}
-                  onChange={(n) =>
-                    patch({
-                      animation: { ...a, [phase]: { ...v, durationMs: n } },
-                    } as Partial<Element>)
-                  }
-                />
-
-                <NumberField
-                  label="Delay ms"
-                  value={v.delayMs ?? 0}
-                  onChange={(n) =>
-                    patch({
-                      animation: { ...a, [phase]: { ...v, delayMs: n } },
-                    } as Partial<Element>)
-                  }
-                />
-
-                <label className="mb-2 block">
-                  <span className="sr-only">{phase} easing</span>
-                  <select
-                    aria-label={`${phase} easing`}
-                    value={v.easing ?? "ease-out"}
-                    onChange={(e) =>
-                      patch({
-                        animation: { ...a, [phase]: { ...v, easing: e.target.value } },
-                      } as Partial<Element>)
-                    }
-                    className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
-                  >
-                    {EASINGS.map((e) => (
-                      <option key={e} value={e}>
-                        {e}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
-            )}
-          </section>
-        );
-      })}
+      {(["entry", "exit", "loop"] as const).map((phase) => (
+        <PhaseBlock key={phase} phase={phase} element={element} patch={patch} />
+      ))}
     </div>
+  );
+}
+
+function PhaseBlock({
+  phase,
+  element,
+  patch,
+}: {
+  phase: AnimPhase;
+  element: Element;
+  patch: (p: Partial<Element>) => void;
+}) {
+  const setMode = useBuilderStore((s) => s.setElementAnimationMode);
+  const toggleTimeline = useBuilderStore((s) => s.toggleTimelinePanel);
+
+  const a = element.animation ?? {};
+  const v = a[phase];
+  const enabled = Boolean(v?.type);
+  const isAdvanced = (v?.advancedTimeline?.length ?? 0) > 0;
+
+  return (
+    <section
+      data-testid={`anim-phase-${phase}`}
+      className="mb-4 border-b border-white/5 pb-3"
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            aria-label={`Enable ${phase}`}
+            checked={enabled}
+            onChange={(e) => {
+              const next = { ...a };
+              if (e.target.checked) {
+                next[phase] = {
+                  type: "fade",
+                  durationMs: 400,
+                  delayMs: 0,
+                  easing: "ease-out",
+                };
+              } else {
+                delete next[phase];
+              }
+              patch({ animation: next } as Partial<Element>);
+            }}
+          />
+          <span className="text-xs uppercase tracking-wide text-white/50">
+            {phase}
+          </span>
+        </label>
+
+        {enabled && (
+          <div
+            className="inline-flex rounded bg-white/5 p-0.5"
+            role="group"
+            aria-label={`${phase} animation mode`}
+          >
+            <button
+              type="button"
+              data-active={!isAdvanced}
+              aria-pressed={!isAdvanced}
+              onClick={() => setMode(element.id, phase, "preset")}
+              className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-wide transition ${
+                !isAdvanced
+                  ? "bg-white/15 text-[#6bcd06]"
+                  : "text-white/40 hover:text-white"
+              }`}
+            >
+              Preset
+            </button>
+            <button
+              type="button"
+              data-active={isAdvanced}
+              aria-pressed={isAdvanced}
+              onClick={() => setMode(element.id, phase, "advanced")}
+              className={`rounded px-2 py-0.5 text-[10px] uppercase tracking-wide transition ${
+                isAdvanced
+                  ? "bg-white/15 text-[#6bcd06]"
+                  : "text-white/40 hover:text-white"
+              }`}
+            >
+              Advanced
+            </button>
+          </div>
+        )}
+      </div>
+
+      {enabled && v && (
+        <>
+          <label className="mb-2 block">
+            <span className="sr-only">{phase} type</span>
+            <select
+              aria-label={`${phase} type`}
+              value={v.type}
+              disabled={isAdvanced}
+              onChange={(e) =>
+                patch({
+                  animation: { ...a, [phase]: { ...v, type: e.target.value } },
+                } as Partial<Element>)
+              }
+              className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {ANIM_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <fieldset
+            disabled={isAdvanced}
+            className="contents disabled:opacity-40"
+          >
+            <NumberField
+              label="Duration ms"
+              value={v.durationMs ?? 400}
+              onChange={(n) =>
+                patch({
+                  animation: { ...a, [phase]: { ...v, durationMs: n } },
+                } as Partial<Element>)
+              }
+            />
+
+            <NumberField
+              label="Delay ms"
+              value={v.delayMs ?? 0}
+              onChange={(n) =>
+                patch({
+                  animation: { ...a, [phase]: { ...v, delayMs: n } },
+                } as Partial<Element>)
+              }
+            />
+
+            <label className="mb-2 block">
+              <span className="sr-only">{phase} easing</span>
+              <select
+                aria-label={`${phase} easing`}
+                value={v.easing ?? "ease-out"}
+                disabled={isAdvanced}
+                onChange={(e) =>
+                  patch({
+                    animation: { ...a, [phase]: { ...v, easing: e.target.value } },
+                  } as Partial<Element>)
+                }
+                className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {EASINGS.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </fieldset>
+
+          {isAdvanced && (
+            <button
+              type="button"
+              onClick={toggleTimeline}
+              className="mt-1 w-full rounded bg-[#6bcd06] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-black hover:bg-[#7be018]"
+            >
+              Open Timeline
+            </button>
+          )}
+        </>
+      )}
+    </section>
   );
 }
