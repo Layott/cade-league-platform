@@ -6,10 +6,12 @@ import {
   type AnimPhase,
 } from "@/state/builder/store";
 import type {
+  BezierEasing,
   Element,
   TimelineProperty,
 } from "@/server/overlays/builder/types";
 import { KeyframeNode } from "./KeyframeNode";
+import { BezierHandle } from "./BezierHandle";
 import { pxToMs } from "./TimelineRuler";
 
 /**
@@ -127,7 +129,12 @@ type TrackRowProps = {
   track:
     | {
         property: TimelineProperty;
-        keyframes: Array<{ id: string; timeMs: number; value: number | string }>;
+        keyframes: Array<{
+          id: string;
+          timeMs: number;
+          value: number | string;
+          easingOut?: BezierEasing | null;
+        }>;
       }
     | undefined;
   durationMs: number;
@@ -154,7 +161,40 @@ function TrackRow({
 }: TrackRowProps) {
   const clickAreaRef = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  // Per-segment hover so BezierHandle is only visible for the segment
+  // the operator is interacting with (unless `easingOut` is set or the
+  // segment is selected, in which case visibility is forced on). We key
+  // by the "from" keyframe id since that uniquely identifies a segment.
+  const [hoveredSegmentFromId, setHoveredSegmentFromId] = useState<
+    string | null
+  >(null);
   const isGhost = !track;
+
+  // Adjacent keyframe pairs sorted by timeMs so the bezier preview spans
+  // the correct interval even if the underlying array isn't pre-sorted.
+  // Keyframes are normally inserted in time order by the store, but
+  // sorting defensively keeps the math correct under any ordering.
+  const sortedKeyframes = track
+    ? [...track.keyframes].sort((a, b) => a.timeMs - b.timeMs)
+    : [];
+  const segments: Array<{
+    fromId: string;
+    fromTimeMs: number;
+    toId: string;
+    toTimeMs: number;
+    easingOut: BezierEasing | null;
+  }> = [];
+  for (let i = 0; i < sortedKeyframes.length - 1; i++) {
+    const from = sortedKeyframes[i];
+    const to = sortedKeyframes[i + 1];
+    segments.push({
+      fromId: from.id,
+      fromTimeMs: from.timeMs,
+      toId: to.id,
+      toTimeMs: to.timeMs,
+      easingOut: from.easingOut ?? null,
+    });
+  }
 
   // Capture the click-area's bounding rect once the row mounts so the
   // KeyframeNode drag math can use rect-relative pixel coords (it falls
@@ -253,6 +293,64 @@ function TrackRow({
         onClick={handleClickArea}
         className="relative min-w-0 flex-1 cursor-cell select-none bg-zinc-950"
       >
+        {/* BezierHandle previews render below the keyframe nodes so the
+            10×10 diamond markers stay on top of the curve. Visibility
+            rule per Wave 3B (Task 10): show when the segment's
+            easingOut is non-null OR the segment is hovered OR either
+            endpoint keyframe is the currently selected one.
+
+            Hover detection lives on a 4px-tall transparent strip at the
+            row's vertical mid-line, sized to the segment. The strip is
+            always mounted (regardless of BezierHandle visibility) so
+            hover state can start AND end reliably — the BezierHandle's
+            wrapper SVG has pointer-events:none so its mouseleave is
+            unreliable across the curve's transparent areas. Strip is
+            4px tall + bottomed at row mid-height so it never steals
+            clicks meant for the clickarea (the rest of the row remains
+            click-throughable into `handleClickArea`). */}
+        {segments.map((seg) => {
+          const isSelected =
+            selectedKeyframeId === seg.fromId ||
+            selectedKeyframeId === seg.toId;
+          const isHovered = hoveredSegmentFromId === seg.fromId;
+          const hasEasing = seg.easingOut !== null;
+          const visible = hasEasing || isSelected || isHovered;
+          const leftPx = (seg.fromTimeMs / 1000) * pxPerSecond;
+          const widthPx =
+            ((seg.toTimeMs - seg.fromTimeMs) / 1000) * pxPerSecond;
+          return (
+            <div key={`seg-${seg.fromId}`}>
+              <div
+                data-testid={`bezier-segment-hover-${seg.fromId}`}
+                onMouseEnter={() => setHoveredSegmentFromId(seg.fromId)}
+                onMouseLeave={() =>
+                  setHoveredSegmentFromId((cur) =>
+                    cur === seg.fromId ? null : cur,
+                  )
+                }
+                className="pointer-events-auto absolute"
+                style={{
+                  left: `${leftPx}px`,
+                  top: `${ROW_HEIGHT_PX / 2 - 2}px`,
+                  width: `${widthPx}px`,
+                  height: "4px",
+                }}
+              />
+              {visible ? (
+                <BezierHandle
+                  elementId={element.id}
+                  phase={phase}
+                  property={property}
+                  fromKeyframeId={seg.fromId}
+                  fromTimeMs={seg.fromTimeMs}
+                  toTimeMs={seg.toTimeMs}
+                  easingOut={seg.easingOut}
+                  pxPerSecond={pxPerSecond}
+                />
+              ) : null}
+            </div>
+          );
+        })}
         {track?.keyframes.map((kf) => (
           <KeyframeNode
             key={kf.id}

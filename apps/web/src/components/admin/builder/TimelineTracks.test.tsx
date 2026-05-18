@@ -579,3 +579,128 @@ describe("TimelineTracks — delete keyframe via keyboard", () => {
     ).toBe(2);
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// BezierHandle visibility (Task 10)
+// ─────────────────────────────────────────────────────────────
+
+describe("TimelineTracks — bezier handle visibility", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: null,
+      selectedElementIds: [],
+      activeSceneId: null,
+      zoomLevel: 1,
+      dirty: false,
+      timelinePanelOpen: false,
+      timelineCursorMs: {},
+      selectedKeyframeId: null,
+    });
+  });
+
+  function elWithEasing(kf1Easing: { x1: number; y1: number; x2: number; y2: number } | null) {
+    return makeElement({
+      animation: {
+        entry: {
+          type: "noop",
+          durationMs: 1000,
+          delayMs: 0,
+          easing: "linear",
+          advancedTimeline: [
+            {
+              property: "opacity",
+              keyframes: [
+                { id: "kf-A", timeMs: 0, value: 0, easingOut: kf1Easing },
+                { id: "kf-B", timeMs: 1000, value: 1, easingOut: null },
+              ],
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  // Stable data-attribute selector for the BezierHandle wrapper SVG —
+  // the testid contains a nanoid suffix that can include `-` chars, so
+  // testid-based regexes are fragile.
+  const BEZIER_WRAPPER_SELECTOR = "[data-bezier-handle-wrapper='true']";
+
+  it("renders a BezierHandle for a segment whose from-keyframe has easingOut set", () => {
+    const el = elWithEasing({ x1: 0.4, y1: 0, x2: 0.6, y2: 1 });
+    seed(el);
+    render(<TimelineTracks element={el} phase="entry" />);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeTruthy();
+  });
+
+  it("does NOT render a BezierHandle for a linear segment with no selection or hover", () => {
+    const el = elWithEasing(null);
+    seed(el);
+    render(<TimelineTracks element={el} phase="entry" />);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeFalsy();
+  });
+
+  it("renders a BezierHandle when either endpoint keyframe is selected", () => {
+    const el = elWithEasing(null);
+    seed(el);
+    // Select the "from" keyframe of the segment.
+    useBuilderStore.setState({ selectedKeyframeId: "kf-A" });
+    render(<TimelineTracks element={el} phase="entry" />);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeTruthy();
+  });
+
+  it("renders a BezierHandle when the 'to' keyframe is the selected one", () => {
+    const el = elWithEasing(null);
+    seed(el);
+    useBuilderStore.setState({ selectedKeyframeId: "kf-B" });
+    render(<TimelineTracks element={el} phase="entry" />);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeTruthy();
+  });
+
+  it("renders a BezierHandle after the operator hovers a segment hover-strip", () => {
+    const el = elWithEasing(null);
+    seed(el);
+    render(<TimelineTracks element={el} phase="entry" />);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeFalsy();
+    const strip = screen.getByTestId("bezier-segment-hover-kf-A");
+    fireEvent.mouseEnter(strip);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeTruthy();
+  });
+
+  it("hides the BezierHandle after mouseleave on the hover-strip (when not selected and easingOut is null)", () => {
+    const el = elWithEasing(null);
+    seed(el);
+    render(<TimelineTracks element={el} phase="entry" />);
+    const strip = screen.getByTestId("bezier-segment-hover-kf-A");
+    fireEvent.mouseEnter(strip);
+    fireEvent.mouseLeave(strip);
+    expect(document.querySelector(BEZIER_WRAPPER_SELECTOR)).toBeFalsy();
+  });
+
+  it("dragging a BezierHandle control point patches easingOut on the from-keyframe in the store", () => {
+    const el = elWithEasing(null);
+    seed(el);
+    // Select kf-A to force the handle to render with linear defaults.
+    useBuilderStore.setState({ selectedKeyframeId: "kf-A" });
+    render(<TimelineTracks element={el} phase="entry" />);
+    // Drag P1 by 25px horizontally and -10px vertically (segment is
+    // 1000ms wide @ 100 px/s = 100px).
+    const p1 = document.querySelector<SVGCircleElement>(
+      "[data-bezier-control='p1']",
+    )!;
+    fireEvent.mouseDown(p1, { clientX: 0, clientY: 28 });
+    fireEvent.mouseMove(window, { clientX: 25, clientY: 18 });
+    fireEvent.mouseUp(window);
+    const kfA = useBuilderStore
+      .getState()
+      .design?.scenes[0].elements[0].animation?.entry?.advancedTimeline?.find(
+        (t) => t.property === "opacity",
+      )
+      ?.keyframes.find((k) => k.id === "kf-A");
+    expect(kfA?.easingOut).not.toBeNull();
+    expect(kfA?.easingOut?.x1).toBeCloseTo(0.25, 5);
+    expect(kfA?.easingOut?.y1).toBeCloseTo(10 / 28, 5);
+    // P2 stayed at the linear endpoint (1, 1)
+    expect(kfA?.easingOut?.x2).toBe(1);
+    expect(kfA?.easingOut?.y2).toBe(1);
+  });
+});
