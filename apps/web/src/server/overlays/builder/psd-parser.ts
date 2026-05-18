@@ -13,6 +13,7 @@
  * Spec: docs/superpowers/specs/2026-05-17-overlay-builder-design.md §9
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { readPsd, initializeCanvas } from "ag-psd";
 import { PNG } from "pngjs";
 
@@ -217,4 +218,122 @@ export async function parsePsd(buffer: Buffer): Promise<ParsedPsd> {
   }
 
   return { flatPng, layers: layerOut, canvasWidth, canvasHeight };
+}
+
+/** Storage bucket holding every overlay-builder user asset. */
+const BUCKET = "overlay-user-assets";
+const PNG_MIME = "image/png";
+
+/**
+ * Wave 2A binding consumed by the Wave 2B Photopea bridge.
+ *
+ * Parses `psdBytes`, then for each non-hidden non-clipping layer:
+ *   1. Uploads the layer PNG to `psd/<parentAssetId>-layer-<i>.png`.
+ *   2. Inserts an `overlay_user_assets` row with
+ *      `asset_type='image'` + `psd_parent_asset_id=parentAssetId`.
+ * Also uploads the flat composite PNG to `psd/<parentAssetId>-flat.png`
+ * and inserts its asset row. Returns the new flat-PNG asset id plus
+ * the sprite asset ids in depth-first order.
+ *
+ * Does NOT touch the parent PSD row's `flat_png_asset_id` — the
+ * bridge re-links separately so a partial failure here doesn't
+ * orphan the parent.
+ *
+ * Signature mirrors the `ParsePsd` callback type in
+ * `photopea-bridge.ts` so the bridge can mock it via `vi.fn()` in
+ * unit tests without loading `ag-psd`.
+ */
+export async function parsePsdAndStoreSprites(
+  sb: SupabaseClient,
+  args: { readonly parentAssetId: string; readonly psdBytes: Uint8Array },
+): Promise<{
+  readonly flatPngAssetId: string;
+  readonly spriteAssetIds: readonly string[];
+}> {
+  const { parentAssetId, psdBytes } = args;
+  const buffer = Buffer.from(
+    psdBytes.buffer,
+    psdBytes.byteOffset,
+    psdBytes.byteLength,
+  );
+  const parsed = await parsePsd(buffer);
+
+  const flatPngAssetId = globalThis.crypto.randomUUID();
+  const spriteAssetIds: string[] = parsed.layers.map(() =>
+    globalThis.crypto.randomUUID(),
+  );
+  const flatKey = `psd/${parentAssetId}-flat.png`;
+  const layerKeys = parsed.layers.map(
+    (_, n) => `psd/${parentAssetId}-layer-${n}.png`,
+  );
+
+  // Storage writes first. Best-effort cleanup on failure: a future
+  // re-run will overwrite via upsert=true so orphaned blobs are
+  // tolerable in the admin-only surface.
+  const flatUp = (await sb.storage.from(BUCKET).upload(flatKey, parsed.flatPng, {
+    contentType: PNG_MIME,
+    upsert: true,
+  } as never)) as { error: { message: string } | null };
+  if (flatUp?.error != null) {
+    throw new Error(`flat PNG upload failed: ${flatUp.error.message}`);
+  }
+  for (let i = 0; i < parsed.layers.length; i++) {
+    const layerUp = (await sb.storage
+      .from(BUCKET)
+      .upload(layerKeys[i], parsed.layers[i].png, {
+        contentType: PNG_MIME,
+        upsert: true,
+      } as never)) as { error: { message: string } | null };
+    if (layerUp?.error != null) {
+      throw new Error(
+        `layer ${i} PNG upload failed: ${layerUp.error.message}`,
+      );
+    }
+  }
+
+  // DB writes — flat PNG row first, then sprites.
+  const flatIns = (await sb
+    .from("overlay_user_assets")
+    .insert({
+      id: flatPngAssetId,
+      asset_type: "image",
+      file_path: flatKey,
+      mime_type: PNG_MIME,
+      original_filename: `${parentAssetId}.flat.png`,
+      width: parsed.canvasWidth,
+      height: parsed.canvasHeight,
+      size_bytes: parsed.flatPng.byteLength,
+      psd_parent_asset_id: parentAssetId,
+      psd_layer_index: null,
+    })) as { error: { message: string } | null };
+  if (flatIns?.error != null) {
+    throw new Error(`flat PNG row insert failed: ${flatIns.error.message}`);
+  }
+
+  for (let i = 0; i < parsed.layers.length; i++) {
+    const layer = parsed.layers[i];
+    const w = layer.bounds.right - layer.bounds.left;
+    const h = layer.bounds.bottom - layer.bounds.top;
+    const layerIns = (await sb
+      .from("overlay_user_assets")
+      .insert({
+        id: spriteAssetIds[i],
+        asset_type: "image",
+        file_path: layerKeys[i],
+        mime_type: PNG_MIME,
+        original_filename: `${layer.name || `Layer ${i + 1}`}.png`,
+        width: w > 0 ? w : null,
+        height: h > 0 ? h : null,
+        size_bytes: layer.png.byteLength,
+        psd_parent_asset_id: parentAssetId,
+        psd_layer_index: layer.index,
+      })) as { error: { message: string } | null };
+    if (layerIns?.error != null) {
+      throw new Error(
+        `layer ${i} row insert failed: ${layerIns.error.message}`,
+      );
+    }
+  }
+
+  return { flatPngAssetId, spriteAssetIds };
 }
