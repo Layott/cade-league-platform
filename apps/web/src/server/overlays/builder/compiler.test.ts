@@ -240,3 +240,57 @@ describe("compileDesignToHtml — path elements", () => {
     expect(openHtml).not.toMatch(/Z"/);
   });
 });
+
+import { designSequence3Scenes } from "./fixtures/design-sequence-3-scenes";
+
+describe("compileDesignToHtml — sequence mode", () => {
+  const html = compileDesignToHtml(designSequence3Scenes, 0);
+
+  it("emits a <div data-scene-id> wrapper per scene", () => {
+    expect(html).toMatch(/<div\s+data-scene-id="00000000-0000-0000-0000-000000000701"/);
+    expect(html).toMatch(/<div\s+data-scene-id="00000000-0000-0000-0000-000000000702"/);
+    expect(html).toMatch(/<div\s+data-scene-id="00000000-0000-0000-0000-000000000703"/);
+  });
+
+  it("emits per-scene element rules namespaced by data-scene-id", () => {
+    expect(html).toMatch(
+      /\[data-scene-id="00000000-0000-0000-0000-000000000701"\]\s+\[data-element-id="00000000-0000-0000-0000-000000000801"\]/,
+    );
+  });
+
+  it("emits the canonical scene transition @keyframes blocks", () => {
+    expect(html).toContain("@keyframes scene-fade-in");
+    expect(html).toContain("@keyframes scene-fade-out");
+    expect(html).toContain("@keyframes scene-slide-left-in");
+    expect(html).toContain("@keyframes scene-slide-left-out");
+    expect(html).toContain("@keyframes scene-slide-up-in");
+    expect(html).toContain("@keyframes scene-slide-up-out");
+  });
+
+  it("hides non-active scenes by default (display:none until activated)", () => {
+    expect(html).toMatch(
+      /\[data-scene-id\]\s*\{[^}]*display:\s*none/,
+    );
+  });
+
+  it("emits __OVERLAY_SCENES_META__ with id/duration/transition for every scene", () => {
+    expect(html).toContain("window.__OVERLAY_SCENES_META__");
+    expect(html).toMatch(/id:\s*['"]00000000-0000-0000-0000-000000000701['"]/);
+    expect(html).toMatch(/durationMs:\s*5000/);
+    expect(html).toMatch(/transitionIn:\s*['"]fade['"]/);
+    expect(html).toMatch(/transitionOut:\s*['"]slide-left['"]/);
+    expect(html).toMatch(/id:\s*['"]00000000-0000-0000-0000-000000000702['"]/);
+    expect(html).toMatch(/durationMs:\s*3000/);
+  });
+
+  it("renders text + image content in each scene's elements", () => {
+    expect(html).toContain(">MIDDLE<");
+    expect(html).toContain("/overlay-user-assets/image/logo-outro.png");
+  });
+
+  it("does NOT emit __OVERLAY_SCENES_META__ for single-mode designs", () => {
+    // Use a single-mode fixture from Wave 1A
+    const singleHtml = compileDesignToHtml(designRectTextImage, 0);
+    expect(singleHtml).not.toContain("__OVERLAY_SCENES_META__");
+  });
+});

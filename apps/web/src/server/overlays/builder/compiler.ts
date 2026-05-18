@@ -127,6 +127,47 @@ function presetKeyframesFor(type: AnimTypeLocal, phase: "in" | "out"): string | 
 }
 
 // -----------------------------------------------------------------------------
+// Scene transition keyframes (Wave 3A). Emitted once per design in
+// sequence mode. Referenced by per-scene rules under
+// `[data-scene-id="..."][data-scene-state="entering"|"exiting"]`.
+// -----------------------------------------------------------------------------
+
+const SCENE_TRANSITION_KEYFRAMES = `
+@keyframes scene-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scene-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes scene-slide-left-in { from { transform: translateX(64px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes scene-slide-left-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-64px); opacity: 0; } }
+@keyframes scene-slide-right-in { from { transform: translateX(-64px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes scene-slide-right-out { from { transform: translateX(0); opacity: 1; } to { transform: translateX(64px); opacity: 0; } }
+@keyframes scene-slide-up-in { from { transform: translateY(64px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes scene-slide-up-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-64px); opacity: 0; } }
+@keyframes scene-slide-down-in { from { transform: translateY(-64px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes scene-slide-down-out { from { transform: translateY(0); opacity: 1; } to { transform: translateY(64px); opacity: 0; } }
+`.trim();
+
+const SCENE_TRANSITION_DURATION_MS = 480;
+
+function sceneTransitionRules(
+  transitionIn: string,
+  transitionOut: string,
+  sceneId: string,
+): string {
+  if (transitionIn === "cut" && transitionOut === "cut") return "";
+  const rules: string[] = [];
+  if (transitionIn !== "cut") {
+    rules.push(
+      `[data-scene-id="${sceneId}"][data-scene-state="entering"] { animation: scene-${transitionIn}-in ${SCENE_TRANSITION_DURATION_MS}ms ease-out both; }`,
+    );
+  }
+  if (transitionOut !== "cut") {
+    rules.push(
+      `[data-scene-id="${sceneId}"][data-scene-state="exiting"] { animation: scene-${transitionOut}-out ${SCENE_TRANSITION_DURATION_MS}ms ease-in both; }`,
+    );
+  }
+  return rules.join("\n");
+}
+
+// -----------------------------------------------------------------------------
 // HTML escape (minimal — text content + attribute values).
 // -----------------------------------------------------------------------------
 
@@ -533,6 +574,12 @@ export function compileDesignToHtml(
   sceneIndex: number = 0,
   opts: { demo?: boolean } = {},
 ): string {
+  // Wave 3A — sequence mode emits every scene, namespaced by data-scene-id.
+  // Single mode falls through to the Wave 1A path below.
+  if (design.mode === "sequence") {
+    return compileSequence(design, opts);
+  }
+
   const scene =
     design.scenes[sceneIndex] ??
     design.scenes[0] ?? {
@@ -577,6 +624,151 @@ ${animationRules}
 <body>
 <script>${feedsScript}\n${demoFlag}</script>
 ${elementDom}
+<script>${BOOTSTRAP_SCRIPT}</script>
+</body>
+</html>`;
+}
+
+// -----------------------------------------------------------------------------
+// Wave 3A — sequence-mode compile path.
+//
+// When `design.mode === 'sequence'`, emit every scene's DOM inside
+// `<div data-scene-id="...">` wrappers and namespace every element CSS
+// rule with the scene selector so styles never bleed across scenes.
+// Scene-level transitions are driven by `data-scene-state` attribute
+// flips applied by the bootstrap's `runSequence` driver, which reads
+// `window.__OVERLAY_SCENES_META__` for the scene order + durations.
+// -----------------------------------------------------------------------------
+
+function compileSequence(
+  design: Design,
+  opts: { demo?: boolean } = {},
+): string {
+  const allFontFaces = new Set<string>();
+  const allKeyframes: string[] = [];
+  const allElementDefaultRules: string[] = [];
+  const allElementVisibleRules: string[] = [];
+  const allElementExitingRules: string[] = [];
+  const allAnimationRules: string[] = [];
+  const allSceneTransitionRules: string[] = [];
+  const allSceneDom: string[] = [];
+  const allFeeds = new Set<string>();
+
+  for (const scene of design.scenes) {
+    // Fonts (de-duped via Set)
+    for (const el of scene.elements) {
+      const fam = el.style?.fontFamily;
+      if (fam && FONT_MAP[fam]) allFontFaces.add(fam);
+    }
+
+    // Element rules with `[data-scene-id="..."] ...` prefix so they only
+    // apply within the wrapping scene container.
+    const sceneSel = `[data-scene-id="${scene.id}"]`;
+    for (const el of scene.elements) {
+      allElementDefaultRules.push(`${sceneSel} ${elementDefaultRule(el)}`);
+      allElementVisibleRules.push(
+        `body.cade-visible ${sceneSel}[data-scene-state="active"] [data-element-id="${el.id}"] { opacity: ${el.transform.opacity}; }`,
+      );
+      allElementExitingRules.push(
+        `${sceneSel}[data-scene-state="exiting"] [data-element-id="${el.id}"] { opacity: 0; }`,
+      );
+    }
+
+    // Per-element animations (Wave 1A entry/exit/loop) — re-scope every
+    // rule with the scene selector so they only fire inside their scene.
+    const animBlocks = collectAnimationBlocks(scene);
+    if (animBlocks.keyframes) allKeyframes.push(animBlocks.keyframes);
+    if (animBlocks.rules) {
+      const scoped = animBlocks.rules
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => `${sceneSel} ${line}`)
+        .join("\n");
+      allAnimationRules.push(scoped);
+    }
+
+    // Scene-level transition rules (in/out).
+    allSceneTransitionRules.push(
+      sceneTransitionRules(scene.transitionIn, scene.transitionOut, scene.id),
+    );
+
+    // Wrap DOM in the scene container, default state = inactive.
+    const elementDom = scene.elements.map(renderElementDom).join("\n");
+    allSceneDom.push(
+      `<div data-scene-id="${scene.id}" data-scene-state="inactive">\n${elementDom}\n</div>`,
+    );
+
+    // Feeds.
+    for (const el of scene.elements) {
+      if (el.binding?.feed) allFeeds.add(el.binding.feed);
+    }
+  }
+
+  // Build font-face block.
+  const fontFaceBlocks: string[] = [];
+  for (const family of allFontFaces) {
+    const path = FONT_MAP[family]!;
+    fontFaceBlocks.push(
+      `@font-face { font-family: '${family}'; src: url('${path}') format('woff2'); font-display: swap; }`,
+    );
+  }
+
+  // Build feeds registry script (same shape as single-mode).
+  const feedsArr = Array.from(allFeeds);
+  const feedEntries: string[] = [];
+  for (const feed of feedsArr) {
+    const spec = FEED_REGISTRY[feed];
+    if (!spec) continue;
+    const fetchPath = spec.fetchPath ? `'${spec.fetchPath}'` : "null";
+    const channels = spec.realtimeChannels.map((c) => `'${c}'`).join(", ");
+    feedEntries.push(
+      `  ${feed}: { fetchPath: ${fetchPath}, realtimeChannels: [${channels}] }`,
+    );
+  }
+  const feedsScript =
+    feedsArr.length === 0
+      ? "window.__OVERLAY_FEEDS__ = {};"
+      : `window.__OVERLAY_FEEDS__ = {\n${feedEntries.join(",\n")}\n};`;
+
+  // Build scenes-meta script. Each entry has id/durationMs/transitionIn/
+  // transitionOut so the bootstrap's runSequence driver knows the order.
+  const sceneMetaEntries = design.scenes
+    .map(
+      (s) =>
+        `  { id: '${s.id}', durationMs: ${s.durationMs}, transitionIn: '${s.transitionIn}', transitionOut: '${s.transitionOut}' }`,
+    )
+    .join(",\n");
+  const scenesMetaScript = `window.__OVERLAY_SCENES_META__ = [\n${sceneMetaEntries}\n];`;
+
+  const demoFlag = opts.demo === true ? "window.__OVERLAY_DEMO__ = true;" : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>${htmlEscape(design.title)}</title>
+<style>
+html, body { background: transparent !important; color-scheme: dark; margin: 0; padding: 0; }
+body { width: 1920px; height: 1080px; overflow: hidden; opacity: 1 !important; }
+${fontFaceBlocks.join("\n")}
+[data-scene-id] { position: absolute; inset: 0; display: none; }
+[data-scene-id][data-scene-state="active"],
+[data-scene-id][data-scene-state="entering"],
+[data-scene-id][data-scene-state="exiting"] { display: block; }
+${SCENE_TRANSITION_KEYFRAMES}
+${allSceneTransitionRules.join("\n")}
+${allElementDefaultRules.join("\n")}
+${allElementVisibleRules.join("\n")}
+${allElementExitingRules.join("\n")}
+${allKeyframes.join("\n")}
+${allAnimationRules.join("\n")}
+</style>
+</head>
+<body>
+<script>${feedsScript}\n${scenesMetaScript}\n${demoFlag}</script>
+${allSceneDom.join("\n")}
 <script>${BOOTSTRAP_SCRIPT}</script>
 </body>
 </html>`;
