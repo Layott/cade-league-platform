@@ -299,7 +299,11 @@ export function CanvasStage() {
 
   if (!design || !activeSceneId) {
     return (
-      <div className="flex h-full items-center justify-center text-white/30">
+      <div
+        data-testid="builder-canvas-stage"
+        data-state="empty"
+        className="flex h-full items-center justify-center text-white/30"
+      >
         No scene loaded
       </div>
     );
@@ -315,7 +319,11 @@ export function CanvasStage() {
   const h = design.canvasHeight * zoom;
 
   return (
-    <div className="overflow-auto">
+    <div
+      data-testid="builder-canvas-stage"
+      data-state="ready"
+      className="overflow-auto"
+    >
       <Stage
         width={w}
         height={h}

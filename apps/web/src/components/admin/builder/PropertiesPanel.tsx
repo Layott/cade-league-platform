@@ -97,6 +97,8 @@ export function PropertiesPanel({
     return (
       <aside
         aria-label="Properties"
+        data-testid="properties-panel"
+        data-state="empty"
         className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-zinc-950"
       >
         {showSceneDrawer && <ScenePropertiesDrawer />}
@@ -121,6 +123,9 @@ export function PropertiesPanel({
   return (
     <aside
       aria-label="Properties"
+      data-testid="properties-panel"
+      data-state="active"
+      data-element-type={selected.elementType}
       className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-zinc-950"
     >
       {/* Wave 1C — Group / Ungroup action row */}
@@ -154,6 +159,7 @@ export function PropertiesPanel({
           <button
             key={t}
             role="tab"
+            data-testid={`properties-tab-${t}`}
             aria-selected={safeTab === t}
             onClick={() => setActiveTab(t)}
             className={`flex-1 px-2 py-2 text-xs uppercase tracking-wider transition ${
@@ -204,11 +210,13 @@ function NumberField({
   value,
   onChange,
   step = 1,
+  testId,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   step?: number;
+  testId?: string;
 }) {
   return (
     <label className="mb-2 block">
@@ -220,6 +228,7 @@ function NumberField({
         value={Number.isFinite(value) ? value : 0}
         step={step}
         aria-label={label}
+        data-testid={testId}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
       />
@@ -335,6 +344,7 @@ function StyleTab({
           </span>
           <textarea
             aria-label="Text content"
+            data-testid="properties-text-content"
             rows={3}
             value={(element.content?.text as string) ?? ""}
             onChange={(e) => patchContent({ text: e.target.value })}
@@ -360,6 +370,7 @@ function StyleTab({
 
         <NumberField
           label="Font size"
+          testId="properties-text-fontsize"
           value={(s.fontSize as number) ?? 32}
           onChange={(n) => patchStyle({ fontSize: n })}
         />
@@ -673,6 +684,7 @@ function PhaseBlock({
             <span className="sr-only">{phase} type</span>
             <select
               aria-label={`${phase} type`}
+              data-testid={`animation-${phase}-type`}
               value={v.type}
               disabled={isAdvanced}
               onChange={(e) =>
@@ -696,6 +708,7 @@ function PhaseBlock({
           >
             <NumberField
               label="Duration ms"
+              testId={`animation-${phase}-duration`}
               value={v.durationMs ?? 400}
               onChange={(n) =>
                 patch({
@@ -706,6 +719,7 @@ function PhaseBlock({
 
             <NumberField
               label="Delay ms"
+              testId={`animation-${phase}-delay`}
               value={v.delayMs ?? 0}
               onChange={(n) =>
                 patch({

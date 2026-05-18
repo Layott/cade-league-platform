@@ -239,6 +239,8 @@ function LayerRow({
       style={style}
       role="listitem"
       data-layer-indent={depth}
+      data-testid={`builder-element-row-${el.id}`}
+      data-element-type={el.elementType}
       className={`flex items-center gap-2 border-b border-white/5 py-1 pr-2 text-sm ${
         selected ? "bg-[#6bcd06]/10" : "hover:bg-white/5"
       }`}

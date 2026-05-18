@@ -120,15 +120,16 @@ export function Toolbar() {
     <aside aria-label="Toolbar" className="relative flex w-16 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-zinc-950 py-3">
       <ToolButton
         label="Select"
+        testId="toolbar-tool-select"
         active={toolMode === "select" && mode === "select"}
         onClick={() => { setMode("select"); setToolMode("select"); cancelPenDraft(); }}
       >
         <MousePointer2 size={18} />
       </ToolButton>
-      <ToolButton label="Rect" onClick={addRect}>
+      <ToolButton label="Rect" testId="toolbar-tool-rect" onClick={addRect}>
         <Square size={18} />
       </ToolButton>
-      <ToolButton label="Text" onClick={addText}>
+      <ToolButton label="Text" testId="toolbar-tool-text" onClick={addText}>
         <Type size={18} />
       </ToolButton>
       <div className="relative">
@@ -139,6 +140,7 @@ export function Toolbar() {
           aria-haspopup="menu"
           aria-expanded={imageMenuOpen}
           title="Image"
+          data-testid="toolbar-tool-image"
           onClick={() => setImageMenuOpen((v) => !v)}
           className={`flex h-10 w-10 items-center justify-center rounded text-white/80 transition hover:bg-white/10 hover:text-white ${
             imageMenuOpen ? "bg-white/10 text-white" : ""
@@ -154,6 +156,7 @@ export function Toolbar() {
             <button
               role="menuitem"
               type="button"
+              data-testid="toolbar-image-upload"
               onClick={addPlaceholderImage}
               className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
             >
@@ -163,6 +166,7 @@ export function Toolbar() {
             <button
               role="menuitem"
               type="button"
+              data-testid="toolbar-image-psd"
               onClick={openPsdPicker}
               className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
             >
@@ -172,26 +176,26 @@ export function Toolbar() {
           </div>
         )}
       </div>
-      <ToolButton label="Pen" active={toolMode === "pen"} onClick={() => startPenDraft()}>
+      <ToolButton label="Pen" testId="toolbar-tool-pen" active={toolMode === "pen"} onClick={() => startPenDraft()}>
         <PenTool size={18} />
       </ToolButton>
-      <ToolButton label="Ellipse" onClick={addEllipse}>
+      <ToolButton label="Ellipse" testId="toolbar-tool-ellipse" onClick={addEllipse}>
         <Circle size={18} />
       </ToolButton>
-      <ToolButton label="Line" onClick={addLine}>
+      <ToolButton label="Line" testId="toolbar-tool-line" onClick={addLine}>
         <Minus size={18} />
       </ToolButton>
-      <ToolButton label="Polygon" onClick={addPolygon}>
+      <ToolButton label="Polygon" testId="toolbar-tool-polygon" onClick={addPolygon}>
         <Hexagon size={18} />
       </ToolButton>
-      <ToolButton label="Data Slot" onClick={openDataSlots}>
+      <ToolButton label="Data Slot" testId="toolbar-tool-data-slot" onClick={openDataSlots}>
         <Database size={18} />
       </ToolButton>
       <hr className="my-2 w-8 border-white/10" />
-      <ToolButton label="Undo" onClick={() => undo()}>
+      <ToolButton label="Undo" testId="toolbar-undo" onClick={() => undo()}>
         <Undo2 size={18} />
       </ToolButton>
-      <ToolButton label="Redo" onClick={() => redo()}>
+      <ToolButton label="Redo" testId="toolbar-redo" onClick={() => redo()}>
         <Redo2 size={18} />
       </ToolButton>
     </aside>
@@ -202,11 +206,13 @@ function ToolButton({
   label,
   onClick,
   active,
+  testId,
   children,
 }: {
   label: string;
   onClick: () => void;
   active?: boolean;
+  testId?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -214,6 +220,7 @@ function ToolButton({
       type="button"
       aria-label={label}
       title={label}
+      data-testid={testId}
       onClick={onClick}
       className={`flex h-10 w-10 items-center justify-center rounded text-white/80 transition hover:bg-white/10 hover:text-white ${
         active ? "bg-[#6bcd06]/15 text-[#6bcd06]" : ""

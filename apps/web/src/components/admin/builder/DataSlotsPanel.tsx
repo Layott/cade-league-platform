@@ -64,6 +64,7 @@ export function DataSlotsPanel() {
   return (
     <div
       data-state={open ? "open" : "closed"}
+      data-testid="data-slot-picker-modal"
       aria-hidden={!open}
       className={`fixed inset-y-0 left-16 z-40 w-80 transform border-r border-white/10 bg-zinc-950 transition-transform ${
         open ? "translate-x-0" : "-translate-x-full"
@@ -76,6 +77,7 @@ export function DataSlotsPanel() {
         <button
           type="button"
           aria-label="Close data slots"
+          data-testid="data-slot-picker-close"
           onClick={() => setOpen(false)}
           className="text-white/50 hover:text-white"
         >
@@ -85,7 +87,11 @@ export function DataSlotsPanel() {
 
       <div className="h-[calc(100%-2.25rem)] overflow-auto p-2">
         {grouped.map(([cat, slots]) => (
-          <section key={cat} className="mb-3">
+          <section
+            key={cat}
+            data-testid={`data-slot-feed-${cat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+            className="mb-3"
+          >
             <h3 className="mb-1 px-1 text-xs font-semibold uppercase tracking-wider text-[#6bcd06]">
               {cat}
             </h3>
@@ -94,6 +100,7 @@ export function DataSlotsPanel() {
                 <li key={slot.id}>
                   <button
                     type="button"
+                    data-testid={`data-slot-field-${slot.id}`}
                     onClick={() => insert(slot)}
                     className="w-full rounded border border-white/10 bg-black px-2 py-2 text-left text-sm text-white/80 transition hover:border-[#6bcd06]/40 hover:text-white"
                   >

@@ -77,10 +77,14 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-10">
+    <div data-testid="builder-library" className="mx-auto max-w-7xl px-6 py-10">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Overlay Designs</h1>
-        <PrimaryButton type="button" onClick={() => setOpen(true)}>
+        <PrimaryButton
+          type="button"
+          data-testid="builder-new-design"
+          onClick={() => setOpen(true)}
+        >
           New Design
         </PrimaryButton>
       </header>
@@ -95,6 +99,7 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
         <div
           role="dialog"
           aria-modal="true"
+          data-testid="builder-new-design-modal"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
           onClick={() => !isPending && setOpen(false)}
         >
@@ -109,6 +114,7 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
               <span className="mb-1 block text-sm text-white/70">Title</span>
               <input
                 aria-label="Title"
+                data-testid="builder-new-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -124,6 +130,7 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
               <label className="mr-4 inline-flex items-center gap-2">
                 <input
                   aria-label="Single"
+                  data-testid="builder-new-mode-single"
                   type="radio"
                   name="mode"
                   value="single"
@@ -135,6 +142,7 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
               <label className="inline-flex items-center gap-2">
                 <input
                   aria-label="Sequence"
+                  data-testid="builder-new-mode-sequence"
                   type="radio"
                   name="mode"
                   value="sequence"
@@ -157,6 +165,7 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
               </SecondaryButton>
               <PrimaryButton
                 type="submit"
+                data-testid="builder-new-submit"
                 disabled={isPending || title.trim().length < 2}
               >
                 {isPending ? "Creating…" : "Create"}

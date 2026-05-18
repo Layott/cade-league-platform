@@ -163,6 +163,7 @@ export default async function LoginPage({
                 required
                 autoComplete="email"
                 placeholder="you@cade.local"
+                data-testid="login-email-input"
                 className={inputClass}
               />
             </FormField>

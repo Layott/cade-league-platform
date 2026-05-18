@@ -117,6 +117,7 @@ export function TopBar() {
           <span className="sr-only">Title</span>
           <input
             aria-label="Title"
+            data-testid="builder-title-input"
             type="text"
             value={title}
             onChange={onTitleChange}
@@ -124,8 +125,20 @@ export function TopBar() {
           />
         </label>
         {design && (
-          <span className="text-xs uppercase tracking-wider text-white/40">
+          <span
+            data-testid="builder-status-badge"
+            className="text-xs uppercase tracking-wider text-white/40"
+          >
             {design.status}
+          </span>
+        )}
+        {dirty && (
+          <span
+            data-testid="builder-dirty-indicator"
+            className="text-[10px] uppercase tracking-wider text-[#fe036d]"
+            aria-label="unsaved changes"
+          >
+            • unsaved
           </span>
         )}
       </div>
@@ -171,6 +184,11 @@ export function TopBar() {
         </SecondaryButton>
         <SecondaryButton
           type="button"
+          data-testid={
+            design?.status === "published"
+              ? "builder-unpublish"
+              : "builder-publish"
+          }
           disabled={isPublishing || !design}
           onClick={onPublishToggle}
         >
@@ -178,11 +196,15 @@ export function TopBar() {
         </SecondaryButton>
         <PrimaryButton
           type="button"
+          data-testid="builder-save"
           disabled={!dirty || isSaving}
           onClick={onSave}
         >
           {isSaving ? "Saving…" : "Save"}
         </PrimaryButton>
+        <span data-testid="builder-save-status" className="sr-only">
+          {isSaving ? "saving" : dirty ? "dirty" : "saved"}
+        </span>
       </div>
     </header>
   );
