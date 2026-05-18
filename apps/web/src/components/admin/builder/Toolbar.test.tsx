@@ -67,12 +67,37 @@ describe("Toolbar", () => {
     expect(els[0].content?.text).toBe("Text");
   });
 
-  it("clicking Image adds an image-placeholder element", () => {
+  it("Image button opens popover (does not insert directly)", () => {
     render(<Toolbar />);
     fireEvent.click(screen.getByRole("button", { name: /^image$/i }));
     const els = useBuilderStore.getState().design!.scenes[0].elements;
+    expect(els).toHaveLength(0);
+  });
+
+  it("Image button opens a popover with Upload + From PSD sub-options", () => {
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^image$/i }));
+    expect(screen.getByRole("menuitem", { name: /upload image/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /from psd/i })).toBeInTheDocument();
+  });
+
+  it("clicking Upload image still drops the placeholder image element", () => {
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^image$/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /upload image/i }));
+    const els = useBuilderStore.getState().design!.scenes[0].elements;
     expect(els[0].elementType).toBe("image");
     expect(els[0].content?.assetId).toBe("image-placeholder");
+  });
+
+  it("clicking From PSD fires the open-psd-picker window event", () => {
+    const handler = vi.fn();
+    window.addEventListener("builder:open-psd-picker", handler);
+    render(<Toolbar />);
+    fireEvent.click(screen.getByRole("button", { name: /^image$/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /from psd/i }));
+    expect(handler).toHaveBeenCalled();
+    window.removeEventListener("builder:open-psd-picker", handler);
   });
 
   it("Undo button fires temporal undo", () => {

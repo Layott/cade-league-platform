@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useStore } from "zustand/react";
 import {
   MousePointer2,
@@ -14,19 +14,24 @@ import {
   Minus,
   Hexagon,
   PenTool,
+  Layers,
 } from "lucide-react";
 import { useBuilderStore, useTemporalStore } from "@/state/builder/store";
 
 /**
- * Wave 1A — left-rail toolbar.
+ * Wave 2A — left-rail toolbar (updated).
  *
- * Vertical column of 40 px square icon buttons. Each tool either sets
- * the cursor mode (Select), inserts a default element into the active
- * scene at canvas-center (Rect / Text / Image), opens the data-slots
- * drawer (broadcast event), or fires the temporal undo / redo.
+ * Image button became a split-button popover with two options:
+ *   - Upload image → existing Wave 1A behavior (drops a placeholder
+ *     image element; Wave 1B wires real upload).
+ *   - From PSD → fires `builder:open-psd-picker` window event so the
+ *     PsdPlaceDrawer (rendered by the editor shell) can list PSDs +
+ *     hand a layer back as an image element.
  */
 export function Toolbar() {
   const [mode, setMode] = useState<"select" | "insert">("select");
+  const [imageMenuOpen, setImageMenuOpen] = useState(false);
+  const imageBtnRef = useRef<HTMLButtonElement | null>(null);
   const activeSceneId = useBuilderStore((s) => s.activeSceneId);
   const addElement = useBuilderStore((s) => s.addElement);
   const undo = useStore(useTemporalStore, (s) => s.undo);
@@ -35,6 +40,15 @@ export function Toolbar() {
   const setToolMode = useBuilderStore((s) => s.setToolMode);
   const startPenDraft = useBuilderStore((s) => s.startPenDraft);
   const cancelPenDraft = useBuilderStore((s) => s.cancelPenDraft);
+
+  useEffect(() => {
+    if (!imageMenuOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (!imageBtnRef.current?.contains(e.target as Node)) setImageMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [imageMenuOpen]);
 
   function addRect() {
     if (!activeSceneId) return;
@@ -55,7 +69,7 @@ export function Toolbar() {
     });
   }
 
-  function addImage() {
+  function addPlaceholderImage() {
     if (!activeSceneId) return;
     addElement(activeSceneId, "image", {
       transform: { x: 860, y: 440, width: 200, height: 200, rotation: 0, scaleX: 1, scaleY: 1, opacity: 1 },
@@ -63,6 +77,7 @@ export function Toolbar() {
       content: { assetId: "image-placeholder", imageFit: "cover" },
       zIndex: 0,
     });
+    setImageMenuOpen(false);
   }
 
   function addEllipse() {
@@ -92,12 +107,17 @@ export function Toolbar() {
     });
   }
 
+  function openPsdPicker() {
+    window.dispatchEvent(new CustomEvent("builder:open-psd-picker"));
+    setImageMenuOpen(false);
+  }
+
   function openDataSlots() {
     window.dispatchEvent(new CustomEvent("builder:open-data-slots"));
   }
 
   return (
-    <aside aria-label="Toolbar" className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-zinc-950 py-3">
+    <aside aria-label="Toolbar" className="relative flex w-16 shrink-0 flex-col items-center gap-1 border-r border-white/10 bg-zinc-950 py-3">
       <ToolButton
         label="Select"
         active={toolMode === "select" && mode === "select"}
@@ -111,9 +131,47 @@ export function Toolbar() {
       <ToolButton label="Text" onClick={addText}>
         <Type size={18} />
       </ToolButton>
-      <ToolButton label="Image" onClick={addImage}>
-        <ImageIcon size={18} />
-      </ToolButton>
+      <div className="relative">
+        <button
+          ref={imageBtnRef}
+          type="button"
+          aria-label="Image"
+          aria-haspopup="menu"
+          aria-expanded={imageMenuOpen}
+          title="Image"
+          onClick={() => setImageMenuOpen((v) => !v)}
+          className={`flex h-10 w-10 items-center justify-center rounded text-white/80 transition hover:bg-white/10 hover:text-white ${
+            imageMenuOpen ? "bg-white/10 text-white" : ""
+          }`}
+        >
+          <ImageIcon size={18} />
+        </button>
+        {imageMenuOpen && (
+          <div
+            role="menu"
+            className="absolute left-12 top-0 z-50 w-44 rounded-md border border-white/10 bg-zinc-900 p-1 shadow-xl"
+          >
+            <button
+              role="menuitem"
+              type="button"
+              onClick={addPlaceholderImage}
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+            >
+              <ImageIcon size={14} />
+              Upload image
+            </button>
+            <button
+              role="menuitem"
+              type="button"
+              onClick={openPsdPicker}
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+            >
+              <Layers size={14} />
+              From PSD
+            </button>
+          </div>
+        )}
+      </div>
       <ToolButton label="Pen" active={toolMode === "pen"} onClick={() => startPenDraft()}>
         <PenTool size={18} />
       </ToolButton>
