@@ -128,3 +128,225 @@ describe("validateAnimation — rejection paths", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("validateAnimation — Wave 3B advanced timeline", () => {
+  it("accepts advanced opacity track with 2 keyframes inside duration", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: 0, easingOut: null },
+              { id: "k2", timeMs: 600, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts multi-property advanced timeline (opacity + x + scaleX)", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 1000,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "o1", timeMs: 0, value: 0, easingOut: null },
+              { id: "o2", timeMs: 1000, value: 1, easingOut: null },
+            ],
+          },
+          {
+            property: "x",
+            keyframes: [
+              { id: "x1", timeMs: 0, value: -120, easingOut: { x1: 0.4, y1: 0, x2: 0.6, y2: 1 } },
+              { id: "x2", timeMs: 1000, value: 0, easingOut: null },
+            ],
+          },
+          {
+            property: "scaleX",
+            keyframes: [
+              { id: "s1", timeMs: 0, value: 0.8, easingOut: null },
+              { id: "s2", timeMs: 500, value: 1.1, easingOut: null },
+              { id: "s3", timeMs: 1000, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects non-monotonic keyframe times", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: 0, easingOut: null },
+              { id: "k2", timeMs: 600, value: 1, easingOut: null },
+              { id: "k3", timeMs: 300, value: 0.5, easingOut: null }, // out of order
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.join("|")).toMatch(/monotonic|order/i);
+    }
+  });
+
+  it("rejects keyframe time greater than phase durationMs", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: 0, easingOut: null },
+              { id: "k2", timeMs: 9000, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.join("|")).toMatch(/durationMs|range/i);
+    }
+  });
+
+  it("rejects numeric value on color property", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "color",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: 0.5, easingOut: null }, // wrong type
+              { id: "k2", timeMs: 600, value: "#fe036d", easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.join("|")).toMatch(/color.*string|value.*type/i);
+    }
+  });
+
+  it("rejects string value on opacity property", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: "zero", easingOut: null },
+              { id: "k2", timeMs: 600, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects opacity values outside [0, 1]", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: -0.2, easingOut: null },
+              { id: "k2", timeMs: 600, value: 1.5, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rejects mutual-exclusivity violation (preset type AND advanced timeline)", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "slide-left",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "ease-out",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 0, value: 0, easingOut: null },
+              { id: "k2", timeMs: 600, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.join("|")).toMatch(/mutual|exclusive|both/i);
+    }
+  });
+
+  it("rejects duplicate keyframe times within a track", () => {
+    const r = validateAnimation({
+      entry: {
+        type: "noop",
+        durationMs: 600,
+        delayMs: 0,
+        easing: "linear",
+        advancedTimeline: [
+          {
+            property: "opacity",
+            keyframes: [
+              { id: "k1", timeMs: 300, value: 0, easingOut: null },
+              { id: "k2", timeMs: 300, value: 1, easingOut: null },
+            ],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.join("|")).toMatch(/duplicate|distinct/i);
+    }
+  });
+});

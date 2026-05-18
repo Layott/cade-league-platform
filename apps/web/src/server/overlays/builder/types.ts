@@ -236,6 +236,7 @@ export const AnimTypeSchema = z.enum([
   "shake",
   "flip",
   "custom-css",
+  "noop", // Wave 3B sentinel — phase driven by advancedTimeline only
 ]);
 export type AnimType = z.infer<typeof AnimTypeSchema>;
 

@@ -17,8 +17,15 @@
 
 import { z } from "zod";
 import { sanitizeKeyframes } from "../animations/sanitize_keyframes";
-import { AnimTypeSchema } from "./types";
-import type { Animation, AnimType, PresetAnim } from "./types";
+import { AdvancedTimelineSchema, AnimTypeSchema } from "./types";
+import type {
+  AdvancedTimeline,
+  AdvancedTimelineTrack,
+  Animation,
+  AnimType,
+  PresetAnim,
+  TimelineProperty,
+} from "./types";
 
 const NAMED_EASING = new Set([
   "linear",
@@ -35,15 +42,168 @@ const DURATION_MAX = 30000;
 
 // The phase payload may carry a `keyframesBody` alongside the preset
 // fields when `type === "custom-css"`. We accept the extended shape
-// here so callers don't need to bolt it onto PresetAnim.
+// here so callers don't need to bolt it onto PresetAnim. Wave 3B adds
+// `advancedTimeline` — validated below in `validateAdvancedTimeline`.
 const PhasePayloadSchema = z.object({
   type: AnimTypeSchema,
   durationMs: z.number(),
   delayMs: z.number(),
   easing: z.string(),
   keyframesBody: z.string().optional(),
+  advancedTimeline: AdvancedTimelineSchema.optional(),
 });
 type PhasePayload = z.infer<typeof PhasePayloadSchema>;
+
+// ─────────── Wave 3B — advanced timeline validation ───────────
+//
+// Property → expected value kind. Branch in `validateTrack`.
+const NUMERIC_PROPS = new Set<TimelineProperty>([
+  "opacity",
+  "x",
+  "y",
+  "scaleX",
+  "scaleY",
+  "rotation",
+]);
+const STRING_PROPS = new Set<TimelineProperty>(["color", "filter"]);
+
+// Per-property numeric range. Tight ranges catch silly inputs early.
+const NUMERIC_RANGE: Record<string, { min: number; max: number }> = {
+  opacity: { min: 0, max: 1 },
+  x: { min: -10_000, max: 10_000 },
+  y: { min: -10_000, max: 10_000 },
+  scaleX: { min: 0, max: 100 },
+  scaleY: { min: 0, max: 100 },
+  rotation: { min: -3600, max: 3600 },
+};
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{3,8}$/;
+
+function validateTrack(
+  track: AdvancedTimelineTrack,
+  phaseDurationMs: number,
+  errors: string[],
+): void {
+  const { property, keyframes } = track;
+  const isNumeric = NUMERIC_PROPS.has(property);
+  const isString = STRING_PROPS.has(property);
+
+  // 1. Monotonic time order + distinct times.
+  for (let i = 1; i < keyframes.length; i++) {
+    const prev = keyframes[i - 1]!;
+    const cur = keyframes[i]!;
+    if (cur.timeMs < prev.timeMs) {
+      errors.push(
+        `track[${property}]: keyframes not monotonic (kf[${i}].timeMs=${cur.timeMs} < kf[${i - 1}].timeMs=${prev.timeMs})`,
+      );
+    }
+    if (cur.timeMs === prev.timeMs) {
+      errors.push(
+        `track[${property}]: duplicate keyframe times not allowed (both at ${cur.timeMs}ms — keyframes must be distinct in time)`,
+      );
+    }
+  }
+
+  // 2. Time bounds inside phase duration.
+  for (const kf of keyframes) {
+    if (kf.timeMs < 0 || kf.timeMs > phaseDurationMs) {
+      errors.push(
+        `track[${property}]: keyframe ${kf.id} timeMs=${kf.timeMs} outside phase range [0, ${phaseDurationMs}]`,
+      );
+    }
+  }
+
+  // 3. Value type matches property kind.
+  for (const kf of keyframes) {
+    if (isNumeric && typeof kf.value !== "number") {
+      errors.push(
+        `track[${property}]: keyframe ${kf.id} value must be a number (got ${typeof kf.value})`,
+      );
+    }
+    if (isString && typeof kf.value !== "string") {
+      errors.push(
+        `track[${property}]: keyframe ${kf.id} value must be a string (got ${typeof kf.value})`,
+      );
+    }
+  }
+
+  // 4. Numeric range checks.
+  if (isNumeric) {
+    const range = NUMERIC_RANGE[property];
+    if (range) {
+      for (const kf of keyframes) {
+        const v = kf.value;
+        if (typeof v === "number" && (v < range.min || v > range.max)) {
+          errors.push(
+            `track[${property}]: keyframe ${kf.id} value=${v} outside allowed range [${range.min}, ${range.max}]`,
+          );
+        }
+      }
+    }
+  }
+
+  // 5. String shape: color must be hex; filter rejects url() / @ /
+  //    expression() / <>. Compiler emits these into `filter:` CSS, so
+  //    we mirror the sanitize_keyframes denylist tokens here.
+  if (property === "color") {
+    for (const kf of keyframes) {
+      if (typeof kf.value === "string" && !HEX_COLOR_RE.test(kf.value)) {
+        errors.push(
+          `track[color]: keyframe ${kf.id} value=${JSON.stringify(kf.value)} must be hex like #6bcd06`,
+        );
+      }
+    }
+  }
+  if (property === "filter") {
+    for (const kf of keyframes) {
+      if (typeof kf.value === "string") {
+        if (/url\s*\(|@|expression\s*\(|<|>/.test(kf.value)) {
+          errors.push(
+            `track[filter]: keyframe ${kf.id} value contains disallowed token (url(), @, expression(), <, >)`,
+          );
+        }
+      }
+    }
+  }
+}
+
+// If advancedTimeline is present and non-empty:
+//   - mutual exclusivity: type MUST be 'noop' (or omitted)
+//   - per-track validation via validateTrack
+function validateAdvancedTimeline(
+  phaseName: string,
+  phase: {
+    type?: AnimType;
+    durationMs?: number;
+    advancedTimeline?: AdvancedTimeline;
+  },
+  errors: string[],
+): void {
+  const tl = phase.advancedTimeline;
+  if (!tl || tl.length === 0) return;
+
+  // Zod shape check first.
+  const parsed = AdvancedTimelineSchema.safeParse(tl);
+  if (!parsed.success) {
+    errors.push(
+      `${phaseName}.advancedTimeline: schema invalid (${parsed.error.issues.map((i) => i.message).join(", ")})`,
+    );
+    return;
+  }
+
+  // Mutual exclusivity. `noop` is the sentinel for "advanced only";
+  // any real preset alongside a non-empty advanced timeline is rejected.
+  if (phase.type && phase.type !== "noop") {
+    errors.push(
+      `${phaseName}: preset type='${phase.type}' AND advancedTimeline both set — mutually exclusive (use type='noop' when advanced timeline drives the phase)`,
+    );
+  }
+
+  const durationMs = phase.durationMs ?? 0;
+  for (const track of parsed.data) {
+    validateTrack(track, durationMs, errors);
+  }
+}
 
 const AnimationPayloadSchema = z.object({
   entry: PhasePayloadSchema.optional(),
@@ -87,6 +247,11 @@ function validatePhase(
       errors.push(`${phaseName}.keyframesBody: ${sanitized.error}`);
     }
   }
+
+  // Wave 3B — advanced timeline branch. Only fires when
+  // phase.advancedTimeline is present and non-empty. Mutual exclusivity
+  // with the preset `type` is enforced inside.
+  validateAdvancedTimeline(phaseName, p, errors);
 }
 
 export function validateAnimation(
