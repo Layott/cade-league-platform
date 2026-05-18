@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useBuilderStore } from "@/state/builder/store";
+import { useBuilderShortcuts } from "./useBuilderShortcuts";
 import { TopBar } from "./TopBar";
 import { Toolbar } from "./Toolbar";
 import { CanvasStage } from "./CanvasStage";
@@ -45,6 +46,8 @@ export function CanvasEditorShell({
   useEffect(() => {
     loadDesign(design);
   }, [design, loadDesign]);
+
+  useBuilderShortcuts();
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-black text-white">
