@@ -70,6 +70,8 @@ export function PropertiesPanel({
   const design = useBuilderStore((s) => s.design);
   const selectedIds = useBuilderStore((s) => s.selectedElementIds);
   const updateElement = useBuilderStore((s) => s.updateElement);
+  const groupElements = useBuilderStore((s) => s.groupElements);
+  const ungroupElements = useBuilderStore((s) => s.ungroupElements);
 
   // Single-select for Wave 1A.
   const selected = (() => {
@@ -115,6 +117,31 @@ export function PropertiesPanel({
       aria-label="Properties"
       className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-zinc-950"
     >
+      {/* Wave 1C — Group / Ungroup action row */}
+      {selectedIds.length > 1 && (
+        <div className="flex gap-2 border-b border-white/10 px-3 py-2">
+          <button
+            type="button"
+            data-testid="properties-group"
+            onClick={() => groupElements(selectedIds)}
+            className="flex-1 rounded bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
+          >
+            Group
+          </button>
+        </div>
+      )}
+      {selectedIds.length === 1 && selected?.elementType === "group" && (
+        <div className="flex gap-2 border-b border-white/10 px-3 py-2">
+          <button
+            type="button"
+            data-testid="properties-ungroup"
+            onClick={() => ungroupElements(selectedIds[0])}
+            className="flex-1 rounded bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
+          >
+            Ungroup
+          </button>
+        </div>
+      )}
       {/* Tab bar */}
       <div role="tablist" className="flex border-b border-white/10">
         {tabs.map((t) => (
