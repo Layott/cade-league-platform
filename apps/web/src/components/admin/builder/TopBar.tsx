@@ -11,11 +11,24 @@ import { useBuilderStore, toServerJson } from "@/state/builder/store";
 import { PrimaryButton, SecondaryButton } from "@/components/admin/buttons";
 
 /**
+ * Read the sequence-mode feature flag at render time (not via the
+ * `featureFlags` singleton, which is computed once at module load).
+ * Reading `process.env` directly here keeps Vitest's `vi.stubEnv`
+ * pattern simple — no `resetModules` / dynamic re-import dance needed.
+ */
+function isSequenceFlagOn(): boolean {
+  return process.env.NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED === "true";
+}
+
+/**
  * Wave 1A — canvas editor top bar.
  *
  * Title input (debounced 500 ms → updateDesignMetaAction), Save
  * (disabled until dirty), Publish/Unpublish toggle, Revert (placeholder
  * pending Wave 1B snapshot UI).
+ *
+ * Wave 3A — mode toggle (single ⇄ sequence) gated on
+ * NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED.
  *
  * Notes on action signatures (real actions vs plan expectations):
  * - saveDesignAction(FormData) — we build FormData from toServerJson(design)
@@ -26,6 +39,8 @@ export function TopBar() {
   const design = useBuilderStore((s) => s.design);
   const dirty = useBuilderStore((s) => s.dirty);
   const markClean = useBuilderStore((s) => s.markClean);
+  const setMode = useBuilderStore((s) => s.setMode);
+  const sequenceFlagOn = isSequenceFlagOn();
   const [title, setTitle] = useState(design?.title ?? "");
   const [isSaving, startSaving] = useTransition();
   const [isPublishing, startPublishing] = useTransition();
@@ -65,6 +80,18 @@ export function TopBar() {
     });
   }
 
+  function onModeChange(next: "single" | "sequence") {
+    if (!design) return;
+    if (next === design.mode) return;
+    if (next === "single" && design.scenes.length > 1) {
+      const ok = window.confirm(
+        `Switching to single-scene mode will delete ${design.scenes.length - 1} scene(s). Continue?`,
+      );
+      if (!ok) return;
+    }
+    setMode(next);
+  }
+
   function onPublishToggle() {
     if (!design) return;
     const isPublished = design.status === "published";
@@ -100,6 +127,30 @@ export function TopBar() {
           </span>
         )}
       </div>
+      {sequenceFlagOn && design && (
+        <div
+          data-testid="mode-toggle"
+          role="group"
+          aria-label="Authoring mode"
+          className="flex items-center rounded border border-white/15 text-xs"
+        >
+          {(["single", "sequence"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              data-testid={`mode-toggle-${m}`}
+              onClick={() => onModeChange(m)}
+              className={`px-3 py-1 ${
+                design.mode === m
+                  ? "bg-[#6bcd06] text-black"
+                  : "text-white/70 hover:text-white"
+              }`}
+            >
+              {m === "single" ? "Single" : "Sequence"}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <SecondaryButton
           type="button"

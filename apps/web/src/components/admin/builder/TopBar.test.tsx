@@ -110,4 +110,60 @@ describe("TopBar", () => {
     });
     vi.useRealTimers();
   });
+
+  it("renders mode toggle when sequenceModeEnabled flag is on", () => {
+    vi.stubEnv("NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED", "true");
+    useBuilderStore.setState({
+      design: { ...fixture, mode: "single" },
+      dirty: false,
+    });
+    render(<TopBar />);
+    expect(screen.getByTestId("mode-toggle")).toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
+
+  it("hides mode toggle when sequenceModeEnabled flag is off", () => {
+    vi.stubEnv("NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED", "");
+    useBuilderStore.setState({
+      design: { ...fixture, mode: "single" },
+      dirty: false,
+    });
+    render(<TopBar />);
+    expect(screen.queryByTestId("mode-toggle")).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("clicking Sequence flips design.mode without confirm", async () => {
+    vi.stubEnv("NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED", "true");
+    useBuilderStore.setState({
+      design: { ...fixture, mode: "single" },
+      dirty: false,
+    });
+    render(<TopBar />);
+    fireEvent.click(screen.getByTestId("mode-toggle-sequence"));
+    expect(useBuilderStore.getState().design!.mode).toBe("sequence");
+    vi.unstubAllEnvs();
+  });
+
+  it("clicking Single with multiple scenes triggers confirm dialog", () => {
+    vi.stubEnv("NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED", "true");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    useBuilderStore.setState({
+      design: {
+        ...fixture,
+        mode: "sequence",
+        scenes: [
+          { ...fixture.scenes[0] },
+          { ...fixture.scenes[0], id: "s2", orderIndex: 1 },
+        ],
+      },
+      dirty: false,
+    });
+    render(<TopBar />);
+    fireEvent.click(screen.getByTestId("mode-toggle-single"));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(useBuilderStore.getState().design!.mode).toBe("sequence");
+    confirmSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
 });
