@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine, Group } from "react-konva";
+import { useState, useRef, useEffect } from "react";
+import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine, Group, Transformer } from "react-konva";
 import { useBuilderStore } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
@@ -105,6 +105,31 @@ export function CanvasStage() {
     transform: { x: number; y: number; width: number; height: number };
   } | null>(null);
 
+  // Wave 1C — multi-element bounding-box transformer
+  const transformerRef = useRef<unknown>(null);
+
+  useEffect(() => {
+    const tr = (transformerRef.current ?? null) as {
+      nodes?: (n: unknown[]) => void;
+      getLayer?: () => { batchDraw: () => void };
+    } | null;
+    if (!tr || !tr.nodes) return;
+    if (selectedIds.length < 2) {
+      tr.nodes([]);
+      tr.getLayer?.().batchDraw();
+      return;
+    }
+    const stage = (document.querySelector("canvas") as unknown as {
+      __stage?: { findOne: (sel: string) => unknown };
+    })?.__stage;
+    if (!stage) return;
+    const nodes = selectedIds
+      .map((id) => stage.findOne(`#${id}`))
+      .filter(Boolean);
+    tr.nodes(nodes as unknown[]);
+    tr.getLayer?.().batchDraw();
+  }, [selectedIds]);
+
   const scene = design && activeSceneId
     ? design.scenes.find((s) => s.id === activeSceneId) ?? null
     : null;
@@ -165,6 +190,15 @@ export function CanvasStage() {
       >
         <Layer>
           {renderTree(sorted, selectedIds, selectElement, updateElement, setDragState, others, design.canvasWidth, design.canvasHeight, null)}
+          {selectedIds.length > 1 && (
+            <Transformer
+              ref={transformerRef as never}
+              rotateEnabled={false}
+              resizeEnabled={false}
+              enabledAnchors={[]}
+              data-konva-tag="Transformer"
+            />
+          )}
           {alignment.guides.map((g, i) =>
             g.kind === "v" ? (
               <KLine
@@ -245,6 +279,7 @@ function RenderedElement({
   if (el.elementType === "rect") {
     return (
       <Rect
+        id={el.id}
         x={t.x}
         y={t.y}
         width={t.width}
@@ -271,6 +306,7 @@ function RenderedElement({
   if (el.elementType === "text") {
     return (
       <Text
+        id={el.id}
         x={t.x}
         y={t.y}
         width={t.width}
@@ -421,6 +457,7 @@ function RenderedImage({
   const img = useImage(url);
   return (
     <KImage
+      id={el.id}
       x={t.x}
       y={t.y}
       width={t.width}

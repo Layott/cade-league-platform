@@ -191,3 +191,27 @@ describe("CanvasStage — Wave 1C groups", () => {
     expect(groups.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe("CanvasStage — Wave 1C multi-select Transformer", () => {
+  beforeEach(() => {
+    useBuilderStore.setState({
+      design: fixture() as never,
+      selectedElementIds: [],
+      activeSceneId: "s1",
+      zoomLevel: 1,
+      dirty: false,
+    });
+  });
+
+  it("mounts a Transformer when selectedElementIds.length > 1", () => {
+    useBuilderStore.setState({ selectedElementIds: ["e1", "e2"] });
+    const { container } = render(<CanvasStage />);
+    expect(container.querySelector('[data-konva-tag="Transformer"]')).not.toBeNull();
+  });
+
+  it("no Transformer when only one element selected", () => {
+    useBuilderStore.setState({ selectedElementIds: ["e1"] });
+    const { container } = render(<CanvasStage />);
+    expect(container.querySelector('[data-konva-tag="Transformer"]')).toBeNull();
+  });
+});
