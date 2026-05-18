@@ -130,6 +130,20 @@ export type BuilderState = {
   toggleTimelinePanel: () => void;
   openTimelinePanel: () => void;
   closeTimelinePanel: () => void;
+
+  // ── Wave 3B (Task 7): per-(element, phase) timeline cursor ────
+  //
+  // TimelineRuler renders a draggable vertical cursor showing the
+  // current scrub position. State is keyed by elementId then phase so
+  // switching elements or phases preserves the last-scrubbed position
+  // per slot. Task 11 reads this to drive the CanvasStage scrub
+  // preview. Defaults to 0ms when no entry exists.
+  timelineCursorMs: Record<string, Partial<Record<AnimPhase, number>>>;
+  setTimelineCursor: (
+    elementId: string,
+    phase: AnimPhase,
+    ms: number,
+  ) => void;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -792,6 +806,25 @@ export const useBuilderStore = create<BuilderState>()(
         set((state) => ({ timelinePanelOpen: !state.timelinePanelOpen })),
       openTimelinePanel: () => set({ timelinePanelOpen: true }),
       closeTimelinePanel: () => set({ timelinePanelOpen: false }),
+
+      // ── Wave 3B (Task 7): timeline cursor (per element + phase) ─
+      //
+      // No clamping here on purpose — TimelineRuler clamps to its
+      // current durationMs before forwarding, and downstream consumers
+      // (Task 11 scrub preview) treat the value as a hint, not a hard
+      // bound. Keeping the action permissive avoids stutter when the
+      // active phase's duration shrinks while a cursor is in flight.
+      timelineCursorMs: {},
+      setTimelineCursor: (elementId, phase, ms) =>
+        set((state) => ({
+          timelineCursorMs: {
+            ...state.timelineCursorMs,
+            [elementId]: {
+              ...(state.timelineCursorMs[elementId] ?? {}),
+              [phase]: ms,
+            },
+          },
+        })),
     }),
     {
       // Track only `design` so selection / zoom / dirty don't pollute history.

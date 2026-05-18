@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { useBuilderStore, type AnimPhase } from "@/state/builder/store";
+import { TimelineRuler } from "./TimelineRuler";
 
 /**
  * Wave 3B (Task 6) — bottom-dock TimelinePanel shell.
@@ -76,16 +77,36 @@ export function TimelinePanel() {
 
       <div
         data-testid="timeline-panel-body"
-        className="flex min-h-0 flex-1 items-center justify-center text-sm text-white/40"
+        className="flex min-h-0 flex-1 flex-col text-sm text-white/40"
       >
         {inAdvancedMode ? (
-          <span data-testid="timeline-panel-placeholder-advanced">
-            Timeline editor mounts here in Tasks 7-12.
-          </span>
+          <>
+            <span data-testid="timeline-panel-placeholder-advanced" className="sr-only">
+              Timeline editor mounted (Tasks 7-12).
+            </span>
+            <div
+              data-testid="timeline-panel-ruler-slot"
+              className="shrink-0 overflow-x-auto"
+            >
+              <TimelineRuler
+                elementId={element.id}
+                phase={phase}
+                durationMs={phaseData?.durationMs ?? 0}
+              />
+            </div>
+            <div
+              data-testid="timeline-panel-tracks-slot"
+              className="flex min-h-0 flex-1 items-center justify-center text-xs text-white/30"
+            >
+              Tracks + keyframes mount here in Tasks 8-12.
+            </div>
+          </>
         ) : (
-          <span data-testid="timeline-panel-placeholder-preset">
-            Switch this phase to Advanced mode in Properties to edit a timeline.
-          </span>
+          <div className="flex flex-1 items-center justify-center">
+            <span data-testid="timeline-panel-placeholder-preset">
+              Switch this phase to Advanced mode in Properties to edit a timeline.
+            </span>
+          </div>
         )}
       </div>
     </div>
