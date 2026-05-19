@@ -54,6 +54,31 @@ describe("BOOTSTRAP_SCRIPT", () => {
   });
 });
 
+describe("BOOTSTRAP_SCRIPT — Gap 3 binding resolver", () => {
+  it("includes a generic applyBindings function that walks data-binding-feed nodes", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/applyBindings/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/data-binding-feed/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/data-binding-path/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/data-binding-template/);
+  });
+
+  it("includes a DEMO_DATA payload with all 7 feed roots", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/DEMO_DATA/);
+    // Spot-check that the standings, live_score, h2h roots are present.
+    expect(BOOTSTRAP_SCRIPT).toMatch(/standings:\s*\[/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/live_score:\s*\{/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/h2h:\s*\{/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/match_day:\s*\[/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(/custom_text:\s*\{/);
+  });
+
+  it("demo show envelope carries DEMO_DATA so bindings hydrate in ?demo=1", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(
+      /type:\s*['"]show['"][^}]*data:\s*DEMO_DATA/,
+    );
+  });
+});
+
 describe("BOOTSTRAP_SCRIPT — sequence mode", () => {
   it("exposes a runSequence function or inline driver branch", () => {
     expect(BOOTSTRAP_SCRIPT).toMatch(/runSequence|__OVERLAY_SCENES_META__/);

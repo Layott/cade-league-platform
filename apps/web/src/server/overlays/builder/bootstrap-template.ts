@@ -194,14 +194,119 @@ export const BOOTSTRAP_SCRIPT = `(function(){
 
   function applyUpdate(data, slot) {
     if (!data || typeof data !== 'object') return;
-    // The compiler emits a per-design window.__cadeBuilderApplyUpdate()
-    // override that walks data-slot DOM nodes and writes their
-    // text/image content. Fall back to a no-op for shape-only designs.
+    // The compiler-emitted per-design window.__cadeBuilderApplyUpdate()
+    // (if present) takes precedence — design-specific data-slot mappings
+    // override the generic resolver below.
     var fn = window.__cadeBuilderApplyUpdate;
     if (typeof fn === 'function') {
-      fn(data, slot);
+      try { fn(data, slot); } catch (e) { /* swallow */ }
+    }
+    // Generic binding resolver — Gap 3 (2026-05-19). Walks every
+    // [data-binding-feed] node and writes its resolved value into the
+    // first <span> (text elements) or <img data-element-img> (image
+    // elements). The data payload shape is normalised:
+    //   - top-level keys may be feed names (data.standings, data.match …)
+    //   - OR the payload may already be unwrapped (single-feed designs)
+    // We try feed-prefixed lookup first, then unprefixed.
+    try { applyBindings(data); } catch (e) { /* swallow */ }
+  }
+
+  // ────────── Generic binding resolver ──────────
+  // Resolves the same path grammar accepted by ManualBindEditor + the
+  // server-side binding-validator:
+  //   identifiers · [N] · . separators
+  // and supports template strings of the form "literal \${path} literal".
+  function resolvePath(root, path) {
+    if (!path) return root;
+    var re = /[A-Za-z_][A-Za-z0-9_]*|\\[\\d+\\]/g;
+    var tokens = path.match(re) || [];
+    var cur = root;
+    for (var i = 0; i < tokens.length; i++) {
+      if (cur == null) return undefined;
+      var t = tokens[i];
+      if (t.charAt(0) === '[') {
+        var idx = Number(t.slice(1, -1));
+        cur = cur[idx];
+      } else {
+        cur = cur[t];
+      }
+    }
+    return cur;
+  }
+
+  function applyTemplate(feed, root, tpl) {
+    return tpl.replace(/\\$\\{([^}]+)\\}/g, function(_m, expr) {
+      var p = expr;
+      if (p.indexOf(feed) === 0) p = p.slice(feed.length);
+      if (p.charAt(0) === '.') p = p.slice(1);
+      var v = resolvePath(root, p);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  function applyBindings(data) {
+    var nodes = document.querySelectorAll('[data-binding-feed]');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var feed = el.getAttribute('data-binding-feed');
+      var path = el.getAttribute('data-binding-path') || '';
+      var tpl = el.getAttribute('data-binding-template');
+      // Resolve the feed root — prefer namespaced data[feed] when present;
+      // fall back to the whole payload (single-feed scenarios).
+      var root = data && Object.prototype.hasOwnProperty.call(data, feed)
+        ? data[feed]
+        : data;
+      var value;
+      if (tpl) {
+        value = applyTemplate(feed, root, tpl);
+      } else {
+        var raw = resolvePath(root, path);
+        value = raw == null ? '' : String(raw);
+      }
+      // Text element: write to inner <span>.
+      var span = el.querySelector('span');
+      if (span) {
+        span.textContent = String(value);
+        continue;
+      }
+      // Image element: write src to <img data-element-img>.
+      var img = el.querySelector('img[data-element-img]');
+      if (img && value) {
+        img.setAttribute('src', String(value));
+      }
     }
   }
+
+  // ────────── Demo data injector ──────────
+  // Gap 3 (2026-05-19) — in ?demo=1 mode the bootstrap auto-fires a
+  // {type:'show', data: DEMO_DATA} envelope so bindings actually paint
+  // their resolved values during preview (instead of staying on the
+  // placeholder content). Same shape as ManualBindEditor's MOCK so the
+  // sample-feed dropdown preview matches the runtime render.
+  var DEMO_DATA = {
+    standings: [
+      { name: 'ADEFOLA', points: 24, gd: 12 },
+      { name: 'ANIFE', points: 22, gd: 9 },
+      { name: 'BAJI JNR', points: 21, gd: 6 }
+    ],
+    live_score: {
+      home_name: 'ADEFOLA',
+      away_name: 'ANIFE',
+      home_score: 2,
+      away_score: 1,
+      clock: '12:34'
+    },
+    top_scorers: [
+      { name: 'ADEFOLA', goals: 14, photoUrl: '' }
+    ],
+    h2h: {
+      playerA: { name: 'ADEFOLA', winProbPct: 58 },
+      playerB: { name: 'ANIFE', winProbPct: 42 }
+    },
+    match: { home_name: 'ADEFOLA', away_name: 'ANIFE' },
+    match_day: [{ home_name: 'ADEFOLA', away_name: 'ANIFE', kickoff: '20:00' }],
+    custom_text: { caster_1_name: 'Sample' }
+  };
 
   // ────────── cade-visible-gate-observer-v2 ──────────
   // Replicated from apps/web/public/overlays/v2/04-h2h-2/index.html.
@@ -242,12 +347,16 @@ export const BOOTSTRAP_SCRIPT = `(function(){
   // Only fires when the URL contains ?demo=1 (exact match). Used by OBS
   // preview iframes and the admin design-editor preview pane. MUST NOT
   // auto-fire on plain overlay routes pointed at by live OBS sources.
+  //
+  // Gap 3 (2026-05-19) — show envelope now carries DEMO_DATA so any
+  // [data-binding-*] elements render their resolved values during demo
+  // preview. Live OBS sources continue to consume real Realtime feeds.
   try {
     var qs = new URLSearchParams(location.search);
     if (qs.get('demo') === '1') {
       setTimeout(function(){
         window.dispatchEvent(new MessageEvent('message', {
-          data: { type: 'show' }
+          data: { type: 'show', data: DEMO_DATA }
         }));
       }, 800);
       setTimeout(function(){
