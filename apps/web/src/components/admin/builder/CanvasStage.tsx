@@ -592,6 +592,12 @@ function useFilterEffect(
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
+    // react-konva in JSDOM tests exposes a stripped node without filters/
+    // cache methods; bail rather than crash unit tests.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof (node as any).filters !== "function" || typeof (node as any).cache !== "function") {
+      return;
+    }
     const hasFilter =
       !!filter &&
       ((filter.blur ?? 0) > 0 ||
@@ -635,7 +641,8 @@ function useFilterEffect(
     return () => {
       // Clear cache so dragging / dimension changes don't render stale
       const n = ref.current;
-      if (n) n.clearCache();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (n && typeof (n as any).clearCache === "function") n.clearCache();
     };
   }, [filter, width, height, ref]);
 }
