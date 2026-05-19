@@ -88,17 +88,29 @@ export type GradientSpec = z.infer<typeof GradientSpecSchema>;
 
 // ────────── Wave 1B — FilterSpec ──────────
 //
-// Maps to CSS `filter: blur(...) brightness(...) hue-rotate(...) saturate(...)`.
+// Maps to CSS `filter: blur(...) brightness(...) hue-rotate(...) saturate(...)
+// contrast(...) grayscale(...) sepia(...) invert(...)`.
 // All keys optional — admin enables only what they need.
 //   - blur in px, capped at 40 (anything larger is performance death).
 //   - brightness as multiplier, 0..2 (0 = black, 1 = identity, 2 = double).
 //   - hueRotate in degrees, 0..360.
 //   - saturate as multiplier, 0..2 (0 = grayscale, 1 = identity).
+//   - contrast as percentage, 0..200 (0 = grey, 100 = identity, 200 = double).
+//   - grayscale as percentage, 0..100 (0 = identity, 100 = full grayscale).
+//   - sepia as percentage, 0..100 (0 = identity, 100 = full sepia).
+//   - invert as percentage, 0..100 (0 = identity, 100 = full inversion).
+//
+// Gap 1 (2026-05-19) — extended beyond original 4 filters to expose
+// the complete CSS filter palette commonly used in broadcast overlays.
 export const FilterSpecSchema = z.object({
   blur: z.number().min(0).max(40).optional(),
   brightness: z.number().min(0).max(2).optional(),
   hueRotate: z.number().min(0).max(360).optional(),
   saturate: z.number().min(0).max(2).optional(),
+  contrast: z.number().min(0).max(200).optional(),
+  grayscale: z.number().min(0).max(100).optional(),
+  sepia: z.number().min(0).max(100).optional(),
+  invert: z.number().min(0).max(100).optional(),
 });
 export type FilterSpec = z.infer<typeof FilterSpecSchema>;
 

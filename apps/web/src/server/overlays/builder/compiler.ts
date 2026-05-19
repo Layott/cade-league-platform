@@ -395,11 +395,23 @@ function filterCss(filter: Style["filter"]): string {
   if (typeof filter.brightness === "number" && filter.brightness !== 1) {
     parts.push(`brightness(${filter.brightness})`);
   }
+  if (typeof filter.contrast === "number" && filter.contrast !== 100) {
+    parts.push(`contrast(${filter.contrast}%)`);
+  }
   if (typeof filter.hueRotate === "number" && filter.hueRotate !== 0) {
     parts.push(`hue-rotate(${filter.hueRotate}deg)`);
   }
   if (typeof filter.saturate === "number" && filter.saturate !== 1) {
     parts.push(`saturate(${filter.saturate})`);
+  }
+  if (typeof filter.grayscale === "number" && filter.grayscale > 0) {
+    parts.push(`grayscale(${filter.grayscale}%)`);
+  }
+  if (typeof filter.sepia === "number" && filter.sepia > 0) {
+    parts.push(`sepia(${filter.sepia}%)`);
+  }
+  if (typeof filter.invert === "number" && filter.invert > 0) {
+    parts.push(`invert(${filter.invert}%)`);
   }
   return parts.length > 0 ? `filter: ${parts.join(" ")};` : "";
 }

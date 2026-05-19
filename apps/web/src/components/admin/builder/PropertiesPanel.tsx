@@ -468,6 +468,13 @@ function StyleTab({
             className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
           />
         </label>
+
+        {/* Gap 2 (2026-05-19) — wire filter sliders for text elements */}
+        <p className="mt-4 mb-2 text-xs uppercase tracking-wider text-white/50">Filter</p>
+        <FilterEditor
+          value={(s as { filter?: import("@/server/overlays/builder/types").FilterSpec }).filter}
+          onChange={(f) => patchStyle({ filter: f })}
+        />
       </div>
     );
   }
@@ -494,6 +501,13 @@ function StyleTab({
             <option value="fill">Fill</option>
           </select>
         </label>
+
+        {/* Gap 2 (2026-05-19) — wire filter sliders for image elements */}
+        <p className="mt-4 mb-2 text-xs uppercase tracking-wider text-white/50">Filter</p>
+        <FilterEditor
+          value={(s as { filter?: import("@/server/overlays/builder/types").FilterSpec }).filter}
+          onChange={(f) => patchStyle({ filter: f })}
+        />
       </div>
     );
   }

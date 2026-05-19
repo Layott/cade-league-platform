@@ -2,6 +2,16 @@
 
 import type { FilterSpec } from "@/server/overlays/builder/types";
 
+/**
+ * FilterEditor — exposes the eight CSS filter primitives the runtime
+ * supports. Each slider commits its scalar to `value` and the
+ * compiler emits a single `filter:` declaration with the chained
+ * functions.
+ *
+ * Gap 1 (2026-05-19) — extended from 4 → 8 filters per QA brief.
+ * blur / brightness / hueRotate / saturate were the original Wave 1B
+ * set; contrast / grayscale / sepia / invert added here.
+ */
 export function FilterEditor({
   value,
   onChange,
@@ -62,6 +72,21 @@ export function FilterEditor({
       </label>
 
       <label className="block">
+        <span className="mb-1 block text-xs uppercase tracking-wider text-white/50">Contrast</span>
+        <input
+          type="range"
+          min={0}
+          max={200}
+          step={1}
+          aria-label="Contrast"
+          value={v.contrast ?? 100}
+          onChange={(e) => patch({ contrast: Number(e.target.value) })}
+          className="w-full"
+        />
+        <span className="block text-xs text-white/40">{v.contrast ?? 100}%</span>
+      </label>
+
+      <label className="block">
         <span className="mb-1 block text-xs uppercase tracking-wider text-white/50">Hue Rotate</span>
         <input
           type="range"
@@ -89,6 +114,51 @@ export function FilterEditor({
           className="w-full"
         />
         <span className="block text-xs text-white/40">{(v.saturate ?? 1).toFixed(2)}</span>
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-xs uppercase tracking-wider text-white/50">Grayscale</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          aria-label="Grayscale"
+          value={v.grayscale ?? 0}
+          onChange={(e) => patch({ grayscale: Number(e.target.value) })}
+          className="w-full"
+        />
+        <span className="block text-xs text-white/40">{v.grayscale ?? 0}%</span>
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-xs uppercase tracking-wider text-white/50">Sepia</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          aria-label="Sepia"
+          value={v.sepia ?? 0}
+          onChange={(e) => patch({ sepia: Number(e.target.value) })}
+          className="w-full"
+        />
+        <span className="block text-xs text-white/40">{v.sepia ?? 0}%</span>
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-xs uppercase tracking-wider text-white/50">Invert</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          aria-label="Invert"
+          value={v.invert ?? 0}
+          onChange={(e) => patch({ invert: Number(e.target.value) })}
+          className="w-full"
+        />
+        <span className="block text-xs text-white/40">{v.invert ?? 0}%</span>
       </label>
 
       <button

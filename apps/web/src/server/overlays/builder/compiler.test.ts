@@ -184,6 +184,16 @@ describe("compileDesignToHtml — Wave 1B", () => {
     );
   });
 
+  it("emits contrast + grayscale + sepia + invert functions in filter chain (Gap 1)", () => {
+    const block = html.match(
+      /\[data-element-id="00000000-0000-0000-0000-00000000ab21"\]\s*\{([^}]*)\}/,
+    )?.[1] ?? "";
+    expect(block).toMatch(/filter:[^;]*contrast\(120%\)/);
+    expect(block).toMatch(/filter:[^;]*grayscale\(30%\)/);
+    expect(block).toMatch(/filter:[^;]*sepia\(25%\)/);
+    expect(block).toMatch(/filter:[^;]*invert\(10%\)/);
+  });
+
   it("emits text background-clip:text + transparent color for gradient text", () => {
     const block = html.match(
       /\[data-element-id="00000000-0000-0000-0000-00000000ab25"\]\s*\{([^}]*)\}/,

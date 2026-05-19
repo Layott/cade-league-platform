@@ -379,12 +379,16 @@ describe("types.ts — Wave 1B extensions (gradient/filter/shadow-stack/font)", 
     expect(FilterSpecSchema.parse(f)).toEqual(f);
   });
 
-  it("FilterSpecSchema accepts full filter stack", () => {
+  it("FilterSpecSchema accepts full filter stack (all 8 fields)", () => {
     const f: FilterSpec = {
       blur: 4,
       brightness: 1.2,
       hueRotate: 180,
       saturate: 1.5,
+      contrast: 150,
+      grayscale: 30,
+      sepia: 50,
+      invert: 20,
     };
     expect(FilterSpecSchema.parse(f)).toEqual(f);
   });
@@ -395,6 +399,17 @@ describe("types.ts — Wave 1B extensions (gradient/filter/shadow-stack/font)", 
 
   it("FilterSpecSchema rejects hueRotate > 360", () => {
     expect(() => FilterSpecSchema.parse({ hueRotate: 400 })).toThrow();
+  });
+
+  it("FilterSpecSchema rejects contrast > 200 and < 0", () => {
+    expect(() => FilterSpecSchema.parse({ contrast: 250 })).toThrow();
+    expect(() => FilterSpecSchema.parse({ contrast: -5 })).toThrow();
+  });
+
+  it("FilterSpecSchema rejects grayscale / sepia / invert > 100", () => {
+    expect(() => FilterSpecSchema.parse({ grayscale: 150 })).toThrow();
+    expect(() => FilterSpecSchema.parse({ sepia: 110 })).toThrow();
+    expect(() => FilterSpecSchema.parse({ invert: 101 })).toThrow();
   });
 
   it("ShadowStackSchema accepts a single-shadow object (Wave 1A shape)", () => {

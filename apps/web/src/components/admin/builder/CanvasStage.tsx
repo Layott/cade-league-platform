@@ -568,14 +568,28 @@ function buildShadowProps(
 }
 
 /**
- * Fix 2026-05-19 — apply FilterSpec (blur / brightness / hueRotate /
- * saturate) to the Konva node in the editor preview. Before this fix
- * filter values were stored on `style.filter` and consumed only by the
- * server-side compiler (published output via CSS `filter:`) — the live
- * canvas preview ignored them so admins couldn't see what they were
- * dialling in. Konva filters require `.cache()` to materialize an
- * offscreen canvas; this hook attaches the requested filters, sets per-
- * filter props, and re-caches whenever the spec or shape dims change.
+ * Fix 2026-05-19 — apply FilterSpec to the Konva node in the editor
+ * preview. Before this fix filter values were stored on `style.filter`
+ * and consumed only by the server-side compiler (published output via
+ * CSS `filter:`) — the live canvas preview ignored them so admins
+ * couldn't see what they were dialling in. Konva filters require
+ * `.cache()` to materialize an offscreen canvas; this hook attaches the
+ * requested filters, sets per-filter props, and re-caches whenever the
+ * spec or shape dims change.
+ *
+ * Gap 1 (2026-05-19) — extended for 4 additional CSS primitives:
+ *   - contrast → Konva.Filters.Contrast (0..100 range; CSS uses 0..200%
+ *     where 100 = identity → subtract 100 then clamp to Konva's signed
+ *     domain).
+ *   - grayscale → Konva.Filters.Grayscale (binary). Strength approximation
+ *     handled via opacity-blend on the cached node would require manual
+ *     compositing; with Konva the filter is monolithic so we apply it
+ *     when value > 50% to keep preview legible.
+ *   - sepia → Konva.Filters.Sepia (binary; same caveat as grayscale).
+ *   - invert → Konva.Filters.Invert (binary; same caveat).
+ *
+ * The PUBLISHED CSS honors the exact percentages (smooth ramp). The
+ * editor preview is a close-enough approximation for binary filters.
  *
  * Saturate is mapped via Konva's HSL filter using a power-of-2 factor
  * — Konva's `saturation` getter is on a log scale (`pow(2, saturation)`
@@ -585,7 +599,18 @@ function buildShadowProps(
  */
 function useFilterEffect(
   ref: React.MutableRefObject<Konva.Node | null>,
-  filter: { blur?: number; brightness?: number; hueRotate?: number; saturate?: number } | undefined,
+  filter:
+    | {
+        blur?: number;
+        brightness?: number;
+        hueRotate?: number;
+        saturate?: number;
+        contrast?: number;
+        grayscale?: number;
+        sepia?: number;
+        invert?: number;
+      }
+    | undefined,
   width: number,
   height: number,
 ) {
@@ -603,7 +628,11 @@ function useFilterEffect(
       ((filter.blur ?? 0) > 0 ||
         (filter.brightness !== undefined && filter.brightness !== 1) ||
         (filter.hueRotate ?? 0) > 0 ||
-        (filter.saturate !== undefined && filter.saturate !== 1));
+        (filter.saturate !== undefined && filter.saturate !== 1) ||
+        (filter.contrast !== undefined && filter.contrast !== 100) ||
+        (filter.grayscale ?? 0) > 0 ||
+        (filter.sepia ?? 0) > 0 ||
+        (filter.invert ?? 0) > 0);
     if (!hasFilter) {
       node.filters([]);
       node.clearCache();
@@ -622,6 +651,14 @@ function useFilterEffect(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (node as any).brightness(filter.brightness);
     }
+    if (filter?.contrast !== undefined && filter.contrast !== 100) {
+      filters.push(Konva.Filters.Contrast);
+      // Konva.Filters.Contrast accepts signed values; CSS 0..200% with
+      // 100% identity maps cleanly: konvaContrast = cssPct - 100, scaled
+      // into Konva's -100..100 working range.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (node as any).contrast(filter.contrast - 100);
+    }
     const wantsHsl =
       (filter?.hueRotate ?? 0) > 0 ||
       (filter?.saturate !== undefined && filter.saturate !== 1);
@@ -634,6 +671,18 @@ function useFilterEffect(
       const sKonva = sMult > 0 ? Math.log2(sMult) : -8;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (node as any).saturation(sKonva);
+    }
+    // Binary filters in Konva — apply when CSS percentage crosses 50% so
+    // the editor preview gives some visual signal. Published CSS honors
+    // the actual percentage continuously.
+    if ((filter?.grayscale ?? 0) >= 50) {
+      filters.push(Konva.Filters.Grayscale);
+    }
+    if ((filter?.sepia ?? 0) >= 50) {
+      filters.push(Konva.Filters.Sepia);
+    }
+    if ((filter?.invert ?? 0) >= 50) {
+      filters.push(Konva.Filters.Invert);
     }
     node.filters(filters);
     node.cache({ pixelRatio: 1 });
@@ -742,8 +791,14 @@ function RenderedElement({
     // fontWeight to Konva so the editor preview matches the published
     // CSS output. Schema already supported these fields; renderer
     // previously ignored them.
+    //
+    // Gap 2 (2026-05-19) — attach `shapeRef` so useFilterEffect applies
+    // the FilterSpec to Text nodes too. Konva.Text supports `.filters([])`
+    // + `.cache()` same as Rect; the cache pass materialises the text
+    // glyphs onto an offscreen canvas which the filter passes mutate.
     return (
       <Text
+        ref={shapeRef as React.MutableRefObject<Konva.Text>}
         id={el.id}
         x={t.x}
         y={t.y}
@@ -773,12 +828,17 @@ function RenderedElement({
   }
 
   if (el.elementType === "image") {
+    // Gap 2 (2026-05-19) — RenderedImage now accepts `shapeRef` so the
+    // same useFilterEffect pipeline (attached above this branch) applies
+    // to image elements. Without the ref the filter values were persisted
+    // and emitted to published CSS but ignored in the live preview.
     return (
       <RenderedImage
         el={el}
         t={t}
         stroke={stroke}
         strokeWidth={strokeWidth}
+        shapeRef={shapeRef as React.MutableRefObject<Konva.Image | null>}
         onClick={onClick}
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
@@ -891,6 +951,7 @@ function RenderedImage({
   t,
   stroke,
   strokeWidth,
+  shapeRef,
   onClick,
   onDragMove,
   onDragEnd,
@@ -899,6 +960,7 @@ function RenderedImage({
   t: Element["transform"];
   stroke?: string;
   strokeWidth: number;
+  shapeRef?: React.MutableRefObject<Konva.Image | null>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onClick: (e: { evt?: any }) => void;
   onDragMove: (e: { target: { x: () => number; y: () => number; position: (p: { x: number; y: number }) => void } }) => void;
@@ -908,6 +970,7 @@ function RenderedImage({
   const img = useImage(url);
   return (
     <KImage
+      ref={shapeRef}
       id={el.id}
       x={t.x}
       y={t.y}
