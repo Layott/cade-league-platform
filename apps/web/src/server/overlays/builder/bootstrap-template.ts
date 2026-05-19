@@ -351,19 +351,52 @@ export const BOOTSTRAP_SCRIPT = `(function(){
   // Gap 3 (2026-05-19) — show envelope now carries DEMO_DATA so any
   // [data-binding-*] elements render their resolved values during demo
   // preview. Live OBS sources continue to consume real Realtime feeds.
+  //
+  // Fix 1 (2026-05-19) — demo loop is now sequence-aware. In single-scene
+  // mode the cadence stays show(800ms) → hide(8000ms). When
+  // __OVERLAY_SCENES_META__ is present (sequence-mode compiled output)
+  // the hide timing slips to sum(scene.durationMs) + transition padding
+  // + a 2s gap, then loops back to show — so all scenes play through
+  // continuously in the preview pane.
   try {
     var qs = new URLSearchParams(location.search);
     if (qs.get('demo') === '1') {
-      setTimeout(function(){
+      var SINGLE_SHOW_MS = 8000;       // single-scene visible duration
+      var DEMO_GAP_MS = 2000;          // pause between loops
+      var DEMO_INITIAL_DELAY_MS = 800; // wait for first paint
+      // Match SCENE_TRANSITION_DURATION above — each scene's exit
+      // transition consumes this much wall-clock before the next entry.
+      var DEMO_SCENE_TRANSITION_MS = 480;
+
+      function computeShowDurationMs() {
+        var meta = window.__OVERLAY_SCENES_META__;
+        if (!meta || !meta.length) return SINGLE_SHOW_MS;
+        var total = 0;
+        for (var i = 0; i < meta.length; i++) {
+          var s = meta[i] || {};
+          total += (typeof s.durationMs === 'number' ? s.durationMs : 0);
+          // Account for each scene's exit transition (cut = 0).
+          if (s.transitionOut !== 'cut') total += DEMO_SCENE_TRANSITION_MS;
+        }
+        return Math.max(SINGLE_SHOW_MS, total + 500);
+      }
+
+      function fireDemoCycle() {
         window.dispatchEvent(new MessageEvent('message', {
           data: { type: 'show', data: DEMO_DATA }
         }));
-      }, 800);
-      setTimeout(function(){
-        window.dispatchEvent(new MessageEvent('message', {
-          data: { type: 'hide' }
-        }));
-      }, 8000);
+        var dur = computeShowDurationMs();
+        setTimeout(function(){
+          window.dispatchEvent(new MessageEvent('message', {
+            data: { type: 'hide' }
+          }));
+          // Loop: wait the demo gap, then start the next cycle. Re-evaluate
+          // duration each cycle in case scene meta is mutated by HMR / dev.
+          setTimeout(fireDemoCycle, DEMO_GAP_MS);
+        }, dur);
+      }
+
+      setTimeout(fireDemoCycle, DEMO_INITIAL_DELAY_MS);
     }
   } catch (e) { /* swallow — SSR/Node environments without location */ }
 })()`;

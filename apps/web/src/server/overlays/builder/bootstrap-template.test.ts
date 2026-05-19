@@ -99,3 +99,24 @@ describe("BOOTSTRAP_SCRIPT — sequence mode", () => {
     expect(BOOTSTRAP_SCRIPT).toMatch(/480|SCENE_TRANSITION_DURATION/);
   });
 });
+
+// Fix 1 (2026-05-19): demo loop must consume scene durations so the
+// preview pane plays every scene instead of cutting off at 8s.
+describe("BOOTSTRAP_SCRIPT — Fix 1 demo loop", () => {
+  it("exposes a fireDemoCycle helper that re-fires the show/hide pair", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/fireDemoCycle/);
+  });
+
+  it("computes show duration from __OVERLAY_SCENES_META__ when present", () => {
+    expect(BOOTSTRAP_SCRIPT).toMatch(/computeShowDurationMs/);
+    expect(BOOTSTRAP_SCRIPT).toMatch(
+      /__OVERLAY_SCENES_META__[\s\S]*durationMs/,
+    );
+  });
+
+  it("schedules the next cycle after the hide envelope (loop, not one-shot)", () => {
+    // After dispatching hide, the script must schedule another fireDemoCycle
+    // via setTimeout(fireDemoCycle, ...) — not just stop.
+    expect(BOOTSTRAP_SCRIPT).toMatch(/setTimeout\s*\(\s*fireDemoCycle/);
+  });
+});
