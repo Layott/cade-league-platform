@@ -164,6 +164,26 @@ describe("TopBar", () => {
     vi.unstubAllEnvs();
   });
 
+  // Fix 3 (2026-05-19): mode toggle must persist to DB immediately so
+  // subsequent server actions (addSceneAction et al) revalidatePath →
+  // RSC refetch don't clobber the local store back to mode='single'.
+  it("clicking Sequence immediately persists mode via updateDesignMetaAction", async () => {
+    vi.stubEnv("NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED", "true");
+    updateDesignMetaActionMock.mockResolvedValueOnce(undefined);
+    useBuilderStore.setState({
+      design: { ...fixture, mode: "single" },
+      dirty: false,
+    });
+    render(<TopBar />);
+    fireEvent.click(screen.getByTestId("mode-toggle-sequence"));
+    await waitFor(() => {
+      expect(updateDesignMetaActionMock).toHaveBeenCalledWith("d1", {
+        mode: "sequence",
+      });
+    });
+    vi.unstubAllEnvs();
+  });
+
   it("clicking Single with multiple scenes triggers confirm dialog", () => {
     vi.stubEnv("NEXT_PUBLIC_OVERLAY_BUILDER_SEQUENCE_MODE_ENABLED", "true");
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);

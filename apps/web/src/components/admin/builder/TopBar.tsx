@@ -120,6 +120,23 @@ export function TopBar() {
       if (!ok) return;
     }
     setMode(next);
+    // Fix 3 (2026-05-19) — persist the mode flip to the DB immediately so
+    // subsequent server actions (addSceneAction et al) don't trigger a
+    // revalidatePath → RSC refetch that hydrates the editor with the
+    // stale `mode: 'single'` value and flips ScenePicker off. Mode is a
+    // structural flag — it must commit before any scene CRUD races.
+    try {
+      const ret = updateDesignMetaAction(design.id, { mode: next }) as
+        | Promise<unknown>
+        | undefined;
+      if (ret && typeof ret.then === "function") {
+        ret.catch((e) =>
+          console.error("updateDesignMetaAction(mode) failed", e),
+        );
+      }
+    } catch (e) {
+      console.error("updateDesignMetaAction(mode) failed", e);
+    }
   }
 
   function onPublishToggle() {
