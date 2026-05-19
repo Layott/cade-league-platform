@@ -54,14 +54,22 @@ export function CanvasEditorShell({
 
   useBuilderShortcuts();
 
+  // Editor shell sits inside the admin layout's chrome (top nav +
+  // breadcrumbs + tabs ≈ 190px). `h-screen` would push the canvas
+  // below the visible viewport — the operator then has to scroll the
+  // page. Constrain to `calc(100vh - 220px)` so the editor fills the
+  // available work area without forcing page-level scroll.
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-black text-white">
+    <div
+      className="flex flex-col overflow-hidden bg-black text-white"
+      style={{ height: "calc(100vh - 220px)", minHeight: "560px" }}
+    >
       <TopBar />
       <ScenePicker />
       <div className="flex min-h-0 flex-1">
         <Toolbar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-auto bg-zinc-900">
+          <div className="min-h-0 flex-1 overflow-hidden bg-zinc-900">
             <CanvasStage />
           </div>
           <LayersPanel />

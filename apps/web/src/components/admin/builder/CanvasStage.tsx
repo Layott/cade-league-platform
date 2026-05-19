@@ -232,11 +232,15 @@ function renderTree(
  * Wave 1A — canvas drawing surface.
  * Wave 1B — adds ellipse / line / polygon renderers + alignment guides.
  * Wave 1C — renderTree() nests children under Konva <Group> by parentGroupId.
+ * Wave 2C (fix 2026-05-19) — auto-fit zoom: 1920×1080 canvas now scales to
+ * fit the available viewport on mount and on resize (via ResizeObserver).
+ * Without this the stage rendered at 1:1 and content placed at canvas
+ * center (x=860 in a 1920px canvas) landed outside a ~700px viewport,
+ * giving the user a "blank canvas" even when elements existed.
  *
  * Renders active scene's elements as react-konva nodes sorted by
  * zIndex. Drag-end commits the new transform to the zustand store;
- * click (or shift-click) sets selection. Container scrolls if window
- * smaller than canvas — pan/zoom polish deferred.
+ * click (or shift-click) sets selection.
  *
  * Alignment guides: during drag, 1px dashed pink lines snap dragged
  * element to edges/centers of other elements or the canvas itself
@@ -245,15 +249,51 @@ function renderTree(
 export function CanvasStage() {
   const design = useBuilderStore((s) => s.design);
   const activeSceneId = useBuilderStore((s) => s.activeSceneId);
-  const zoom = useBuilderStore((s) => s.zoomLevel);
   const selectedIds = useBuilderStore((s) => s.selectedElementIds);
   const updateElement = useBuilderStore((s) => s.updateElement);
   const selectElement = useBuilderStore((s) => s.selectElement);
+
+  const canvasW = design?.canvasWidth ?? 1920;
+  const canvasH = design?.canvasHeight ?? 1080;
 
   const [dragState, setDragState] = useState<{
     id: string;
     transform: { x: number; y: number; width: number; height: number };
   } | null>(null);
+
+  // Auto-fit zoom — observe the scroll-container size and pick a zoom
+  // level so the entire 1920×1080 canvas fits inside (with a small
+  // padding margin so handles/borders aren't clipped). Falls back to
+  // store's `zoomLevel` ONLY if the user has explicitly set a zoom
+  // (future user-controlled zoom UI not yet shipped — for now we use
+  // fit-to-screen unconditionally).
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [autoZoom, setAutoZoom] = useState<number>(0);
+
+  useEffect(() => {
+    const node = scrollContainerRef.current;
+    if (!node) return;
+    const compute = () => {
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const padPx = 24;
+      const z = Math.min(
+        (rect.width - padPx) / canvasW,
+        (rect.height - padPx) / canvasH,
+      );
+      if (z > 0 && Number.isFinite(z)) {
+        setAutoZoom(z);
+      }
+    };
+    compute();
+    // ResizeObserver isn't defined in JSDOM — skip in that environment.
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(compute);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [canvasW, canvasH]);
+
+  const zoom = autoZoom > 0 ? autoZoom : 1;
 
   // Wave 1C — multi-element bounding-box transformer
   const transformerRef = useRef<unknown>(null);
@@ -294,12 +334,13 @@ export function CanvasStage() {
     dragState?.id ?? null,
     dragState?.transform ?? null,
     others,
-    { width: design?.canvasWidth ?? 1920, height: design?.canvasHeight ?? 1080 },
+    { width: canvasW, height: canvasH },
   );
 
   if (!design || !activeSceneId) {
     return (
       <div
+        ref={scrollContainerRef}
         data-testid="builder-canvas-stage"
         data-state="empty"
         className="flex h-full items-center justify-center text-white/30"
@@ -315,15 +356,33 @@ export function CanvasStage() {
     .filter((e) => e.visible !== false)
     .sort((a, b) => a.zIndex - b.zIndex);
 
-  const w = design.canvasWidth * zoom;
-  const h = design.canvasHeight * zoom;
+  const w = canvasW * zoom;
+  const h = canvasH * zoom;
 
   return (
     <div
+      ref={scrollContainerRef}
       data-testid="builder-canvas-stage"
       data-state="ready"
-      className="overflow-auto"
+      data-zoom={zoom.toFixed(4)}
+      className="flex h-full w-full items-center justify-center overflow-hidden"
     >
+      <div
+        data-testid="builder-canvas-stage-frame"
+        style={{
+          width: w,
+          height: h,
+          // Subtle checker so the operator sees the 1920x1080 canvas
+          // edges against the surrounding workspace.
+          backgroundColor: "#0a0a0a",
+          backgroundImage:
+            "linear-gradient(45deg, #141414 25%, transparent 25%), linear-gradient(-45deg, #141414 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #141414 75%), linear-gradient(-45deg, transparent 75%, #141414 75%)",
+          backgroundSize: "16px 16px",
+          backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+          boxShadow: "0 0 0 1px rgba(107, 205, 6, 0.25)",
+        }}
+        className="relative"
+      >
       <Stage
         width={w}
         height={h}
@@ -381,6 +440,7 @@ export function CanvasStage() {
         </Layer>
         <PathPenOverlay />
       </Stage>
+      </div>
     </div>
   );
 }

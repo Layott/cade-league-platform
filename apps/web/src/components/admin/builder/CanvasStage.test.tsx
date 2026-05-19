@@ -103,12 +103,18 @@ describe("CanvasStage", () => {
     expect(texts.length).toBe(1);
   });
 
-  it("Stage size reflects zoomLevel", () => {
+  it("Stage size falls back to 1:1 when container is unmeasurable", () => {
+    // Fix 2026-05-19: CanvasStage now auto-fits via ResizeObserver on
+    // its scroll container. In JSDOM `getBoundingClientRect()` returns
+    // 0×0 so autoZoom stays at the fallback 1.0 — Stage receives the
+    // raw 1920×1080 dimensions. In a real browser the ResizeObserver
+    // shrinks zoom to fit the visible viewport (see /admin/broadcast/
+    // v2/builder Chrome screenshots).
     useBuilderStore.setState({ zoomLevel: 0.5 });
     const { container } = render(<CanvasStage />);
     const stage = container.querySelector('[data-konva-tag="Stage"]');
-    expect(stage?.getAttribute("width")).toBe("960");
-    expect(stage?.getAttribute("height")).toBe("540");
+    expect(stage?.getAttribute("width")).toBe("1920");
+    expect(stage?.getAttribute("height")).toBe("1080");
   });
 
   it("renders nothing when activeSceneId is null", () => {
