@@ -727,6 +727,10 @@ function RenderedElement({
   }
 
   if (el.elementType === "text") {
+    // Fix 2026-05-19 — propagate letterSpacing / lineHeight / textAlign /
+    // fontWeight to Konva so the editor preview matches the published
+    // CSS output. Schema already supported these fields; renderer
+    // previously ignored them.
     return (
       <Text
         id={el.id}
@@ -739,7 +743,14 @@ function RenderedElement({
         text={(el.content?.text as string) ?? "Text"}
         fontFamily={(s.fontFamily as string) ?? "Agharti"}
         fontSize={(s.fontSize as number) ?? 32}
-        fontStyle={(s.fontStyle as string) ?? "normal"}
+        fontStyle={
+          ((s.fontStyle as string) ?? "normal") === "italic"
+            ? `italic ${(s.fontWeight as number | undefined) ?? 600}`
+            : `${(s.fontWeight as number | undefined) ?? 600}`
+        }
+        align={(s.textAlign as "left" | "center" | "right" | undefined) ?? "left"}
+        letterSpacing={(s.letterSpacing as number | undefined) ?? 0}
+        lineHeight={(s.lineHeight as number | undefined) ?? 1.2}
         fill={(s.color as string) ?? "#ffffff"}
         draggable
         onClick={onClick}

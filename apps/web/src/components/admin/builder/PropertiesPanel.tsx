@@ -432,6 +432,42 @@ function StyleTab({
             ))}
           </div>
         </label>
+
+        {/* Fix 2026-05-19 — schema accepts letterSpacing + lineHeight; expose to admins */}
+        <label className="mb-2 block">
+          <span className="mb-1 block text-xs uppercase tracking-wide text-white/50">
+            Letter spacing (px)
+          </span>
+          <input
+            aria-label="Letter spacing"
+            type="number"
+            step={0.1}
+            value={(s.letterSpacing as number | undefined) ?? 0}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              patchStyle({ letterSpacing: Number.isNaN(n) ? undefined : n });
+            }}
+            className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
+          />
+        </label>
+
+        <label className="mb-2 block">
+          <span className="mb-1 block text-xs uppercase tracking-wide text-white/50">
+            Line height (multiplier)
+          </span>
+          <input
+            aria-label="Line height"
+            type="number"
+            step={0.1}
+            min={0}
+            value={(s.lineHeight as number | undefined) ?? 1.2}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              patchStyle({ lineHeight: Number.isNaN(n) ? undefined : n });
+            }}
+            className="w-full rounded border border-white/15 bg-black px-2 py-1 text-sm text-white"
+          />
+        </label>
       </div>
     );
   }
