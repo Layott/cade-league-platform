@@ -296,9 +296,20 @@ export default async function EditPlayerPage({
             </FormField>
           </div>
 
-          <FormField label="Photo URL" hint="Public URL — host in Storage or CDN">
+          <FormField
+            label="Photo URL"
+            hint="Public URL (https://…) or site-relative path (/brand/players/…)"
+          >
+            {/*
+              type="text" not "url" — `<input type="url">` blocks site-
+              relative paths like `/brand/players/adefola.png`, which is
+              the canonical format for in-repo player photos. The server
+              schema in ../../actions.ts permits both shapes; the native
+              URL validator does not. Submit was silently failing for
+              every existing player row before this change (2026-05-19).
+            */}
             <input
-              type="url"
+              type="text"
               name="photoUrl"
               defaultValue={p.photo_url ?? ""}
               className={inputClass}

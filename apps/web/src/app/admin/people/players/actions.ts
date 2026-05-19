@@ -13,7 +13,10 @@ import { clearLockoutForEmail } from "@/server/auth/sessions";
 // every text field so a wedge upload can't blow past the DB column
 // length, and forces photoUrl through a URL parse with a scheme allow-
 // list (`http`/`https` only — no `javascript:` / `data:` exfiltration
-// vectors).
+// vectors). Site-relative paths starting with `/` are also accepted
+// because in-repo player photos canonically live at
+// `/brand/players/<slug>.png` (see /profile/schemas.ts for the matching
+// rule on the player self-edit form, 2026-05-19).
 const PHOTO_URL_SCHEMES = new Set(["http:", "https:"]);
 const updatePlayerSchema = z.object({
   playerId: z.string().uuid(),
@@ -31,6 +34,10 @@ const updatePlayerSchema = z.object({
     .refine(
       (v) => {
         if (!v) return true;
+        // Allow site-relative paths (e.g. /brand/players/adefola.png)
+        // alongside absolute http(s) URLs. Reject every other shape so
+        // `javascript:`/`data:` exfil vectors stay blocked.
+        if (v.startsWith("/")) return !v.startsWith("//");
         try {
           const u = new URL(v);
           return PHOTO_URL_SCHEMES.has(u.protocol);
@@ -38,7 +45,10 @@ const updatePlayerSchema = z.object({
           return false;
         }
       },
-      { message: "photoUrl must be a valid http/https URL" },
+      {
+        message:
+          "photoUrl must be an http(s) URL or a site-relative path starting with /",
+      },
     ),
   organizationId: z.string().uuid().nullable().optional(),
   coachId: z.string().uuid().nullable().optional(),
