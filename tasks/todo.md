@@ -1359,3 +1359,14 @@ User picks: (a) start Phase 1 implementation now, or (b) more spec edits first.
 - [x] Chrome visual verify for each of the 3 polish targets.
 - [x] Commit + push + memory note.
 
+### Review
+
+Commit `32d8e60b` shipped. All four task surfaces covered:
+
+- **Task A/E**: 04/07/14 entry animations use `cubic-bezier(0.16, 1, 0.3, 1)` expo-out, longer 500-700ms durations, 80ms stagger on leaderboard, translate3d GPU path. Mid-show data swaps fade in 300ms cubic-bezier(0.4,0,0.2,1) — `!important` required because gate observer appends inline `transition: opacity 360ms ease-out` that otherwise wins.
+- **Task B**: 23 of 27 v2 overlays now keep bg visible across cade-visible flips. Implementation: unified bootstrap injected `body.cade-bg-persistent .bg-image/fill/vignette/grain { opacity: 1 !important }` rule + reads `--overlay-bg-persistent` token to toggle the class. Per-overlay gate-observer SEL lists scrubbed to drop bg layers (observer was forcing inline `opacity:0!important` which beats CSS). For 21-29 cover-up overlays additionally moved `.bg-fill`+`.bg-vignette` DOM nodes OUT of `.canvas` wrapper — CSS opacity inherits multiplicatively so they had to bypass the canvas gate at the DOM level.
+- **Task C**: `bg-persistent` token in catalog. Existing boolean widget renders automatically in admin design editor.
+- **Task D**: 07-leaderboard already wired in INITIAL_FETCH_PATH + REALTIME_KEY_EVENTS. No changes needed.
+
+Verification: tsc clean, 798 overlay tests green, Chrome visual on 04/07/14/21 confirms timings + bg-persistence + body classes. SHA `32d8e60b` on main.
+
