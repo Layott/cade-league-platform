@@ -3,32 +3,70 @@
 import { HexColorPicker } from "react-colorful";
 import type { GradientSpec, GradientStop } from "@/server/overlays/builder/types";
 
-const DEFAULT_LINEAR: GradientSpec = {
-  kind: "linear",
-  angle: 90,
-  stops: [
-    { offset: 0, color: "#6bcd06" },
-    { offset: 1, color: "#fe036d" },
-  ],
-};
+const FALLBACK_STOP_A = "#6bcd06";
+const FALLBACK_STOP_B = "#fe036d";
 
-const DEFAULT_RADIAL: GradientSpec = {
-  kind: "radial",
-  cx: 0.5,
-  cy: 0.5,
-  radius: 0.5,
-  stops: [
-    { offset: 0, color: "#ffffff" },
-    { offset: 1, color: "#050505" },
-  ],
-};
+/**
+ * Normalise hex colours so the same colour written as #FFF / #FFFFFF /
+ * #ffffff compares equal.
+ */
+function normaliseHex(hex: string): string {
+  let v = hex.trim().toLowerCase();
+  if (v.startsWith("#") && v.length === 4) {
+    // #abc → #aabbcc
+    v = "#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
+  }
+  return v;
+}
+
+function defaultLinear(currentFill?: string): GradientSpec {
+  const stop1 = currentFill ?? FALLBACK_STOP_A;
+  // If Stop 1 would collide with the default Stop 2, fall back to a
+  // contrasting black so the gradient is visible immediately.
+  const stop2 =
+    normaliseHex(stop1) === normaliseHex(FALLBACK_STOP_B)
+      ? "#050505"
+      : FALLBACK_STOP_B;
+  return {
+    kind: "linear",
+    angle: 90,
+    stops: [
+      { offset: 0, color: stop1 },
+      { offset: 1, color: stop2 },
+    ],
+  };
+}
+
+function defaultRadial(currentFill?: string): GradientSpec {
+  const stop1 = currentFill ?? "#ffffff";
+  const stop2 =
+    normaliseHex(stop1) === normaliseHex("#050505") ? "#ffffff" : "#050505";
+  return {
+    kind: "radial",
+    cx: 0.5,
+    cy: 0.5,
+    radius: 0.5,
+    stops: [
+      { offset: 0, color: stop1 },
+      { offset: 1, color: stop2 },
+    ],
+  };
+}
 
 export function GradientEditor({
   value,
   onChange,
+  currentFill,
 }: {
   value: GradientSpec | undefined;
   onChange: (next: GradientSpec | undefined) => void;
+  /**
+   * Fix 2 (2026-05-19) — when present, the first stop seeded by a
+   * None → Linear / None → Radial toggle inherits the element's current
+   * solid fill so the gradient starts at the colour the operator is
+   * already looking at (per brief: "Stop 1: offset=0, color=current fill").
+   */
+  currentFill?: string;
 }) {
   const kind = value?.kind ?? "none";
 
@@ -55,8 +93,22 @@ export function GradientEditor({
 
   function setKind(next: "none" | "linear" | "radial") {
     if (next === "none") return onChange(undefined);
-    if (next === "linear") return onChange({ ...DEFAULT_LINEAR });
-    return onChange({ ...DEFAULT_RADIAL });
+
+    // Fix 2 (2026-05-19) — preserve existing stops when toggling between
+    // linear and radial so the operator doesn't lose tuned colours.
+    if (value && value.stops.length >= 2) {
+      if (next === "linear") {
+        const angle = value.kind === "linear" ? value.angle : 90;
+        return onChange({ kind: "linear", angle, stops: value.stops });
+      }
+      const cx = value.kind === "radial" ? value.cx : 0.5;
+      const cy = value.kind === "radial" ? value.cy : 0.5;
+      const radius = value.kind === "radial" ? value.radius : 0.5;
+      return onChange({ kind: "radial", cx, cy, radius, stops: value.stops });
+    }
+
+    if (next === "linear") return onChange(defaultLinear(currentFill));
+    return onChange(defaultRadial(currentFill));
   }
 
   return (

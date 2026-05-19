@@ -313,6 +313,7 @@ function StyleTab({
         <GradientEditor
           value={(s as { gradient?: import("@/server/overlays/builder/types").GradientSpec }).gradient}
           onChange={(g) => patchStyle({ gradient: g })}
+          currentFill={(s.fill as string) ?? undefined}
         />
 
         {/* Wave 1B — filter sliders */}

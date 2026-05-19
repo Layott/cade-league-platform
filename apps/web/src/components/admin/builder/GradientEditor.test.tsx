@@ -102,4 +102,72 @@ describe("GradientEditor", () => {
     fireEvent.click(screen.getByLabelText(/none/i));
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
+
+  // Fix 2 (2026-05-19): when transitioning from solid (no gradient) to
+  // Linear / Radial, the first stop inherits the element's current fill
+  // so the gradient starts at the visible colour.
+  it("uses currentFill as Stop 1 when toggling None → Linear", () => {
+    const onChange = vi.fn();
+    render(<GradientEditor value={undefined} onChange={onChange} currentFill="#ff8800" />);
+    fireEvent.click(screen.getByLabelText(/linear/i));
+    const emitted = onChange.mock.calls.at(-1)![0];
+    expect(emitted.kind).toBe("linear");
+    expect(emitted.stops[0]).toEqual({ offset: 0, color: "#ff8800" });
+    expect(emitted.stops[1].offset).toBe(1);
+  });
+
+  it("uses currentFill as Stop 1 when toggling None → Radial", () => {
+    const onChange = vi.fn();
+    render(<GradientEditor value={undefined} onChange={onChange} currentFill="#00aaff" />);
+    fireEvent.click(screen.getByLabelText(/radial/i));
+    const emitted = onChange.mock.calls.at(-1)![0];
+    expect(emitted.kind).toBe("radial");
+    expect(emitted.stops[0]).toEqual({ offset: 0, color: "#00aaff" });
+    expect(emitted.stops[1].offset).toBe(1);
+  });
+
+  // Fix 2 (2026-05-19): toggling Linear → Radial (or vice-versa) preserves
+  // the tuned stop list so the operator doesn't lose work.
+  it("preserves stops when toggling Linear → Radial", () => {
+    const onChange = vi.fn();
+    const tunedStops = [
+      { offset: 0, color: "#aabbcc" },
+      { offset: 0.5, color: "#ddeeff" },
+      { offset: 1, color: "#112233" },
+    ];
+    render(
+      <GradientEditor
+        value={{ kind: "linear", angle: 45, stops: tunedStops }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/radial/i));
+    const emitted = onChange.mock.calls.at(-1)![0];
+    expect(emitted.kind).toBe("radial");
+    expect(emitted.stops).toEqual(tunedStops);
+  });
+
+  it("preserves stops when toggling Radial → Linear", () => {
+    const onChange = vi.fn();
+    const tunedStops = [
+      { offset: 0, color: "#deadbe" },
+      { offset: 1, color: "#efbeef" },
+    ];
+    render(
+      <GradientEditor
+        value={{
+          kind: "radial",
+          cx: 0.3,
+          cy: 0.6,
+          radius: 0.7,
+          stops: tunedStops,
+        }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/linear/i));
+    const emitted = onChange.mock.calls.at(-1)![0];
+    expect(emitted.kind).toBe("linear");
+    expect(emitted.stops).toEqual(tunedStops);
+  });
 });
