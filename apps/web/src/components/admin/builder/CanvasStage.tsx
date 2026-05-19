@@ -638,11 +638,15 @@ function useFilterEffect(
     node.filters(filters);
     node.cache({ pixelRatio: 1 });
     node.getLayer()?.batchDraw();
+    // Capture the node into a local so cleanup can call clearCache even
+    // after the ref points elsewhere (silences react-hooks/exhaustive-deps).
+    const capturedNode = node;
     return () => {
       // Clear cache so dragging / dimension changes don't render stale
-      const n = ref.current;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (n && typeof (n as any).clearCache === "function") n.clearCache();
+      if (capturedNode && typeof (capturedNode as any).clearCache === "function") {
+        capturedNode.clearCache();
+      }
     };
   }, [filter, width, height, ref]);
 }
