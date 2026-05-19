@@ -408,6 +408,24 @@
         s5.textContent = animRulesCss;
         document.head.appendChild(s5);
       }
+      // Task B 2026-05-19 — bg-persistent CSS rule.
+      // Injected once per overlay; appends to <head> AFTER author CSS
+      // so the !important rule wins source-order vs the legacy
+      // body:not(.cade-visible):not(.cade-exiting) .bg-X gate. Per-
+      // overlay author CSS still adds .bg-X to their gate selector
+      // lists, but this rule overrides them when the body has
+      // cade-bg-persistent (set by applyBgPersistent below).
+      if (!document.getElementById('cade-injected-bg-persistent')) {
+        var s7 = document.createElement('style');
+        s7.id = 'cade-injected-bg-persistent';
+        s7.textContent =
+          'body.cade-bg-persistent .bg-image,' +
+          'body.cade-bg-persistent .bg-fill,' +
+          'body.cade-bg-persistent .bg-vignette,' +
+          'body.cade-bg-persistent .bg-grain ' +
+          '{ opacity: 1 !important; }';
+        document.head.appendChild(s7);
+      }
       // Apply textContent edits AFTER DOM is parsed.
       applyTextContent(textTokens);
       applyTextContent(previewTextTokens);
@@ -510,6 +528,50 @@
     } else {
       emit();
     }
+
+    // Task B 2026-05-19 — bg-persistent class wiring.
+    //
+    // Resolution order (later wins):
+    //   1. HTML hard-coded :root { --overlay-bg-persistent: true; } default
+    //   2. Design token bg-persistent (DB-persisted)
+    //   3. Preview token bg-persistent (admin live-edit)
+    // Empty / missing → treat as 'true' (persistent default per Task B).
+    // Toggles body.cade-bg-persistent. CSS rule in each overlay then
+    // forces .bg-image / .bg-fill / .bg-vignette / .bg-grain opacity:1
+    // regardless of cade-visible state.
+    function applyBgPersistent() {
+      try {
+        var on = true; // default = persistent
+        if (design && Object.prototype.hasOwnProperty.call(design, 'bg-persistent')) {
+          on = (design['bg-persistent'] === 'true' || design['bg-persistent'] === '1');
+        }
+        if (preview && Object.prototype.hasOwnProperty.call(preview, 'bg-persistent')) {
+          on = (preview['bg-persistent'] === 'true' || preview['bg-persistent'] === '1');
+        }
+        // If neither token speaks but the HTML has a :root --overlay-bg-persistent
+        // default, honour it. (Hard-coded false on excluded overlays.)
+        if (
+          (!design || !Object.prototype.hasOwnProperty.call(design, 'bg-persistent')) &&
+          (!preview || !Object.prototype.hasOwnProperty.call(preview, 'bg-persistent'))
+        ) {
+          var hv = '';
+          try {
+            hv = getComputedStyle(document.documentElement)
+              .getPropertyValue('--overlay-bg-persistent').trim()
+              .replace(/^['"]|['"]$/g, '');
+          } catch (e) { /* ignore */ }
+          if (hv === 'false' || hv === '0') on = false;
+        }
+        if (document.body) {
+          document.body.classList.toggle('cade-bg-persistent', on);
+        }
+      } catch (e) { /* never throw */ }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', applyBgPersistent);
+    } else {
+      applyBgPersistent();
+    }
   } catch (e) {
     // Bootstrap MUST never throw — fall back to HTML defaults.
   }
@@ -601,6 +663,10 @@
     --overlay-text-color: #ffffff;
     --overlay-font-display: 'Agharti';
     --overlay-font-body: 'Quedora';
+    /* Task B 2026-05-19 — bg-persistent default. Bootstrap reads token
+       + sets body.cade-bg-persistent so bg stays visible regardless
+       of trigger state. */
+    --overlay-bg-persistent: true;
   }
 
   /* ── DESIGN TOKENS ─────────────────────────────────────────────
@@ -649,10 +715,11 @@
 
   /* HIDE bg + inner content until trigger ON. animation-name: none cancels
      the entry animations during the dormant state — when cade-visible
-     is added, the animation re-runs fresh (with help of show() reflow). */
-  body:not(.cade-visible):not(.cade-exiting) .bg-image,
-  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
-  body:not(.cade-visible):not(.cade-exiting) .bg-grain,
+     is added, the animation re-runs fresh (with help of show() reflow).
+     Task B 2026-05-19 — bg-image/.bg-vignette/.bg-grain removed from the
+     dormant-state opacity gate. They're now driven by
+     body.cade-bg-persistent below so the stadium texture stays visible
+     between Trigger events. */
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .chevrons,
   body:not(.cade-visible):not(.cade-exiting) .h2h-kicker-wrap,
@@ -678,10 +745,26 @@
     animation-name: none !important;
   }
 
-  /* Smooth exit on cade-exiting — applies cade-fade-out to all content shells */
-  body.cade-exiting .bg-image,
-  body.cade-exiting .bg-vignette,
-  body.cade-exiting .bg-grain {
+  /* Task B 2026-05-19 — bg-layer persistence. When body.cade-bg-persistent
+     is set (default — bootstrap reads `--overlay-bg-persistent` token),
+     the bg stays visible across cade-visible/cade-exiting flips. Setting
+     the token to 'false' restores the strict gate path below. */
+  body.cade-bg-persistent .bg-image,
+  body.cade-bg-persistent .bg-vignette,
+  body.cade-bg-persistent .bg-grain {
+    opacity: 1 !important;
+  }
+  body:not(.cade-bg-persistent):not(.cade-visible):not(.cade-exiting) .bg-image,
+  body:not(.cade-bg-persistent):not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  body:not(.cade-bg-persistent):not(.cade-visible):not(.cade-exiting) .bg-grain {
+    opacity: 0 !important;
+  }
+
+  /* Smooth exit on cade-exiting — applies cade-fade-out to all content shells.
+     Background only fades out when NOT persistent. */
+  body:not(.cade-bg-persistent).cade-exiting .bg-image,
+  body:not(.cade-bg-persistent).cade-exiting .bg-vignette,
+  body:not(.cade-bg-persistent).cade-exiting .bg-grain {
     opacity: 0 !important;
     transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
@@ -922,30 +1005,35 @@
   }
   .player-col--a {
     left: 110px;
-    animation: player-a-in 1.0s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
-               player-a-out 0.9s calc(var(--cycle) - 1.1s) cubic-bezier(0.55, 0, 0.78, 0) both;
+    /* Task A 2026-05-19 — expo-out for entry feels velocity-smooth;
+       inverse expo-in for exit reads as a controlled retreat. */
+    animation: player-a-in 1.1s 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+               player-a-out 0.9s calc(var(--cycle) - 1.1s) cubic-bezier(0.7, 0, 0.84, 0) both;
+    will-change: transform, opacity;
   }
   .player-col--b {
     right: 110px;
-    animation: player-b-in 1.0s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both,
-               player-b-out 0.9s calc(var(--cycle) - 1.1s) cubic-bezier(0.55, 0, 0.78, 0) both;
+    animation: player-b-in 1.1s 0.4s cubic-bezier(0.16, 1, 0.3, 1) both,
+               player-b-out 0.9s calc(var(--cycle) - 1.1s) cubic-bezier(0.7, 0, 0.84, 0) both;
+    will-change: transform, opacity;
   }
 
+  /* Task A 2026-05-19 — translate3d for GPU compositing path. */
   @keyframes player-a-in {
-    0%   { opacity: 0; transform: translateX(-180px); }
-    100% { opacity: 1; transform: translateX(0); }
+    0%   { opacity: 0; transform: translate3d(-180px, 0, 0); }
+    100% { opacity: 1; transform: translate3d(0, 0, 0); }
   }
   @keyframes player-a-out {
-    0%   { opacity: 1; transform: translateX(0); }
-    100% { opacity: 0; transform: translateX(-180px); }
+    0%   { opacity: 1; transform: translate3d(0, 0, 0); }
+    100% { opacity: 0; transform: translate3d(-180px, 0, 0); }
   }
   @keyframes player-b-in {
-    0%   { opacity: 0; transform: translateX(180px); }
-    100% { opacity: 1; transform: translateX(0); }
+    0%   { opacity: 0; transform: translate3d(180px, 0, 0); }
+    100% { opacity: 1; transform: translate3d(0, 0, 0); }
   }
   @keyframes player-b-out {
-    0%   { opacity: 1; transform: translateX(0); }
-    100% { opacity: 0; transform: translateX(180px); }
+    0%   { opacity: 1; transform: translate3d(0, 0, 0); }
+    100% { opacity: 0; transform: translate3d(180px, 0, 0); }
   }
 
   /* HUGE Agharti condensed name backdrop behind each photo */
@@ -1312,6 +1400,22 @@
   }
   .stat-row .stat-val--a { text-align: left;  padding-left:  8px; }
   .stat-row .stat-val--b { text-align: right; padding-right: 8px; }
+  /* Task A/E 2026-05-19 — crossfade stat values on mid-show updates.
+     When the iframe receives a fresh stats payload while
+     body.cade-visible is set, the text content swaps in place. A
+     short opacity-transition makes the swap read as a fade rather
+     than a snap. Live-stream is the load-bearing case: operator
+     switches opponents on the score-bug control + this overlay's
+     auto-refetch repaints the stat cells via Realtime.
+     `!important` overrides the gate observer's inline
+     `transition: opacity 360ms ease-out` so this smoother curve wins. */
+  .stat-row .stat-val,
+  .stats-header .col-name,
+  .winprob-under-value,
+  .draw-prob-value {
+    transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    will-change: opacity;
+  }
 
   /* highlight better/worse per row */
   .stat-row .stat-val.better {
@@ -2048,6 +2152,32 @@
       // Once shown, design holds steady. Operator hits Update to refresh.
     })();
   </script>
+<script data-tag="cade-bg-persistent-bootstrap-v1">
+(function () {
+  /* Task B 2026-05-19 — read `--overlay-bg-persistent` token and toggle
+     body.cade-bg-persistent so the bg-layer CSS rules above keep the
+     stadium texture visible regardless of trigger state. */
+  function readToken() {
+    try {
+      var v = getComputedStyle(document.documentElement)
+        .getPropertyValue('--overlay-bg-persistent').trim();
+      v = v.replace(/^['"]|['"]$/g, '');
+      return v;
+    } catch (e) { return ''; }
+  }
+  function apply() {
+    var v = readToken();
+    var on = (v === '' || v === 'true' || v === '1');
+    document.body.classList.toggle('cade-bg-persistent', on);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+  new MutationObserver(apply).observe(document.head, { childList: true, subtree: true });
+})();
+</script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function(){
   // Phase B4 — `.player-col` REMOVED from SEL so the keyframe entry slide
@@ -2057,7 +2187,10 @@
   // and left the entry feeling muted. Visibility is still gated via the
   // `body.cade-visible` CSS rule on `.player-col` itself + the keyframe
   // animation handles the from-state.
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.season-mark,.stat-row,.stats-card,.top-band,.winprob-under-name,.draw-prob-pill';
+  // Task B 2026-05-19 — bg-image/.bg-vignette/.bg-grain removed; their
+  // visibility is now driven by body.cade-bg-persistent + CSS rule
+  // above. Gate observer no longer fights the persistent-bg path.
+  var SEL = '.chevrons,.h2h-kicker-wrap,.name-backdrop,.partners,.season-mark,.stat-row,.stats-card,.top-band,.winprob-under-name,.draw-prob-pill';
   function apply() {
     var b = document.body;
     if (!b) return;

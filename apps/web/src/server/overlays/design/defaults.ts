@@ -105,6 +105,13 @@ export const TOKEN_CATALOG: readonly TokenCatalogEntry[] = [
     description:
       "Custom backdrop image (recommended 1920×1080 PNG/JPG/WebP, ≤2MB). Only available on full-canvas overlays.",
   },
+  {
+    tokenKey: "bg-persistent",
+    tokenType: "boolean",
+    label: "Persistent background",
+    description:
+      "When ON, overlay background stays visible when trigger off. Content still animates in/out.",
+  },
 ] as const;
 
 /**
@@ -180,6 +187,7 @@ const BASE_DEFAULTS: Record<string, string> = {
   pattern: "none",
   "partner-strip-show": "true",
   "partner-strip-scroll": "false",
+  "bg-persistent": "true",
 };
 
 /**
@@ -196,6 +204,7 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
   },
   "02-timer": {
     "partner-strip-show": "false",
+    "bg-persistent": "false",
   },
   "04-h2h-2": {
     "bg-image": "",
@@ -215,16 +224,19 @@ const OVERLAY_OVERRIDES: Record<OverlayKey, Partial<Record<string, string>>> = {
     "pos-x": "60",
     "pos-y": "880",
     "partner-strip-show": "false",
+    "bg-persistent": "false",
   },
   "09-secondary-score-bug": {
     "pos-x": "40",
     "pos-y": "40",
     "partner-strip-show": "false",
+    "bg-persistent": "false",
   },
   "10-up-next-bug": {
     "pos-x": "0",
     "pos-y": "60",
     "partner-strip-show": "false",
+    "bg-persistent": "false",
   },
   "11-match-scores-day": {
     "partner-strip-show": "false",

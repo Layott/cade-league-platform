@@ -417,6 +417,24 @@
         s5.textContent = animRulesCss;
         document.head.appendChild(s5);
       }
+      // Task B 2026-05-19 — bg-persistent CSS rule.
+      // Injected once per overlay; appends to <head> AFTER author CSS
+      // so the !important rule wins source-order vs the legacy
+      // body:not(.cade-visible):not(.cade-exiting) .bg-X gate. Per-
+      // overlay author CSS still adds .bg-X to their gate selector
+      // lists, but this rule overrides them when the body has
+      // cade-bg-persistent (set by applyBgPersistent below).
+      if (!document.getElementById('cade-injected-bg-persistent')) {
+        var s7 = document.createElement('style');
+        s7.id = 'cade-injected-bg-persistent';
+        s7.textContent =
+          'body.cade-bg-persistent .bg-image,' +
+          'body.cade-bg-persistent .bg-fill,' +
+          'body.cade-bg-persistent .bg-vignette,' +
+          'body.cade-bg-persistent .bg-grain ' +
+          '{ opacity: 1 !important; }';
+        document.head.appendChild(s7);
+      }
       // Apply textContent edits AFTER DOM is parsed.
       applyTextContent(textTokens);
       applyTextContent(previewTextTokens);
@@ -519,6 +537,50 @@
     } else {
       emit();
     }
+
+    // Task B 2026-05-19 — bg-persistent class wiring.
+    //
+    // Resolution order (later wins):
+    //   1. HTML hard-coded :root { --overlay-bg-persistent: true; } default
+    //   2. Design token bg-persistent (DB-persisted)
+    //   3. Preview token bg-persistent (admin live-edit)
+    // Empty / missing → treat as 'true' (persistent default per Task B).
+    // Toggles body.cade-bg-persistent. CSS rule in each overlay then
+    // forces .bg-image / .bg-fill / .bg-vignette / .bg-grain opacity:1
+    // regardless of cade-visible state.
+    function applyBgPersistent() {
+      try {
+        var on = true; // default = persistent
+        if (design && Object.prototype.hasOwnProperty.call(design, 'bg-persistent')) {
+          on = (design['bg-persistent'] === 'true' || design['bg-persistent'] === '1');
+        }
+        if (preview && Object.prototype.hasOwnProperty.call(preview, 'bg-persistent')) {
+          on = (preview['bg-persistent'] === 'true' || preview['bg-persistent'] === '1');
+        }
+        // If neither token speaks but the HTML has a :root --overlay-bg-persistent
+        // default, honour it. (Hard-coded false on excluded overlays.)
+        if (
+          (!design || !Object.prototype.hasOwnProperty.call(design, 'bg-persistent')) &&
+          (!preview || !Object.prototype.hasOwnProperty.call(preview, 'bg-persistent'))
+        ) {
+          var hv = '';
+          try {
+            hv = getComputedStyle(document.documentElement)
+              .getPropertyValue('--overlay-bg-persistent').trim()
+              .replace(/^['"]|['"]$/g, '');
+          } catch (e) { /* ignore */ }
+          if (hv === 'false' || hv === '0') on = false;
+        }
+        if (document.body) {
+          document.body.classList.toggle('cade-bg-persistent', on);
+        }
+      } catch (e) { /* never throw */ }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', applyBgPersistent);
+    } else {
+      applyBgPersistent();
+    }
   } catch (e) {
     // Bootstrap MUST never throw — fall back to HTML defaults.
   }
@@ -589,6 +651,11 @@
     --overlay-row-highlight-count: 2;
     --overlay-pattern: halftone;
     --overlay-partner-strip-show: flex;
+    /* Task B 2026-05-19 — bg-persistent default. Bootstrap script
+       reads this token and adds body.cade-bg-persistent so the
+       background is visible regardless of trigger state. Admins can
+       flip OFF via the design editor to restore old gate behaviour. */
+    --overlay-bg-persistent: true;
   }
 
   /* ── LOCAL BRAND TOKENS ─────────────────────────────────────
@@ -621,10 +688,25 @@
   }
   body { opacity: 1 !important; }
 
-  /* Gate inner content until cade-visible. Background stays gated too
-     so the ELITE S2 BG doesn't leak when the overlay is dormant. */
-  body:not(.cade-visible):not(.cade-exiting) .bg-fill,
-  body:not(.cade-visible):not(.cade-exiting) .bg-vignette,
+  /* Task B 2026-05-19 — bg-layer persistence.
+     `.bg-fill` + `.bg-vignette` are removed from the cade-visible gate
+     list when body.cade-bg-persistent is set (the default — bootstrap
+     reads `--overlay-bg-persistent` token and adds the class). The
+     overlay's background then stays visible regardless of trigger
+     state so OBS sources don't flash to transparent between Trigger
+     events. Admins can flip the token OFF in the design editor to
+     restore the old strict gate.
+  */
+  body.cade-bg-persistent .bg-fill,
+  body.cade-bg-persistent .bg-vignette {
+    opacity: 1 !important;
+  }
+  body:not(.cade-bg-persistent):not(.cade-visible):not(.cade-exiting) .bg-fill,
+  body:not(.cade-bg-persistent):not(.cade-visible):not(.cade-exiting) .bg-vignette {
+    opacity: 0 !important;
+  }
+
+  /* Gate inner content until cade-visible. */
   body:not(.cade-visible):not(.cade-exiting) .top-band,
   body:not(.cade-visible):not(.cade-exiting) .corner-badge,
   body:not(.cade-visible):not(.cade-exiting) .headline,
@@ -637,8 +719,6 @@
   body:not(.cade-visible):not(.cade-exiting) .season-mark {
     opacity: 0 !important;
   }
-  body.cade-exiting .bg-fill,
-  body.cade-exiting .bg-vignette,
   body.cade-exiting .top-band,
   body.cade-exiting .corner-badge,
   body.cade-exiting .headline,
@@ -646,6 +726,13 @@
   body.cade-exiting .partners,
   body.cade-exiting .matchday-mark,
   body.cade-exiting .season-mark {
+    opacity: 0 !important;
+    transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
+  }
+  /* Background fade-out only fires when NOT persistent (legacy gate
+     path). When persistent, bg stays at opacity 1 through cade-exiting. */
+  body:not(.cade-bg-persistent).cade-exiting .bg-fill,
+  body:not(.cade-bg-persistent).cade-exiting .bg-vignette {
     opacity: 0 !important;
     transition: opacity 0.5s cubic-bezier(0.7, 0, 0.84, 0);
   }
@@ -831,7 +918,11 @@
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, 0.06),
       0 4px 14px rgba(0, 0, 0, 0.22);
-    transition: opacity 360ms ease-out, transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+    /* Task A 2026-05-19 — longer/softer entry. Expo-out for slide-in,
+       gentle ease-out for fade. Transform-only animation = GPU path. */
+    transition:
+      opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
     will-change: opacity, transform;
   }
 
@@ -932,22 +1023,45 @@
      STAGGERED ENTRANCE
      Each row slides in from the left when body.cade-visible.
      The gate observer sets opacity:1 inline; transition handles the flip.
+     Task A 2026-05-19 — translate3d for GPU path; 80ms stagger; longer
+     hold of the slide so the cascade reads as deliberate not snappy.
   ============================================================ */
-  body:not(.cade-visible) .row { opacity: 0; transform: translateX(-32px); }
-  body.cade-visible .row { opacity: 1; transform: translateX(0); }
-  body.cade-visible .col-left .row:nth-child(1)  { transition-delay: 60ms;   }
-  body.cade-visible .col-left .row:nth-child(2)  { transition-delay: 120ms;  }
-  body.cade-visible .col-left .row:nth-child(3)  { transition-delay: 180ms;  }
-  body.cade-visible .col-left .row:nth-child(4)  { transition-delay: 240ms;  }
-  body.cade-visible .col-left .row:nth-child(5)  { transition-delay: 300ms;  }
-  body.cade-visible .col-left .row:nth-child(6)  { transition-delay: 360ms;  }
-  body.cade-visible .col-right .row:nth-child(1) { transition-delay: 90ms;   }
-  body.cade-visible .col-right .row:nth-child(2) { transition-delay: 150ms;  }
-  body.cade-visible .col-right .row:nth-child(3) { transition-delay: 210ms;  }
-  body.cade-visible .col-right .row:nth-child(4) { transition-delay: 270ms;  }
-  body.cade-visible .col-right .row:nth-child(5) { transition-delay: 330ms;  }
-  body.cade-visible .col-right .row:nth-child(6) { transition-delay: 390ms;  }
-  body.cade-visible .col-right .row:nth-child(7) { transition-delay: 450ms;  }
+  body:not(.cade-visible) .row { opacity: 0; transform: translate3d(-32px, 0, 0); }
+  body.cade-visible .row { opacity: 1; transform: translate3d(0, 0, 0); }
+  body.cade-visible .col-left .row:nth-child(1)  { transition-delay: 80ms;   }
+  body.cade-visible .col-left .row:nth-child(2)  { transition-delay: 160ms;  }
+  body.cade-visible .col-left .row:nth-child(3)  { transition-delay: 240ms;  }
+  body.cade-visible .col-left .row:nth-child(4)  { transition-delay: 320ms;  }
+  body.cade-visible .col-left .row:nth-child(5)  { transition-delay: 400ms;  }
+  body.cade-visible .col-left .row:nth-child(6)  { transition-delay: 480ms;  }
+  body.cade-visible .col-left .row:nth-child(7)  { transition-delay: 560ms;  }
+  body.cade-visible .col-right .row:nth-child(1) { transition-delay: 120ms;  }
+  body.cade-visible .col-right .row:nth-child(2) { transition-delay: 200ms;  }
+  body.cade-visible .col-right .row:nth-child(3) { transition-delay: 280ms;  }
+  body.cade-visible .col-right .row:nth-child(4) { transition-delay: 360ms;  }
+  body.cade-visible .col-right .row:nth-child(5) { transition-delay: 440ms;  }
+  body.cade-visible .col-right .row:nth-child(6) { transition-delay: 520ms;  }
+  body.cade-visible .col-right .row:nth-child(7) { transition-delay: 600ms;  }
+
+  /* Task A/E 2026-05-19 — mid-show update crossfade.
+     When the iframe receives a fresh standings payload while
+     body.cade-visible is set, the stat cells get new text content
+     in place. Without a transition, the swap is a SNAP. Adding a
+     short opacity transition makes the value fade-replace cleanly.
+     transform on text-only cells skipped to avoid reflow jank;
+     opacity-only ride keeps GPU path.
+     `!important` overrides the gate observer's inline
+     `transition: opacity 360ms ease-out` (INNER_SEL forces a 360ms
+     ease-out onto every row cell) so this smoother curve wins. */
+  .row .pos-num,
+  .row .player-name,
+  .row .stat,
+  .row .stat-gd,
+  .row .stat-ded,
+  .row .pts {
+    transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    will-change: opacity;
+  }
 
   /* ============================================================
      PARTNER STRIP — bottom row, 5 logos (added OAS esport)
@@ -1312,12 +1426,53 @@
   })();
 </script>
 
+<script data-tag="cade-bg-persistent-bootstrap-v1">
+(function () {
+  /* Task B 2026-05-19 — read `--overlay-bg-persistent` token and toggle
+     body.cade-bg-persistent class so the bg-layer CSS rules above can
+     pin the background regardless of trigger state.
+     Default = persistent (token empty or 'true'). Admins flip OFF via
+     the design editor (token value 'false') to restore the old strict
+     gate where bg fades in/out with cade-visible. */
+  function readToken() {
+    try {
+      var v = getComputedStyle(document.documentElement)
+        .getPropertyValue('--overlay-bg-persistent').trim();
+      /* Trim quotes some browsers wrap string-typed CSS vars in. */
+      v = v.replace(/^['"]|['"]$/g, '');
+      return v;
+    } catch (e) { return ''; }
+  }
+  function apply() {
+    var v = readToken();
+    var on = (v === '' || v === 'true' || v === '1');
+    document.body.classList.toggle('cade-bg-persistent', on);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+  /* Re-apply when SSR/preview style blocks land mid-load (the design
+     editor injects them via postMessage / URL-encoded blocks). */
+  new MutationObserver(apply).observe(document.head, { childList: true, subtree: true });
+})();
+</script>
 <script data-tag="cade-visible-gate-observer-v2">
 (function () {
   /* Top-level gated containers — these must be hidden by CSS rule when no
      cade-visible class on body. Force-set to opacity:1 on cade-visible so
-     Chrome cross-origin iframe stuck-transition bug cannot leave them at 0. */
-  var SEL = '.bg-fill,.bg-vignette,.col-headers,.headline,.matchday-mark,.partners,.row,.rows,.season-mark,.table-block,.top-band,.corner-badge';
+     Chrome cross-origin iframe stuck-transition bug cannot leave them at 0.
+     Task B 2026-05-19 — .bg-fill/.bg-vignette excluded; their visibility
+     is now driven by body.cade-bg-persistent + CSS rule (no inline
+     style override). */
+  /* Task A 2026-05-19 — `.row` REMOVED from SEL so the row's own
+     entry-transition (opacity 500ms + transform 700ms expo-out) plays
+     uninterrupted. Observer was clobbering opacity timing with a
+     360ms ease-out append. The `.rows` container still gets the gate
+     treatment so any wholly-new rows added post-cade-visible still
+     fade in via CSS rule on `.row` itself. */
+  var SEL = '.col-headers,.headline,.matchday-mark,.partners,.rows,.season-mark,.table-block,.top-band,.corner-badge';
   /* Inner row internals — when the row's own entrance transition has
      burnt out before cade-visible, force-set opacity 1.
      NB: `.row` itself is omitted — its slide-in transition animates

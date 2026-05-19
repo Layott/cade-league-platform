@@ -1328,3 +1328,34 @@ User picks: (a) start Phase 1 implementation now, or (b) more spec edits first.
   - GET /admin/broadcast/v2/builder/no-such-slug/edit → 307
   - GET /overlay/v2/user/no-such-slug → 404
 - Next: Wave 1B brainstorm/plan dispatch.
+
+## 2026-05-17 — Wave 1B Overlay Builder: Verification Review
+
+### Result: SHIPPED
+
+- 18 Wave 1B feature/test commits + 5 docs/plan commits + 1 cleanup commit = 24 commits total pushed to origin/main. Latest cleanup commit: `e2f1e029`.
+- Unit tests: 2886/2888 pass. 2 pre-existing failures unchanged (diff_upsert_bg HMAC + OverlayDataInjector mini-preview gate). Wave 1B adds 86 new tests.
+- Lint: 0 errors, 31 warnings (all pre-existing).
+- Build: 2 type/bundling errors found and fixed during this gate:
+  - `fontkit` missing TypeScript declarations — fixed by installing `@types/fontkit@2.0.9`.
+  - `ttf2woff2` WASM not found at build time — fixed by adding `fontkit` + `ttf2woff2` to `serverExternalPackages` in `next.config.ts` (same pattern as `isomorphic-dompurify`/`jsdom`).
+- E2E: SKIPPED (no dev server). User to run manually post-push.
+- Visual regression baseline: SKIPPED. Same reason.
+- Chrome manual end-to-end: SKIPPED per task brief instructions.
+- Push: pending curl probe then `git push origin main`.
+- Next: Wave 1C plan dispatch — path/pen tool, grouping, multi-select, keyboard shortcuts.
+
+---
+
+## 2026-05-19 — Overlay polish: smoother entry + bg-persistent token + auto-refresh verify
+
+### Plan
+- [x] Task C: add `bg-persistent` token (catalog + BASE_DEFAULTS + overrides for 02/08/09/10 = false).
+- [x] Task A+E: smoother entry animations for 04-h2h-2, 07-leaderboard, 14-top-scorers + crossfade on mid-show updates.
+- [x] Task B: persistent backgrounds on all overlays EXCEPT 02-timer / 08-lower-third / 09-secondary-score-bug / 10-up-next-bug. Reads `bg-persistent` token.
+- [x] Task D: verify 07-leaderboard auto-refresh wiring (INITIAL_FETCH_PATH + REALTIME_KEY_EVENTS).
+- [x] Sync KNOWLEDGE → public.
+- [x] tsc --noEmit clean.
+- [x] Chrome visual verify for each of the 3 polish targets.
+- [x] Commit + push + memory note.
+

@@ -404,6 +404,24 @@
         s5.textContent = animRulesCss;
         document.head.appendChild(s5);
       }
+      // Task B 2026-05-19 — bg-persistent CSS rule.
+      // Injected once per overlay; appends to <head> AFTER author CSS
+      // so the !important rule wins source-order vs the legacy
+      // body:not(.cade-visible):not(.cade-exiting) .bg-X gate. Per-
+      // overlay author CSS still adds .bg-X to their gate selector
+      // lists, but this rule overrides them when the body has
+      // cade-bg-persistent (set by applyBgPersistent below).
+      if (!document.getElementById('cade-injected-bg-persistent')) {
+        var s7 = document.createElement('style');
+        s7.id = 'cade-injected-bg-persistent';
+        s7.textContent =
+          'body.cade-bg-persistent .bg-image,' +
+          'body.cade-bg-persistent .bg-fill,' +
+          'body.cade-bg-persistent .bg-vignette,' +
+          'body.cade-bg-persistent .bg-grain ' +
+          '{ opacity: 1 !important; }';
+        document.head.appendChild(s7);
+      }
       // Apply textContent edits AFTER DOM is parsed.
       applyTextContent(textTokens);
       applyTextContent(previewTextTokens);
@@ -505,6 +523,50 @@
       document.addEventListener('DOMContentLoaded', emit);
     } else {
       emit();
+    }
+
+    // Task B 2026-05-19 — bg-persistent class wiring.
+    //
+    // Resolution order (later wins):
+    //   1. HTML hard-coded :root { --overlay-bg-persistent: true; } default
+    //   2. Design token bg-persistent (DB-persisted)
+    //   3. Preview token bg-persistent (admin live-edit)
+    // Empty / missing → treat as 'true' (persistent default per Task B).
+    // Toggles body.cade-bg-persistent. CSS rule in each overlay then
+    // forces .bg-image / .bg-fill / .bg-vignette / .bg-grain opacity:1
+    // regardless of cade-visible state.
+    function applyBgPersistent() {
+      try {
+        var on = true; // default = persistent
+        if (design && Object.prototype.hasOwnProperty.call(design, 'bg-persistent')) {
+          on = (design['bg-persistent'] === 'true' || design['bg-persistent'] === '1');
+        }
+        if (preview && Object.prototype.hasOwnProperty.call(preview, 'bg-persistent')) {
+          on = (preview['bg-persistent'] === 'true' || preview['bg-persistent'] === '1');
+        }
+        // If neither token speaks but the HTML has a :root --overlay-bg-persistent
+        // default, honour it. (Hard-coded false on excluded overlays.)
+        if (
+          (!design || !Object.prototype.hasOwnProperty.call(design, 'bg-persistent')) &&
+          (!preview || !Object.prototype.hasOwnProperty.call(preview, 'bg-persistent'))
+        ) {
+          var hv = '';
+          try {
+            hv = getComputedStyle(document.documentElement)
+              .getPropertyValue('--overlay-bg-persistent').trim()
+              .replace(/^['"]|['"]$/g, '');
+          } catch (e) { /* ignore */ }
+          if (hv === 'false' || hv === '0') on = false;
+        }
+        if (document.body) {
+          document.body.classList.toggle('cade-bg-persistent', on);
+        }
+      } catch (e) { /* never throw */ }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', applyBgPersistent);
+    } else {
+      applyBgPersistent();
     }
   } catch (e) {
     // Bootstrap MUST never throw — fall back to HTML defaults.
@@ -2005,7 +2067,8 @@
   // (card-in-left / -center / -right starting from opacity:0) gets to play.
   // Without this exclusion the observer forced opacity:1 immediately on
   // cade-visible, which clobbered the keyframe `from-opacity:0` step.
-  var SEL = '.bg-image,.bg-vignette,.bg-grain,.card-row,.chevrons,.headline,.partners,.season-mark,.top-band,.winprob-bar';
+  /* Task B 2026-05-19 — bg layers removed; driven by body.cade-bg-persistent. */
+  var SEL = '.card-row,.chevrons,.headline,.partners,.season-mark,.top-band,.winprob-bar';
   // Inner descendants that have their own entrance animations — when the
   // page-load animation has already burnt out by the time cade-visible
   // arrives, Chrome leaves them at the animation's "to" state OR at the
