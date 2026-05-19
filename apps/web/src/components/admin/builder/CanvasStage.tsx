@@ -445,6 +445,127 @@ export function CanvasStage() {
   );
 }
 
+/**
+ * Fix 2026-05-19 — translate the design-system Gradient / Shadow specs
+ * into Konva-native props so the editor preview matches what the
+ * compiler emits as CSS in the published HTML.
+ *
+ * The compiler at `apps/web/src/server/overlays/builder/compiler.ts`
+ * emits `background: linear-gradient(...)` / `radial-gradient(...)` for
+ * styled elements. Konva can't read CSS gradients — it needs explicit
+ * stop arrays. Map the structured Style.gradient into Konva's
+ * fillLinearGradient* / fillRadialGradient* props.
+ *
+ * Returns `null` when no gradient is set so the rect's solid fill keeps
+ * winning. Callers spread the returned object with `...` and must skip
+ * setting `fill={...}` when gradient is present (Konva ignores fill
+ * when fillLinearGradientColorStops is provided, but explicit is safer).
+ */
+function buildGradientProps(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  style: any,
+  width: number,
+  height: number,
+):
+  | {
+      fillLinearGradientStartPoint?: { x: number; y: number };
+      fillLinearGradientEndPoint?: { x: number; y: number };
+      fillLinearGradientColorStops?: (string | number)[];
+      fillRadialGradientStartPoint?: { x: number; y: number };
+      fillRadialGradientEndPoint?: { x: number; y: number };
+      fillRadialGradientStartRadius?: number;
+      fillRadialGradientEndRadius?: number;
+      fillRadialGradientColorStops?: (string | number)[];
+    }
+  | null {
+  const gradient = style?.gradient as
+    | {
+        kind: "linear" | "radial";
+        angle?: number;
+        cx?: number;
+        cy?: number;
+        radius?: number;
+        stops?: Array<{ offset: number; color: string }>;
+      }
+    | undefined;
+  if (!gradient || !Array.isArray(gradient.stops) || gradient.stops.length < 2) {
+    return null;
+  }
+  const colorStops: (string | number)[] = [];
+  for (const stop of gradient.stops) {
+    colorStops.push(stop.offset, stop.color);
+  }
+  if (gradient.kind === "linear") {
+    const angleRad = ((gradient.angle ?? 90) - 90) * (Math.PI / 180);
+    const halfDiag = Math.sqrt(width * width + height * height) / 2;
+    const dx = Math.cos(angleRad) * halfDiag;
+    const dy = Math.sin(angleRad) * halfDiag;
+    return {
+      fillLinearGradientStartPoint: { x: width / 2 - dx, y: height / 2 - dy },
+      fillLinearGradientEndPoint: { x: width / 2 + dx, y: height / 2 + dy },
+      fillLinearGradientColorStops: colorStops,
+    };
+  }
+  // Radial
+  const cx = (gradient.cx ?? 0.5) * width;
+  const cy = (gradient.cy ?? 0.5) * height;
+  const radius = (gradient.radius ?? 0.5) * Math.min(width, height);
+  return {
+    fillRadialGradientStartPoint: { x: cx, y: cy },
+    fillRadialGradientEndPoint: { x: cx, y: cy },
+    fillRadialGradientStartRadius: 0,
+    fillRadialGradientEndRadius: radius,
+    fillRadialGradientColorStops: colorStops,
+  };
+}
+
+/**
+ * Fix 2026-05-19 — pick the first shadow from a `shadows[]` stack OR
+ * fall back to legacy single `shadow`. Konva nodes only paint ONE
+ * shadow per node so previewing the full stack would require offscreen
+ * compositing. For the editor preview the first-stop approximation is
+ * close enough; the compiler-emitted CSS `box-shadow` honors the full
+ * stack in the published output.
+ */
+function buildShadowProps(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  style: any,
+): {
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+} {
+  const stack = style?.shadows as
+    | Array<{
+        color?: string;
+        blur?: number;
+        offsetX?: number;
+        offsetY?: number;
+        opacity?: number;
+      }>
+    | undefined;
+  const first = Array.isArray(stack) && stack.length > 0 ? stack[0] : null;
+  const shadow = first ?? (style?.shadow as
+    | {
+        color?: string;
+        blur?: number;
+        offsetX?: number;
+        offsetY?: number;
+        opacity?: number;
+      }
+    | undefined);
+  if (!shadow) return {};
+  return {
+    shadowColor: shadow.color,
+    shadowBlur: shadow.blur,
+    shadowOffsetX: shadow.offsetX,
+    shadowOffsetY: shadow.offsetY,
+    shadowOpacity: shadow.opacity,
+  };
+}
+
 function RenderedElement({
   el,
   selected,
@@ -498,6 +619,8 @@ function RenderedElement({
 
   const stroke = selected ? "#6bcd06" : (s.stroke as string | undefined);
   const strokeWidth = selected ? 2 : ((s.strokeWidth as number | undefined) ?? 0);
+  const gradientProps = buildGradientProps(s, t.width, t.height);
+  const shadowProps = buildShadowProps(s);
 
   if (el.elementType === "rect") {
     return (
@@ -509,14 +632,12 @@ function RenderedElement({
         height={t.height}
         rotation={t.rotation ?? 0}
         opacity={t.opacity ?? 1}
-        fill={(s.fill as string) ?? "#cccccc"}
+        fill={gradientProps ? undefined : ((s.fill as string) ?? "#cccccc")}
+        {...(gradientProps ?? {})}
         stroke={stroke}
         strokeWidth={strokeWidth}
         cornerRadius={(s.cornerRadius as number) ?? 0}
-        shadowColor={(s.shadow as { color?: string } | undefined)?.color}
-        shadowBlur={(s.shadow as { blur?: number } | undefined)?.blur}
-        shadowOffsetX={(s.shadow as { offsetX?: number } | undefined)?.offsetX}
-        shadowOffsetY={(s.shadow as { offsetY?: number } | undefined)?.offsetY}
+        {...shadowProps}
         draggable
         onClick={onClick}
         onTap={onClick}
@@ -573,7 +694,9 @@ function RenderedElement({
         radiusY={t.height / 2}
         rotation={t.rotation ?? 0}
         opacity={t.opacity ?? 1}
-        fill={(s.fill as string) ?? "#cccccc"}
+        fill={gradientProps ? undefined : ((s.fill as string) ?? "#cccccc")}
+        {...(gradientProps ?? {})}
+        {...shadowProps}
         stroke={stroke}
         strokeWidth={strokeWidth}
         draggable
@@ -629,7 +752,9 @@ function RenderedElement({
         radius={radius}
         rotation={t.rotation ?? 0}
         opacity={t.opacity ?? 1}
-        fill={(s.fill as string) ?? "#cccccc"}
+        fill={gradientProps ? undefined : ((s.fill as string) ?? "#cccccc")}
+        {...(gradientProps ?? {})}
+        {...shadowProps}
         stroke={stroke}
         strokeWidth={strokeWidth}
         draggable
