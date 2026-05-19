@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Stage, Layer, Rect, Text, Image as KImage, Ellipse, Line, RegularPolygon, Line as KLine, Group, Transformer } from "react-konva";
+import Konva from "konva";
 import { useBuilderStore, type AnimPhase } from "@/state/builder/store";
 import { useImage } from "./useImage";
 import type { Element } from "@/server/overlays/builder/types";
@@ -566,6 +567,79 @@ function buildShadowProps(
   };
 }
 
+/**
+ * Fix 2026-05-19 — apply FilterSpec (blur / brightness / hueRotate /
+ * saturate) to the Konva node in the editor preview. Before this fix
+ * filter values were stored on `style.filter` and consumed only by the
+ * server-side compiler (published output via CSS `filter:`) — the live
+ * canvas preview ignored them so admins couldn't see what they were
+ * dialling in. Konva filters require `.cache()` to materialize an
+ * offscreen canvas; this hook attaches the requested filters, sets per-
+ * filter props, and re-caches whenever the spec or shape dims change.
+ *
+ * Saturate is mapped via Konva's HSL filter using a power-of-2 factor
+ * — Konva's `saturation` getter is on a log scale (`pow(2, saturation)`
+ * is the actual multiplier) so we invert: `log2(value)`. Brightness is
+ * mapped to Konva's `Brightness` filter (multiplicative, 0..2 range
+ * matches CSS). Hue rotate maps directly.
+ */
+function useFilterEffect(
+  ref: React.MutableRefObject<Konva.Node | null>,
+  filter: { blur?: number; brightness?: number; hueRotate?: number; saturate?: number } | undefined,
+  width: number,
+  height: number,
+) {
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const hasFilter =
+      !!filter &&
+      ((filter.blur ?? 0) > 0 ||
+        (filter.brightness !== undefined && filter.brightness !== 1) ||
+        (filter.hueRotate ?? 0) > 0 ||
+        (filter.saturate !== undefined && filter.saturate !== 1));
+    if (!hasFilter) {
+      node.filters([]);
+      node.clearCache();
+      node.getLayer()?.batchDraw();
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filters: any[] = [];
+    if ((filter?.blur ?? 0) > 0) {
+      filters.push(Konva.Filters.Blur);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (node as any).blurRadius(filter!.blur!);
+    }
+    if (filter?.brightness !== undefined && filter.brightness !== 1) {
+      filters.push(Konva.Filters.Brightness);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (node as any).brightness(filter.brightness);
+    }
+    const wantsHsl =
+      (filter?.hueRotate ?? 0) > 0 ||
+      (filter?.saturate !== undefined && filter.saturate !== 1);
+    if (wantsHsl) {
+      filters.push(Konva.Filters.HSL);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (node as any).hue(filter?.hueRotate ?? 0);
+      // Konva saturation is power-of-2; CSS multiplier value v maps to log2(v)
+      const sMult = filter?.saturate ?? 1;
+      const sKonva = sMult > 0 ? Math.log2(sMult) : -8;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (node as any).saturation(sKonva);
+    }
+    node.filters(filters);
+    node.cache({ pixelRatio: 1 });
+    node.getLayer()?.batchDraw();
+    return () => {
+      // Clear cache so dragging / dimension changes don't render stale
+      const n = ref.current;
+      if (n) n.clearCache();
+    };
+  }, [filter, width, height, ref]);
+}
+
 function RenderedElement({
   el,
   selected,
@@ -621,10 +695,15 @@ function RenderedElement({
   const strokeWidth = selected ? 2 : ((s.strokeWidth as number | undefined) ?? 0);
   const gradientProps = buildGradientProps(s, t.width, t.height);
   const shadowProps = buildShadowProps(s);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filterSpec = (s as { filter?: any }).filter;
+  const shapeRef = useRef<Konva.Node | null>(null);
+  useFilterEffect(shapeRef, filterSpec, t.width, t.height);
 
   if (el.elementType === "rect") {
     return (
       <Rect
+        ref={shapeRef as React.MutableRefObject<Konva.Rect>}
         id={el.id}
         x={t.x}
         y={t.y}
@@ -688,6 +767,7 @@ function RenderedElement({
   if (el.elementType === "ellipse") {
     return (
       <Ellipse
+        ref={shapeRef as React.MutableRefObject<Konva.Ellipse>}
         x={t.x + t.width / 2}
         y={t.y + t.height / 2}
         radiusX={t.width / 2}
@@ -746,6 +826,7 @@ function RenderedElement({
     const radius = Math.min(t.width, t.height) / 2;
     return (
       <RegularPolygon
+        ref={shapeRef as React.MutableRefObject<Konva.RegularPolygon>}
         x={t.x + t.width / 2}
         y={t.y + t.height / 2}
         sides={sides}
