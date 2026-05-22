@@ -307,6 +307,27 @@ export default async function OverlayV2Page({
   // surface the param when the admin has actually persisted layout /
   // logos OR the resolver returned at least one logo (the seed has 5
   // logos). Empty map → bootstrap leaves HTML defaults alone.
+  //
+  // 2026-05-22 — when logos exist but the admin hasn't saved a layout
+  // row yet (e.g. h2h-5), synthesize a sane default so the bootstrap
+  // ALWAYS emits a `[data-element-id="partners-strip"]{flex-direction:
+  // row;...}` override. Several overlays' author CSS hard-codes
+  // `.partners { flex-direction: column }` to stack a label on top of
+  // the marquee — but the bootstrap flattens the marquee wrapper into
+  // bare `<img>` children, so the column rule then stacks logos
+  // vertically. Emitting a default horizontal layout for every overlay
+  // with logos defeats that stacking regardless of DB state.
+  const DEFAULT_PARTNER_LAYOUT = {
+    visible: true,
+    positionXPx: 0,
+    positionYPx: 60,
+    anchor: "bottom-center" as const,
+    orientation: "horizontal" as const,
+    scalePct: 100,
+    itemSpacingPx: 64,
+    justification: "center" as const,
+    zIndex: 12,
+  };
   const designPartnerTokens =
     partnerStrip || partnerLogos.length > 0
       ? {
@@ -322,7 +343,7 @@ export default async function OverlayV2Page({
                 justification: partnerStrip.justification,
                 zIndex: partnerStrip.zIndex,
               }
-            : undefined,
+            : DEFAULT_PARTNER_LAYOUT,
           logos: partnerLogos.map((l, i) => ({
             partnerKey: l.partnerKey,
             label: l.label,
