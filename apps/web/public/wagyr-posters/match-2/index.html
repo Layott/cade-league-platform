@@ -30,8 +30,14 @@
   .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:108px;line-height:0.92;letter-spacing:-0.045em;color:var(--ink);text-align:right;}
   .hero h1 .glow{color:var(--green);}
   .stage{position:absolute;top:420px;left:64px;right:64px;bottom:240px;display:grid;grid-template-columns:1fr;grid-template-rows:1.3fr 1fr;gap:20px;z-index:2;}
-  .stage .card.secondary{}
-  .stage .card.secondary .vs .vs-tag{font-size:80px;}
+  /* M2: face-off arrangement — players close together, HUGE ghost VS letterform behind them */
+  .stage .card .vs-row{display:grid;grid-template-columns:1fr 1fr;align-items:end;padding:0;position:relative;}
+  .stage .card .vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:0;}
+  .stage .card .vs .vs-tag{font-size:260px;line-height:0.9;color:transparent;-webkit-text-stroke:2px rgba(24,185,72,0.55);text-shadow:0 0 60px rgba(24,185,72,0.30);opacity:0.45;}
+  .stage .card .vs .pool{display:none;}
+  .stage .card .player{position:relative;z-index:2;}
+  .stage .card .player .photo{width:96%;height:88%;}
+  .stage .card.secondary .vs .vs-tag{font-size:200px;}
   .stage .card.secondary .player .name{font-size:46px;}
   .card{position:relative;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;display:flex;flex-direction:column;}
   .card::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.06), transparent 40%);}
