@@ -7,10 +7,11 @@
  * the blurb at slot 1 immediately switches to FARUK's standout stat
  * instead of staying pinned on the previous occupant's storyline.
  *
- * Rule cascade (first match wins). Each branch returns a ≤ 90 char line
- * with one verb-y storyline and at least one numeric stat. Deterministic
- * per (rank, p, w, d, l, gf, ga, gd, pts) tuple so the same standings
- * snapshot yields the same lines on every refresh.
+ * Rule cascade (first match wins). Each branch returns a hyped ≤ 90 char
+ * line with one verb-y storyline and at least one numeric stat. Variants
+ * per branch — picked by `rank` modulo variant count — so no two slots
+ * on screen ever read identically even when they hit the same cascade
+ * rule. Deterministic per (rank, p, w, d, l, gf, ga, gd, pts) tuple.
  *
  * Companion to `apps/web/src/server/overlays/copy/ai_regenerate.ts` —
  * the AI-regen path overwrites `overlay_text_elements.content`, the
@@ -42,69 +43,199 @@ function fmtSigned(n: number): string {
 function recordLabel(s: LeaderboardStatInput): string {
   return `${s.w}W-${s.d}D-${s.l}L`;
 }
+function pick(variants: string[], rank: number): string {
+  if (variants.length === 0) return "";
+  return variants[(Math.max(1, rank) - 1) % variants.length];
+}
 
 export function buildPowerRankingNarrative(s: LeaderboardStatInput): string {
+  const gpm = gfPerMatch(s).toFixed(1);
+  const gapm = gaPerMatch(s).toFixed(1);
+  const rec = recordLabel(s);
+  const gd = fmtSigned(s.gd);
+
+  // No games played yet
   if (s.p === 0) {
-    return s.rank === 1
-      ? `Tipped to set the pace this season.`
-      : `Awaiting opening fixture · MD-1 looms.`;
+    if (s.rank === 1) {
+      return pick(
+        [
+          `Tipped to set the pace this season.`,
+          `Pre-season favourite. Time to deliver.`,
+          `Crown on loan — defending starts now.`,
+        ],
+        s.rank,
+      );
+    }
+    return pick(
+      [
+        `Awaiting opening fixture · MD-1 looms.`,
+        `Pen is loaded · season about to ignite.`,
+        `Quiet so far · explosion incoming.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Perfect record — every fixture won.
+  // Perfect record
   if (s.l === 0 && s.d === 0 && s.w >= 3) {
-    return `Flawless · ${s.w}-${s.w}-0 with GD ${fmtSigned(s.gd)}.`;
+    return pick(
+      [
+        `Untouchable · ${s.w}-0-0, GD ${gd}, nothing in sight.`,
+        `Perfect run · ${s.w} from ${s.w}, GD ${gd}.`,
+        `${s.w} games. Zero blemishes. GD ${gd}.`,
+        `Cleansheet machine · ${s.w}-0-0, scoring ${s.gf}.`,
+        `Flawless · ${s.w} wins on the bounce, GD ${gd}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Unbeaten run with some draws.
+  // Unbeaten with draws
   if (s.l === 0 && s.p >= 3) {
-    return `Unbeaten through ${s.p} · ${recordLabel(s)}, GD ${fmtSigned(s.gd)}.`;
+    return pick(
+      [
+        `Refusing to lose · ${rec}, GD ${gd}.`,
+        `${s.p} games. 0 Ls. GD ${gd}.`,
+        `Iron run · unbeaten through ${s.p}, GD ${gd}.`,
+        `Brick wall season · ${rec}, ${s.pts} pts.`,
+        `Stays standing · ${s.p} games, 0 losses.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Goal flood — top-2 attack rate AND in the medal places.
+  // Goal flood — top-3 attack
   if (gfPerMatch(s) >= 3.0 && s.p >= 2 && s.rank <= 3) {
-    return `Goal machine · ${s.gf} scored across ${s.p} (${gfPerMatch(s).toFixed(1)}/match).`;
+    return pick(
+      [
+        `Scoring at will · ${s.gf} goals in ${s.p} (${gpm}/match).`,
+        `Goalscorer in chief · ${s.gf} bagged across ${s.p}.`,
+        `Defences in shambles · ${s.gf} put past them.`,
+        `Goal blitz · ${s.gf} netted, ${gpm} per game.`,
+        `Foot off the gas, never · ${s.gf} in ${s.p}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Defensive wall — sub-goal-per-game AND top-half.
+  // Stingy defence
   if (gaPerMatch(s) <= 0.8 && s.p >= 2 && s.rank <= 6) {
-    return `Stingy defence · ${s.ga} conceded in ${s.p}, GD ${fmtSigned(s.gd)}.`;
+    return pick(
+      [
+        `Concrete back · ${s.ga} let in across ${s.p}.`,
+        `Lockdown mode · only ${s.ga} conceded, GD ${gd}.`,
+        `Wall going up · ${gapm}/match conceded.`,
+        `Defence locked tight · ${s.ga} past them in ${s.p}.`,
+        `Vault sealed · ${s.ga} conceded, GD ${gd}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Hot streak — high win rate when in medal places.
+  // Hot streak in medal places
   if (s.w >= 4 && s.l <= 1 && s.rank <= 3) {
-    return `Form is electric · ${recordLabel(s)} with ${s.pts} pts banked.`;
+    return pick(
+      [
+        `Steamrolling · ${rec}, ${s.pts} pts banked.`,
+        `On the warpath · ${s.w} wins, only ${s.l} L.`,
+        `Conveyor of wins · ${s.w} from ${s.p}.`,
+        `Form is electric · ${rec}, ${s.pts} pts.`,
+        `Hot run · ${s.w}W from ${s.p}, ${s.pts} pts.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Climbing — middle of the pack, more wins than losses.
-  if (s.rank >= 3 && s.rank <= 6 && s.w > s.l) {
-    return `Climbing the table · ${recordLabel(s)} (${s.pts} pts).`;
-  }
-
-  // Goal-difference giant despite mid rank.
+  // Goal-difference giant despite mid rank
   if (s.gd >= 10 && s.rank >= 2) {
-    return `Goal-difference monster · GD ${fmtSigned(s.gd)} despite the slip.`;
+    return pick(
+      [
+        `Scoreline punisher · GD ${gd} despite the slip.`,
+        `Goal-swing monster · GD ${gd}.`,
+        `Margins savage · GD ${gd}, ranked ${s.rank}.`,
+        `Hammers when it counts · GD ${gd}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Bad spell.
+  // Mid-pack with wins > losses
+  if (s.rank >= 3 && s.rank <= 8 && s.w > s.l) {
+    return pick(
+      [
+        `Charging up the board · ${rec}, ${s.pts} pts.`,
+        `Stalking the leaders · ${s.pts} pts and counting.`,
+        `Quiet surge · ${s.w}W from ${s.p}, ${s.pts} pts.`,
+        `Knocking on the door · ${rec}, ${s.pts} pts.`,
+        `Trending up · ${s.pts} pts, ${gd} swing.`,
+        `Pressing the chasers · ${rec}, ${s.pts} pts.`,
+        `Engine warming · ${s.w} wins, ${s.pts} pts.`,
+      ],
+      s.rank,
+    );
+  }
+
+  // Bad spell — multiple losses, few wins
   if (s.l >= 3 && s.w <= 1) {
-    return `Tough run · ${recordLabel(s)}, GD ${fmtSigned(s.gd)}.`;
+    return pick(
+      [
+        `Searching for the spark · ${rec}.`,
+        `Stuck in low gear · ${s.l} losses already.`,
+        `Off the boil · ${rec}, GD ${gd}.`,
+        `Form has slipped · ${rec}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Negative GD trending wrong way.
+  // Negative GD trending wrong way
   if (s.gd <= -5) {
-    return `Need a response · GD ${fmtSigned(s.gd)} after ${s.p}.`;
+    return pick(
+      [
+        `GD ${gd}. Time to swing back hard.`,
+        `Bleeding goals · GD ${gd} after ${s.p}.`,
+        `Damage piling up · GD ${gd}, response needed.`,
+        `Conceding too freely · GD ${gd}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Gritty draws — mostly draws, few losses.
+  // Stalemate king
   if (s.d >= 3 && s.w <= 2 && s.l <= 2) {
-    return `Stalemate king · ${s.d} draws so far · ${s.pts} pts ticking up.`;
+    return pick(
+      [
+        `Draw specialist · ${s.d} stalemates, ${s.pts} grinding pts.`,
+        `King of the deadlock · ${s.d} draws banked.`,
+        `Won't crack, won't crush · ${s.d}D, ${s.pts} pts.`,
+        `Stalemate factory · ${s.d} draws from ${s.p}.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Generic top-of-table fallback.
+  // Top-of-table fallback
   if (s.rank === 1) {
-    return `Leading the pack · ${recordLabel(s)}, ${s.pts} pts (GD ${fmtSigned(s.gd)}).`;
+    return pick(
+      [
+        `Pacesetter · ${rec}, ${s.pts} pts, GD ${gd}.`,
+        `Top of the pile · ${rec}, ${s.pts} pts.`,
+        `Setting the standard · ${s.pts} pts and ${gd} GD.`,
+        `Throne occupied · ${rec}, ${s.pts} pts.`,
+      ],
+      s.rank,
+    );
   }
 
-  // Generic fallback.
-  return `${recordLabel(s)} · ${s.pts} pts, GD ${fmtSigned(s.gd)}.`;
+  // Generic fallback — pick by rank
+  return pick(
+    [
+      `${rec} · ${s.pts} pts, GD ${gd}.`,
+      `${s.pts} on the board · ${s.gf} scored, ${s.ga} let in.`,
+      `Holding station · ${rec}, ${s.pts} pts.`,
+      `${rec} so far · ${s.pts} pts, ${gd} GD.`,
+      `Grinding through · ${s.pts} pts banked.`,
+    ],
+    s.rank,
+  );
 }
