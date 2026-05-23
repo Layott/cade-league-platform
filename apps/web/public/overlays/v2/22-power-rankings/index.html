@@ -696,7 +696,7 @@ body.cade-exiting .canvas { opacity: 0; }
     <img src="/overlays/v2/_assets/logos/pro%20league%20.png" data-element-id="logo-pro" alt="Pro League">
   </div>
   <div class="stage pr-stage">
-    <div class="pr-head"><h1 class="title-h1">POWER <span class="accent-p">RANKINGS</span></h1><div class="sub-h1">WEEK 3 · 2026-05-09</div></div>
+    <div class="pr-head"><h1 class="title-h1">POWER <span class="accent-p">RANKINGS</span></h1><div class="sub-h1" data-element-id="pr-subhead">WEEK 3 · 2026-05-09</div></div>
     <div class="pr-grid"><div class="pr-card first">
     <img class="photo" src="/overlays/v2/_assets/players/processed/baji_jnr/fullbody_01_nobg.png">
     <div class="text-layer">
@@ -768,6 +768,24 @@ body.cade-exiting .canvas { opacity: 0; }
   // server endpoint shapes ({payload:{rows:[...]}} from leaderboard).
   function update(data) {
     if (!data || typeof data !== 'object') return;
+    // 2026-05-23 — sub-headline "WEEK N · YYYY-MM-DD" from feed payload.
+    var subEl = document.querySelector('[data-element-id="pr-subhead"]');
+    if (subEl) {
+      var weekNum = data.matchDayNumber != null ? data.matchDayNumber :
+                    (data.payload && data.payload.matchDayNumber != null) ? data.payload.matchDayNumber : null;
+      var date = data.matchDate || (data.payload && data.payload.matchDate) || null;
+      if (weekNum != null) {
+        var parts = ['WEEK ' + weekNum];
+        if (date) parts.push(String(date).slice(0, 10));
+        // Only overwrite if admin hasn't pinned content via text-element
+        // overrides (those SSR-inject via cade-injected-text before this
+        // runs; check whether current text matches that pattern OR is the
+        // hardcoded fallback that we want to replace).
+        if (!subEl.dataset.cadeAdminPinned) {
+          subEl.textContent = parts.join(' · ');
+        }
+      }
+    }
     var rows =
       (data.payload && Array.isArray(data.payload.rows)) ? data.payload.rows :
       Array.isArray(data.rows) ? data.rows :

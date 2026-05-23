@@ -149,6 +149,10 @@ const INLINE_SEED_ALLOWLIST = [
     "28-punditry",
     "29-goalfests",
   ].map((overlay) => [overlay, "partners-strip"]),
+  // 2026-05-23 — 22-power-rankings sub-headline (live "WEEK N · DATE"
+  // from leaderboard payload). Not in any seed migration; runtime
+  // update() populates from data.matchDayNumber + data.matchDate.
+  ["22-power-rankings", "pr-subhead"],
 ];
 
 /** Extract every (overlay_key, element_id) tuple from the seed migration. */

@@ -56,14 +56,19 @@ export async function GET(
 
   const { data: mdRaw, error: mdErr } = await sb
     .from("match_days")
-    .select("id, season_id")
+    .select("id, season_id, match_day_number, played_at")
     .eq("id", sess.match_day_id)
     .is("deleted_at", null)
     .maybeSingle();
   if (mdErr || !mdRaw) {
     return NextResponse.json({ error: "match_day not found" }, { status: 404 });
   }
-  const md = mdRaw as { id: string; season_id: string };
+  const md = mdRaw as {
+    id: string;
+    season_id: string;
+    match_day_number: number | null;
+    played_at: string | null;
+  };
 
   // Optional `?topN=` override — defaults to 13 (full Elite roster),
   // capped at 13 by reader. Older callers may still pass `topN=10`.
@@ -78,6 +83,11 @@ export async function GET(
       payload,
       seasonId: data.seasonId,
       channel: data.channel,
+      // 2026-05-23 — overlay 22-power-rankings reads matchDayNumber +
+      // matchDate so its "WEEK N · YYYY-MM-DD" sub-headline reflects
+      // the active match-day instead of hard-coded "WEEK 3 · 2026-05-09".
+      matchDayNumber: md.match_day_number,
+      matchDate: md.played_at,
     },
     {
       headers: {
