@@ -79,6 +79,132 @@ const PLAYER_TRIVIA: Array<{
   },
 ];
 
+/**
+ * Verified last-season (previous Elite league) final standings.
+ *
+ * Producer-supplied 2026-05-23 from final-fixture screenshot. ONLY
+ * players who returned to the current Elite roster are listed here
+ * — last season had 16 competitors; 7 carry over (Faruk, Killer Freak,
+ * Baji Jr, Adefola, Mitch, Mr Oga, Anife). Six new arrivals this
+ * season (Dadaboi, Guru, Kaykay, KingNonex, Tactical, Wolevation)
+ * have no prior data → no cross-season card.
+ *
+ * Used to derive cross-season comparison variants. Update only when
+ * the producer provides verified figures.
+ */
+const LAST_SEASON_STANDINGS: Array<{
+  slug: string;
+  displayName: string;
+  rank: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDiff: number;
+  points: number;
+}> = [
+  { slug: "faruk", displayName: "FARUK", rank: 1, played: 15, wins: 14, draws: 1, losses: 0, goalsFor: 103, goalsAgainst: 35, goalDiff: 68, points: 43 },
+  { slug: "killer_freak", displayName: "KILLER FREAK", rank: 2, played: 15, wins: 13, draws: 1, losses: 1, goalsFor: 87, goalsAgainst: 31, goalDiff: 56, points: 40 },
+  { slug: "baji_jnr", displayName: "BAJI JNR", rank: 4, played: 15, wins: 10, draws: 2, losses: 3, goalsFor: 76, goalsAgainst: 54, goalDiff: 22, points: 32 },
+  { slug: "adefola", displayName: "ADEFOLA", rank: 7, played: 15, wins: 8, draws: 0, losses: 7, goalsFor: 68, goalsAgainst: 46, goalDiff: 22, points: 24 },
+  { slug: "mitch", displayName: "MITCH", rank: 8, played: 15, wins: 7, draws: 3, losses: 5, goalsFor: 79, goalsAgainst: 63, goalDiff: 16, points: 24 },
+  { slug: "mr_oga", displayName: "MR OGA", rank: 10, played: 15, wins: 4, draws: 4, losses: 7, goalsFor: 58, goalsAgainst: 65, goalDiff: -7, points: 16 },
+  { slug: "anife", displayName: "ANIFE", rank: 13, played: 15, wins: 4, draws: 2, losses: 9, goalsFor: 54, goalsAgainst: 88, goalDiff: -34, points: 14 },
+];
+
+function lastSeasonCard(
+  variantId: string,
+  slug: string,
+  headline: string,
+  detail: string,
+): DidYouKnowVariant {
+  const row = LAST_SEASON_STANDINGS.find((r) => r.slug === slug);
+  return {
+    variantId,
+    kind: "biggest_gd",
+    headline,
+    detail,
+    player: row
+      ? {
+          playerId: "",
+          displayName: row.displayName,
+          slug: row.slug,
+          photoUrl: null,
+          orgName: null,
+          orgLogoUrl: null,
+        }
+      : null,
+  };
+}
+
+/**
+ * Hand-derived cross-season cards. Each one cites a verified figure
+ * from `LAST_SEASON_STANDINGS` so the producer can confirm before
+ * triggering on stream.
+ */
+const CROSS_SEASON_VARIANTS: DidYouKnowVariant[] = [
+  lastSeasonCard(
+    "cross-faruk-unbeaten",
+    "faruk",
+    "FARUK — UNBEATEN LAST SEASON",
+    "Last season Faruk finished 14W-1D-0L across 15 matches. 103 goals scored, 35 conceded, +68 differential — and never lost a fixture.",
+  ),
+  lastSeasonCard(
+    "cross-killer-freak-one-loss",
+    "killer_freak",
+    "KILLER FREAK — ONE LOSS IN 15",
+    "Killer Freak lost exactly ONE match last season. Final record 13W-1D-1L for 40 points and a +56 goal difference — the second-best campaign of any returning Elite player.",
+  ),
+  lastSeasonCard(
+    "cross-baji-22-gd",
+    "baji_jnr",
+    "BAJI'S +22 LAST SEASON",
+    "Baji JNR closed last season at 10W-2D-3L for 32 points and a +22 differential. Fourth place — the bedrock above which his Season 2 form is being measured.",
+  ),
+  lastSeasonCard(
+    "cross-adefola-zero-draws",
+    "adefola",
+    "ADEFOLA NEVER DREW",
+    "Adefola did not draw a single match across 15 fixtures last season. 8 wins, 7 losses, zero stalemates — the only Elite returner with no draws on the books.",
+  ),
+  lastSeasonCard(
+    "cross-mitch-mid-table",
+    "mitch",
+    "MITCH — MID-TABLE METRONOME",
+    "Mitch tied for 8th last season with 7W-3D-5L and a +16 differential. Quietly consistent — his Season 2 trajectory is the one to watch.",
+  ),
+  lastSeasonCard(
+    "cross-mr-oga-draw-merchant",
+    "mr_oga",
+    "MR OGA'S DRAW HABIT",
+    "Mr Oga ended last season with 4 draws — the most of any returning Elite player. Final tally 4W-4D-7L for 16 points.",
+  ),
+  lastSeasonCard(
+    "cross-anife-comeback-arc",
+    "anife",
+    "ANIFE'S COMEBACK ARC",
+    "Anife finished last season 13th with a -34 differential. He's back in Elite — the biggest GD swing-target of any returning player.",
+  ),
+  {
+    variantId: "cross-new-arrivals",
+    kind: "top_scorer",
+    headline: "SIX NEW ARRIVALS",
+    detail:
+      "Six of this season's 13 Elite players are new to the division: Dadaboi, Guru, Kaykay, KingNonex, Tactical, and Wolevation. Nearly half the roster is unproven Elite blood.",
+    player: null,
+  },
+  {
+    variantId: "cross-seven-returners",
+    kind: "top_scorer",
+    headline: "SEVEN RETURNERS",
+    detail:
+      "Seven players carry experience from the previous Elite season: Faruk, Killer Freak, Baji JNR, Adefola, Mitch, Mr Oga, and Anife. Their Season 1 form is the league's only baseline.",
+    player: null,
+  },
+];
+
 function safe(s: string | null | undefined): string {
   return (s || "").trim();
 }
@@ -108,6 +234,10 @@ export function buildDidYouKnowVariants(
   // 1. User-provided curated trivia (verified facts only — see PLAYER_TRIVIA
   //    docblock for the rule).
   out.push(...curatedPlayerVariants());
+
+  // 1b. Cross-season comparisons. Sourced from LAST_SEASON_STANDINGS
+  //     (producer-supplied final-fixture data 2026-05-23).
+  out.push(...CROSS_SEASON_VARIANTS);
 
   // 2. Computed cards from real season stats. Each must NOT duplicate
   //    what's already on another overlay (no raw streak counts → 21,
