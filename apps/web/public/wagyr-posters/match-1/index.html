@@ -4,10 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="color-scheme" content="dark" />
 <title>WAGYR × CADE · Match 01</title>
-<link rel="preconnect" href="https://api.fontshare.com" crossorigin />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@700,800&display=swap" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" />
 <style>
   :root{
     --bg:#14161A;
@@ -21,7 +19,7 @@
     --green-hot:rgba(24,185,72,0.40);
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Montserrat',system-ui,sans-serif;}
+  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;}
   body{
     position:relative;
     background:
@@ -75,7 +73,7 @@
   .tape .track .sep{color:var(--rule-strong);}
   /* headline panel */
   .hero{
-    position:absolute;top:140px;left:64px;right:64px;height:170px;
+    position:absolute;top:130px;left:64px;right:64px;height:260px;
     display:grid;grid-template-columns:auto 1fr auto;align-items:end;gap:48px;
     z-index:3;
   }
@@ -84,14 +82,14 @@
   .hero .label .figtag span{color:var(--green);}
   .hero .label .kicker{font:600 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink-dim);}
   .hero h1{
-    font-family:'Clash Display','Inter',system-ui,sans-serif;font-weight:800;
-    font-size:140px;line-height:0.88;letter-spacing:-0.035em;color:var(--ink);
+    font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;
+    font-size:108px;line-height:0.92;letter-spacing:-0.045em;color:var(--ink);
     text-align:right;
   }
   .hero h1 .glow{color:var(--green);}
   /* main match grid */
   .stage{
-    position:absolute;top:340px;left:64px;right:64px;bottom:200px;
+    position:absolute;top:420px;left:64px;right:64px;bottom:200px;
     display:grid;grid-template-columns:1.35fr 1fr;gap:28px;
     z-index:2;
   }
@@ -128,7 +126,7 @@
     filter:drop-shadow(0 30px 60px rgba(0,0,0,0.6));
   }
   .card .player .name{
-    margin-top:6px;font-family:'Clash Display','Inter',sans-serif;font-weight:700;
+    margin-top:6px;font-family:'Archivo Black','Inter',sans-serif;font-weight:700;
     font-size:46px;letter-spacing:-0.02em;color:var(--ink);text-transform:uppercase;
     line-height:0.95;text-align:center;
   }
@@ -139,7 +137,7 @@
     display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 12px;
   }
   .card .vs .vs-tag{
-    font-family:'Clash Display','Inter',sans-serif;font-weight:800;
+    font-family:'Archivo Black','Inter',sans-serif;font-weight:800;
     font-size:80px;line-height:1;letter-spacing:-0.04em;
     color:var(--ink);
     -webkit-text-stroke:1px var(--green);

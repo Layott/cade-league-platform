@@ -4,14 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="color-scheme" content="dark" />
 <title>WAGYR × CADE · Promo</title>
-<link rel="preconnect" href="https://api.fontshare.com" crossorigin />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@700,800&display=swap" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" />
 <style>
   :root{--bg:#14161A;--bg-2:#0E1013;--ink:#F1F2F3;--ink-dim:rgba(241,242,243,0.55);--rule:rgba(241,242,243,0.10);--rule-strong:rgba(241,242,243,0.18);--green:#18B948;--green-soft:rgba(24,185,72,0.18);--green-hot:rgba(24,185,72,0.40);}
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Montserrat',system-ui,sans-serif;}
+  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;}
   body{position:relative;background:radial-gradient(1200px 700px at 80% 20%, rgba(24,185,72,0.16), transparent 60%),radial-gradient(900px 600px at 20% 90%, rgba(24,185,72,0.10), transparent 60%),linear-gradient(115deg, transparent 0%, rgba(24,185,72,0.10) 30%, transparent 55%, rgba(24,185,72,0.06) 75%, transparent 100%),var(--bg);}
   .grid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right, rgba(241,242,243,0.04) 1px, transparent 1px),linear-gradient(to bottom, rgba(241,242,243,0.04) 1px, transparent 1px);background-size:80px 80px;mask-image:radial-gradient(ellipse at center, black 40%, transparent 95%);}
   .noise{position:absolute;inset:0;pointer-events:none;opacity:0.05;mix-blend-mode:overlay;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");}
@@ -27,25 +25,25 @@
   .tape .track{display:flex;gap:40px;animation:tape 36s linear infinite;white-space:nowrap;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.18em;color:var(--ink-dim);}
   .tape .track .item .v{color:var(--green);} .tape .track .sep{color:var(--rule-strong);}
   /* HERO — promo headline + supercopy */
-  .hero{position:absolute;top:160px;left:64px;right:64px;height:300px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:48px;z-index:3;}
+  .hero{position:absolute;top:140px;left:64px;right:64px;height:330px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:48px;z-index:3;}
   .hero .label-stack{display:flex;flex-direction:column;gap:18px;align-items:flex-start;}
   .hero .label-stack .figtag{font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--green);}
   .hero .label-stack .kicker{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--bg);background:var(--green);padding:8px 14px;}
-  .hero h1{font-family:'Clash Display','Inter',system-ui,sans-serif;font-weight:800;font-size:200px;line-height:0.85;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
+  .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:140px;line-height:0.92;letter-spacing:-0.045em;color:var(--ink);text-align:right;}
   .hero h1 .glow{color:var(--green);}
   /* STEPS — three big number cards */
-  .steps{position:absolute;top:500px;left:64px;right:64px;height:260px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
+  .steps{position:absolute;top:500px;left:64px;right:64px;height:220px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
   .step{position:relative;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;padding:32px 36px;display:flex;flex-direction:column;justify-content:space-between;}
   .step::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.08), transparent 50%);}
-  .step .n{font-family:'Clash Display','Inter',sans-serif;font-weight:800;font-size:140px;line-height:0.85;letter-spacing:-0.04em;color:var(--green);}
+  .step .n{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:108px;line-height:0.95;letter-spacing:-0.035em;color:var(--green);}
   .step .lbl{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink-dim);margin-top:6px;}
-  .step h3{font-family:'Clash Display','Inter',sans-serif;font-weight:700;font-size:54px;line-height:0.95;letter-spacing:-0.02em;color:var(--ink);margin-top:12px;}
+  .step h3{font-family:'Archivo Black','Inter',sans-serif;font-weight:700;font-size:44px;line-height:0.95;letter-spacing:-0.02em;color:var(--ink);margin-top:12px;}
   .step p{font:500 16px/1.4 'Montserrat',sans-serif;color:var(--ink-dim);margin-top:8px;max-width:90%;}
   /* STAT STRIP */
   .stats{position:absolute;left:64px;right:64px;bottom:240px;height:90px;display:grid;grid-template-columns:repeat(5, 1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);z-index:2;}
   .stat{display:flex;flex-direction:column;justify-content:center;align-items:center;border-right:1px solid var(--rule);padding:10px;}
   .stat:last-child{border-right:none;}
-  .stat .v{font-family:'Clash Display','Inter',sans-serif;font-weight:800;font-size:42px;letter-spacing:-0.02em;color:var(--green);line-height:1;}
+  .stat .v{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:42px;letter-spacing:-0.02em;color:var(--green);line-height:1;}
   .stat .l{font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink-dim);margin-top:8px;text-transform:uppercase;}
   .chipbar{position:absolute;left:64px;right:64px;bottom:104px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
   .chipbar .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
