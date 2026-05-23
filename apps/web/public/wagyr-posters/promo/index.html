@@ -25,14 +25,14 @@
   .tape .track{display:flex;gap:40px;animation:tape 36s linear infinite;white-space:nowrap;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.18em;color:var(--ink-dim);}
   .tape .track .item .v{color:var(--green);} .tape .track .sep{color:var(--rule-strong);}
   /* HERO — promo headline + supercopy */
-  .hero{position:absolute;top:144px;left:64px;right:64px;height:330px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:48px;z-index:3;}
+  .hero{position:absolute;top:144px;left:64px;right:64px;height:220px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:48px;z-index:3;}
   .hero .label-stack{display:flex;flex-direction:column;gap:18px;align-items:flex-start;}
   .hero .label-stack .figtag{font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--green);}
   .hero .label-stack .kicker{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--bg);background:var(--green);padding:8px 14px;}
-  .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:140px;line-height:0.92;letter-spacing:-0.045em;color:var(--ink);text-align:right;}
+  .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:88px;line-height:0.95;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
   .hero h1 .glow{color:var(--green);}
   /* STEPS — three big number cards */
-  .steps{position:absolute;top:500px;left:64px;right:64px;height:320px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
+  .steps{position:absolute;top:380px;left:64px;right:64px;height:440px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
   .step{position:relative;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;padding:22px 28px;display:flex;flex-direction:column;justify-content:space-between;}
   .step::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.08), transparent 50%);}
   .step .n{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:108px;line-height:0.95;letter-spacing:-0.035em;color:var(--green);}
@@ -53,7 +53,6 @@
   .wager-banner .track .sep{color:var(--rule-strong);font-weight:400;} .wager-banner .track .green{color:var(--green);}
   .partners{position:absolute;left:64px;right:64px;bottom:24px;height:64px;display:flex;align-items:center;justify-content:center;gap:18px;z-index:2;}
   .partners .logos{display:flex;align-items:center;gap:36px;overflow:hidden;justify-content:center;} .partners .logos img{height:38px;object-fit:contain;opacity:0.85;filter:grayscale(0.2) brightness(1.05);} .partners .logos img[data-emph]{height:48px;opacity:1;filter:none;}
-  .partners .wagyr-cta{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--green);color:var(--bg);font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;box-shadow:0 0 40px rgba(24,185,72,0.5);} .partners .wagyr-cta .url{font-weight:800;} .partners .wagyr-cta::before{content:"";width:10px;height:10px;background:var(--bg);animation:pulse 1.2s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.25;}}
   @keyframes tape{from{transform:translateX(0);}to{transform:translateX(-50%);}}
   @keyframes chips{from{transform:translateX(0);}to{transform:translateX(-50%);}}
@@ -148,7 +147,6 @@
       <img src="../../overlays/v2/_assets/logos/Gamepride Green-01.png" alt="Gamepride" />
       <img src="../../overlays/v2/_assets/logos/processed/OAS_colored_strip.png" alt="OAS Esports" />
       <img src="../../overlays/v2/_assets/logos/ESPORTS AFRICA NEWS WHITE.png" alt="Esports Africa News" />
-      <img src="../../overlays/v2/_assets/logos/eSports Federation of Nigeria-1.png" alt="eSports Federation of Nigeria" />
       <img src="../../overlays/v2/_assets/logos/processed/Trace_TV_Logo.svg_strip.png" alt="Trace TV" />
     </div>
   </footer>
