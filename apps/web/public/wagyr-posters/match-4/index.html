@@ -47,11 +47,14 @@
   .card .foot .chips{display:flex;gap:10px;} .card .foot .chip{font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:0.25em;color:var(--ink-dim);border:1px solid var(--rule);padding:8px 12px;text-transform:uppercase;}
   .card .foot .cta{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.35em;color:var(--bg);background:var(--green);padding:14px 22px;display:flex;align-items:center;gap:10px;box-shadow:0 0 32px rgba(24,185,72,0.4);} .card .foot .cta::after{content:"→";font-weight:700;}
   .card.secondary .vs .vs-tag{font-size:60px;} .card.secondary .player .name{font-size:34px;}
-  .chipbar{position:absolute;left:64px;right:64px;bottom:104px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
-  .chipbar .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
-  .chipbar .track .sep{color:var(--rule-strong);font-weight:400;} .chipbar .track .green{color:var(--green);}
-  .partners{position:absolute;left:64px;right:64px;bottom:24px;height:64px;display:flex;align-items:center;justify-content:space-between;gap:18px;z-index:2;}
-  .partners .logos{display:flex;align-items:center;gap:36px;flex:1;overflow:hidden;} .partners .logos img{height:38px;object-fit:contain;opacity:0.85;filter:grayscale(0.2) brightness(1.05);} .partners .logos img[data-emph]{height:48px;opacity:1;filter:none;}
+  .wager-banner{position:absolute;left:64px;right:64px;bottom:104px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
+  .wager-banner .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
+  .wager-banner .cta-text{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:30px;letter-spacing:0.05em;color:var(--ink);text-transform:uppercase;display:flex;align-items:center;gap:18px;text-align:center;}
+  .wager-banner .cta-text .green{color:var(--green);}
+  .wager-banner .cta-text .arrow{color:var(--green);font-size:42px;line-height:0.6;}
+  .wager-banner .track .sep{color:var(--rule-strong);font-weight:400;} .wager-banner .track .green{color:var(--green);}
+  .partners{position:absolute;left:64px;right:64px;bottom:24px;height:64px;display:flex;align-items:center;justify-content:center;gap:18px;z-index:2;}
+  .partners .logos{display:flex;align-items:center;gap:36px;overflow:hidden;justify-content:center;} .partners .logos img{height:38px;object-fit:contain;opacity:0.85;filter:grayscale(0.2) brightness(1.05);} .partners .logos img[data-emph]{height:48px;opacity:1;filter:none;}
   .partners .wagyr-cta{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--green);color:var(--bg);font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;box-shadow:0 0 40px rgba(24,185,72,0.5);} .partners .wagyr-cta .url{font-weight:800;} .partners .wagyr-cta::before{content:"";width:10px;height:10px;background:var(--bg);animation:pulse 1.2s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.25;}}
   @keyframes tape{from{transform:translateX(0);}to{transform:translateX(-50%);}}
@@ -70,7 +73,6 @@
     <div class="right"><span class="match-num">MATCH 04 / 05</span><span>·</span><span>FIG.04</span></div>
   </header>
   <div class="tape reveal d1">
-    <div class="pulse">LIVE TAPE</div>
     <div class="track">
       <span class="item">+$680 <span class="v">MITCH · SHARP IN</span></span><span class="sep">/</span>
       <span class="item">POOL +$410 <span class="v">TACTICAL HOT</span></span><span class="sep">/</span>
@@ -115,10 +117,11 @@
       <div class="foot"><div class="chips"><span class="chip">COPY SMART</span><span class="chip">&lt;60s SETTLE</span></div><div class="cta">BET LIVE</div></div>
     </section>
   </main>
-  <div class="chipbar reveal d4">
-    <div class="track">
-      <span>USDC MULTI-CHAIN</span><span class="sep">/</span><span>PARIMUTUEL</span><span class="sep">/</span><span>NO HOUSE</span><span class="sep">/</span><span class="green">COPY-TRADE SMART MONEY</span><span class="sep">/</span><span>WITHDRAW ANYTIME</span><span class="sep">/</span><span>FREE TO JOIN</span><span class="sep">/</span><span>LIVE MARKETS RIGHT NOW</span><span class="sep">/</span><span class="green">BUILT ON BASE</span><span class="sep">/</span><span>PREDICT · EARN · OWN YOUR RECORD</span><span class="sep">/</span>
-      <span>USDC MULTI-CHAIN</span><span class="sep">/</span><span>PARIMUTUEL</span><span class="sep">/</span><span>NO HOUSE</span><span class="sep">/</span><span class="green">COPY-TRADE SMART MONEY</span><span class="sep">/</span><span>WITHDRAW ANYTIME</span><span class="sep">/</span><span>FREE TO JOIN</span><span class="sep">/</span><span>LIVE MARKETS RIGHT NOW</span><span class="sep">/</span><span class="green">BUILT ON BASE</span><span class="sep">/</span><span>PREDICT · EARN · OWN YOUR RECORD</span><span class="sep">/</span>
+  <div class="wager-banner reveal d4">
+    <div class="cta-text">
+      <span>GO BET ON TODAY'S MATCHES AT</span>
+      <span class="green">WAGYR.CO</span>
+      <span class="arrow">→</span>
     </div>
   </div>
   <footer class="partners reveal d5">
