@@ -3,7 +3,11 @@ import { getServiceRoleSupabase } from "@/lib/supabase/service";
 import { checkViewToken } from "@/server/broadcast/view_token_gate";
 import { enforcePublicRead } from "@/lib/api-rate-limit";
 import { fetchCoverUpStats } from "@/server/overlays/cover_up_stats";
-import { buildDidYouKnowVariants } from "@/server/overlays/did_you_know_variants";
+import {
+  buildDidYouKnowVariants,
+  type CurrentPlayerStat,
+} from "@/server/overlays/did_you_know_variants";
+import { gamerTagToSlug } from "@/lib/player-photos";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -71,7 +75,68 @@ export async function GET(
   }
 
   const stats = await fetchCoverUpStats(sb, seasonId);
-  const variants = buildDidYouKnowVariants(stats.payload);
+
+  // 2026-05-23 — pull current-season standings rows so cross-season
+  // comparison variants can pair last-season figures with this-season's
+  // live numbers. Returners-only — new players have no last-season row.
+  const RETURNER_SLUGS = [
+    "faruk",
+    "killer_freak",
+    "baji_jnr",
+    "adefola",
+    "mitch",
+    "mr_oga",
+    "anife",
+  ];
+  const currentBySlug = new Map<string, CurrentPlayerStat>();
+  try {
+    const { data: standingsRows } = await sb
+      .from("standings")
+      .select(
+        `
+        matches_played, wins, draws, losses, goals_for, goals_against,
+        goal_difference, points,
+        player:player_id ( gamer_tag )
+        `,
+      )
+      .eq("season_id", seasonId)
+      .is("deleted_at", null);
+    type Row = {
+      matches_played: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goals_for: number;
+      goals_against: number;
+      goal_difference: number;
+      points: number;
+      player: { gamer_tag: string | null } | { gamer_tag: string | null }[] | null;
+    };
+    const rows = (standingsRows ?? []) as unknown as Row[];
+    for (const r of rows) {
+      const playerObj = Array.isArray(r.player) ? r.player[0] : r.player;
+      const tag = playerObj?.gamer_tag;
+      if (!tag) continue;
+      const slug = gamerTagToSlug(tag);
+      if (!RETURNER_SLUGS.includes(slug)) continue;
+      currentBySlug.set(slug, {
+        slug,
+        wins: r.wins ?? 0,
+        draws: r.draws ?? 0,
+        losses: r.losses ?? 0,
+        goalsFor: r.goals_for ?? 0,
+        goalsAgainst: r.goals_against ?? 0,
+        goalDiff: r.goal_difference ?? 0,
+        points: r.points ?? 0,
+        played: r.matches_played ?? 0,
+      });
+    }
+  } catch {
+    // Best-effort — variants short-circuit per-player when current
+    // row is missing; cross-season cards just drop out gracefully.
+  }
+
+  const variants = buildDidYouKnowVariants(stats.payload, currentBySlug);
 
   return NextResponse.json(
     {

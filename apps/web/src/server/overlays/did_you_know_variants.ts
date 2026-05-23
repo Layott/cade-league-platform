@@ -114,96 +114,170 @@ const LAST_SEASON_STANDINGS: Array<{
   { slug: "anife", displayName: "ANIFE", rank: 13, played: 15, wins: 4, draws: 2, losses: 9, goalsFor: 54, goalsAgainst: 88, goalDiff: -34, points: 14 },
 ];
 
-function lastSeasonCard(
-  variantId: string,
-  slug: string,
-  headline: string,
-  detail: string,
-): DidYouKnowVariant {
-  const row = LAST_SEASON_STANDINGS.find((r) => r.slug === slug);
-  return {
-    variantId,
-    kind: "biggest_gd",
-    headline,
-    detail,
-    player: row
-      ? {
-          playerId: "",
-          displayName: row.displayName,
-          slug: row.slug,
-          photoUrl: null,
-          orgName: null,
-          orgLogoUrl: null,
-        }
-      : null,
-  };
+export type CurrentPlayerStat = {
+  slug: string;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDiff: number;
+  points: number;
+  played: number;
+};
+
+function fmtSigned(n: number): string {
+  return n >= 0 ? `+${n}` : `${n}`;
+}
+
+function diff(curr: number, prev: number): string {
+  const d = curr - prev;
+  if (d === 0) return "matching last season's mark exactly";
+  if (d > 0) return `up ${d} on last season's pace`;
+  return `down ${Math.abs(d)} from last season's pace`;
 }
 
 /**
- * Hand-derived cross-season cards. Each one cites a verified figure
- * from `LAST_SEASON_STANDINGS` so the producer can confirm before
- * triggering on stream.
+ * Build cross-season comparison cards. Each card pairs a verified
+ * last-season figure with the player's CURRENT live-season figure
+ * from the standings table. Cards short-circuit when current data
+ * isn't yet available for that player (early-season state).
  */
-const CROSS_SEASON_VARIANTS: DidYouKnowVariant[] = [
-  lastSeasonCard(
-    "cross-faruk-unbeaten",
-    "faruk",
-    "FARUK — UNBEATEN LAST SEASON",
-    "Last season Faruk finished 14W-1D-0L across 15 matches. 103 goals scored, 35 conceded, +68 differential — and never lost a fixture.",
-  ),
-  lastSeasonCard(
-    "cross-killer-freak-one-loss",
-    "killer_freak",
-    "KILLER FREAK — ONE LOSS IN 15",
-    "Killer Freak lost exactly ONE match last season. Final record 13W-1D-1L for 40 points and a +56 goal difference — the second-best campaign of any returning Elite player.",
-  ),
-  lastSeasonCard(
-    "cross-baji-22-gd",
-    "baji_jnr",
-    "BAJI'S +22 LAST SEASON",
-    "Baji JNR closed last season at 10W-2D-3L for 32 points and a +22 differential. Fourth place — the bedrock above which his Season 2 form is being measured.",
-  ),
-  lastSeasonCard(
-    "cross-adefola-zero-draws",
-    "adefola",
-    "ADEFOLA NEVER DREW",
-    "Adefola did not draw a single match across 15 fixtures last season. 8 wins, 7 losses, zero stalemates — the only Elite returner with no draws on the books.",
-  ),
-  lastSeasonCard(
-    "cross-mitch-mid-table",
-    "mitch",
-    "MITCH — MID-TABLE METRONOME",
-    "Mitch tied for 8th last season with 7W-3D-5L and a +16 differential. Quietly consistent — his Season 2 trajectory is the one to watch.",
-  ),
-  lastSeasonCard(
-    "cross-mr-oga-draw-merchant",
-    "mr_oga",
-    "MR OGA'S DRAW HABIT",
-    "Mr Oga ended last season with 4 draws — the most of any returning Elite player. Final tally 4W-4D-7L for 16 points.",
-  ),
-  lastSeasonCard(
-    "cross-anife-comeback-arc",
-    "anife",
-    "ANIFE'S COMEBACK ARC",
-    "Anife finished last season 13th with a -34 differential. He's back in Elite — the biggest GD swing-target of any returning player.",
-  ),
-  {
+function crossSeasonComparisons(
+  current: Map<string, CurrentPlayerStat>,
+): DidYouKnowVariant[] {
+  const out: DidYouKnowVariant[] = [];
+
+  for (const last of LAST_SEASON_STANDINGS) {
+    const now = current.get(last.slug);
+    if (!now || now.played === 0) continue;
+
+    const playerRef: CoverUpPlayer = {
+      playerId: "",
+      displayName: last.displayName,
+      slug: last.slug,
+      photoUrl: null,
+      orgName: null,
+      orgLogoUrl: null,
+    };
+
+    // Player-specific paired angle.
+    if (last.slug === "faruk") {
+      // Drew exactly 1 last season; flag the same-draw parallel when
+      // this season has matched.
+      if (now.draws === last.draws) {
+        out.push({
+          variantId: "cross-faruk-draw-parallel",
+          kind: "biggest_gd",
+          headline: "FARUK'S DRAW PARALLEL",
+          detail: `Faruk drew ${last.draws} match last season across his 15-game unbeaten run. ${now.played} games into this season he's already drawn ${now.draws} — matching the pace exactly.`,
+          player: playerRef,
+        });
+      }
+      // Unbeaten check.
+      out.push({
+        variantId: "cross-faruk-loss-watch",
+        kind: "biggest_gd",
+        headline:
+          now.losses === 0
+            ? "FARUK STILL UNBEATEN"
+            : `FARUK'S ${now.losses}-LOSS RESET`,
+        detail:
+          now.losses === 0
+            ? `Faruk went 14W-1D-0L last season — zero losses in 15. This season he's ${now.wins}W-${now.draws}D-0L across ${now.played} so the unbeaten streak rolls on.`
+            : `Faruk never lost a match last season (14W-1D-0L). He's already taken ${now.losses} ${now.losses === 1 ? "loss" : "losses"} this season after ${now.played} fixtures.`,
+        player: playerRef,
+      });
+    }
+
+    if (last.slug === "killer_freak") {
+      out.push({
+        variantId: "cross-killer-freak-loss-pace",
+        kind: "biggest_gd",
+        headline: "KF'S ONE-LOSS BAR",
+        detail: `Killer Freak lost ONE match all of last season (13W-1D-1L). ${now.played} games in this season he's at ${now.losses} ${now.losses === 1 ? "loss" : "losses"} — ${diff(now.losses, last.losses)}.`,
+        player: playerRef,
+      });
+    }
+
+    if (last.slug === "baji_jnr") {
+      out.push({
+        variantId: "cross-baji-gd-pace",
+        kind: "biggest_gd",
+        headline: "BAJI VS BAJI",
+        detail: `Baji JNR closed last season at ${fmtSigned(last.goalDiff)} differential across 15 games. ${now.played} into this season he sits at ${fmtSigned(now.goalDiff)} — ${diff(now.goalDiff, Math.round(last.goalDiff * (now.played / last.played)))}.`,
+        player: playerRef,
+      });
+    }
+
+    if (last.slug === "adefola") {
+      // last season ZERO draws. Flag the moment this season draws.
+      out.push({
+        variantId: "cross-adefola-first-draw",
+        kind: "biggest_gd",
+        headline:
+          now.draws === 0
+            ? "ADEFOLA — STILL NO DRAWS"
+            : `ADEFOLA'S FIRST DRAW IN ELITE`,
+        detail:
+          now.draws === 0
+            ? `Adefola went the entire previous season without a single draw (8W-0D-7L). ${now.played} matches into this season he's STILL drawn zero — the signature win-or-lose pattern continues.`
+            : `Adefola did not draw a single match across 15 fixtures last season. After ${now.played} games this season he's already on ${now.draws} ${now.draws === 1 ? "draw" : "draws"} — a new look for a player who only ever wins or loses.`,
+        player: playerRef,
+      });
+    }
+
+    if (last.slug === "mitch") {
+      out.push({
+        variantId: "cross-mitch-pts-pace",
+        kind: "biggest_gd",
+        headline: "MITCH'S PACE",
+        detail: `Mitch banked ${last.points} points last season (7W-3D-5L, ${fmtSigned(last.goalDiff)} GD). After ${now.played} matches this season he's on ${now.points} pts at ${fmtSigned(now.goalDiff)} — ${diff(now.points, Math.round(last.points * (now.played / last.played)))}.`,
+        player: playerRef,
+      });
+    }
+
+    if (last.slug === "mr_oga") {
+      out.push({
+        variantId: "cross-mr-oga-draws",
+        kind: "biggest_gd",
+        headline: "MR OGA'S DRAW LINE",
+        detail: `Mr Oga led all returners in draws last season — 4 in 15 (4W-4D-7L). ${now.played} games into this season he's on ${now.draws} ${now.draws === 1 ? "draw" : "draws"} so far.`,
+        player: playerRef,
+      });
+    }
+
+    if (last.slug === "anife") {
+      out.push({
+        variantId: "cross-anife-gd-swing",
+        kind: "biggest_gd",
+        headline: "ANIFE'S GD ARC",
+        detail: `Anife finished last season at ${fmtSigned(last.goalDiff)} GD — the worst differential of any returning Elite player. ${now.played} into this season he's at ${fmtSigned(now.goalDiff)} — ${diff(now.goalDiff, Math.round(last.goalDiff * (now.played / last.played)))}.`,
+        player: playerRef,
+      });
+    }
+  }
+
+  // League-wide context cards (no per-player current data needed).
+  out.push({
     variantId: "cross-new-arrivals",
     kind: "top_scorer",
     headline: "SIX NEW ARRIVALS",
     detail:
       "Six of this season's 13 Elite players are new to the division: Dadaboi, Guru, Kaykay, KingNonex, Tactical, and Wolevation. Nearly half the roster is unproven Elite blood.",
     player: null,
-  },
-  {
+  });
+  out.push({
     variantId: "cross-seven-returners",
     kind: "top_scorer",
     headline: "SEVEN RETURNERS",
     detail:
       "Seven players carry experience from the previous Elite season: Faruk, Killer Freak, Baji JNR, Adefola, Mitch, Mr Oga, and Anife. Their Season 1 form is the league's only baseline.",
     player: null,
-  },
-];
+  });
+
+  return out;
+}
 
 function safe(s: string | null | undefined): string {
   return (s || "").trim();
@@ -228,6 +302,7 @@ function curatedPlayerVariants(): DidYouKnowVariant[] {
 
 export function buildDidYouKnowVariants(
   stats: CoverUpStatsPayload,
+  currentStandings: Map<string, CurrentPlayerStat> = new Map(),
 ): DidYouKnowVariant[] {
   const out: DidYouKnowVariant[] = [];
 
@@ -235,9 +310,10 @@ export function buildDidYouKnowVariants(
   //    docblock for the rule).
   out.push(...curatedPlayerVariants());
 
-  // 1b. Cross-season comparisons. Sourced from LAST_SEASON_STANDINGS
-  //     (producer-supplied final-fixture data 2026-05-23).
-  out.push(...CROSS_SEASON_VARIANTS);
+  // 1b. Cross-season comparisons. Each PAIRS last-season verified data
+  //     with the player's live current-season figure from standings.
+  //     Cards short-circuit per player when their current row is empty.
+  out.push(...crossSeasonComparisons(currentStandings));
 
   // 2. Computed cards from real season stats. Each must NOT duplicate
   //    what's already on another overlay (no raw streak counts → 21,
