@@ -182,6 +182,8 @@ const BOOTSTRAP = `<script id="cade-token-bootstrap">
       if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
       if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
       if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
+      if (s.width)         declarations.push('width:' + sanitizeCss(s.width));
+      if (s.height)        declarations.push('height:' + sanitizeCss(s.height));
       if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
       if (s.left || s.top) declarations.push('position:absolute');
       if (t.visible === false) declarations.push('display:none');

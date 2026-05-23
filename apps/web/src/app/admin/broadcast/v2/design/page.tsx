@@ -146,6 +146,8 @@ export default async function OverlayDesignPage({
     opacityPct: r.opacityPct,
     positionXPx: r.positionXPx,
     positionYPx: r.positionYPx,
+    widthPx: r.widthPx,
+    heightPx: r.heightPx,
     zIndex: r.zIndex,
   }));
 

@@ -133,6 +133,8 @@ export type TextElement = {
   opacityPct: number | null;
   positionXPx: number | null;
   positionYPx: number | null;
+  widthPx: number | null;
+  heightPx: number | null;
   zIndex: number | null;
   sortOrder: number;
   setBy: string;
@@ -160,6 +162,8 @@ export type ResolvedTextElement = {
     opacity: number;
     left: string;
     top: string;
+    width: string;
+    height: string;
     zIndex: number;
   }>;
 };
@@ -184,6 +188,8 @@ type Row = {
   opacity_pct: number | null;
   position_x_px: number | null;
   position_y_px: number | null;
+  width_px: number | null;
+  height_px: number | null;
   z_index: number | null;
   sort_order: number;
   set_by: string;
@@ -192,7 +198,7 @@ type Row = {
 };
 
 const SELECT_COLS =
-  "id, overlay_key, variant_id, element_id, origin, kind, display_label, visible, content, font_family, font_weight, font_size_px, letter_spacing, line_height, color, alignment, opacity_pct, position_x_px, position_y_px, z_index, sort_order, set_by, created_at, updated_at";
+  "id, overlay_key, variant_id, element_id, origin, kind, display_label, visible, content, font_family, font_weight, font_size_px, letter_spacing, line_height, color, alignment, opacity_pct, position_x_px, position_y_px, width_px, height_px, z_index, sort_order, set_by, created_at, updated_at";
 
 function toElement(r: Row): TextElement {
   const ls = r.letter_spacing == null ? null : Number(r.letter_spacing);
@@ -217,6 +223,8 @@ function toElement(r: Row): TextElement {
     opacityPct: r.opacity_pct,
     positionXPx: r.position_x_px,
     positionYPx: r.position_y_px,
+    widthPx: r.width_px,
+    heightPx: r.height_px,
     zIndex: r.z_index,
     sortOrder: r.sort_order,
     setBy: r.set_by,
@@ -272,6 +280,12 @@ function validateInput(input: TextElementInput): void {
     throw new Error(
       `upsertTextElement: content too long (${input.content.length} > 1024 chars)`,
     );
+  }
+  if (input.widthPx != null && (input.widthPx < 1 || input.widthPx > 2000)) {
+    throw new Error(`upsertTextElement: widthPx out of range (1..2000)`);
+  }
+  if (input.heightPx != null && (input.heightPx < 1 || input.heightPx > 2000)) {
+    throw new Error(`upsertTextElement: heightPx out of range (1..2000)`);
   }
 }
 
@@ -338,6 +352,8 @@ export async function upsertTextElement(
     opacity_pct: input.opacityPct,
     position_x_px: input.positionXPx,
     position_y_px: input.positionYPx,
+    width_px: input.widthPx,
+    height_px: input.heightPx,
     z_index: input.zIndex,
     sort_order: input.sortOrder,
     set_by: actor.userId,
@@ -465,6 +481,8 @@ export async function resolveTextElements(
     if (r.opacityPct != null) styles.opacity = r.opacityPct / 100;
     if (r.positionXPx != null) styles.left = `${r.positionXPx}px`;
     if (r.positionYPx != null) styles.top = `${r.positionYPx}px`;
+    if (r.widthPx != null) styles.width = `${r.widthPx}px`;
+    if (r.heightPx != null) styles.height = `${r.heightPx}px`;
     if (r.zIndex != null) styles.zIndex = r.zIndex;
 
     const hasStyles = Object.keys(styles).length > 0;

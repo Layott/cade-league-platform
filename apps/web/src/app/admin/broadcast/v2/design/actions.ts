@@ -473,6 +473,8 @@ const SetTextElementSchema = z.object({
   opacityPct: z.string().max(4).optional(),
   positionXPx: z.string().max(6).optional(),
   positionYPx: z.string().max(6).optional(),
+  widthPx: z.string().max(5).optional(),
+  heightPx: z.string().max(5).optional(),
   zIndex: z.string().max(3).optional(),
 });
 
@@ -530,6 +532,8 @@ export async function setTextElementAction(formData: FormData) {
     opacityPct: (formData.get("opacityPct") as string | null) ?? undefined,
     positionXPx: (formData.get("positionXPx") as string | null) ?? undefined,
     positionYPx: (formData.get("positionYPx") as string | null) ?? undefined,
+    widthPx: (formData.get("widthPx") as string | null) ?? undefined,
+    heightPx: (formData.get("heightPx") as string | null) ?? undefined,
     zIndex: (formData.get("zIndex") as string | null) ?? undefined,
   };
 
@@ -600,6 +604,8 @@ export async function setTextElementAction(formData: FormData) {
     opacityPct: parseOptInt(parsed.data.opacityPct),
     positionXPx: parseOptInt(parsed.data.positionXPx),
     positionYPx: parseOptInt(parsed.data.positionYPx),
+    widthPx: parseOptInt(parsed.data.widthPx),
+    heightPx: parseOptInt(parsed.data.heightPx),
     zIndex: parseOptInt(parsed.data.zIndex),
     sortOrder,
   });
@@ -683,6 +689,8 @@ export async function clearTextElementAction(formData: FormData) {
     opacityPct: null,
     positionXPx: null,
     positionYPx: null,
+    widthPx: null,
+    heightPx: null,
     zIndex: null,
     sortOrder: existing.sortOrder,
   });
@@ -841,6 +849,8 @@ export async function regenerateOverlayCopyAction(formData: FormData) {
     opacityPct: existing.opacityPct,
     positionXPx: existing.positionXPx,
     positionYPx: existing.positionYPx,
+    widthPx: existing.widthPx,
+    heightPx: existing.heightPx,
     zIndex: existing.zIndex,
     sortOrder: existing.sortOrder,
   });

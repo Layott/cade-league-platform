@@ -176,6 +176,16 @@ const TextStyleSchema = z
       .max(20)
       .refine((v) => !FORBIDDEN_CHARS.test(v))
       .optional(),
+    width: z
+      .string()
+      .max(20)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .optional(),
+    height: z
+      .string()
+      .max(20)
+      .refine((v) => !FORBIDDEN_CHARS.test(v))
+      .optional(),
     zIndex: z.number().int().min(0).max(40).optional(),
   })
   .strict();

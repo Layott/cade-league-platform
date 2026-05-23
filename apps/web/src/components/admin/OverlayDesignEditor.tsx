@@ -101,6 +101,8 @@ export type TextElementRow = {
   opacityPct: number | null;
   positionXPx: number | null;
   positionYPx: number | null;
+  widthPx: number | null;
+  heightPx: number | null;
   zIndex: number | null;
 };
 
@@ -568,6 +570,8 @@ function rowToPreviewToken(
   if (row.opacityPct != null) styles.opacity = row.opacityPct / 100;
   if (row.positionXPx != null) styles.left = `${row.positionXPx}px`;
   if (row.positionYPx != null) styles.top = `${row.positionYPx}px`;
+  if (row.widthPx != null) styles.width = `${row.widthPx}px`;
+  if (row.heightPx != null) styles.height = `${row.heightPx}px`;
   if (row.zIndex != null) styles.zIndex = row.zIndex;
 
   const hasContent = row.content && row.content.length > 0;
@@ -926,6 +930,8 @@ export default function OverlayDesignEditor({
             fd.set("positionXPx", String(row.positionXPx));
           if (row.positionYPx != null)
             fd.set("positionYPx", String(row.positionYPx));
+          if (row.widthPx != null) fd.set("widthPx", String(row.widthPx));
+          if (row.heightPx != null) fd.set("heightPx", String(row.heightPx));
           if (row.zIndex != null) fd.set("zIndex", String(row.zIndex));
           await setTextElementAction(fd);
           setSuccess(true);
@@ -965,6 +971,8 @@ export default function OverlayDesignEditor({
                     opacityPct: null,
                     positionXPx: null,
                     positionYPx: null,
+                    widthPx: null,
+                    heightPx: null,
                     zIndex: null,
                   }
                 : r,
@@ -988,6 +996,8 @@ export default function OverlayDesignEditor({
                       opacityPct: null,
                       positionXPx: null,
                       positionYPx: null,
+                      widthPx: null,
+                      heightPx: null,
                       zIndex: null,
                     }
                   : r,
@@ -2382,6 +2392,44 @@ function TextElementEditorRow({
               }
               className={inputStyle}
               data-testid={`text-row-${row.elementId}-pos-y`}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Width (px)</label>
+            <input
+              type="number"
+              min={1}
+              max={2000}
+              step={1}
+              value={row.widthPx ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  widthPx:
+                    e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              placeholder="auto"
+              className={inputStyle}
+              data-testid={`text-row-${row.elementId}-width`}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className={labelStyle}>Height (px)</label>
+            <input
+              type="number"
+              min={1}
+              max={2000}
+              step={1}
+              value={row.heightPx ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  heightPx:
+                    e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              placeholder="auto"
+              className={inputStyle}
+              data-testid={`text-row-${row.elementId}-height`}
             />
           </div>
           <div className="space-y-1">

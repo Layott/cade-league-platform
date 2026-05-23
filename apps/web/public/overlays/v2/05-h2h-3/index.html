@@ -96,6 +96,8 @@
       if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
       if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
       if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
+      if (s.width)         declarations.push('width:' + sanitizeCss(s.width));
+      if (s.height)        declarations.push('height:' + sanitizeCss(s.height));
       if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
       if (s.left || s.top) declarations.push('position:absolute');
       if (t.visible === false) declarations.push('display:none');
@@ -1623,9 +1625,9 @@
 
     <!-- Top header: CADE | Pro League -->
     <header class="top-band">
-      <img class="logo logo--cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
+      <img class="logo logo--cade" data-element-id="logo-cade" src="/overlays/v2/_assets/logos/1cade%20esport.png" alt="CADE Esports" />
       <span class="divider" aria-hidden="true"></span>
-      <img class="logo logo--pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
+      <img class="logo logo--pro" data-element-id="logo-pro" src="/overlays/v2/_assets/logos/pro%20league%20.png" alt="National E-Soccer Pro League" />
     </header>
 
     <!-- Side chevrons -->
