@@ -153,41 +153,26 @@
     var sx = ((+layout.scalePct) || 100) / 100;
     var transformOps = [];
     var paddingTop = 0, paddingRight = 0, paddingBottom = 0, paddingLeft = 0;
-    // Bug 12 (2026-05-01) - *-center anchor X/Y honour positionXPx /
-    // positionYPx as a NUDGE from canvas center.
+    // 2026-05-22 — positionXPx / positionYPx are DIRECT OFFSETS from
+    // the chosen anchor edge:
+    //   top-* + py=60        → top:60px (60px from canvas top)
+    //   bottom-* + py=60     → bottom:60px (60px from canvas bottom)
+    //   left-* + px=120      → left:120px
+    //   right-* + px=120     → right:120px (120px from canvas right)
+    //   middle-* / *-center  → nudge from canvas center (full-axis
+    //                          span + flex/align center + padding shift)
     //
-    // CRITICAL - earlier impl baked the nudge into a static
-    // transform: translateX(-50%) declaration. That broke for
-    // overlays whose author CSS already runs an entry animation on
-    // the same element (e.g. .partners has animation: top-fade ... on
-    // h2h-2 / 11-match-scores-day, animating translateY). When a
-    // CSS animation is running on transform, the keyframe transform
-    // value supersedes any static transform: declaration on the same
-    // element - so our translateX(-50%) got swallowed and the strip
-    // rendered with left:50% + animation transform:translateY(0),
-    // making its left edge sit at canvas centre and the content
-    // auto-extend right (visually drifting to the right half of the
-    // canvas). This was the root cause of the user "stays at the
-    // bottom right rather than bottom middle" report.
-    //
-    // Fix: when X is centered, span full canvas width (left:0;
-    // right:0; width:auto) and rely on display:flex +
-    // justify-content:center (already in this emit) to center the
-    // content. positionXPx then shifts the centered content via
-    // padding (positionXPx > 0 -> padding-left = 2*positionXPx so
-    // flex-center moves the content right by positionXPx; symmetric
-    // for negative values). Same approach for Y center -> full
-    // canvas-tall + align-items:center + padding-top adjustment.
-    //
-    // For *-left and *-right anchors, the existing direct-offset
-    // logic still works untouched (no transform involved on those
-    // axes - left:Npx / right:Npx are absolute and don't conflict
-    // with the running translateY animation).
+    // Earlier impl was inconsistent: top/left used direct offsets but
+    // bottom/right used canvas-coordinate (bottom = 1080 - py / right
+    // = 1920 - px). That meant picking the bottom-center default (py=
+    // 60) drove the strip near the TOP of the canvas instead of near
+    // the bottom. Migration 20260903000010 converts existing saved
+    // rows so visuals stay byte-identical after the bootstrap flip.
     if (anchor.indexOf('top') === 0) {
       declarations.push('top:' + py + 'px');
       declarations.push('bottom:auto');
     } else if (anchor.indexOf('bottom') === 0) {
-      declarations.push('bottom:' + (1080 - py) + 'px');
+      declarations.push('bottom:' + py + 'px');
       declarations.push('top:auto');
     } else {
       // middle-* — span full canvas height + align center + Y nudge.
@@ -201,7 +186,7 @@
       declarations.push('left:' + px + 'px');
       declarations.push('right:auto');
     } else if (anchor.indexOf('right') !== -1) {
-      declarations.push('right:' + (1920 - px) + 'px');
+      declarations.push('right:' + px + 'px');
       declarations.push('left:auto');
     } else {
       // *-center — span full canvas width + center via flex + X nudge.
