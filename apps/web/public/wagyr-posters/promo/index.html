@@ -32,7 +32,7 @@
   .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:88px;line-height:0.95;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
   .hero h1 .glow{color:var(--green);}
   /* STEPS — three big number cards */
-  .steps{position:absolute;top:380px;left:64px;right:64px;height:440px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
+  .steps{position:absolute;top:380px;left:64px;right:64px;height:380px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
   .step{position:relative;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;padding:22px 28px;display:flex;flex-direction:column;justify-content:space-between;}
   .step::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.08), transparent 50%);}
   .step .n{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:108px;line-height:0.95;letter-spacing:-0.035em;color:var(--green);}
@@ -40,12 +40,12 @@
   .step h3{font-family:'Archivo Black','Inter',sans-serif;font-weight:700;font-size:34px;line-height:1;letter-spacing:-0.015em;color:var(--ink);margin-top:12px;}
   .step p{font:500 14px/1.4 'Inter',sans-serif;color:var(--ink-dim);margin-top:8px;max-width:90%;}
   /* STAT STRIP */
-  .stats{position:absolute;left:64px;right:64px;bottom:170px;height:80px;display:grid;grid-template-columns:repeat(5, 1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);z-index:2;}
+  .stats{position:absolute;left:64px;right:64px;bottom:220px;height:80px;display:grid;grid-template-columns:repeat(5, 1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);z-index:2;}
   .stat{display:flex;flex-direction:column;justify-content:center;align-items:center;border-right:1px solid var(--rule);padding:10px;}
   .stat:last-child{border-right:none;}
   .stat .v{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:42px;letter-spacing:-0.02em;color:var(--green);line-height:1;}
   .stat .l{font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink-dim);margin-top:8px;text-transform:uppercase;}
-  .wager-banner{position:absolute;left:64px;right:64px;bottom:104px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
+  .wager-banner{position:absolute;left:64px;right:64px;bottom:140px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
   .wager-banner .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
   .wager-banner .cta-text{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:30px;letter-spacing:0.05em;color:var(--ink);text-transform:uppercase;display:flex;align-items:center;gap:18px;text-align:center;}
   .wager-banner .cta-text .green{color:var(--green);}
