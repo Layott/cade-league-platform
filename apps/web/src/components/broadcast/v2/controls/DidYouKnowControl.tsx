@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlCard, postToFrame } from "../ControlCard";
 import { ReTriggerHideButtons } from "../ReTriggerHideButtons";
+import { retriggerOverlayAction } from "@/app/admin/broadcast/v2/[sessionId]/actions";
 
 type Variant = {
   variantId: string;
@@ -147,34 +148,78 @@ export function DidYouKnowControl({
             ) : null}
             {variants.map((v) => {
               const isSelected = v.variantId === selectedId;
+              const variantPayload = JSON.stringify({
+                didYouKnow: {
+                  kind: v.kind,
+                  headline: v.headline,
+                  detail: v.detail,
+                  player: v.player,
+                },
+              });
+              const onCardClick = () => {
+                setSelectedId(v.variantId);
+                postToFrame(iframeRef.current, {
+                  type: "show",
+                  data: {
+                    payload: {
+                      didYouKnow: {
+                        kind: v.kind,
+                        headline: v.headline,
+                        detail: v.detail,
+                        player: v.player,
+                      },
+                    },
+                  },
+                });
+              };
               return (
-                <button
+                <div
                   key={v.variantId}
-                  type="button"
-                  onClick={() => setSelectedId(v.variantId)}
                   data-testid={`dyk-variant-${v.variantId}`}
                   data-selected={isSelected ? "true" : "false"}
                   className={
-                    "block w-full px-3 py-2 text-left transition-colors " +
+                    "flex items-stretch transition-colors " +
                     (isSelected
                       ? "bg-[var(--primary)]/20 ring-1 ring-[var(--primary)]"
                       : "hover:bg-[var(--ink-2)]")
                   }
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)]">
-                      {v.headline}
-                    </div>
-                    {v.player?.displayName ? (
-                      <div className="shrink-0 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
-                        {v.player.displayName}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(v.variantId)}
+                    className="block flex-1 px-3 py-2 text-left"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)]">
+                        {v.headline}
                       </div>
-                    ) : null}
-                  </div>
-                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[var(--chalk-3)]">
-                    {v.detail}
-                  </div>
-                </button>
+                      {v.player?.displayName ? (
+                        <div className="shrink-0 text-[10px] uppercase tracking-[0.18em] text-[var(--chalk-3)]">
+                          {v.player.displayName}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[var(--chalk-3)]">
+                      {v.detail}
+                    </div>
+                  </button>
+                  <form
+                    action={retriggerOverlayAction}
+                    className="flex shrink-0 items-center px-2"
+                    onSubmit={onCardClick}
+                  >
+                    <input type="hidden" name="sessionId" value={sessionId} />
+                    <input type="hidden" name="overlayKey" value="25-did-you-know" />
+                    <input type="hidden" name="payload" value={variantPayload} />
+                    <button
+                      type="submit"
+                      data-testid={`dyk-trigger-${v.variantId}`}
+                      className="rounded-sm border border-[var(--primary)] bg-[var(--primary)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-black hover:opacity-90"
+                    >
+                      Trigger
+                    </button>
+                  </form>
+                </div>
               );
             })}
           </div>
