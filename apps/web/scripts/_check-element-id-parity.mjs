@@ -66,6 +66,13 @@ const SEED_AUGMENTS = [
     "migrations",
     "20260620000017_overlay_template_variants_highlight.sql",
   ),
+  // Cover-up overlays 22/25/26/28/29 text seed (added 2026-05-11).
+  resolve(
+    REPO_ROOT,
+    "supabase",
+    "migrations",
+    "20260802000001_overlay_cover_up_text_seed.sql",
+  ),
 ];
 
 /**
@@ -94,10 +101,54 @@ const INLINE_SEED_ALLOWLIST = [
     "16-coaches",
     "17-penalties",
     "19-player-squads",
+    // Migration 20260903000020 — cover-up overlays 21-29 brand-strip
+    // CADE + Pro League logos.
+    "21-streaks",
+    "22-power-rankings",
+    "23-org-standings",
+    "24-biggest-margins",
+    "25-did-you-know",
+    "26-card-meta",
+    "27-schedule",
+    "28-punditry",
+    "29-goalfests",
   ].flatMap((overlay) => [
     [overlay, "logo-cade"],
     [overlay, "logo-pro"],
   ]),
+  // partners-strip is a logical element on every overlay (handled by
+  // the partner-strip layout pipeline, not the text-element resolver).
+  // The text-element seed table only has rows for a few overlays — but
+  // the parity check should accept this attr universally.
+  ...[
+    "01-brb",
+    "02-timer",
+    "04-h2h-2",
+    "05-h2h-3",
+    "06-h2h-5",
+    "07-leaderboard",
+    "08-lower-third",
+    "09-secondary-score-bug",
+    "10-up-next-bug",
+    "11-match-scores-day",
+    "12-starting-soon",
+    "13-stream-ended",
+    "14-top-scorers",
+    "15-orgs",
+    "16-coaches",
+    "17-penalties",
+    "19-player-squads",
+    "20-highlight",
+    "21-streaks",
+    "22-power-rankings",
+    "23-org-standings",
+    "24-biggest-margins",
+    "25-did-you-know",
+    "26-card-meta",
+    "27-schedule",
+    "28-punditry",
+    "29-goalfests",
+  ].map((overlay) => [overlay, "partners-strip"]),
 ];
 
 /** Extract every (overlay_key, element_id) tuple from the seed migration. */
