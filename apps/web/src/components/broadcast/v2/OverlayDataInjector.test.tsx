@@ -325,7 +325,12 @@ describe("OverlayDataInjector", () => {
   });
 
   // S2 smoke fix (2026-04-26) — Bug CC#2.
-  it("does NOT call initial-fetch when active=false (mini-preview gate)", async () => {
+  // 2026-05-11 — `if (!active) return` was removed so OBS browser sources
+  // always have data preloaded before the visibility class flips. Initial
+  // fetch now runs regardless of `active`; visibility is gated by the
+  // cade-visible class added on trigger, not by data presence. Test
+  // updated to reflect the new always-fetch contract.
+  it("DOES call initial-fetch when active=false (data preload, visibility decoupled)", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response("{}", { status: 200 }));
@@ -341,9 +346,12 @@ describe("OverlayDataInjector", () => {
       iframe.dispatchEvent(new Event("load"));
       await flush();
     });
-    // Initial-fetch must be suppressed so the mini-preview iframe stays
-    // in default-OFF state. Realtime events still flow on demand.
-    expect(fetchSpy).not.toHaveBeenCalled();
+    // Initial-fetch runs regardless of `active`. The cade-visible class
+    // remains the visibility gate, not data presence.
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/api/broadcast/v2/sessions/sess-x/orgs"),
+      expect.objectContaining({ cache: "no-store" }),
+    );
     fetchSpy.mockRestore();
   });
 
