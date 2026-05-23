@@ -30,6 +30,7 @@ import {
 } from "@/components/broadcast/v2/controls/PlayerSquadsControl";
 import { HighlightControl } from "@/components/broadcast/v2/controls/HighlightControl";
 import { SimpleOverlayControl } from "@/components/broadcast/v2/controls/SimpleOverlayControl";
+import { DidYouKnowControl } from "@/components/broadcast/v2/controls/DidYouKnowControl";
 
 /**
  * Plan 51 — control card grid layout.
@@ -253,8 +254,7 @@ export function ControlGrid({
         viewToken={viewToken}
         active={active["24-biggest-margins"] ?? false}
       />
-      <SimpleOverlayControl
-        overlayKey="25-did-you-know"
+      <DidYouKnowControl
         sessionId={sessionId}
         viewToken={viewToken}
         active={active["25-did-you-know"] ?? false}
