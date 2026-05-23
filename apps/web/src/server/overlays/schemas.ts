@@ -477,6 +477,26 @@ export const topScorersSchema = z.object({
         .optional(),
     })
     .optional(),
+  // 2026-05-23 — 28-punditry also rides this schema. Its variant
+  // picker sends a `punditryQuote` payload.
+  punditryQuote: z
+    .object({
+      text: z.string().max(800).optional(),
+      author: z.string().max(120).optional(),
+      role: z.string().max(120).optional(),
+      player: z
+        .object({
+          playerId: z.string().optional(),
+          displayName: z.string().max(80).optional(),
+          slug: z.string().max(80).optional(),
+          photoUrl: z.string().max(500).nullable().optional(),
+          orgName: z.string().max(80).nullable().optional(),
+          orgLogoUrl: z.string().max(500).nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .optional(),
 });
 export type TopScorersPayload = z.infer<typeof topScorersSchema>;
 

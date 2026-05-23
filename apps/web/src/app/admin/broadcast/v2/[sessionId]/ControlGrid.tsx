@@ -31,6 +31,7 @@ import {
 import { HighlightControl } from "@/components/broadcast/v2/controls/HighlightControl";
 import { SimpleOverlayControl } from "@/components/broadcast/v2/controls/SimpleOverlayControl";
 import { DidYouKnowControl } from "@/components/broadcast/v2/controls/DidYouKnowControl";
+import { PunditryControl } from "@/components/broadcast/v2/controls/PunditryControl";
 
 /**
  * Plan 51 — control card grid layout.
@@ -271,8 +272,7 @@ export function ControlGrid({
         viewToken={viewToken}
         active={active["27-schedule"] ?? false}
       />
-      <SimpleOverlayControl
-        overlayKey="28-punditry"
+      <PunditryControl
         sessionId={sessionId}
         viewToken={viewToken}
         active={active["28-punditry"] ?? false}

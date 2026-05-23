@@ -70,12 +70,12 @@ const PLAYER_TRIVIA: Array<{
       "Wolevation pauses matches at key moments — a deliberate tactic to break opponents' rhythm and disrupt their concentration.",
   },
   {
-    variantId: "trivia-faruk-first-draw",
+    variantId: "trivia-faruk-draw-parallel",
     slug: "faruk",
     displayName: "FARUK",
-    headline: "FARUK'S FIRST DRAW",
+    headline: "FARUK'S DRAW PARALLEL",
     detail:
-      "Faruk did not draw a single match in the previous league season. This season he's already dropped points to a stalemate — against Guru, a new Elite arrival.",
+      "Faruk drew exactly one match across his 15-game campaign last season. This season is already mirroring it — one draw on the books, against Guru, a new Elite arrival.",
   },
 ];
 

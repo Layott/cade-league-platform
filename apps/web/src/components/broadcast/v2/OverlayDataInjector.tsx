@@ -116,10 +116,8 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   // squad.updated proxies through standingsChannel per server/squads/
   // realtime.ts so admin approvals + Friday changes propagate.
   "26-card-meta": ["squad.updated", "standings.changed"],
-  // 28-punditry — quote text is admin/AI-managed; only the player photo
-  // rotates based on didYouKnow.player so the talking-head image
-  // matches whoever the headline stat is about.
-  "28-punditry": ["standings.changed", "match.ended"],
+  // 28-punditry — producer-driven via variant picker. NO realtime
+  // re-fetch (would clobber the picked quote within seconds of trigger).
 };
 
 /**
@@ -181,9 +179,9 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   // 26-card-meta — distinct endpoint joining squad_player_items to
   // fc26_players for card art + pick percentages.
   "26-card-meta": (s) => `/api/broadcast/sessions/${s}/card-meta`,
-  // 28-punditry — fetches cover-up-stats only to swap the .pq-photo-wrap
-  // image to the didYouKnow.player. Quote text stays admin/AI-managed.
-  "28-punditry": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  // 28-punditry — no INITIAL_FETCH. Producer picks variant from the
+  // control panel; trigger sends payload directly. Auto-fetch would
+  // overwrite the picked quote on every standings.changed event.
 };
 
 /**
