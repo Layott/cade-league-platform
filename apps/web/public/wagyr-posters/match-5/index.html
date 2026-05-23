@@ -26,14 +26,14 @@
   .tape .track{display:flex;gap:40px;animation:tape 32s linear infinite;white-space:nowrap;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.18em;color:var(--ink-dim);}
   .tape .track .item .v{color:var(--green);} .tape .track .item .red{color:var(--red);} .tape .track .sep{color:var(--rule-strong);}
   /* HERO BANNER for main event */
-  .hero{position:absolute;top:144px;left:64px;right:64px;height:220px;display:grid;grid-template-columns:auto 1fr;align-items:end;gap:48px;z-index:3;}
+  .hero{position:absolute;top:144px;left:64px;right:64px;height:180px;display:grid;grid-template-columns:auto 1fr;align-items:end;gap:48px;z-index:3;}
   .hero .label{display:flex;flex-direction:column;gap:8px;}
   .hero .label .figtag{font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--green);}
   .hero .label .kicker{font:600 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink);background:var(--green);color:var(--bg);padding:8px 14px;align-self:flex-start;}
-  .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:100px;line-height:0.94;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
+  .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:84px;line-height:0.96;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
   .hero h1 .glow{color:var(--green);}
   /* MAIN STAGE — single match, big */
-  .stage{position:absolute;top:400px;left:64px;right:64px;bottom:240px;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;display:flex;flex-direction:column;z-index:2;}
+  .stage{position:absolute;top:360px;left:64px;right:64px;bottom:220px;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;display:flex;flex-direction:column;z-index:2;}
   .stage::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.08), transparent 50%);}
   .stage .head{padding:24px 36px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center;font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.35em;color:var(--ink-dim);}
   .stage .head .tag{color:var(--green);}
@@ -53,7 +53,7 @@
   .stage .foot .chips{display:flex;gap:12px;} .stage .foot .chip{font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink-dim);border:1px solid var(--rule);padding:10px 14px;text-transform:uppercase;}
   .stage .foot .cta{font:700 15px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--bg);background:var(--green);padding:18px 28px;display:flex;align-items:center;gap:12px;box-shadow:0 0 50px rgba(24,185,72,0.5);}
   .stage .foot .cta::after{content:"→";font-weight:800;font-size:18px;}
-  .wager-banner{position:absolute;left:64px;right:64px;bottom:140px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
+  .wager-banner{position:absolute;left:64px;right:64px;bottom:120px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
   .wager-banner .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
   .wager-banner .cta-text{font-family:'Archivo Black','Inter',sans-serif;font-weight:800;font-size:30px;letter-spacing:0.05em;color:var(--ink);text-transform:uppercase;display:flex;align-items:center;gap:18px;text-align:center;}
   .wager-banner .cta-text .green{color:var(--green);}
@@ -112,7 +112,6 @@
         <div class="photo" style="background-image:url('../../overlays/v2/_assets/players/processed/faruk/fullbody_01_nobg.png');"></div>
         <div class="name">Faruk</div>
         <div class="meta">@FARUK · CADE ELITE</div>
-        <div class="badge">SMART MONEY · IN</div>
       </div>
       <div class="vs">
         <div class="vs-tag">VS</div>
@@ -122,7 +121,6 @@
         <div class="photo" style="background-image:url('../../overlays/v2/_assets/players/processed/killer_freak/fullbody_01_nobg.png');"></div>
         <div class="name">Killer Freak</div>
         <div class="meta">@KILLERFREAK · CADE ELITE</div>
-        <div class="badge">RISING · 2.4x</div>
       </div>
     </div>
     <div class="foot">
