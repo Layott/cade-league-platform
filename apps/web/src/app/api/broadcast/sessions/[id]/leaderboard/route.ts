@@ -54,28 +54,105 @@ export async function GET(
   }
   const sess = sessRaw as { id: string; match_day_id: string };
 
-  const { data: mdRaw, error: mdErr } = await sb
-    .from("match_days")
-    .select("id, season_id, match_day_number, played_at")
-    .eq("id", sess.match_day_id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (mdErr || !mdRaw) {
-    return NextResponse.json({ error: "match_day not found" }, { status: 404 });
+  // 2026-05-23 — resilient match-day + season resolution.
+  //
+  // Original logic 404'd when session.match_day_id pointed to a
+  // soft-deleted or missing row, leaving overlays (esp. 22-power-
+  // rankings) stuck on static demo data forever. Now we fall back
+  // through three layers so live standings ALWAYS load when a season
+  // exists:
+  //   1. session's bound match_day (preferred — gives true "WEEK N")
+  //   2. latest played match_day on the same season (when 1 missing)
+  //   3. latest active season (when neither 1 nor 2 resolves)
+  let seasonId: string | null = null;
+  let matchDayNumber: number | null = null;
+  let matchDate: string | null = null;
+
+  if (sess.match_day_id) {
+    const { data: mdRaw } = await sb
+      .from("match_days")
+      .select("id, season_id, match_day_number, played_at")
+      .eq("id", sess.match_day_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (mdRaw) {
+      const md = mdRaw as {
+        id: string;
+        season_id: string;
+        match_day_number: number | null;
+        played_at: string | null;
+      };
+      seasonId = md.season_id;
+      matchDayNumber = md.match_day_number;
+      matchDate = md.played_at;
+    }
   }
-  const md = mdRaw as {
-    id: string;
-    season_id: string;
-    match_day_number: number | null;
-    played_at: string | null;
-  };
+
+  // Fallback 2 — season resolved but match-day stale: pull latest
+  // played match-day on that season so "WEEK N" still surfaces.
+  if (seasonId && matchDayNumber == null) {
+    const { data: latestMd } = await sb
+      .from("match_days")
+      .select("match_day_number, played_at")
+      .eq("season_id", seasonId)
+      .is("deleted_at", null)
+      .not("played_at", "is", null)
+      .order("match_day_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestMd) {
+      const lm = latestMd as {
+        match_day_number: number | null;
+        played_at: string | null;
+      };
+      matchDayNumber = lm.match_day_number;
+      matchDate = lm.played_at;
+    }
+  }
+
+  // Fallback 3 — no season resolved from session: use the latest active
+  // season globally. Lets a stale / detached session still render the
+  // current standings instead of black overlay.
+  if (!seasonId) {
+    const { data: latestSeason } = await sb
+      .from("seasons")
+      .select("id")
+      .is("deleted_at", null)
+      .order("starts_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    seasonId = (latestSeason as { id: string } | null)?.id ?? null;
+    if (seasonId) {
+      const { data: latestMd2 } = await sb
+        .from("match_days")
+        .select("match_day_number, played_at")
+        .eq("season_id", seasonId)
+        .is("deleted_at", null)
+        .not("played_at", "is", null)
+        .order("match_day_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestMd2) {
+        const lm = latestMd2 as {
+          match_day_number: number | null;
+          played_at: string | null;
+        };
+        matchDayNumber = lm.match_day_number;
+        matchDate = lm.played_at;
+      }
+    }
+  }
+
+  if (!seasonId) {
+    return NextResponse.json({ error: "no active season" }, { status: 404 });
+  }
 
   // Optional `?topN=` override — defaults to 13 (full Elite roster),
   // capped at 13 by reader. Older callers may still pass `topN=10`.
   const topNRaw = req.nextUrl.searchParams.get("topN");
   const topN = topNRaw ? Number(topNRaw) : 13;
 
-  const data = await fetchLeaderboardData(sb, md.season_id, topN);
+  const data = await fetchLeaderboardData(sb, seasonId, topN);
   const payload = toLeaderboardAnimatedPayload(data);
 
   return NextResponse.json(
@@ -86,8 +163,8 @@ export async function GET(
       // 2026-05-23 — overlay 22-power-rankings reads matchDayNumber +
       // matchDate so its "WEEK N · YYYY-MM-DD" sub-headline reflects
       // the active match-day instead of hard-coded "WEEK 3 · 2026-05-09".
-      matchDayNumber: md.match_day_number,
-      matchDate: md.played_at,
+      matchDayNumber,
+      matchDate,
     },
     {
       headers: {
