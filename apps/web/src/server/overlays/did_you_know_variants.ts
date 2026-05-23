@@ -70,12 +70,12 @@ const PLAYER_TRIVIA: Array<{
       "Wolevation pauses matches at key moments — a deliberate tactic to break opponents' rhythm and disrupt their concentration.",
   },
   {
-    variantId: "trivia-faruk-vs-guru-cross-season",
+    variantId: "trivia-faruk-first-draw",
     slug: "faruk",
     displayName: "FARUK",
-    headline: "FARUK'S GURU FLIP",
+    headline: "FARUK'S FIRST DRAW",
     detail:
-      "Faruk won every head-to-head against Guru in the last league season. This season has flipped — they've already drawn one of their meetings.",
+      "Faruk did not draw a single match in the previous league season. This season he's already dropped points to a stalemate — against Guru, a new Elite arrival.",
   },
 ];
 
@@ -173,28 +173,7 @@ export function buildDidYouKnowVariants(
     }
   }
 
-  // 2c. Deepest competitive stable — largest org roster active in Elite.
-  const longestRoster = [...orgs].sort((a, b) => b.playerCount - a.playerCount)[0];
-  if (longestRoster && longestRoster.playerCount >= 2) {
-    out.push({
-      variantId: "computed-longest-org-roster",
-      kind: "top_scorer",
-      headline: `${longestRoster.playerCount}-DEEP ROSTER`,
-      detail: `${safe(longestRoster.name)} field ${longestRoster.playerCount} Elite players this season — the deepest active stable in the league.`,
-      player: longestRoster.topPlayer
-        ? {
-            playerId: "",
-            displayName: longestRoster.topPlayer.name,
-            slug: "",
-            photoUrl: null,
-            orgName: longestRoster.name,
-            orgLogoUrl: longestRoster.logoUrl,
-          }
-        : null,
-    });
-  }
-
-  // 2d. Wildest single match (combined-score) — ONLY when the total is
+  // 2c. Wildest single match (combined-score) — ONLY when the total is
   //     genuinely outlier (≥ 8). Frames as season record, not raw stat.
   const gf = stats.goalfests[0];
   if (gf && gf.total >= 8) {
