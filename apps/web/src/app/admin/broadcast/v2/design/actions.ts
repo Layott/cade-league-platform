@@ -166,32 +166,55 @@ export async function saveTokensAction(formData: FormData) {
   const { sb, publicUserId, roles } = await gate();
   const actor = { userId: publicUserId, roles };
 
+  // 2026-05-23 — per-token try/catch so one bad write doesn't kill the
+  // whole save. Collect errors + throw an aggregate at the end if any
+  // failed — caller still sees a usable message, partial successes
+  // persist. Common single-token failures: DB CHECK constraint on
+  // token_type, FK violation on changed_by during history insert,
+  // forbidden CSS metacharacter in a hand-typed value.
+  const failures: { tokenKey: string; message: string }[] = [];
   for (const [tokenKey, tokenValue] of Object.entries(parsed.data.tokens)) {
     const catalog = TOKEN_CATALOG_BY_KEY[tokenKey];
     if (!catalog) continue; // unknown key — silently drop
-    if (tokenValue === "") {
-      await clearDesignToken(
-        sb,
-        actor,
-        parsed.data.overlayKey,
-        parsed.data.variantId,
-        tokenKey,
+    try {
+      if (tokenValue === "") {
+        await clearDesignToken(
+          sb,
+          actor,
+          parsed.data.overlayKey,
+          parsed.data.variantId,
+          tokenKey,
+        );
+      } else {
+        await setDesignToken(
+          sb,
+          actor,
+          parsed.data.overlayKey,
+          parsed.data.variantId,
+          tokenKey,
+          tokenValue,
+          catalog.tokenType,
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[saveTokensAction] token ${tokenKey} failed on ${parsed.data.overlayKey}/${parsed.data.variantId}: ${message}`,
       );
-    } else {
-      await setDesignToken(
-        sb,
-        actor,
-        parsed.data.overlayKey,
-        parsed.data.variantId,
-        tokenKey,
-        tokenValue,
-        catalog.tokenType,
-      );
+      failures.push({ tokenKey, message });
     }
   }
 
   revalidatePath("/admin/broadcast/v2/design");
   revalidatePath(`/overlay/v2/${parsed.data.overlayKey}`, "page");
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Some tokens did not save: ${failures
+        .map((f) => `${f.tokenKey} (${f.message})`)
+        .join("; ")}`,
+    );
+  }
 }
 
 const SetActiveTemplateSchema = z.object({

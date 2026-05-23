@@ -103,7 +103,19 @@ export default async function OverlayDesignPage({
   // Variant list for picker + gallery. Falls back to a synthetic
   // 'default' row if the table is unreachable (e.g. fresh schema with
   // unseeded variant table).
-  const variants = await listTemplates(sb, selectedOverlay);
+  // 2026-05-23 — wrap the three unguarded server calls (listTemplates,
+  // resolveTokens, listHistory) in try/catch with structured logging
+  // so an intermittent DB failure on any one of them no longer bubbles
+  // up as a "Server Components render" prod error. The fallbacks let
+  // the editor still load with safe defaults; admin can retry the
+  // save once the underlying issue clears.
+  const variants = await listTemplates(sb, selectedOverlay).catch((err) => {
+    console.error(
+      `[design/page] listTemplates(${selectedOverlay}) failed:`,
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  });
   const fallbackVariant = {
     id: "synthetic-default",
     overlayKey: selectedOverlay,
@@ -121,8 +133,27 @@ export default async function OverlayDesignPage({
     variantList.find((v) => v.active)?.variantId ??
     variantList[0].variantId;
 
-  const tokens = await resolveTokens(sb, selectedOverlay, selectedVariantId);
-  const history = await listHistory(sb, selectedOverlay, selectedVariantId, 50);
+  const tokens = await resolveTokens(sb, selectedOverlay, selectedVariantId).catch(
+    (err) => {
+      console.error(
+        `[design/page] resolveTokens(${selectedOverlay}/${selectedVariantId}) failed:`,
+        err instanceof Error ? err.message : err,
+      );
+      return {} as Record<string, string>;
+    },
+  );
+  const history = await listHistory(
+    sb,
+    selectedOverlay,
+    selectedVariantId,
+    50,
+  ).catch((err) => {
+    console.error(
+      `[design/page] listHistory(${selectedOverlay}/${selectedVariantId}) failed:`,
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  });
   // Wave 2 Stage 2 — text-element catalog for the new Text panel.
   const textRowsRaw = await listTextElements(
     sb,
