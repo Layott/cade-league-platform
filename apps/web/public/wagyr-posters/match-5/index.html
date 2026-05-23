@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>WAGYR × CADE · Match 05 · Main Event</title>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@700,800&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" />
+<style>
+  :root{--bg:#14161A;--bg-2:#0E1013;--ink:#F1F2F3;--ink-dim:rgba(241,242,243,0.55);--rule:rgba(241,242,243,0.10);--rule-strong:rgba(241,242,243,0.18);--green:#18B948;--green-soft:rgba(24,185,72,0.18);--green-hot:rgba(24,185,72,0.40);--red:#FF3366;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Montserrat',system-ui,sans-serif;}
+  body{position:relative;background:radial-gradient(1300px 800px at 50% 100%, rgba(24,185,72,0.18), transparent 65%),radial-gradient(1000px 600px at 50% 0%, rgba(24,185,72,0.10), transparent 60%),linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 50%, var(--bg-2) 100%);}
+  .grid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right, rgba(241,242,243,0.04) 1px, transparent 1px),linear-gradient(to bottom, rgba(241,242,243,0.04) 1px, transparent 1px);background-size:80px 80px;mask-image:radial-gradient(ellipse at center, black 35%, transparent 90%);}
+  .noise{position:absolute;inset:0;pointer-events:none;opacity:0.05;mix-blend-mode:overlay;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");}
+  /* SPOTLIGHT — backlights center of stage */
+  .spotlight{position:absolute;left:50%;top:50%;width:1400px;height:900px;transform:translate(-50%,-45%);background:radial-gradient(ellipse at center, rgba(24,185,72,0.20), rgba(24,185,72,0.06) 40%, transparent 70%);pointer-events:none;animation:spot 5s ease-in-out infinite alternate;}
+  .topbar{position:absolute;top:0;left:0;right:0;height:96px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 64px;border-bottom:1px solid var(--rule);z-index:5;}
+  .topbar .mark{display:flex;align-items:center;gap:18px;} .topbar .mark img{height:36px;display:block;} .topbar .mark .dot{width:8px;height:8px;background:var(--green);animation:pulse 1.6s ease-in-out infinite;}
+  .topbar .beta{font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.25em;color:var(--ink-dim);border:1px solid var(--rule-strong);padding:6px 10px;}
+  .topbar .center{font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--green);text-align:center;}
+  .topbar .right{display:flex;justify-content:flex-end;align-items:center;gap:18px;font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);}
+  .topbar .right .match-num{color:var(--green);}
+  .tape{position:absolute;top:96px;left:0;right:0;height:44px;border-bottom:1px solid var(--rule);overflow:hidden;display:flex;align-items:center;background:linear-gradient(90deg, rgba(24,185,72,0.10), transparent 60%);z-index:4;}
+  .tape .pulse{margin:0 28px 0 64px;display:flex;align-items:center;gap:10px;font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--green);white-space:nowrap;} .tape .pulse::before{content:"";width:8px;height:8px;background:var(--green);animation:pulse 1.0s ease-in-out infinite;}
+  .tape .track{display:flex;gap:40px;animation:tape 32s linear infinite;white-space:nowrap;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.18em;color:var(--ink-dim);}
+  .tape .track .item .v{color:var(--green);} .tape .track .item .red{color:var(--red);} .tape .track .sep{color:var(--rule-strong);}
+  /* HERO BANNER for main event */
+  .hero{position:absolute;top:160px;left:64px;right:64px;height:200px;display:grid;grid-template-columns:auto 1fr;align-items:end;gap:48px;z-index:3;}
+  .hero .label{display:flex;flex-direction:column;gap:8px;}
+  .hero .label .figtag{font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--green);}
+  .hero .label .kicker{font:600 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink);background:var(--green);color:var(--bg);padding:8px 14px;align-self:flex-start;}
+  .hero h1{font-family:'Clash Display','Inter',system-ui,sans-serif;font-weight:800;font-size:180px;line-height:0.85;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
+  .hero h1 .glow{color:var(--green);}
+  /* MAIN STAGE — single match, big */
+  .stage{position:absolute;top:400px;left:64px;right:64px;bottom:200px;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;display:flex;flex-direction:column;z-index:2;}
+  .stage::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.08), transparent 50%);}
+  .stage .head{padding:24px 36px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center;font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.35em;color:var(--ink-dim);}
+  .stage .head .tag{color:var(--green);}
+  .stage .head .live{display:flex;align-items:center;gap:10px;color:var(--green);font-weight:700;} .stage .head .live::before{content:"";width:10px;height:10px;background:var(--green);animation:pulse 1.0s ease-in-out infinite;}
+  .stage .vs-row{flex:1;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 30px;position:relative;min-height:0;}
+  /* dramatic player */
+  .stage .player{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;padding-bottom:22px;}
+  .stage .player .photo{width:90%;height:88%;background:transparent;background-size:contain;background-repeat:no-repeat;background-position:bottom center;filter:drop-shadow(0 40px 80px rgba(24,185,72,0.25)) drop-shadow(0 30px 60px rgba(0,0,0,0.7));}
+  .stage .player .name{margin-top:8px;font-family:'Clash Display','Inter',sans-serif;font-weight:800;font-size:80px;letter-spacing:-0.03em;color:var(--ink);text-transform:uppercase;line-height:0.92;text-align:center;}
+  .stage .player .meta{font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.35em;color:var(--ink-dim);margin-top:8px;}
+  .stage .player .badge{font:700 11px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--green);background:rgba(24,185,72,0.10);border:1px solid rgba(24,185,72,0.4);padding:6px 12px;margin-top:8px;}
+  .stage .vs{display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 30px;}
+  .stage .vs .vs-tag{font-family:'Clash Display','Inter',sans-serif;font-weight:800;font-size:200px;line-height:1;letter-spacing:-0.04em;color:var(--ink);-webkit-text-stroke:2px var(--green);text-shadow:0 0 50px rgba(24,185,72,0.55), 0 0 100px rgba(24,185,72,0.25);}
+  .stage .vs .pool{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.35em;color:var(--ink);border:1px solid rgba(24,185,72,0.5);padding:10px 16px;background:rgba(24,185,72,0.06);}
+  .stage .vs .pool .v{color:var(--green);}
+  .stage .foot{border-top:1px solid var(--rule);padding:22px 36px;display:flex;justify-content:space-between;align-items:center;}
+  .stage .foot .chips{display:flex;gap:12px;} .stage .foot .chip{font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink-dim);border:1px solid var(--rule);padding:10px 14px;text-transform:uppercase;}
+  .stage .foot .cta{font:700 15px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--bg);background:var(--green);padding:18px 28px;display:flex;align-items:center;gap:12px;box-shadow:0 0 50px rgba(24,185,72,0.5);}
+  .stage .foot .cta::after{content:"→";font-weight:800;font-size:18px;}
+  .chipbar{position:absolute;left:64px;right:64px;bottom:104px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
+  .chipbar .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
+  .chipbar .track .sep{color:var(--rule-strong);font-weight:400;} .chipbar .track .green{color:var(--green);}
+  .partners{position:absolute;left:64px;right:64px;bottom:24px;height:64px;display:flex;align-items:center;justify-content:space-between;gap:18px;z-index:2;}
+  .partners .logos{display:flex;align-items:center;gap:36px;flex:1;overflow:hidden;} .partners .logos img{height:38px;object-fit:contain;opacity:0.85;filter:grayscale(0.2) brightness(1.05);} .partners .logos img[data-emph]{height:48px;opacity:1;filter:none;}
+  .partners .wagyr-cta{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--green);color:var(--bg);font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;box-shadow:0 0 40px rgba(24,185,72,0.5);} .partners .wagyr-cta .url{font-weight:800;} .partners .wagyr-cta::before{content:"";width:10px;height:10px;background:var(--bg);animation:pulse 1.0s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.25;}}
+  @keyframes tape{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  @keyframes chips{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  @keyframes rise{from{opacity:0;transform:translateY(40px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes spot{from{opacity:0.7;transform:translate(-50%,-45%) scale(1);}to{opacity:1;transform:translate(-50%,-45%) scale(1.05);}}
+  .reveal{animation:rise 900ms cubic-bezier(.16,1,.3,1) both;}
+  .reveal.d1{animation-delay:120ms;} .reveal.d2{animation-delay:280ms;} .reveal.d3{animation-delay:440ms;} .reveal.d4{animation-delay:600ms;} .reveal.d5{animation-delay:780ms;}
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="spotlight"></div>
+  <div class="noise"></div>
+  <header class="topbar reveal">
+    <div class="mark"><img src="../../overlays/v2/_assets/logos/WAGYR.png" alt="WAGYR" /><span class="beta">BETA</span><span class="dot"></span></div>
+    <div class="center">MAIN EVENT · CADE PRO LEAGUE</div>
+    <div class="right"><span class="match-num">MATCH 05 / 05</span><span>·</span><span>FIG.05</span></div>
+  </header>
+  <div class="tape reveal d1">
+    <div class="pulse">LIVE TAPE · MAIN EVENT</div>
+    <div class="track">
+      <span class="item">+$1,240 <span class="v">FARUK · SMART MONEY</span></span><span class="sep">/</span>
+      <span class="item">POOL +$890 <span class="v">KILLER FREAK HOT</span></span><span class="sep">/</span>
+      <span class="item">DEPTH $5,400+</span><span class="sep">/</span>
+      <span class="item">CLOSE 16:00</span><span class="sep">/</span>
+      <span class="item">+$520 <span class="v">FARUK · 1.6x</span></span><span class="sep">/</span>
+      <span class="item">+$380 <span class="v">KILLER FREAK · 2.4x</span></span><span class="sep">/</span>
+      <span class="item">-$120 <span class="red">EXIT</span></span><span class="sep">/</span>
+      <span class="item">CLOSING DEEPEST</span><span class="sep">/</span>
+      <span class="item">+$1,240 <span class="v">FARUK · SMART MONEY</span></span><span class="sep">/</span>
+      <span class="item">POOL +$890 <span class="v">KILLER FREAK HOT</span></span><span class="sep">/</span>
+      <span class="item">DEPTH $5,400+</span><span class="sep">/</span>
+      <span class="item">CLOSE 16:00</span><span class="sep">/</span>
+      <span class="item">+$520 <span class="v">FARUK · 1.6x</span></span><span class="sep">/</span>
+      <span class="item">+$380 <span class="v">KILLER FREAK · 2.4x</span></span><span class="sep">/</span>
+      <span class="item">CLOSING DEEPEST</span>
+    </div>
+  </div>
+  <div class="hero">
+    <div class="label reveal d2">
+      <div class="figtag">FIG.05 · DEEPEST POOL OF THE NIGHT</div>
+      <div class="kicker">MAIN EVENT · FINAL</div>
+    </div>
+    <h1 class="reveal d2">Last call.<br/><span class="glow">Edge</span> expires.</h1>
+  </div>
+  <main class="stage reveal d3">
+    <div class="head"><span><span class="tag">MAIN EVENT</span> · MATCH 05 · FIG.05</span><span class="live">MARKET CLOSING SOONEST</span></div>
+    <div class="vs-row">
+      <div class="player">
+        <div class="photo" style="background-image:url('../../overlays/v2/_assets/players/processed/faruk/fullbody_01_nobg.png');"></div>
+        <div class="name">Faruk</div>
+        <div class="meta">@FARUK · CADE ELITE</div>
+        <div class="badge">SMART MONEY · IN</div>
+      </div>
+      <div class="vs">
+        <div class="vs-tag">VS</div>
+        <div class="pool">POOL · <span class="v">DEEPEST</span></div>
+      </div>
+      <div class="player">
+        <div class="photo" style="background-image:url('../../overlays/v2/_assets/players/processed/killer_freak/fullbody_01_nobg.png');"></div>
+        <div class="name">Killer Freak</div>
+        <div class="meta">@KILLERFREAK · CADE ELITE</div>
+        <div class="badge">RISING · 2.4x</div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="chips">
+        <span class="chip">PARIMUTUEL</span>
+        <span class="chip">NO HOUSE</span>
+        <span class="chip">USDC · BASE</span>
+        <span class="chip">&lt;60s SETTLEMENT</span>
+        <span class="chip">CLOSE TONIGHT</span>
+      </div>
+      <div class="cta">BET LIVE · WAGYR.CO</div>
+    </div>
+  </main>
+  <div class="chipbar reveal d4">
+    <div class="track">
+      <span class="green">EDGE IS THE ONLY CURRENCY</span><span class="sep">/</span><span>USDC MULTI-CHAIN</span><span class="sep">/</span><span>PARIMUTUEL</span><span class="sep">/</span><span class="green">NO HOUSE</span><span class="sep">/</span><span>COPY-TRADE SMART MONEY</span><span class="sep">/</span><span>WITHDRAW ANYTIME</span><span class="sep">/</span><span class="green">CLOSING DEEPEST</span><span class="sep">/</span><span>BUILT ON BASE</span><span class="sep">/</span><span>PREDICT · EARN · OWN YOUR RECORD</span><span class="sep">/</span>
+      <span class="green">EDGE IS THE ONLY CURRENCY</span><span class="sep">/</span><span>USDC MULTI-CHAIN</span><span class="sep">/</span><span>PARIMUTUEL</span><span class="sep">/</span><span class="green">NO HOUSE</span><span class="sep">/</span><span>COPY-TRADE SMART MONEY</span><span class="sep">/</span><span>WITHDRAW ANYTIME</span><span class="sep">/</span><span class="green">CLOSING DEEPEST</span><span class="sep">/</span><span>BUILT ON BASE</span><span class="sep">/</span><span>PREDICT · EARN · OWN YOUR RECORD</span><span class="sep">/</span>
+    </div>
+  </div>
+  <footer class="partners reveal d5">
+    <div class="logos">
+      <img data-emph src="../../overlays/v2/_assets/logos/1cade esport.png" alt="CADE Esports" />
+      <img data-emph src="../../overlays/v2/_assets/logos/pro league .png" alt="CADE Pro League" />
+      <img src="../../overlays/v2/_assets/logos/GameEvo Esports White.png" alt="GameEvo Esports" />
+      <img src="../../overlays/v2/_assets/logos/Gamepride Green-01.png" alt="Gamepride" />
+      <img src="../../overlays/v2/_assets/logos/OAS ESPORTS COLORED.png" alt="OAS Esports" />
+      <img src="../../overlays/v2/_assets/logos/ESPORTS AFRICA NEWS WHITE.png" alt="Esports Africa News" />
+      <img src="../../overlays/v2/_assets/logos/eSports Federation of Nigeria-1.png" alt="eSports Federation of Nigeria" />
+      <img src="../../overlays/v2/_assets/logos/Trace_TV_Logo.svg.png" alt="Trace TV" />
+    </div>
+    <div class="wagyr-cta"><span class="url">WAGYR.CO</span><span>· BET LIVE</span></div>
+  </footer>
+</body>
+</html>

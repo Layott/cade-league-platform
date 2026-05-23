@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>WAGYR × CADE · Promo</title>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@700,800&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" />
+<style>
+  :root{--bg:#14161A;--bg-2:#0E1013;--ink:#F1F2F3;--ink-dim:rgba(241,242,243,0.55);--rule:rgba(241,242,243,0.10);--rule-strong:rgba(241,242,243,0.18);--green:#18B948;--green-soft:rgba(24,185,72,0.18);--green-hot:rgba(24,185,72,0.40);}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);font-family:'Montserrat',system-ui,sans-serif;}
+  body{position:relative;background:radial-gradient(1200px 700px at 80% 20%, rgba(24,185,72,0.16), transparent 60%),radial-gradient(900px 600px at 20% 90%, rgba(24,185,72,0.10), transparent 60%),linear-gradient(115deg, transparent 0%, rgba(24,185,72,0.10) 30%, transparent 55%, rgba(24,185,72,0.06) 75%, transparent 100%),var(--bg);}
+  .grid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right, rgba(241,242,243,0.04) 1px, transparent 1px),linear-gradient(to bottom, rgba(241,242,243,0.04) 1px, transparent 1px);background-size:80px 80px;mask-image:radial-gradient(ellipse at center, black 40%, transparent 95%);}
+  .noise{position:absolute;inset:0;pointer-events:none;opacity:0.05;mix-blend-mode:overlay;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");}
+  .topbar{position:absolute;top:0;left:0;right:0;height:96px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 64px;border-bottom:1px solid var(--rule);z-index:5;}
+  .topbar .mark{display:flex;align-items:center;gap:18px;} .topbar .mark img{height:36px;display:block;} .topbar .mark .dot{width:8px;height:8px;background:var(--green);animation:pulse 1.6s ease-in-out infinite;}
+  .topbar .beta{font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.25em;color:var(--ink-dim);border:1px solid var(--rule-strong);padding:6px 10px;}
+  .topbar .center{font:600 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink-dim);text-align:center;}
+  .topbar .right{display:flex;justify-content:flex-end;align-items:center;gap:18px;font:600 14px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);}
+  .topbar .right .match-num{color:var(--green);}
+  /* TAPE */
+  .tape{position:absolute;top:96px;left:0;right:0;height:44px;border-bottom:1px solid var(--rule);overflow:hidden;display:flex;align-items:center;background:linear-gradient(90deg, rgba(24,185,72,0.06), transparent 60%);z-index:4;}
+  .tape .pulse{margin:0 28px 0 64px;display:flex;align-items:center;gap:10px;font:600 12px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--green);white-space:nowrap;} .tape .pulse::before{content:"";width:8px;height:8px;background:var(--green);animation:pulse 1.2s ease-in-out infinite;}
+  .tape .track{display:flex;gap:40px;animation:tape 36s linear infinite;white-space:nowrap;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.18em;color:var(--ink-dim);}
+  .tape .track .item .v{color:var(--green);} .tape .track .sep{color:var(--rule-strong);}
+  /* HERO — promo headline + supercopy */
+  .hero{position:absolute;top:160px;left:64px;right:64px;height:300px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:48px;z-index:3;}
+  .hero .label-stack{display:flex;flex-direction:column;gap:18px;align-items:flex-start;}
+  .hero .label-stack .figtag{font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--green);}
+  .hero .label-stack .kicker{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--bg);background:var(--green);padding:8px 14px;}
+  .hero h1{font-family:'Clash Display','Inter',system-ui,sans-serif;font-weight:800;font-size:200px;line-height:0.85;letter-spacing:-0.04em;color:var(--ink);text-align:right;}
+  .hero h1 .glow{color:var(--green);}
+  /* STEPS — three big number cards */
+  .steps{position:absolute;top:500px;left:64px;right:64px;height:260px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;z-index:2;}
+  .step{position:relative;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;padding:32px 36px;display:flex;flex-direction:column;justify-content:space-between;}
+  .step::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.08), transparent 50%);}
+  .step .n{font-family:'Clash Display','Inter',sans-serif;font-weight:800;font-size:140px;line-height:0.85;letter-spacing:-0.04em;color:var(--green);}
+  .step .lbl{font:700 13px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink-dim);margin-top:6px;}
+  .step h3{font-family:'Clash Display','Inter',sans-serif;font-weight:700;font-size:54px;line-height:0.95;letter-spacing:-0.02em;color:var(--ink);margin-top:12px;}
+  .step p{font:500 16px/1.4 'Montserrat',sans-serif;color:var(--ink-dim);margin-top:8px;max-width:90%;}
+  /* STAT STRIP */
+  .stats{position:absolute;left:64px;right:64px;bottom:240px;height:90px;display:grid;grid-template-columns:repeat(5, 1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);z-index:2;}
+  .stat{display:flex;flex-direction:column;justify-content:center;align-items:center;border-right:1px solid var(--rule);padding:10px;}
+  .stat:last-child{border-right:none;}
+  .stat .v{font-family:'Clash Display','Inter',sans-serif;font-weight:800;font-size:42px;letter-spacing:-0.02em;color:var(--green);line-height:1;}
+  .stat .l{font:600 11px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink-dim);margin-top:8px;text-transform:uppercase;}
+  .chipbar{position:absolute;left:64px;right:64px;bottom:104px;height:60px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:2;}
+  .chipbar .track{display:flex;align-items:center;gap:28px;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink);white-space:nowrap;animation:chips 28s linear infinite;}
+  .chipbar .track .sep{color:var(--rule-strong);font-weight:400;} .chipbar .track .green{color:var(--green);}
+  .partners{position:absolute;left:64px;right:64px;bottom:24px;height:64px;display:flex;align-items:center;justify-content:space-between;gap:18px;z-index:2;}
+  .partners .logos{display:flex;align-items:center;gap:36px;flex:1;overflow:hidden;} .partners .logos img{height:38px;object-fit:contain;opacity:0.85;filter:grayscale(0.2) brightness(1.05);} .partners .logos img[data-emph]{height:48px;opacity:1;filter:none;}
+  .partners .wagyr-cta{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--green);color:var(--bg);font:700 14px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;box-shadow:0 0 40px rgba(24,185,72,0.5);} .partners .wagyr-cta .url{font-weight:800;} .partners .wagyr-cta::before{content:"";width:10px;height:10px;background:var(--bg);animation:pulse 1.2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.25;}}
+  @keyframes tape{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  @keyframes chips{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  @keyframes rise{from{opacity:0;transform:translateY(40px);}to{opacity:1;transform:translateY(0);}}
+  .reveal{animation:rise 900ms cubic-bezier(.16,1,.3,1) both;}
+  .reveal.d1{animation-delay:120ms;} .reveal.d2{animation-delay:280ms;} .reveal.d3{animation-delay:440ms;} .reveal.d4{animation-delay:600ms;} .reveal.d5{animation-delay:780ms;}
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="noise"></div>
+  <header class="topbar reveal">
+    <div class="mark"><img src="../../overlays/v2/_assets/logos/WAGYR.png" alt="WAGYR" /><span class="beta">BETA</span><span class="dot"></span></div>
+    <div class="center">CADE PRO LEAGUE · ELITE DIVISION 2025—2026</div>
+    <div class="right"><span class="match-num">WAGYR × CADE</span><span>·</span><span>FIG.00</span></div>
+  </header>
+  <div class="tape reveal d1">
+    <div class="pulse">LIVE TAPE · 24H ON-CHAIN</div>
+    <div class="track">
+      <span class="item">+$10,700 <span class="v">VOLUME</span></span><span class="sep">/</span>
+      <span class="item">1,619+ <span class="v">TRADERS</span></span><span class="sep">/</span>
+      <span class="item">600+ <span class="v">MATCHES SETTLED</span></span><span class="sep">/</span>
+      <span class="item">&lt;60s <span class="v">AVG SETTLEMENT</span></span><span class="sep">/</span>
+      <span class="item">51 <span class="v">LIVE MARKETS</span></span><span class="sep">/</span>
+      <span class="item">195 <span class="v">COUNTRIES</span></span><span class="sep">/</span>
+      <span class="item">40+ <span class="v">ESPORTS TITLES</span></span><span class="sep">/</span>
+      <span class="item">+$10,700 <span class="v">VOLUME</span></span><span class="sep">/</span>
+      <span class="item">1,619+ <span class="v">TRADERS</span></span><span class="sep">/</span>
+      <span class="item">600+ <span class="v">MATCHES SETTLED</span></span><span class="sep">/</span>
+      <span class="item">&lt;60s <span class="v">AVG SETTLEMENT</span></span><span class="sep">/</span>
+      <span class="item">51 <span class="v">LIVE MARKETS</span></span><span class="sep">/</span>
+      <span class="item">195 <span class="v">COUNTRIES</span></span>
+    </div>
+  </div>
+  <div class="hero">
+    <div class="label-stack reveal d2">
+      <div class="figtag">CADE × WAGYR · 5 MARKETS LIVE TONIGHT</div>
+      <div class="kicker">TURN GAME NIGHT INTO INCOME</div>
+    </div>
+    <h1 class="reveal d2">Your CADE.<br/><span class="glow">Your</span> money.</h1>
+  </div>
+  <section class="steps">
+    <div class="step reveal d3">
+      <div>
+        <div class="n">01</div>
+        <div class="lbl">STEP · PLAY</div>
+      </div>
+      <div>
+        <h3>Every<br/>match opens<br/>a market.</h3>
+        <p>13 CADE Elite players. 5 matches tonight. Friends, your city, the world stake on you.</p>
+      </div>
+    </div>
+    <div class="step reveal d4">
+      <div>
+        <div class="n">02</div>
+        <div class="lbl">STEP · PREDICT</div>
+      </div>
+      <div>
+        <h3>Pick<br/>the sharper<br/>read.</h3>
+        <p>Parimutuel pools. No house. Smart money signals. Live tape rolls every trade.</p>
+      </div>
+    </div>
+    <div class="step reveal d5">
+      <div>
+        <div class="n">03</div>
+        <div class="lbl">STEP · EARN</div>
+      </div>
+      <div>
+        <h3>USDC<br/>hits<br/>your wallet.</h3>
+        <p>Settles &lt;60s. Withdraw on Base. Cash out to NGN, GHS, more. No setup. No gas.</p>
+      </div>
+    </div>
+  </section>
+  <div class="stats reveal d5">
+    <div class="stat"><div class="v">5</div><div class="l">Markets Live</div></div>
+    <div class="stat"><div class="v">9</div><div class="l">Elite Players</div></div>
+    <div class="stat"><div class="v">&lt;60s</div><div class="l">Settlement</div></div>
+    <div class="stat"><div class="v">0%</div><div class="l">House Edge</div></div>
+    <div class="stat"><div class="v">USDC</div><div class="l">On Base</div></div>
+  </div>
+  <div class="chipbar reveal d5">
+    <div class="track">
+      <span class="green">FREE TO JOIN</span><span class="sep">/</span><span>USDC ON BASE</span><span class="sep">/</span><span>WITHDRAW ANYTIME</span><span class="sep">/</span><span class="green">LIVE MARKETS RIGHT NOW</span><span class="sep">/</span><span>PARIMUTUEL</span><span class="sep">/</span><span>NO HOUSE</span><span class="sep">/</span><span class="green">COPY-TRADE SMART MONEY</span><span class="sep">/</span><span>BUILT ON BASE</span><span class="sep">/</span><span>PREDICT · EARN · OWN YOUR RECORD</span><span class="sep">/</span>
+      <span class="green">FREE TO JOIN</span><span class="sep">/</span><span>USDC ON BASE</span><span class="sep">/</span><span>WITHDRAW ANYTIME</span><span class="sep">/</span><span class="green">LIVE MARKETS RIGHT NOW</span><span class="sep">/</span><span>PARIMUTUEL</span><span class="sep">/</span><span>NO HOUSE</span><span class="sep">/</span><span class="green">COPY-TRADE SMART MONEY</span><span class="sep">/</span><span>BUILT ON BASE</span><span class="sep">/</span><span>PREDICT · EARN · OWN YOUR RECORD</span><span class="sep">/</span>
+    </div>
+  </div>
+  <footer class="partners reveal d5">
+    <div class="logos">
+      <img data-emph src="../../overlays/v2/_assets/logos/1cade esport.png" alt="CADE Esports" />
+      <img data-emph src="../../overlays/v2/_assets/logos/pro league .png" alt="CADE Pro League" />
+      <img src="../../overlays/v2/_assets/logos/GameEvo Esports White.png" alt="GameEvo Esports" />
+      <img src="../../overlays/v2/_assets/logos/Gamepride Green-01.png" alt="Gamepride" />
+      <img src="../../overlays/v2/_assets/logos/OAS ESPORTS COLORED.png" alt="OAS Esports" />
+      <img src="../../overlays/v2/_assets/logos/ESPORTS AFRICA NEWS WHITE.png" alt="Esports Africa News" />
+      <img src="../../overlays/v2/_assets/logos/eSports Federation of Nigeria-1.png" alt="eSports Federation of Nigeria" />
+      <img src="../../overlays/v2/_assets/logos/Trace_TV_Logo.svg.png" alt="Trace TV" />
+    </div>
+    <div class="wagyr-cta"><span class="url">WAGYR.CO</span><span>· BET LIVE</span></div>
+  </footer>
+</body>
+</html>
