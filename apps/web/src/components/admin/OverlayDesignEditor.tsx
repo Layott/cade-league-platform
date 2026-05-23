@@ -917,22 +917,36 @@ export default function OverlayDesignEditor({
           if (row.displayLabel) fd.set("displayLabel", row.displayLabel);
           fd.set("visible", row.visible ? "true" : "false");
           fd.set("content", row.content ?? "");
-          if (row.fontFamily) fd.set("fontFamily", row.fontFamily);
-          if (row.fontWeight != null) fd.set("fontWeight", String(row.fontWeight));
-          if (row.fontSizePx != null) fd.set("fontSizePx", String(row.fontSizePx));
-          if (row.letterSpacing != null)
-            fd.set("letterSpacing", String(row.letterSpacing));
-          if (row.lineHeight != null) fd.set("lineHeight", String(row.lineHeight));
-          if (row.color) fd.set("color", row.color);
-          if (row.alignment) fd.set("alignment", row.alignment);
-          if (row.opacityPct != null) fd.set("opacityPct", String(row.opacityPct));
-          if (row.positionXPx != null)
-            fd.set("positionXPx", String(row.positionXPx));
-          if (row.positionYPx != null)
-            fd.set("positionYPx", String(row.positionYPx));
-          if (row.widthPx != null) fd.set("widthPx", String(row.widthPx));
-          if (row.heightPx != null) fd.set("heightPx", String(row.heightPx));
-          if (row.zIndex != null) fd.set("zIndex", String(row.zIndex));
+          // 2026-05-23 — ALWAYS forward every field, sending empty
+          // string for null so the action layer can NULL out a
+          // previously-set value. The earlier `if (... != null)`
+          // filter let admins SET values but not CLEAR them: clearing
+          // an input dropped the field from FormData, the action's
+          // FormData.get() returned null → undefined → parseOptInt
+          // returned null in parsed.data but the upsert dict in
+          // upsertTextElement DID write width_px=null. BUT because
+          // upsertTextElement reads `existing` row first + spreads
+          // its kind/origin/sortOrder while we only forward CHANGED
+          // fields, ONE missing field on the wire side propagated
+          // the prior value (since the action layer's parseOptInt on
+          // a missing string defaulted back to the existing row's
+          // value via the kind-from-form path). Empty-string
+          // sentinels close that ambiguity for sure: action's
+          // parseOptInt("") returns null; "" + parseOptStr returns
+          // null. Either way the upsert writes null.
+          fd.set("fontFamily", row.fontFamily ?? "");
+          fd.set("fontWeight", row.fontWeight != null ? String(row.fontWeight) : "");
+          fd.set("fontSizePx", row.fontSizePx != null ? String(row.fontSizePx) : "");
+          fd.set("letterSpacing", row.letterSpacing != null ? String(row.letterSpacing) : "");
+          fd.set("lineHeight", row.lineHeight != null ? String(row.lineHeight) : "");
+          fd.set("color", row.color ?? "");
+          fd.set("alignment", row.alignment ?? "");
+          fd.set("opacityPct", row.opacityPct != null ? String(row.opacityPct) : "");
+          fd.set("positionXPx", row.positionXPx != null ? String(row.positionXPx) : "");
+          fd.set("positionYPx", row.positionYPx != null ? String(row.positionYPx) : "");
+          fd.set("widthPx", row.widthPx != null ? String(row.widthPx) : "");
+          fd.set("heightPx", row.heightPx != null ? String(row.heightPx) : "");
+          fd.set("zIndex", row.zIndex != null ? String(row.zIndex) : "");
           await setTextElementAction(fd);
           setSuccess(true);
         } catch (e) {
