@@ -29,7 +29,11 @@
   .hero .label .kicker{font:600 14px/1 'JetBrains Mono',monospace;letter-spacing:0.4em;color:var(--ink-dim);}
   .hero h1{font-family:'Archivo Black','Inter',system-ui,sans-serif;font-weight:800;font-size:108px;line-height:0.92;letter-spacing:-0.045em;color:var(--ink);text-align:right;}
   .hero h1 .glow{color:var(--green);}
-  .stage{position:absolute;top:420px;left:64px;right:64px;bottom:240px;display:grid;grid-template-columns:1.35fr 1fr;gap:28px;z-index:2;}
+  .stage{position:absolute;top:420px;left:64px;right:64px;bottom:240px;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(6,1fr);gap:18px;z-index:2;}
+  .stage .card:not(.secondary){grid-column:1 / 8;grid-row:1 / 5;}
+  .stage .card.secondary{grid-column:7 / 13;grid-row:4 / 7;}
+  .stage .card.secondary .vs .vs-tag{font-size:64px;}
+  .stage .card.secondary .player .name{font-size:38px;}
   .card{position:relative;border:1px solid var(--rule-strong);background:linear-gradient(180deg, rgba(241,242,243,0.02), rgba(241,242,243,0.005));overflow:hidden;display:flex;flex-direction:column;}
   .card::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg, rgba(24,185,72,0.06), transparent 40%);}
   .card .head{padding:22px 30px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center;font:600 13px/1 'JetBrains Mono',monospace;letter-spacing:0.3em;color:var(--ink-dim);}
