@@ -335,6 +335,13 @@ export const leaderboardAnimatedSchema = z.object({
         gf: z.coerce.number().int().min(0).max(999).optional(),
         ga: z.coerce.number().int().min(0).max(999).optional(),
         sanctions: z.string().trim().max(40).optional(),
+        // 2026-05-22 — per-row auto-derived stat blurb consumed by
+        // overlay 22-power-rankings. Single line summarizing the most
+        // notable stat for that player (e.g. "Unbeaten · 5W-1D-0L.").
+        // Computed deterministically server-side from the row stats
+        // so the overlay refresh always reflects the latest standings
+        // without an AI round-trip.
+        narrative: z.string().trim().max(180).optional(),
       }),
     )
     .max(20),

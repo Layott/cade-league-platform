@@ -796,8 +796,16 @@ body.cade-exiting .canvas { opacity: 0; }
       if (nameEl) nameEl.textContent = (r.displayName || r.name || '').toUpperCase();
       var ptsEl = card.querySelector('.pts-row .num');
       if (ptsEl && r.pts != null) ptsEl.textContent = String(r.pts);
-      // .blurb is admin-managed via overlay_text_elements + Phase 3 AI;
-      // do NOT overwrite — the SSR resolver injects content separately.
+      // 2026-05-22 — blurb auto-derives from per-rank stats so the line
+      // tracks whoever currently occupies the slot. SSR-resolved admin
+      // override (overlay_text_elements.content) seeds the initial text
+      // on load; once leaderboard refresh fires, `r.narrative` from the
+      // server wins. AI Regenerate writes admin content + survives until
+      // the next standings change overwrites it.
+      var blurbEl = card.querySelector('.blurb');
+      if (blurbEl && typeof r.narrative === 'string' && r.narrative.length > 0) {
+        blurbEl.textContent = r.narrative;
+      }
     }
   }
   window.addEventListener('message', function (ev) {

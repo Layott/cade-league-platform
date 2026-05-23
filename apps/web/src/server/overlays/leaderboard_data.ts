@@ -10,6 +10,7 @@ import {
   buildPhotoUrl,
   getVariantKindForOverlay,
 } from "./player-photos/variant-map";
+import { buildPowerRankingNarrative } from "./power_rankings_narrative";
 
 /**
  * Audit Slice 1 (2026-04-24) — server reader for the `/overlay/leaderboard-
@@ -320,6 +321,17 @@ export function toLeaderboardAnimatedPayload(
     const sanctions = sanctionPieces.length > 0
       ? sanctionPieces.join(" · ")
       : undefined;
+    const narrative = buildPowerRankingNarrative({
+      rank: r.rank,
+      p: r.matches_played,
+      w: r.wins,
+      d: r.draws,
+      l: r.losses,
+      gf: r.goals_for,
+      ga: r.goals_against,
+      gd: r.goal_difference,
+      pts: r.points,
+    });
     return {
       rank: r.rank,
       displayName: r.player_name,
@@ -335,6 +347,7 @@ export function toLeaderboardAnimatedPayload(
       gf: r.goals_for,
       ga: r.goals_against,
       sanctions,
+      narrative,
     };
   });
   return leaderboardAnimatedSchema.parse({

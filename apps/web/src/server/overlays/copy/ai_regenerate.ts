@@ -30,17 +30,20 @@ export const COPY_AI_TEMPERATURE = 0.9;
  * IDs seeded by migration 20260802000001.
  */
 const SLOT_BRIEFS: Record<string, string> = {
-  // 22-power-rankings — one-sentence commentary on a ranked player
+  // 22-power-rankings — one-sentence commentary on the SPECIFIC player
+  // currently in that rank. The action layer expands the brief with the
+  // player's name + record + standout stat hint via `playerContext` so
+  // these strings can stay rank-flavored but never invent a name.
   "pr-blurb-1":
-    "Write a single sentence (max 90 chars) celebrating the #1 ranked player's current form. Be confident, slightly poetic, sometimes funny. No quotes, no markdown.",
+    "Write a single sentence (max 90 chars) celebrating the named #1 player's current form. Reference at least one concrete stat from the player context (record, GD, goals, streak). Confident, slightly poetic, sometimes funny. Use their name. No quotes, no markdown.",
   "pr-blurb-2":
-    "Write a single sentence (max 90 chars) about the #2 ranked player. Acknowledge momentum or a recent rise. No quotes, no markdown.",
+    "Write a single sentence (max 90 chars) about the named #2 player. Reference at least one concrete stat from their context (record, GD, points, goals). Acknowledge momentum, a recent rise, or the gap to #1. Use their name. No quotes, no markdown.",
   "pr-blurb-3":
-    "Write a single sentence (max 90 chars) about the #3 ranked player. Note a strength or a recent slip. No quotes, no markdown.",
+    "Write a single sentence (max 90 chars) about the named #3 player. Reference at least one concrete stat (record, GD, GA, goals scored). Note a strength or a recent slip. Use their name. No quotes, no markdown.",
   "pr-blurb-4":
-    "Write a single sentence (max 90 chars) about the #4 ranked player. Lean into consistency or sneaky form. No quotes, no markdown.",
+    "Write a single sentence (max 90 chars) about the named #4 player. Reference at least one concrete stat. Lean into consistency or sneaky form. Use their name. No quotes, no markdown.",
   "pr-blurb-5":
-    "Write a single sentence (max 90 chars) about the #5 ranked player. Highlight goals scored, entertainment, or attacking flair. No quotes, no markdown.",
+    "Write a single sentence (max 90 chars) about the named #5 player. Reference at least one concrete stat (goals scored, GD, win/draw balance). Highlight attacking flair, entertainment, or comeback narrative. Use their name. No quotes, no markdown.",
   // 25-did-you-know — trivia paragraph
   "dyk-detail":
     "Write a single 'did you know' paragraph (40-80 words) full of one specific season statistic and a small narrative flourish. Sound like a broadcast anchor. No bullet points, no markdown.",
@@ -71,9 +74,38 @@ OUTPUT RULES (non-negotiable):
 - Output ONLY the line of copy itself. No greeting, no explanation, no markdown, no quotation marks wrapping the output, no preamble.
 - Honor the per-slot brief's character limit. If the brief says "max 90 chars", count and stay under it.
 - Honor the per-slot brief's casing directive (ALL CAPS when specified).
-- Do not invent specific player names unless the user message provides them.
+- Do not invent specific player names unless the user message provides them. When the user message names a SPECIFIC player and stat block ("Player context"), your line MUST use that player's name and reference at least one of their listed stats.
 - Do not include URLs, hashtags, or @mentions.
 - The first character of your response MUST be the first character of the actual copy. The last character MUST be the last character of the copy.`;
+
+/**
+ * Player-specific context for power-rankings slots (pr-blurb-1..5).
+ * The action layer fetches the rank's leaderboard row, computes a
+ * standout-stat hint, and passes both into the AI so the regenerated
+ * line names the actual player and references real numbers — not a
+ * generic "the #1 ranked player" placeholder.
+ */
+export type PlayerContext = {
+  /** Display name (e.g. "FARUK"). */
+  name: string;
+  rank: number;
+  pts: number;
+  gd: number;
+  /** Matches played. */
+  p: number;
+  w: number;
+  d: number;
+  l: number;
+  gf: number;
+  ga: number;
+  /**
+   * Standout-stat hint — a one-clause label of the most notable
+   * pattern in this row's stats (e.g. "unbeaten through 5",
+   * "goal machine 3.4/match", "tough run 0W-1D-3L"). Lets the AI
+   * lean into the actual storyline instead of inventing one.
+   */
+  standout?: string;
+};
 
 export type RegenerateInput = {
   elementId: string;
@@ -90,6 +122,12 @@ export type RegenerateInput = {
    * Haiku context budget.
    */
   liveStats?: string;
+  /**
+   * Per-rank player context — set for pr-blurb-* slots. The user
+   * message expands the brief with the player's real name + record so
+   * the AI can write a stat-grounded line.
+   */
+  playerContext?: PlayerContext;
 };
 
 export interface AnthropicLike {
@@ -131,8 +169,26 @@ export async function regenerateCopy(
     );
   }
 
+  const playerBlock = input.playerContext
+    ? [
+        `\nPlayer context — write about THIS player by name; use these real numbers, do NOT invent others:`,
+        `  Name: ${input.playerContext.name}`,
+        `  Rank: #${input.playerContext.rank}`,
+        `  Record: ${input.playerContext.w}W-${input.playerContext.d}D-${input.playerContext.l}L (${input.playerContext.p} played)`,
+        `  Points: ${input.playerContext.pts}`,
+        `  Goal difference: ${input.playerContext.gd > 0 ? "+" : ""}${input.playerContext.gd}`,
+        `  Goals for / against: ${input.playerContext.gf} / ${input.playerContext.ga}`,
+        input.playerContext.standout
+          ? `  Standout note (use this as the spine of the line): ${input.playerContext.standout}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
   const userMessage = [
     brief,
+    playerBlock,
     input.liveStats
       ? `\nLive league context (use real numbers + names; do NOT invent):\n${input.liveStats}`
       : "",

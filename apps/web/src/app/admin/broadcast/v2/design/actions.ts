@@ -822,12 +822,81 @@ export async function regenerateOverlayCopyAction(formData: FormData) {
     liveStats = undefined;
   }
 
+  // 2026-05-22 — for `pr-blurb-N` slots, fetch the current leaderboard
+  // and bind the AI brief to the player ACTUALLY at rank N right now.
+  // The action layer is the natural place to resolve "what does rank 3
+  // look like today" because the AI prompt itself has no DB access.
+  let playerContext: Parameters<typeof regenerateCopy>[1]["playerContext"];
+  const prMatch = /^pr-blurb-([1-5])$/.exec(parsed.data.elementId);
+  if (prMatch) {
+    const rankN = Number(prMatch[1]);
+    try {
+      const { data: anySess } = await sb
+        .from("stream_sessions")
+        .select("id, match_day_id")
+        .is("ended_at", null)
+        .is("deleted_at", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const sess = anySess as { id: string; match_day_id: string } | null;
+      if (sess) {
+        const { data: mdRow } = await sb
+          .from("match_days")
+          .select("season_id")
+          .eq("id", sess.match_day_id)
+          .maybeSingle();
+        const md = mdRow as { season_id: string } | null;
+        if (md?.season_id) {
+          const { fetchLeaderboardData } = await import(
+            "@/server/overlays/leaderboard_data"
+          );
+          const { buildPowerRankingNarrative } = await import(
+            "@/server/overlays/power_rankings_narrative"
+          );
+          const lb = await fetchLeaderboardData(sb, md.season_id, 5);
+          const row = lb.rows.find((r) => r.rank === rankN);
+          if (row) {
+            const standout = buildPowerRankingNarrative({
+              rank: row.rank,
+              p: row.matches_played,
+              w: row.wins,
+              d: row.draws,
+              l: row.losses,
+              gf: row.goals_for,
+              ga: row.goals_against,
+              gd: row.goal_difference,
+              pts: row.points,
+            });
+            playerContext = {
+              name: row.player_name,
+              rank: row.rank,
+              pts: row.points,
+              gd: row.goal_difference,
+              p: row.matches_played,
+              w: row.wins,
+              d: row.draws,
+              l: row.losses,
+              gf: row.goals_for,
+              ga: row.goals_against,
+              standout,
+            };
+          }
+        }
+      }
+    } catch {
+      // best-effort — fall through to generic regen without player context
+      playerContext = undefined;
+    }
+  }
+
   const client = getAnthropicClient() as unknown as AnthropicLikeT;
   const fresh = await regenerateCopy(client, {
     elementId: parsed.data.elementId,
     currentContent: existing.content,
     overlayKey: parsed.data.overlayKey,
     liveStats,
+    playerContext,
   });
 
   await upsertTextElement(sb, actor, {
