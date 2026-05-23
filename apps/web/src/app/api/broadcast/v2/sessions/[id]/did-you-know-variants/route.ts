@@ -60,7 +60,7 @@ export async function GET(
       .from("seasons")
       .select("id")
       .is("deleted_at", null)
-      .order("starts_at", { ascending: false })
+      .order("start_date", { ascending: false })
       .limit(1)
       .maybeSingle();
     seasonId = (latest as { id: string } | null)?.id ?? null;

@@ -113,12 +113,13 @@ export async function GET(
   // Fallback 3 — no season resolved from session: use the latest active
   // season globally. Lets a stale / detached session still render the
   // current standings instead of black overlay.
+  // seasons table uses start_date (date) — see migration 20260422000001.
   if (!seasonId) {
     const { data: latestSeason } = await sb
       .from("seasons")
       .select("id")
       .is("deleted_at", null)
-      .order("starts_at", { ascending: false })
+      .order("start_date", { ascending: false })
       .limit(1)
       .maybeSingle();
     seasonId = (latestSeason as { id: string } | null)?.id ?? null;
