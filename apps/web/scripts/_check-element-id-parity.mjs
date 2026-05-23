@@ -68,6 +68,38 @@ const SEED_AUGMENTS = [
   ),
 ];
 
+/**
+ * Inline allowlist — element_ids that are seeded by a foreach-loop
+ * migration (or runtime upsert) which the literal-VALUES regex above
+ * can't parse. Mirrors the `(overlay_key, element_id)` tuples those
+ * migrations insert.
+ *
+ * Add new tuples here when a migration uses a loop / dynamic insert
+ * instead of literal VALUES.
+ */
+const INLINE_SEED_ALLOWLIST = [
+  // Migration 20260903000002 — CADE + ESOCCER header logos on 12
+  // overlays. Uses `foreach v_overlay in array v_overlays loop ...`
+  // so the column 1 is a PG variable, not a literal.
+  ...[
+    "01-brb",
+    "04-h2h-2",
+    "05-h2h-3",
+    "06-h2h-5",
+    "11-match-scores-day",
+    "12-starting-soon",
+    "13-stream-ended",
+    "14-top-scorers",
+    "15-orgs",
+    "16-coaches",
+    "17-penalties",
+    "19-player-squads",
+  ].flatMap((overlay) => [
+    [overlay, "logo-cade"],
+    [overlay, "logo-pro"],
+  ]),
+];
+
 /** Extract every (overlay_key, element_id) tuple from the seed migration. */
 async function loadSeedCatalog() {
   if (!existsSync(SEED_PATH)) {
@@ -89,6 +121,10 @@ async function loadSeedCatalog() {
       if (!out.has(overlay)) out.set(overlay, new Set());
       out.get(overlay).add(elementId);
     }
+  }
+  for (const [overlay, elementId] of INLINE_SEED_ALLOWLIST) {
+    if (!out.has(overlay)) out.set(overlay, new Set());
+    out.get(overlay).add(elementId);
   }
   return out;
 }
