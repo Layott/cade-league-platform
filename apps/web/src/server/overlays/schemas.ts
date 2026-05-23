@@ -455,6 +455,28 @@ export const topScorersSchema = z.object({
     .default([]),
   soundSlot: soundSlotSchema,
   slot: matchSlotSchema,
+  // 2026-05-23 — 25-did-you-know rides this schema (template_key=
+  // top_scorers per template-mapping). Its variant picker sends a
+  // `didYouKnow` payload that the overlay's update() handler renders.
+  // Optional so existing top_scorers triggers (overlay 14) stay valid.
+  didYouKnow: z
+    .object({
+      kind: z.string().max(40).optional(),
+      headline: z.string().max(200).optional(),
+      detail: z.string().max(800).optional(),
+      player: z
+        .object({
+          playerId: z.string().optional(),
+          displayName: z.string().max(80).optional(),
+          slug: z.string().max(80).optional(),
+          photoUrl: z.string().max(500).nullable().optional(),
+          orgName: z.string().max(80).nullable().optional(),
+          orgLogoUrl: z.string().max(500).nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .optional(),
 });
 export type TopScorersPayload = z.infer<typeof topScorersSchema>;
 
