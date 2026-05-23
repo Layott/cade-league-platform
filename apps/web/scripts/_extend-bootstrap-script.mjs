@@ -165,6 +165,15 @@ const BOOTSTRAP = `<script id="cade-token-bootstrap">
   function buildTextRules(tokens) {
     if (!tokens || typeof tokens !== 'object') return '';
     var rules = [];
+    // 2026-05-23 — admin edits ALWAYS win over author CSS. The naked
+    // [data-element-id] attr selector has specificity (0,1,0) which
+    // loses to common author selectors like .top-band .logo--cade
+    // (0,2,0 — two classes). Without !important, admin-tuned
+    // position/size/animation on the CADE + ESOCCER logos got
+    // silently overridden by author rules e.g. .top-band .logo--cade
+    // { height: 110px }. The IMP suffix forces every emitted
+    // declaration to win regardless of author specificity.
+    var IMP = ' !important';
     for (var elId in tokens) {
       if (!Object.prototype.hasOwnProperty.call(tokens, elId)) continue;
       if (!/^[a-z][a-z0-9-]*$/.test(elId)) continue;
@@ -172,21 +181,21 @@ const BOOTSTRAP = `<script id="cade-token-bootstrap">
       if (!t || typeof t !== 'object') continue;
       var s = t.styles || {};
       var declarations = [];
-      if (s.color)         declarations.push('color:' + sanitizeCss(s.color));
-      if (s.fontFamily)    declarations.push("font-family:'" + sanitizeCss(s.fontFamily) + "'");
-      if (s.fontWeight)    declarations.push('font-weight:' + (+s.fontWeight || 400));
-      if (s.fontSize)      declarations.push('font-size:' + sanitizeCss(s.fontSize));
-      if (s.letterSpacing) declarations.push('letter-spacing:' + sanitizeCss(s.letterSpacing));
-      if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1));
-      if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign));
-      if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0));
-      if (s.left)          declarations.push('left:' + sanitizeCss(s.left));
-      if (s.top)           declarations.push('top:' + sanitizeCss(s.top));
-      if (s.width)         declarations.push('width:' + sanitizeCss(s.width));
-      if (s.height)        declarations.push('height:' + sanitizeCss(s.height));
-      if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0));
-      if (s.left || s.top) declarations.push('position:absolute');
-      if (t.visible === false) declarations.push('display:none');
+      if (s.color)         declarations.push('color:' + sanitizeCss(s.color) + IMP);
+      if (s.fontFamily)    declarations.push("font-family:'" + sanitizeCss(s.fontFamily) + "'" + IMP);
+      if (s.fontWeight)    declarations.push('font-weight:' + (+s.fontWeight || 400) + IMP);
+      if (s.fontSize)      declarations.push('font-size:' + sanitizeCss(s.fontSize) + IMP);
+      if (s.letterSpacing) declarations.push('letter-spacing:' + sanitizeCss(s.letterSpacing) + IMP);
+      if (s.lineHeight != null) declarations.push('line-height:' + (+s.lineHeight || 1) + IMP);
+      if (s.textAlign)     declarations.push('text-align:' + sanitizeCss(s.textAlign) + IMP);
+      if (s.opacity != null) declarations.push('opacity:' + (+s.opacity || 0) + IMP);
+      if (s.left)          declarations.push('left:' + sanitizeCss(s.left) + IMP);
+      if (s.top)           declarations.push('top:' + sanitizeCss(s.top) + IMP);
+      if (s.width)         declarations.push('width:' + sanitizeCss(s.width) + IMP);
+      if (s.height)        declarations.push('height:' + sanitizeCss(s.height) + IMP);
+      if (s.zIndex != null) declarations.push('z-index:' + (+s.zIndex || 0) + IMP);
+      if (s.left || s.top) declarations.push('position:absolute' + IMP);
+      if (t.visible === false) declarations.push('display:none' + IMP);
       if (declarations.length) {
         rules.push('[data-element-id="' + elId + '"]{' + declarations.join(';') + ';}');
       }
