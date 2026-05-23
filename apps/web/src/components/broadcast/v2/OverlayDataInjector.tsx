@@ -109,7 +109,8 @@ const REALTIME_KEY_EVENTS: Readonly<Record<string, ReadonlyArray<KeyEvent>>> = {
   "21-streaks": ["standings.changed", "match.ended"],
   "23-org-standings": ["standings.changed", "match.ended"],
   "24-biggest-margins": ["standings.changed", "match.ended", "score.changed"],
-  "25-did-you-know": ["standings.changed", "match.ended"],
+  // 25-did-you-know — producer-driven via variant picker. NO realtime
+  // re-fetch (would clobber the picked variant within seconds of trigger).
   "29-goalfests": ["standings.changed", "match.ended", "score.changed"],
   // 26-card-meta — most-picked FUT cards from squad_submissions.
   // squad.updated proxies through standingsChannel per server/squads/
@@ -173,7 +174,9 @@ const INITIAL_FETCH_PATH: Readonly<Record<string, (sessionId: string, overlayKey
   "21-streaks": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
   "23-org-standings": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
   "24-biggest-margins": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
-  "25-did-you-know": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
+  // 25-did-you-know — no INITIAL_FETCH. Producer picks variant from the
+  // control panel; trigger sends payload directly. Auto-fetch would
+  // overwrite the picked variant on every standings.changed event.
   "29-goalfests": (s) => `/api/broadcast/sessions/${s}/cover-up-stats`,
   // 26-card-meta — distinct endpoint joining squad_player_items to
   // fc26_players for card art + pick percentages.

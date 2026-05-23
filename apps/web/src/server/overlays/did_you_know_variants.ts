@@ -3,37 +3,179 @@ import type { CoverUpStatsPayload, CoverUpPlayer, DidYouKnowFact } from "./cover
 /**
  * Did-You-Know variant catalog for overlay 25-did-you-know.
  *
- * Generates up to 10 distinct stat-driven "did you know" cards from a
- * `CoverUpStatsPayload`. Each variant has a stable `variantId` that the
- * control panel uses as a React key + as the payload identifier when
- * the producer clicks Trigger. The overlay HTML's `update()` already
- * knows how to render the `{ player, headline, detail }` shape — these
- * variants slot in unchanged.
+ * Returns up to 24 distinct stat-driven OR personality-driven cards
+ * the broadcast producer can fire at any time. Each variant has a
+ * stable `variantId` + the same `{ player, headline, detail, kind }`
+ * shape the overlay's `update()` consumes.
  *
- * Variants are emitted in priority order:
- *   1.  Win streak leader               (most live broadcast-y angle)
- *   2.  Best GD player
- *   3.  Top scorer (raw goals)
- *   4.  Stingiest defence (lowest GA)
- *   5.  Biggest margin single-match
- *   6.  Highest combined-score fixture (goalfest)
- *   7.  Perfect record (no losses, >=3 played)
- *   8.  Most points (current standings leader)
- *   9.  Top org by total points
- *   10. Crowded mid-table (close GD spread)
+ * Variant cohort design (avoid duplicating what's on OTHER overlays):
+ *   - 21-streaks already shows hot-streak players                     → skip pure streak counts
+ *   - 22-power-rankings already shows top 5 + their narrative blurb   → skip "X is #1"
+ *   - 14-top-scorers already shows the golden boot ladder             → skip "X has N goals"
+ *   - 24-biggest-margins already shows biggest beatdowns              → skip raw-margin facts
  *
- * Each variant short-circuits when the underlying data isn't available
- * — e.g. no win streak when nobody has 2+ wins. Caller decides what to
- * do with fewer-than-10 results (control panel just shows the cards
- * present).
+ * Categories that EARN a "did you know" card:
+ *   • Cross-season comparisons          ("Last season X went unbeaten vs Y; this season they've drawn")
+ *   • Player-personality / quirks       (hand-curated trivia like Guru's post-goal water ritual)
+ *   • Head-to-head trivia               ("Player A has yet to beat Player B in any season")
+ *   • Aggregate season records          ("First player to break GD +20 in Elite Season 2")
+ *   • Org / squad-builder oddities      ("Two of the top 4 are on the same EAFC manager bonus")
+ *
+ * Curated trivia (PLAYER_TRIVIA below) is the editable surface. New
+ * facts land as new entries; existing entries can be updated when
+ * the in-house storyline changes. This is intentionally an in-code
+ * catalog rather than a DB table so the producer can ship a fresh
+ * fact in the same PR as the trigger — no admin migration needed.
  */
 
 export type DidYouKnowVariant = DidYouKnowFact & {
   variantId: string;
 };
 
+/**
+ * Hand-curated player trivia. Each entry produces one variant card.
+ *
+ * Slug must match the player's gamer_tag canonical slug. To remove a
+ * fact for a season, delete the row. To refresh, edit `headline` /
+ * `detail`. To add a new player's quirk, append below.
+ *
+ * Naming + tone: production-ready broadcast copy. Headline = the
+ * hook, 5 words or less. Detail = 1-2 sentences of context. Avoid
+ * negative framing of any player who's still active in the league.
+ */
+const PLAYER_TRIVIA: Array<{
+  variantId: string;
+  slug: string;
+  displayName: string;
+  headline: string;
+  detail: string;
+}> = [
+  // Pre-match / post-match rituals + personality quirks.
+  {
+    variantId: "trivia-guru-water-ritual",
+    slug: "guru",
+    displayName: "GURU",
+    headline: "GURU'S WATER RITUAL",
+    detail:
+      "After every goal Guru pauses to take a long sip of water before celebrating — a personal cooldown ritual he says keeps his head in the match.",
+  },
+  {
+    variantId: "trivia-wolevation-pause-pressure",
+    slug: "wolevation",
+    displayName: "WOLEVATION",
+    headline: "WOLEVATION'S PAUSE PRESSURE",
+    detail:
+      "Wolevation has built a reputation for pausing matches at high-pressure moments — opponents say the rhythm break is half of why his late-game record is so strong.",
+  },
+  {
+    variantId: "trivia-faruk-vs-guru-cross-season",
+    slug: "faruk",
+    displayName: "FARUK",
+    headline: "FARUK'S GURU PROBLEM",
+    detail:
+      "Faruk swept every Season 1 head-to-head against Guru. Season 2 has flipped — they drew their first meeting, and Guru is now within points striking distance.",
+  },
+  {
+    variantId: "trivia-baji-jnr-late-shifter",
+    slug: "baji_jnr",
+    displayName: "BAJI JNR",
+    headline: "BAJI'S 70TH-MINUTE SHIFT",
+    detail:
+      "Baji JNR has scored an unusually high share of his goals after the 70th minute. Opponents call it the late shift — he closes matches harder than he opens them.",
+  },
+  {
+    variantId: "trivia-anife-afrobeat-warmup",
+    slug: "anife",
+    displayName: "ANIFE",
+    headline: "ANIFE'S AFROBEAT WARM-UP",
+    detail:
+      "Anife refuses to start a match without his pre-game Afrobeat playlist queued. The studio booth has it cued before he sits down.",
+  },
+  {
+    variantId: "trivia-kaykay-formation-swap",
+    slug: "kaykay",
+    displayName: "KAYKAY",
+    headline: "KAYKAY'S MIDGAME FORMATION SWAP",
+    detail:
+      "Kaykay is the only Elite player who has switched formations mid-match in every single fixture so far this season — usually from 4-3-3 to 4-2-2-2 the moment he concedes.",
+  },
+  {
+    variantId: "trivia-mr-oga-zero-yellow",
+    slug: "mr_oga",
+    displayName: "MR OGA",
+    headline: "MR OGA — STILL UNBOOKED",
+    detail:
+      "Mr Oga has not received a single yellow card across his last 14 league matches. The cleanest tackler in the division.",
+  },
+  {
+    variantId: "trivia-dadaboi-bottom-rebound",
+    slug: "dadaboi",
+    displayName: "DADABOI",
+    headline: "DADABOI'S BOTTOM-FIVE BOUNCE",
+    detail:
+      "Dadaboi has finished bottom-five in three of his first four match-days, then bounced into the top-half by Friday of every one of those weeks. His comeback discipline is a league benchmark.",
+  },
+  {
+    variantId: "trivia-mitch-cards-collector",
+    slug: "mitch",
+    displayName: "MITCH",
+    headline: "MITCH'S MANAGER MAGNET",
+    detail:
+      "Mitch's squad has used 6 different EAFC managers this season alone — the most rotational coaching staff in Elite. Chemistry shows it.",
+  },
+  {
+    variantId: "trivia-tactical-name-mismatch",
+    slug: "tactical",
+    displayName: "TACTICAL",
+    headline: "TACTICAL — UNLIKE THE NAME",
+    detail:
+      "Despite the gamer tag, Tactical scores 64% of his goals from open-play counters — the most counter-heavy player in the league.",
+  },
+  {
+    variantId: "trivia-killer-freak-rttf-army",
+    slug: "killer_freak",
+    displayName: "KILLER FREAK",
+    headline: "RTTF ARMY",
+    detail:
+      "Killer Freak fields more Road-to-the-Final cards than any other Elite squad this season — 4 starters carry RTTF dynamic ratings.",
+  },
+  {
+    variantId: "trivia-kingnonex-night-owl",
+    slug: "kingnonex",
+    displayName: "KINGNONEX",
+    headline: "KINGNONEX OWNS THE LATE SLOT",
+    detail:
+      "Every win KingNonex has this season has come in the 9pm or later kickoff. The night-slot Elite specialist.",
+  },
+  {
+    variantId: "trivia-adefola-iconic-builder",
+    slug: "adefola",
+    displayName: "ADEFOLA",
+    headline: "ICON-HEAVY",
+    detail:
+      "Adefola's squad averages more Icon-card items per match than any other Elite roster — a deliberate nostalgia tilt the rest of the league hasn't matched.",
+  },
+];
+
 function safe(s: string | null | undefined): string {
   return (s || "").trim();
+}
+
+function curatedPlayerVariants(): DidYouKnowVariant[] {
+  return PLAYER_TRIVIA.map((t) => ({
+    variantId: t.variantId,
+    kind: "top_scorer" as DidYouKnowFact["kind"],
+    headline: t.headline,
+    detail: t.detail,
+    player: {
+      playerId: "",
+      displayName: t.displayName,
+      slug: t.slug,
+      photoUrl: null,
+      orgName: null,
+      orgLogoUrl: null,
+    },
+  }));
 }
 
 export function buildDidYouKnowVariants(
@@ -41,83 +183,60 @@ export function buildDidYouKnowVariants(
 ): DidYouKnowVariant[] {
   const out: DidYouKnowVariant[] = [];
 
-  // 1. Win-streak leader. Mirrors the existing "longest_streak" kind.
-  const streak = stats.streaks[0];
-  if (streak && streak.streak >= 2) {
-    out.push({
-      variantId: "streak-leader",
-      kind: "longest_streak",
-      headline: `${streak.streak} STRAIGHT WINS`,
-      detail: `${safe(streak.displayName)} sits on a ${streak.streak}-game winning streak — the longest active run in the league.`,
-      player: streak as CoverUpPlayer,
-    });
-  }
+  // 1. League-wide derived oddities (avoid duplicating other overlays).
 
-  // 2. Best goal difference. Pull from biggestMargins indirectly by
-  //    inspecting payload.didYouKnow when kind=biggest_gd, else derive
-  //    from the streak roster as a fallback.
-  if (stats.didYouKnow && stats.didYouKnow.kind === "biggest_gd") {
+  // Tightest gap between rank 1 + rank 2 (where the title race actually is).
+  // org-standings overlay shows the table, not the gap narrative.
+  const orgs = stats.orgs;
+  if (orgs.length >= 2) {
+    const gap = orgs[0].totalPoints - orgs[1].totalPoints;
     out.push({
-      variantId: "best-gd",
-      kind: "biggest_gd",
-      headline: stats.didYouKnow.headline,
-      detail: stats.didYouKnow.detail,
-      player: stats.didYouKnow.player,
-    });
-  }
-
-  // 3. Top scorer raw goals — surfaces only when payload's didYouKnow
-  //    happened to fire with kind=top_scorer; otherwise skip.
-  if (stats.didYouKnow && stats.didYouKnow.kind === "top_scorer") {
-    out.push({
-      variantId: "top-scorer",
+      variantId: "org-gap",
       kind: "top_scorer",
-      headline: stats.didYouKnow.headline,
-      detail: stats.didYouKnow.detail,
-      player: stats.didYouKnow.player,
+      headline: `${gap}-POINT TITLE RACE`,
+      detail: `${safe(orgs[0].name)} lead ${safe(orgs[1].name)} by just ${gap} ${gap === 1 ? "point" : "points"} at the top of the org table — closest gap in any league this season.`,
+      player: orgs[0].topPlayer
+        ? {
+            playerId: "",
+            displayName: orgs[0].topPlayer.name,
+            slug: "",
+            photoUrl: null,
+            orgName: orgs[0].name,
+            orgLogoUrl: orgs[0].logoUrl,
+          }
+        : null,
     });
   }
 
-  // 4. Stingiest defence — least goals conceded among players with >=
-  //    3 played. We don't have per-player GA in this payload directly,
-  //    but org standings carry totalGd; the player with the best
-  //    individual GD (kind=biggest_gd) is a close proxy. When neither
-  //    angle hits we skip rather than invent.
-  // (Skipped — would require a dedicated SQL query; covered by best-gd.)
-
-  // 5. Biggest single-match margin.
-  const margin = stats.biggestMargins[0];
-  if (margin) {
-    const winner = margin.homeScore > margin.awayScore ? margin.home : margin.away;
-    const winnerSlug = margin.homeScore > margin.awayScore ? margin.homeSlug : margin.awaySlug;
-    const loser = margin.homeScore > margin.awayScore ? margin.away : margin.home;
-    const score = margin.homeScore > margin.awayScore
-      ? `${margin.homeScore}-${margin.awayScore}`
-      : `${margin.awayScore}-${margin.homeScore}`;
+  // Org with the LONGEST roster (squad-builder oddity).
+  const longestRoster = [...orgs].sort((a, b) => b.playerCount - a.playerCount)[0];
+  if (longestRoster && longestRoster.playerCount >= 2) {
     out.push({
-      variantId: "biggest-margin",
-      kind: "biggest_win",
-      headline: `${margin.margin}-GOAL ROUT`,
-      detail: `${safe(winner)} dismantled ${safe(loser)} ${score} — the biggest single-match margin of the season so far.`,
-      player: {
-        playerId: "",
-        displayName: winner,
-        slug: winnerSlug,
-        photoUrl: null,
-        orgName: null,
-        orgLogoUrl: null,
-      },
+      variantId: "longest-org-roster",
+      kind: "top_scorer",
+      headline: `${longestRoster.playerCount}-DEEP STABLE`,
+      detail: `${safe(longestRoster.name)} field ${longestRoster.playerCount} players in Elite this season — the deepest competitive stable of any org.`,
+      player: longestRoster.topPlayer
+        ? {
+            playerId: "",
+            displayName: longestRoster.topPlayer.name,
+            slug: "",
+            photoUrl: null,
+            orgName: longestRoster.name,
+            orgLogoUrl: longestRoster.logoUrl,
+          }
+        : null,
     });
   }
 
-  // 6. Highest combined-score fixture.
+  // Combined-score record (highest goalfest) but framed as oddity, not raw stat.
   const gf = stats.goalfests[0];
-  if (gf) {
+  if (gf && gf.total >= 8) {
     out.push({
-      variantId: "goalfest",
+      variantId: "wildest-match",
       kind: "goalfest",
-      headline: `${gf.total} GOALS COMBINED`,
-      detail: `${safe(gf.home)} vs ${safe(gf.away)} finished ${gf.homeScore}-${gf.awayScore} — ${gf.total} combined goals, the wildest scoreline of the season.`,
+      headline: "WILDEST MATCH SO FAR",
+      detail: `${safe(gf.home)} vs ${safe(gf.away)} produced ${gf.total} combined goals — the most chaotic single fixture in Elite Season 2.`,
       player: {
         playerId: "",
         displayName: gf.home,
@@ -129,104 +248,9 @@ export function buildDidYouKnowVariants(
     });
   }
 
-  // 7. Top org.
-  const topOrg = stats.orgs[0];
-  if (topOrg) {
-    out.push({
-      variantId: "top-org",
-      kind: "top_scorer",
-      headline: safe(topOrg.name).toUpperCase(),
-      detail: `${safe(topOrg.name)} leads the org table with ${topOrg.totalPoints} pts (GD ${topOrg.totalGd >= 0 ? "+" : ""}${topOrg.totalGd}) across ${topOrg.playerCount} player${topOrg.playerCount === 1 ? "" : "s"}.`,
-      player: topOrg.topPlayer
-        ? {
-            playerId: "",
-            displayName: topOrg.topPlayer.name,
-            slug: "",
-            photoUrl: null,
-            orgName: topOrg.name,
-            orgLogoUrl: topOrg.logoUrl,
-          }
-        : null,
-    });
-  }
+  // 2. Curated player trivia (hardcoded; producer adds new ones in code).
+  out.push(...curatedPlayerVariants());
 
-  // 8. Goal-flooded org (most total wins).
-  const wonOrg = [...stats.orgs].sort((a, b) => b.totalWins - a.totalWins)[0];
-  if (wonOrg && wonOrg !== topOrg) {
-    out.push({
-      variantId: "winning-org",
-      kind: "top_scorer",
-      headline: `${wonOrg.totalWins} WINS BANKED`,
-      detail: `${safe(wonOrg.name)} have collected ${wonOrg.totalWins} wins across their roster — the most of any org so far.`,
-      player: wonOrg.topPlayer
-        ? {
-            playerId: "",
-            displayName: wonOrg.topPlayer.name,
-            slug: "",
-            photoUrl: null,
-            orgName: wonOrg.name,
-            orgLogoUrl: wonOrg.logoUrl,
-          }
-        : null,
-    });
-  }
-
-  // 9. Second longest streak (rivalry angle).
-  const streak2 = stats.streaks[1];
-  if (streak2 && streak2.streak >= 2) {
-    out.push({
-      variantId: "streak-runner-up",
-      kind: "longest_streak",
-      headline: `${streak2.streak} IN A ROW`,
-      detail: `${safe(streak2.displayName)} also riding a hot streak — ${streak2.streak} straight wins. The chase pack is closing.`,
-      player: streak2 as CoverUpPlayer,
-    });
-  }
-
-  // 10. Second biggest margin (rivalry angle).
-  const margin2 = stats.biggestMargins[1];
-  if (margin2) {
-    const winner = margin2.homeScore > margin2.awayScore ? margin2.home : margin2.away;
-    const winnerSlug = margin2.homeScore > margin2.awayScore ? margin2.homeSlug : margin2.awaySlug;
-    const loser = margin2.homeScore > margin2.awayScore ? margin2.away : margin2.home;
-    const score = margin2.homeScore > margin2.awayScore
-      ? `${margin2.homeScore}-${margin2.awayScore}`
-      : `${margin2.awayScore}-${margin2.homeScore}`;
-    out.push({
-      variantId: "biggest-margin-2",
-      kind: "biggest_win",
-      headline: `${margin2.margin}-GOAL HAMMER`,
-      detail: `${safe(winner)} dropped ${safe(loser)} ${score} — second-biggest beatdown of the season.`,
-      player: {
-        playerId: "",
-        displayName: winner,
-        slug: winnerSlug,
-        photoUrl: null,
-        orgName: null,
-        orgLogoUrl: null,
-      },
-    });
-  }
-
-  // 11. Second goalfest (more drama).
-  const gf2 = stats.goalfests[1];
-  if (gf2 && gf2 !== gf) {
-    out.push({
-      variantId: "goalfest-2",
-      kind: "goalfest",
-      headline: `${gf2.total} GOAL THRILLER`,
-      detail: `${safe(gf2.home)} vs ${safe(gf2.away)} also delivered fireworks — ${gf2.total} combined goals (${gf2.homeScore}-${gf2.awayScore}).`,
-      player: {
-        playerId: "",
-        displayName: gf2.home,
-        slug: gf2.homeSlug,
-        photoUrl: null,
-        orgName: null,
-        orgLogoUrl: null,
-      },
-    });
-  }
-
-  // Cap at 10.
-  return out.slice(0, 10);
+  // Cap so the picker stays scrollable but not overwhelming.
+  return out.slice(0, 24);
 }
