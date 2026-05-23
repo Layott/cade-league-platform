@@ -1,4 +1,9 @@
 import type { CoverUpStatsPayload, CoverUpPlayer, DidYouKnowFact } from "./cover_up_stats";
+import {
+  LAST_SEASON_STANDINGS,
+  fmtSigned,
+  type CurrentPlayerStat as SharedCurrentPlayerStat,
+} from "./season_history";
 
 /**
  * Did-You-Know variant catalog for overlay 25-did-you-know.
@@ -79,56 +84,7 @@ const PLAYER_TRIVIA: Array<{
   },
 ];
 
-/**
- * Verified last-season (previous Elite league) final standings.
- *
- * Producer-supplied 2026-05-23 from final-fixture screenshot. ONLY
- * players who returned to the current Elite roster are listed here
- * — last season had 16 competitors; 7 carry over (Faruk, Killer Freak,
- * Baji Jr, Adefola, Mitch, Mr Oga, Anife). Six new arrivals this
- * season (Dadaboi, Guru, Kaykay, KingNonex, Tactical, Wolevation)
- * have no prior data → no cross-season card.
- *
- * Used to derive cross-season comparison variants. Update only when
- * the producer provides verified figures.
- */
-const LAST_SEASON_STANDINGS: Array<{
-  slug: string;
-  displayName: string;
-  rank: number;
-  played: number;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDiff: number;
-  points: number;
-}> = [
-  { slug: "faruk", displayName: "FARUK", rank: 1, played: 15, wins: 14, draws: 1, losses: 0, goalsFor: 103, goalsAgainst: 35, goalDiff: 68, points: 43 },
-  { slug: "killer_freak", displayName: "KILLER FREAK", rank: 2, played: 15, wins: 13, draws: 1, losses: 1, goalsFor: 87, goalsAgainst: 31, goalDiff: 56, points: 40 },
-  { slug: "baji_jnr", displayName: "BAJI JNR", rank: 4, played: 15, wins: 10, draws: 2, losses: 3, goalsFor: 76, goalsAgainst: 54, goalDiff: 22, points: 32 },
-  { slug: "adefola", displayName: "ADEFOLA", rank: 7, played: 15, wins: 8, draws: 0, losses: 7, goalsFor: 68, goalsAgainst: 46, goalDiff: 22, points: 24 },
-  { slug: "mitch", displayName: "MITCH", rank: 8, played: 15, wins: 7, draws: 3, losses: 5, goalsFor: 79, goalsAgainst: 63, goalDiff: 16, points: 24 },
-  { slug: "mr_oga", displayName: "MR OGA", rank: 10, played: 15, wins: 4, draws: 4, losses: 7, goalsFor: 58, goalsAgainst: 65, goalDiff: -7, points: 16 },
-  { slug: "anife", displayName: "ANIFE", rank: 13, played: 15, wins: 4, draws: 2, losses: 9, goalsFor: 54, goalsAgainst: 88, goalDiff: -34, points: 14 },
-];
-
-export type CurrentPlayerStat = {
-  slug: string;
-  wins: number;
-  draws: number;
-  losses: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDiff: number;
-  points: number;
-  played: number;
-};
-
-function fmtSigned(n: number): string {
-  return n >= 0 ? `+${n}` : `${n}`;
-}
+export type CurrentPlayerStat = SharedCurrentPlayerStat;
 
 function diff(curr: number, prev: number): string {
   const d = curr - prev;
