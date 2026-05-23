@@ -245,6 +245,21 @@ export default async function OverlayDesignPage({
         description="Tune colors, fonts, scale, and partner-strip toggles per overlay. Edits land as CSS variables on the SSR overlay route — OBS browser sources reflect the change without a redeploy."
       />
 
+      <div className="flex flex-wrap items-center gap-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-1)] px-4 py-3 text-sm">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--chalk-3)]">
+          Need a brand-new overlay?
+        </span>
+        <Link
+          href="/admin/broadcast/v2/builder"
+          className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--chalk-1)] hover:border-[var(--signal)] hover:text-[var(--signal)]"
+        >
+          Open Overlay Builder →
+        </Link>
+        <span className="text-xs text-[var(--chalk-3)]">
+          Compose new overlays from scratch (PSD → scene tree → keyframes → publish).
+        </span>
+      </div>
+
       <form
         method="get"
         className="flex flex-wrap items-end gap-3 rounded-sm border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"

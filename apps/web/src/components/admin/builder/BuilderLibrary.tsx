@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDesignAction, softDeleteDesignAction } from "@/app/admin/broadcast/v2/builder/actions";
 import type { DesignSummary } from "@/server/overlays/builder/designs";
@@ -80,13 +81,21 @@ export function BuilderLibrary({ designs }: { designs: BuilderLibraryCard[] }) {
     <div data-testid="builder-library" className="mx-auto max-w-7xl px-6 py-10">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Overlay Designs</h1>
-        <PrimaryButton
-          type="button"
-          data-testid="builder-new-design"
-          onClick={() => setOpen(true)}
-        >
-          New Design
-        </PrimaryButton>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/broadcast/v2/design"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-white/80 hover:border-white/40 hover:text-white"
+          >
+            ← Branded overlays (Design)
+          </Link>
+          <PrimaryButton
+            type="button"
+            data-testid="builder-new-design"
+            onClick={() => setOpen(true)}
+          >
+            New Design
+          </PrimaryButton>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
