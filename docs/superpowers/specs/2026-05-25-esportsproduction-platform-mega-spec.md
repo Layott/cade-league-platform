@@ -119,6 +119,7 @@ Goal: combine ESOCCER's production polish + BRGAMES's game-domain knowledge into
 | Testing — E2E | Playwright against dev server | free | ESOCCER parity, 30+ specs precedent |
 | Testing — visual regression | Playwright snapshots on all overlays | free | ESOCCER parity |
 | Storybook | Storybook 8 for shadcn components + overlay component library | free | design-system documentation |
+| Package manager | **pnpm** (npm is BANNED — virus on user machine confirmed 2026-05-25) | free | drop-in npm-script compat, content-addressable store, Vercel + GitHub Actions native |
 | Styling | Tailwind CSS v4 (BRGAMES parity) | free | + per-tenant CSS vars for theming |
 | UI primitives | shadcn/ui (with Base UI underneath, BRGAMES proved out base-nova preset) | free | composable, accessible |
 | Animation | Framer Motion | free | overlay animations, page transitions, micro-interactions |
