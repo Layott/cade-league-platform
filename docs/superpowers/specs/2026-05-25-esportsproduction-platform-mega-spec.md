@@ -34,7 +34,7 @@ Goal: combine ESOCCER's production polish + BRGAMES's game-domain knowledge into
 |---|---|---|
 | 1 | Tenancy | Multi-tenant simultaneous |
 | 2 | Routing | URL prefix (`/t/<slug>/...`) |
-| 3 | Custom domains | URL prefix only at v1; CNAME deferred to v2 |
+| 3 | Custom domains | URL prefix only, forever (DROPPED — no CNAME plan) |
 | 4 | Platform shape | Hybrid — generic spine + per-game adapters |
 | 5 | Stack auth | Clerk (orgs + roles + invites + switcher) |
 | 6 | Stack DB/storage/realtime | Supabase |
@@ -1209,7 +1209,7 @@ Organizer wizard: "I have 16 teams, 1 day, EAFC". Claude returns ranked recommen
 - `/t/[slug]/tournaments` — list (filters: game, status, format)
 - `/t/[slug]/tournaments/[id]` — tournament detail (overview, bracket, schedule, standings, settings tabs)
 - `/t/[slug]/tournaments/[id]/bracket` — full-page bracket viz
-- `/t/[slug]/tournaments/[id]/matches/[matchId]` — match detail (per-game stat entry, OCR, sim, dispute, VOD)
+- `/t/[slug]/tournaments/[id]/matches/[matchId]` — match detail (per-game stat entry, OCR, sim, dispute)
 - `/t/[slug]/standings` — overall standings + per-tournament views
 - `/t/[slug]/standings/matchday/[n]` — per-MD standings (ESOCCER port)
 - `/t/[slug]/players` — player list
@@ -1361,7 +1361,6 @@ Match-day view (`/admin/[slug]/match-days/[id]`) for tenants using MD windows:
 - Live tab: if `status='live'`, embed BroadcastChannel/Realtime score updates
 - Stats tab: per-game stats (per `MatchEntryForm` adapter)
 - Dispute tab: open dispute filings (when dispute system enabled)
-- VOD tab: deferred to v2
 - Comments tab: removed (no in-app chat)
 
 `/admin/[slug]/matches/[id]` — admin view:
@@ -1411,7 +1410,7 @@ PSD upload + Photopea iframe = env-gated until verified. Sequence mode = env-gat
 - Tournament history: scrollable list with W/L per event, finishing position, prize earned
 - Form chart: last 10 matches with W/L/D
 - Achievements grid (deferred to v2 as nice-to-have)
-- Action buttons: "Compare to..." (cross-tournament), "Watch matches" (link to VOD when shipped)
+- Action buttons: "Compare to..." (cross-tournament)
 
 ### 11.9 Notifications
 
@@ -1585,9 +1584,9 @@ Generic partner kind `'wager'`. Same webhook + REST + GraphQL. Additional event 
 - Install prompt: trigger after 3 page views on tenant pages
 - Push: opt-in via permission flow; VAPID keys in env; `push_subscriptions` table stores
 
-### 14.3 Capacitor wrap (v2 candidate, NOT in v1 scope)
+### 14.3 Capacitor wrap (deferred — NOT in v1 scope, no committed v2)
 
-Reserved for future. PWA covers immediate need.
+Deferred. PWA covers immediate need. Revisit only if PWA limits hit (background tasks, deep OS integration, native APIs).
 
 ---
 
@@ -1806,18 +1805,24 @@ memory/lessons/                                       ← all 13 BRGAMES lessons
 
 ---
 
-## 23. Open Questions (deferred)
+## 23. Out-of-Scope + Deferred
 
-These are deliberately not locked at brainstorm. Resolve during corresponding phase.
+### 23.1 Dropped (NOT building — confirmed 2026-05-25)
 
-1. **VOD library** — defer to v2; reconsider if tenants demand it after first 3 events.
-2. **Custom domains per tenant** — defer to v2; needs Vercel Pro + DNS automation.
-3. **Companion mobile app (Capacitor)** — defer to v3; PWA covers v1.
-4. **Spectator reactions / live emoji overlay** — defer; non-critical.
-5. **Tournament check-in granularity** — locked as per-tenant toggle but per-tournament tuning may be needed; revisit in phase 3.
-6. **Game adapter SDK public publishing** — defer; internal pattern at v1.
-7. **Plugin marketplace** — defer to v3.
-8. **eSports federation compliance / KYC** — defer until first regulated tournament.
+1. **VOD library** — DROPPED. No post-match video archive.
+2. **Custom domains per tenant** — DROPPED. URL prefix (`/t/<slug>`) is canonical forever.
+
+### 23.2 Deferred (revisit later — NOT v1 scope)
+
+1. **Companion mobile app (Capacitor wrap)** — deferred. PWA covers v1 mobile need; revisit only when PWA limits hit.
+2. **Spectator reactions / live emoji overlay** — deferred; non-critical.
+3. **Game adapter SDK public publishing** — deferred; internal pattern at v1.
+4. **Plugin marketplace** — deferred to v3.
+5. **eSports federation compliance / KYC** — deferred until first regulated tournament demands.
+
+### 23.3 Resolved-during-phase (locked but tunable per implementation)
+
+1. **Tournament check-in granularity** — locked as per-tenant toggle; per-tournament tuning may be added during phase 3 if real-world need surfaces.
 
 ---
 
