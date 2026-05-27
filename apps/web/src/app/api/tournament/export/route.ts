@@ -6,16 +6,25 @@ import { getActiveSeason } from "@/server/seasons";
 import { generateLeaderboardXLSX } from "@/server/exports/leaderboard_xlsx";
 import { generateLeaderboardDOCX } from "@/server/exports/leaderboard_docx";
 import { generateMetricsXLSX } from "@/server/exports/metrics_xlsx";
+import {
+  generateBundleJSON,
+  generateBundleXLSX,
+} from "@/server/exports/bundle";
 
 /**
- * Plan 51 — GET /api/tournament/export?type=leaderboard|metrics&format=xlsx|docx
+ * GET /api/tournament/export?type=leaderboard|metrics|bundle&format=xlsx|docx|json
  *
- * Streams a binary buffer (xlsx or docx) of the active season's standings
- * (or full multi-sheet metrics workbook). Gated behind `tournament.export`
- * — admin / loc / idc / technical roles.
+ * Streams a binary (xlsx/docx) or JSON buffer of the active season's data.
+ * Gated behind `tournament.export` — admin / loc / idc / technical roles.
  *
- * `type=metrics` is XLSX-only (multi-sheet workbook). `format=docx` is only
- * valid with `type=leaderboard`. Disallowed combinations 400.
+ * Allowed combinations:
+ *   - leaderboard + xlsx | docx
+ *   - metrics + xlsx
+ *   - bundle + xlsx | json   ← full tournament dump (organizer, sponsors,
+ *                                match days, matchups, standings, walkovers,
+ *                                disciplinary)
+ *
+ * Any other combo returns 400.
  */
 
 export const dynamic = "force-dynamic";
@@ -24,27 +33,40 @@ const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const JSON_MIME = "application/json";
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const type = (sp.get("type") ?? "leaderboard").toLowerCase();
   const format = (sp.get("format") ?? "xlsx").toLowerCase();
 
-  if (type !== "leaderboard" && type !== "metrics") {
+  if (type !== "leaderboard" && type !== "metrics" && type !== "bundle") {
     return NextResponse.json(
-      { error: "type must be leaderboard or metrics" },
+      { error: "type must be leaderboard, metrics, or bundle" },
       { status: 400 },
     );
   }
-  if (format !== "xlsx" && format !== "docx") {
+  if (format !== "xlsx" && format !== "docx" && format !== "json") {
     return NextResponse.json(
-      { error: "format must be xlsx or docx" },
+      { error: "format must be xlsx, docx, or json" },
       { status: 400 },
     );
   }
   if (type === "metrics" && format !== "xlsx") {
     return NextResponse.json(
       { error: "metrics export is only available as xlsx" },
+      { status: 400 },
+    );
+  }
+  if (type === "leaderboard" && format === "json") {
+    return NextResponse.json(
+      { error: "leaderboard export does not support json — use bundle" },
+      { status: 400 },
+    );
+  }
+  if (type === "bundle" && format === "docx") {
+    return NextResponse.json(
+      { error: "bundle export does not support docx — use xlsx or json" },
       { status: 400 },
     );
   }
@@ -95,10 +117,19 @@ export async function GET(req: NextRequest) {
       buf = await generateLeaderboardDOCX(season.id, svc);
       mime = DOCX_MIME;
       ext = "docx";
-    } else {
+    } else if (type === "metrics") {
       buf = await generateMetricsXLSX(season.id, svc);
       mime = XLSX_MIME;
       ext = "xlsx";
+    } else if (type === "bundle" && format === "xlsx") {
+      buf = await generateBundleXLSX(season.id, svc);
+      mime = XLSX_MIME;
+      ext = "xlsx";
+    } else {
+      // bundle + json
+      buf = await generateBundleJSON(season.id, svc);
+      mime = JSON_MIME;
+      ext = "json";
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "export failed";

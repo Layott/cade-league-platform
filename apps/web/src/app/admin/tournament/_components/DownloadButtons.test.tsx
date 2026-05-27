@@ -40,6 +40,34 @@ describe("DownloadButtons", () => {
     expect(screen.getByTestId("download-leaderboard-xlsx")).toBeTruthy();
     expect(screen.getByTestId("download-leaderboard-docx")).toBeTruthy();
     expect(screen.getByTestId("download-metrics-xlsx")).toBeTruthy();
+    expect(screen.getByTestId("download-bundle-xlsx")).toBeTruthy();
+    expect(screen.getByTestId("download-bundle-json")).toBeTruthy();
+  });
+
+  it("hits bundle endpoint with type=bundle&format=json", async () => {
+    const fetchSpy = mockFetchOk();
+    vi.stubGlobal("fetch", fetchSpy);
+    render(<DownloadButtons variants={["bundle-json"]} />);
+    fireEvent.click(screen.getByTestId("download-bundle-json"));
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/tournament/export?type=bundle&format=json",
+        expect.any(Object),
+      ),
+    );
+  });
+
+  it("hits bundle endpoint with type=bundle&format=xlsx", async () => {
+    const fetchSpy = mockFetchOk();
+    vi.stubGlobal("fetch", fetchSpy);
+    render(<DownloadButtons variants={["bundle-xlsx"]} />);
+    fireEvent.click(screen.getByTestId("download-bundle-xlsx"));
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/tournament/export?type=bundle&format=xlsx",
+        expect.any(Object),
+      ),
+    );
   });
 
   it("renders only the requested variants", () => {

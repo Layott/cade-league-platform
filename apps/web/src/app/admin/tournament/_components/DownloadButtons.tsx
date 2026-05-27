@@ -12,11 +12,21 @@ import { SecondaryButton } from "@/components/admin/buttons";
  * to Supabase + xlsx serialization warrants a feedback nub).
  */
 
-type DownloadType = "leaderboard-xlsx" | "leaderboard-docx" | "metrics-xlsx";
+type DownloadType =
+  | "leaderboard-xlsx"
+  | "leaderboard-docx"
+  | "metrics-xlsx"
+  | "bundle-xlsx"
+  | "bundle-json";
 
 const VARIANTS: Record<
   DownloadType,
-  { type: "leaderboard" | "metrics"; format: "xlsx" | "docx"; label: string; ext: string }
+  {
+    type: "leaderboard" | "metrics" | "bundle";
+    format: "xlsx" | "docx" | "json";
+    label: string;
+    ext: string;
+  }
 > = {
   "leaderboard-xlsx": {
     type: "leaderboard",
@@ -36,10 +46,28 @@ const VARIANTS: Record<
     label: "Metrics workbook",
     ext: "xlsx",
   },
+  "bundle-xlsx": {
+    type: "bundle",
+    format: "xlsx",
+    label: "Full bundle XLSX",
+    ext: "xlsx",
+  },
+  "bundle-json": {
+    type: "bundle",
+    format: "json",
+    label: "Full bundle JSON",
+    ext: "json",
+  },
 };
 
 export function DownloadButtons({
-  variants = ["leaderboard-xlsx", "leaderboard-docx", "metrics-xlsx"],
+  variants = [
+    "leaderboard-xlsx",
+    "leaderboard-docx",
+    "metrics-xlsx",
+    "bundle-xlsx",
+    "bundle-json",
+  ],
 }: {
   variants?: DownloadType[];
 }) {
